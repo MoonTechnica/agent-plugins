@@ -57,6 +57,8 @@
 **記憶で書かない。** ここに挙げた文書と Skill に無い API・グローバル変数・外部 URL は存在しない。
 書いても静的検証（取り込み時）と実行時の CSP が落とすので、作り直しになる。
 
+開始画面を作る/変更する時は `$game-ux` references/start-screen.md を読み、ジャンルと初回/再訪に合う入口を選ぶ。
+構図は `$game-screen-layout` §5 と `$game-art-direction` §6.1、入力の解禁と開始の分離は `$game-controls` §3。
 代表場面を実装/変更したら `$game-playtest` references/visual-observation.md の制作中の目的付き試遊で
 実行→画像観察→局所修正→同条件で再確認する。コンセプトは利用者と方向を共有する資料として維持し、実画面の証拠と分ける。
 

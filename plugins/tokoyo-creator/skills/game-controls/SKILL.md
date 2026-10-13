@@ -144,8 +144,9 @@ description: ゲームの操作を PC（キーボード・マウス）とスマ�
 
 ## 3. 開始画面（最初のタップ / クリック / キー）
 
-最初の画面は**そのゲームの画面そのもの**にする（説明のページを作らない）。タイトルと 1〜2 行の操作説明と
-「タップ / クリック / キーでスタート」を重ね、**最初の操作でゲームを始める**。
+画面の構図は `$game-screen-layout` §5、開始/再開/任意設定は `$game-ux` references/start-screen.md。
+**最初の操作によるフォーカス/音の解禁と、選んだ項目の決定を分ける**。
+設定/ミュート/操作ガイドの操作でゲームを開始しない。準備済みの短時間ゲームは開始の決定1回で遊べるようにする。
 
 これは飾りではなく必要な処理:
 
@@ -163,15 +164,17 @@ description: ゲームの操作を PC（キーボード・マウス）とスマ�
 ```ts
 const audio = new AudioContext()                // 作った時点では止まっている（suspended）
 input.onFirstInteraction(() => {
-  void audio.resume()                           // ここで呼ぶ（await の後では遅いブラウザがある）
+  // ここで呼ぶ（await の後では遅いブラウザがある）。失敗しても無音で遊べるようにする。
+  void audio.resume().catch((error) => console.warn('audio resume failed', error))
 })
 input.setControlsVisible(false)                 // タイトル中は操作部を隠す
-input.firstInteraction.then(() => {             // タップ / クリック / キーのどれか
-  input.setControlsVisible(true)
-  startGame()
-})
+// 開始は主ボタン/選択中の項目の決定側で処理する。
+// firstInteraction や onFirstInteraction から無条件に startGame() を呼ばない。
 ```
 
+- 主ボタンのクリック/タップと `input.onAction` の決定は同じ開始処理に集める。
+  画面状態と選択先が開始可能な時だけ開始し、設定画面やガイド表示中の入力はその画面が扱う。
+  `input.setControlsVisible(true)` はプレイへ移る時に呼ぶ。開始操作の押しっぱなしを本編へ誤転送しない。
 - `AudioContext` は 1 つだけ作り、効果音も BGM もそれで鳴らす。
 - 画面の上端に**ミュートのボタン**を置く（44px 以上。スマホは音を出せない場所で遊ばれる）。
 
