@@ -6,6 +6,7 @@ description: 広い世界を局所的に読み込み、解放して長く遊べ�
 # オープンワールド・長時間探索
 
 RPGの進行は `$game-design` references/rpg.md。SDK APIの正本は `<kit>/sdk/app-sdk/spec.md`。
+地域の役割・接続・配置・生成候補の選定は `$game-level-design`。このSkillは採用した世界の読み込み・活動範囲・保存を扱う。
 エンジンAPIは同梱版の型/公式Skill。存在しないThree.js APIをBabylon/Phaserへ持ち込まない。
 世界規模・活動NPC・生成・描画方式を決める段階で `$game-design` references/performance-risk.md を読み、
 懸念を先に伝え、代表的な地域の最小試作を実描画して比較する。広げてから負荷を調べない。
@@ -13,6 +14,8 @@ RPGの進行は `$game-design` references/rpg.md。SDK APIの正本は `<kit>/sd
 ## 1. 世界と活動範囲
 
 作者設計の地域データ/tilemap/GLB、seed生成、両者の組み合わせを使える。総面積ではなく現在の負荷を限定する。
+部屋/場所を切り替える世界も使える。切替方式と実世界/マップメニューの対応は `$game-level-design`
+references/transitions-and-map.md。地域/部屋・bundle・chunkを同じ単位と決めつけず、小さい場所切替へ半径式の管理を強制しない。
 
 - 地形はチャンクへ分割する。32mや32–64tileは初期候補であり保証値ではない。
 - 読み込み半径r、保持半径r+1、描画、physics、AI、骨格animationの範囲を別に決める。

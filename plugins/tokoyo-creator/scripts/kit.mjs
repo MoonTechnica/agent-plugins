@@ -168,8 +168,8 @@ var require_common = __commonJS((exports, module) => {
     createDebug.enabled = enabled;
     createDebug.humanize = require_ms();
     createDebug.destroy = destroy;
-    Object.keys(env).forEach((key) => {
-      createDebug[key] = env[key];
+    Object.keys(env).forEach((key2) => {
+      createDebug[key2] = env[key2];
     });
     createDebug.names = [];
     createDebug.skips = [];
@@ -696,13 +696,13 @@ var require_node = __commonJS((exports, module) => {
       ];
     }
   } catch (error51) {}
-  exports.inspectOpts = Object.keys(process.env).filter((key) => {
-    return /^debug_/i.test(key);
-  }).reduce((obj, key) => {
-    const prop = key.substring(6).toLowerCase().replace(/_([a-z])/g, (_, k) => {
+  exports.inspectOpts = Object.keys(process.env).filter((key2) => {
+    return /^debug_/i.test(key2);
+  }).reduce((obj, key2) => {
+    const prop = key2.substring(6).toLowerCase().replace(/_([a-z])/g, (_, k) => {
       return k.toUpperCase();
     });
-    let val = process.env[key];
+    let val = process.env[key2];
     if (/^(yes|on|true|enabled)$/i.test(val)) {
       val = true;
     } else if (/^(no|off|false|disabled)$/i.test(val)) {
@@ -2457,9 +2457,9 @@ var init_APEv2Parser = __esm(() => {
       this.ape = {};
     }
     static calculateDuration(ah) {
-      let duration3 = ah.totalFrames > 1 ? ah.blocksPerFrame * (ah.totalFrames - 1) : 0;
-      duration3 += ah.finalFrameBlocks;
-      return duration3 / ah.sampleRate;
+      let duration4 = ah.totalFrames > 1 ? ah.blocksPerFrame * (ah.totalFrames - 1) : 0;
+      duration4 += ah.finalFrameBlocks;
+      return duration4 / ah.sampleRate;
     }
     static async findApeFooterOffset(tokenizer, offset) {
       const apeBuf = new Uint8Array(TagFooter.len);
@@ -2544,9 +2544,9 @@ var init_APEv2Parser = __esm(() => {
         if (zero === -1) {
           throw new ApeContentError("Unterminated tag item key");
         }
-        const key = await this.tokenizer.readToken(new StringType(zero, "ascii"));
+        const key2 = await this.tokenizer.readToken(new StringType(zero, "ascii"));
         await this.tokenizer.ignore(1);
-        bytesRemaining -= key.length + 1;
+        bytesRemaining -= key2.length + 1;
         if (this.tokenizer.fileInfo.size !== undefined && tagItemHeader.size > this.tokenizer.fileInfo.size - this.tokenizer.position) {
           throw new ApeContentError(`Invalid tag item size: ${tagItemHeader.size}`);
         }
@@ -2555,7 +2555,7 @@ var init_APEv2Parser = __esm(() => {
           case DataType.text_utf8: {
             const value = textDecode(await this.readTagValue(tagItemHeader.size), "utf-8");
             const values = value.split(/\x00/g);
-            await Promise.all(values.map((val) => this.metadata.addTag(tagFormat, key, val)));
+            await Promise.all(values.map((val) => this.metadata.addTag(tagFormat, key2, val)));
             break;
           }
           case DataType.binary:
@@ -2566,19 +2566,19 @@ var init_APEv2Parser = __esm(() => {
               zero = findZero(picData);
               const description = textDecode(picData.subarray(0, zero), "utf-8");
               const data = picData.subarray(zero + 1);
-              await this.metadata.addTag(tagFormat, key, {
+              await this.metadata.addTag(tagFormat, key2, {
                 description,
                 data
               });
             }
             break;
           case DataType.external_info:
-            debug(`Ignore external info ${key}`);
+            debug(`Ignore external info ${key2}`);
             await this.tokenizer.ignore(tagItemHeader.size);
             break;
           case DataType.reserved:
-            debug(`Ignore external info ${key}`);
-            this.metadata.addWarning(`APEv2 header declares a reserved datatype for "${key}"`);
+            debug(`Ignore external info ${key2}`);
+            this.metadata.addWarning(`APEv2 header declares a reserved datatype for "${key2}"`);
             await this.tokenizer.ignore(tagItemHeader.size);
             break;
         }
@@ -2995,7 +2995,7 @@ var require_dist = __commonJS((exports) => {
             continue parameter;
           if (code === EQ) {
             const keyEnd = trailingOWS(header, keyStart, index);
-            const key = header.slice(keyStart, keyEnd).toLowerCase();
+            const key2 = header.slice(keyStart, keyEnd).toLowerCase();
             index = skipOWS(header, index + 1, len);
             if (index < len && header.charCodeAt(index) === DQUOTE) {
               index++;
@@ -3004,8 +3004,8 @@ var require_dist = __commonJS((exports) => {
                 const code2 = header.charCodeAt(index++);
                 if (code2 === DQUOTE) {
                   index = skipValue(header, index, len, stopChar);
-                  if (parameters[key] === undefined)
-                    parameters[key] = value;
+                  if (parameters[key2] === undefined)
+                    parameters[key2] = value;
                   break;
                 }
                 if (code2 === BSLASH && index < len) {
@@ -3018,9 +3018,9 @@ var require_dist = __commonJS((exports) => {
             }
             const valueStart = index;
             index = skipValue(header, index, len, stopChar);
-            if (parameters[key] === undefined) {
+            if (parameters[key2] === undefined) {
               const valueEnd = trailingOWS(header, valueStart, index);
-              parameters[key] = header.slice(valueStart, valueEnd);
+              parameters[key2] = header.slice(valueStart, valueEnd);
             }
             continue parameter;
           }
@@ -6115,9 +6115,9 @@ var init_MatroskaParser = __esm(() => {
                 const info = value;
                 const timecodeScale = info.timecodeScale ? info.timecodeScale : 1e6;
                 if (typeof info.duration === "number") {
-                  const duration3 = info.duration * timecodeScale / 1e9;
+                  const duration4 = info.duration * timecodeScale / 1e9;
                   await this.addTag("segment:title", info.title);
-                  this.metadata.setFormat("duration", Number(duration3));
+                  this.metadata.setFormat("duration", Number(duration4));
                 }
               }
               break;
@@ -7774,9 +7774,9 @@ var init_MpegParser = __esm(() => {
               const numberOfSamples = this.frameCount * this.samplesPerFrame;
               this.metadata.setFormat("numberOfSamples", numberOfSamples);
               if (this.metadata.format.sampleRate) {
-                const duration3 = numberOfSamples / this.metadata.format.sampleRate;
-                debug18(`Calculate duration at EOF: ${duration3} sec.`, duration3);
-                this.metadata.setFormat("duration", duration3);
+                const duration4 = numberOfSamples / this.metadata.format.sampleRate;
+                debug18(`Calculate duration at EOF: ${duration4} sec.`, duration4);
+                this.metadata.setFormat("duration", duration4);
               }
             }
           }
@@ -7801,9 +7801,9 @@ var init_MpegParser = __esm(() => {
             const numberOfSamples = Math.round(mpegSize / this.frame_size) * this.samplesPerFrame;
             this.metadata.setFormat("numberOfSamples", numberOfSamples);
             if (format.sampleRate && !format.duration) {
-              const duration3 = numberOfSamples / format.sampleRate;
-              debug18("Calculate CBR duration based on file size: %s", duration3);
-              this.metadata.setFormat("duration", duration3);
+              const duration4 = numberOfSamples / format.sampleRate;
+              debug18("Calculate CBR duration based on file size: %s", duration4);
+              this.metadata.setFormat("duration", duration4);
             }
           }
         }
@@ -8019,8 +8019,8 @@ var init_MpegParser = __esm(() => {
         }
       }
       if (infoTag.streamSize && this.audioFrameHeader && infoTag.numFrames !== null) {
-        const duration3 = this.audioFrameHeader.calcDuration(infoTag.numFrames);
-        this.metadata.setFormat("duration", duration3);
+        const duration4 = this.audioFrameHeader.calcDuration(infoTag.numFrames);
+        this.metadata.setFormat("duration", duration4);
         debug18("Get duration from Xing header: %s", this.metadata.format.duration);
         return infoTag;
       }
@@ -8194,10 +8194,10 @@ class StreamReader2 {
     this._tokenizer = _tokenizer;
   }
   async readPacketHeader() {
-    const key = await this.tokenizer.readToken(PacketKey);
+    const key2 = await this.tokenizer.readToken(PacketKey);
     const size = await this.readVariableSizeField();
     return {
-      key,
+      key: key2,
       payloadLength: size.value - 2 - size.len
     };
   }
@@ -9054,8 +9054,8 @@ var init_WaveParser = __esm(() => {
           }
           case "bext": {
             const bext = await this.tokenizer.readToken(BroadcastAudioExtensionChunk);
-            for (const key of Object.keys(bext)) {
-              await this.metadata.addTag("exif", `bext.${key}`, bext[key]);
+            for (const key2 of Object.keys(bext)) {
+              await this.metadata.addTag("exif", `bext.${key2}`, bext[key2]);
             }
             const bextRemaining = header.chunkSize - BroadcastAudioExtensionChunk.len;
             await this.tokenizer.ignore(bextRemaining);
@@ -25165,6 +25165,57 @@ function buildArtifactIndex(files, input) {
     }))
   });
 }
+// frontend/packages/app-validator/src/observation.ts
+var key = exports_external.string().trim().min(1).max(64);
+var duration3 = exports_external.number().int().min(0).max(30000);
+var point = { x: exports_external.number().finite().min(0), y: exports_external.number().finite().min(0) };
+var stepSchema = exports_external.discriminatedUnion("type", [
+  exports_external.object({ type: exports_external.literal("press"), key }).strict(),
+  exports_external.object({ type: exports_external.literal("hold"), keys: exports_external.array(key).min(1).max(8), ms: duration3 }).strict(),
+  exports_external.object({ type: exports_external.literal("click"), ...point }).strict(),
+  exports_external.object({ type: exports_external.literal("tap"), ...point }).strict(),
+  exports_external.object({ type: exports_external.literal("wait"), ms: duration3 }).strict(),
+  exports_external.object({ type: exports_external.literal("capture"), name: exports_external.string().regex(/^[a-z0-9][a-z0-9-]{0,63}$/) }).strict()
+]);
+var observationPlanSchema = exports_external.object({
+  purpose: exports_external.string().trim().min(1).max(1000),
+  viewport: exports_external.object({
+    width: exports_external.number().int().min(240).max(1920),
+    height: exports_external.number().int().min(240).max(1920)
+  }).strict(),
+  inputMode: exports_external.enum(["touch", "keyboard-pointer"]).default("keyboard-pointer"),
+  steps: exports_external.array(stepSchema).min(1).max(64)
+}).strict().superRefine((plan, ctx) => {
+  let scheduledMs = 0;
+  const captures = new Set;
+  for (const [index, step] of plan.steps.entries()) {
+    const issue2 = (message) => ctx.addIssue({ code: "custom", path: ["steps", index], message });
+    if (step.type === "wait" || step.type === "hold")
+      scheduledMs += step.ms;
+    if (step.type === "click" || step.type === "tap") {
+      if (step.x >= plan.viewport.width || step.y >= plan.viewport.height)
+        issue2("Coordinates must be inside the viewport");
+    }
+    if (step.type === "tap" && plan.inputMode !== "touch")
+      issue2("Tap requires touch input mode");
+    if (step.type === "hold" && new Set(step.keys).size !== step.keys.length)
+      issue2("Held keys must be unique");
+    if (step.type === "capture") {
+      if (captures.has(step.name))
+        issue2("Capture names must be unique");
+      captures.add(step.name);
+    }
+  }
+  if (scheduledMs > 30000)
+    ctx.addIssue({
+      code: "custom",
+      path: ["steps"],
+      message: "Scheduled waits and holds must total at most 30 seconds"
+    });
+  if (captures.size < 1 || captures.size > 6)
+    ctx.addIssue({ code: "custom", path: ["steps"], message: "Include between 1 and 6 captures" });
+});
+
 // frontend/packages/app-validator/src/playtest-video.ts
 import { execFile } from "node:child_process";
 import { promisify } from "node:util";
@@ -25509,8 +25560,8 @@ var EventDispatcher = class {
     return this;
   }
   dispose() {
-    for (const key in this._listeners)
-      delete this._listeners[key];
+    for (const key2 in this._listeners)
+      delete this._listeners[key2];
   }
 };
 var GraphEdge = class {
@@ -25677,14 +25728,14 @@ var RefMap = class {
     if (map2)
       Object.assign(this.map, map2);
   }
-  set(key, child) {
-    this.map[key] = child;
+  set(key2, child) {
+    this.map[key2] = child;
   }
-  delete(key) {
-    delete this.map[key];
+  delete(key2) {
+    delete this.map[key2];
   }
-  get(key) {
-    return this.map[key] || null;
+  get(key2) {
+    return this.map[key2] || null;
   }
   keys() {
     return Object.keys(this.map);
@@ -25712,14 +25763,14 @@ var GraphNode = class GraphNode2 extends EventDispatcher {
   _createAttributes() {
     const defaultAttributes = this.getDefaults();
     const attributes = {};
-    for (const key in defaultAttributes) {
-      const value = defaultAttributes[key];
+    for (const key2 in defaultAttributes) {
+      const value = defaultAttributes[key2];
       if (value instanceof GraphNode2) {
-        const ref = this.graph._createEdge(key, this, value);
-        this[$immutableKeys].add(key);
-        attributes[key] = ref;
+        const ref = this.graph._createEdge(key2, this, value);
+        this[$immutableKeys].add(key2);
+        attributes[key2] = ref;
       } else
-        attributes[key] = value;
+        attributes[key2] = value;
     }
     return attributes;
   }
@@ -25762,10 +25813,10 @@ var GraphNode = class GraphNode2 extends EventDispatcher {
           this.addRef(attribute, nextValue, refAttributes);
         }
       } else if (value instanceof RefMap)
-        for (const key of value.keys()) {
-          const ref = value.get(key);
+        for (const key2 of value.keys()) {
+          const ref = value.get(key2);
           if (ref.getChild() === prevValue)
-            this.setRefMap(attribute, key, nextValue, ref.getAttributes());
+            this.setRefMap(attribute, key2, nextValue, ref.getAttributes());
         }
     }
     return this;
@@ -25834,27 +25885,27 @@ var GraphNode = class GraphNode2 extends EventDispatcher {
   listRefMapValues(attribute) {
     return this.assertRefMap(attribute).values().map((ref) => ref.getChild());
   }
-  getRefMap(attribute, key) {
-    const ref = this.assertRefMap(attribute).get(key);
+  getRefMap(attribute, key2) {
+    const ref = this.assertRefMap(attribute).get(key2);
     return ref ? ref.getChild() : null;
   }
-  setRefMap(attribute, key, value, metadata) {
+  setRefMap(attribute, key2, value, metadata) {
     const refMap = this.assertRefMap(attribute);
-    const prevRef = refMap.get(key);
+    const prevRef = refMap.get(key2);
     if (prevRef)
       prevRef.dispose();
     if (!value)
       return this;
-    metadata = Object.assign(metadata || {}, { key });
+    metadata = Object.assign(metadata || {}, { key: key2 });
     const ref = this.graph._createEdge(attribute, this, value, {
       ...metadata,
-      key
+      key: key2
     });
-    refMap.set(key, ref);
+    refMap.set(key2, ref);
     return this.dispatchEvent({
       type: "change",
       attribute,
-      key
+      key: key2
     });
   }
   assertRefMap(attribute) {
@@ -25887,9 +25938,9 @@ var GraphNode = class GraphNode2 extends EventDispatcher {
       this[$attributes][attribute].remove(ref);
     else if (this[$attributes][attribute] instanceof RefMap) {
       const refMap = this[$attributes][attribute];
-      for (const key of refMap.keys())
-        if (refMap.get(key) === ref)
-          refMap.delete(key);
+      for (const key2 of refMap.keys())
+        if (refMap.get(key2) === ref)
+          refMap.delete(key2);
     } else
       return;
     this.graph._destroyEdge(ref);
@@ -26228,10 +26279,10 @@ function getMeshBounds(mesh, worldMatrix) {
   }
   return meshBounds;
 }
-function expandBounds(point, target) {
+function expandBounds(point2, target) {
   for (let i = 0;i < 3; i++) {
-    target.min[i] = Math.min(point[i], target.min[i]);
-    target.max[i] = Math.max(point[i], target.max[i]);
+    target.min[i] = Math.min(point2[i], target.min[i]);
+    target.max[i] = Math.max(point2[i], target.max[i]);
   }
 }
 function createBounds() {
@@ -26595,9 +26646,9 @@ function equalsRefMap(refMapA, refMapB) {
   const keysB = refMapB.keys();
   if (keysA.length !== keysB.length)
     return false;
-  for (const key of keysA) {
-    const refA = refMapA.get(key);
-    const refB = refMapB.get(key);
+  for (const key2 of keysA) {
+    const refA = refMapA.get(key2);
+    const refB = refMapB.get(key2);
     if (!!refA !== !!refB)
       return false;
     const a = refA.getChild();
@@ -26632,16 +26683,16 @@ function equalsObject(_a3, _b) {
   const b = _b;
   let numKeysA = 0;
   let numKeysB = 0;
-  let key;
-  for (key in a)
+  let key2;
+  for (key2 in a)
     numKeysA++;
-  for (key in b)
+  for (key2 in b)
     numKeysB++;
   if (numKeysA !== numKeysB)
     return false;
-  for (key in a) {
-    const valueA = a[key];
-    const valueB = b[key];
+  for (key2 in a) {
+    const valueA = a[key2];
+    const valueB = b[key2];
     if (isArray(valueA) && isArray(valueB)) {
       if (!equalsArray(valueA, valueB))
         return false;
@@ -26716,10 +26767,10 @@ var Property = class extends GraphNode {
     return new PropertyClass(this.graph).copy(this, COPY_IDENTITY);
   }
   copy(other, resolve = COPY_IDENTITY) {
-    for (const key in this[$attributes]) {
-      const value = this[$attributes][key];
+    for (const key2 in this[$attributes]) {
+      const value = this[$attributes][key2];
       if (value instanceof GraphEdge) {
-        if (!this[$immutableKeys].has(key))
+        if (!this[$immutableKeys].has(key2))
           value.dispose();
       } else if (value instanceof RefList || value instanceof RefSet)
         for (const ref of value.values())
@@ -26728,28 +26779,28 @@ var Property = class extends GraphNode {
         for (const ref of value.values())
           ref.dispose();
     }
-    for (const key in other[$attributes]) {
-      const thisValue = this[$attributes][key];
-      const otherValue = other[$attributes][key];
+    for (const key2 in other[$attributes]) {
+      const thisValue = this[$attributes][key2];
+      const otherValue = other[$attributes][key2];
       if (otherValue instanceof GraphEdge)
-        if (this[$immutableKeys].has(key))
+        if (this[$immutableKeys].has(key2))
           thisValue.getChild().copy(resolve(otherValue.getChild()), resolve);
         else
-          this.setRef(key, resolve(otherValue.getChild()), otherValue.getAttributes());
+          this.setRef(key2, resolve(otherValue.getChild()), otherValue.getAttributes());
       else if (otherValue instanceof RefSet || otherValue instanceof RefList)
         for (const ref of otherValue.values())
-          this.addRef(key, resolve(ref.getChild()), ref.getAttributes());
+          this.addRef(key2, resolve(ref.getChild()), ref.getAttributes());
       else if (otherValue instanceof RefMap)
         for (const subkey of otherValue.keys()) {
           const ref = otherValue.get(subkey);
-          this.setRefMap(key, subkey, resolve(ref.getChild()), ref.getAttributes());
+          this.setRefMap(key2, subkey, resolve(ref.getChild()), ref.getAttributes());
         }
       else if (isPlainObject2(otherValue))
-        this[$attributes][key] = JSON.parse(JSON.stringify(otherValue));
+        this[$attributes][key2] = JSON.parse(JSON.stringify(otherValue));
       else if (Array.isArray(otherValue) || otherValue instanceof ArrayBuffer || ArrayBuffer.isView(otherValue))
-        this[$attributes][key] = otherValue.slice();
+        this[$attributes][key2] = otherValue.slice();
       else
-        this[$attributes][key] = otherValue;
+        this[$attributes][key2] = otherValue;
     }
     return this;
   }
@@ -26758,11 +26809,11 @@ var Property = class extends GraphNode {
       return true;
     if (this.propertyType !== other.propertyType)
       return false;
-    for (const key in this[$attributes]) {
-      if (skip.has(key))
+    for (const key2 in this[$attributes]) {
+      if (skip.has(key2))
         continue;
-      const a = this[$attributes][key];
-      const b = other[$attributes][key];
+      const a = this[$attributes][key2];
+      const b = other[$attributes][key2];
       if (a instanceof GraphEdge || b instanceof GraphEdge) {
         if (!equalsRef(a, b))
           return false;
@@ -28189,8 +28240,8 @@ var GLTFReader = class {
         const unsupportedHooks = extension.prereadTypes.filter((type) => !SUPPORTED_PREREAD_TYPES.has(type));
         if (unsupportedHooks.length)
           options.logger.warn(`Preread hooks for some types (${unsupportedHooks.join()}), requested by extension ${extension.extensionName}, are unsupported. Please file an issue or a PR.`);
-        for (const key of extension.readDependencies)
-          extension.install(key, options.dependencies[key]);
+        for (const key2 of extension.readDependencies)
+          extension.install(key2, options.dependencies[key2]);
       }
     const bufferDefs = json2.buffers || [];
     document2.getRoot().listExtensionsUsed().filter((extension) => extension.prereadTypes.includes("Buffer")).forEach((extension) => extension.preread(context, "Buffer"));
@@ -28780,8 +28831,8 @@ var GLTFWriter = class {
       const unsupportedHooks = extension.prewriteTypes.filter((type) => !SUPPORTED_PREWRITE_TYPES.has(type));
       if (unsupportedHooks.length)
         logger.warn(`Prewrite hooks for some types (${unsupportedHooks.join()}), requested by extension ${extension.extensionName}, are unsupported. Please file an issue or a PR.`);
-      for (const key of extension.writeDependencies)
-        extension.install(key, options.dependencies[key]);
+      for (const key2 of extension.writeDependencies)
+        extension.install(key2, options.dependencies[key2]);
     }
     function concatAccessors(accessors, bufferIndex, bufferByteOffset, bufferViewTarget) {
       const buffers = [];
@@ -29025,16 +29076,16 @@ var GLTFWriter = class {
         if (context.accessorIndexMap.has(accessor))
           continue;
         const usage = context.getAccessorUsage(accessor);
-        let key = usage;
+        let key2 = usage;
         if (groupByParent.has(usage)) {
           const parent = context.accessorParents.get(accessor);
-          key += `:${parentToIndex.get(parent)}`;
+          key2 += `:${parentToIndex.get(parent)}`;
         }
-        accessorGroups[key] ||= {
+        accessorGroups[key2] ||= {
           usage,
           accessors: []
         };
-        accessorGroups[key].accessors.push(accessor);
+        accessorGroups[key2].accessors.push(accessor);
       }
       const buffers = [];
       const bufferIndex = json2.buffers.length;
@@ -29320,17 +29371,17 @@ var GLTFWriter = class {
 };
 function clean(object2) {
   const unused = [];
-  for (const key in object2) {
-    const value = object2[key];
+  for (const key2 in object2) {
+    const value = object2[key2];
     if (Array.isArray(value) && value.length === 0)
-      unused.push(key);
+      unused.push(key2);
     else if (value === null || value === "")
-      unused.push(key);
+      unused.push(key2);
     else if (value && typeof value === "object" && Object.keys(value).length === 0)
-      unused.push(key);
+      unused.push(key2);
   }
-  for (const key of unused)
-    delete object2[key];
+  for (const key2 of unused)
+    delete object2[key2];
 }
 var PlatformIO = class {
   _logger = Logger.DEFAULT_INSTANCE;
@@ -29756,11 +29807,11 @@ function read(data) {
   while (kvdReader._offset < kvdByteLength) {
     const keyValueByteLength = kvdReader._nextUint32();
     const keyData = kvdReader._scan(keyValueByteLength);
-    const key = decodeText(keyData);
-    container.keyValue[key] = kvdReader._nextUint8Array(keyValueByteLength - keyData.byteLength - 1);
-    if (key.match(/^ktx/i)) {
-      const text = decodeText(container.keyValue[key]);
-      container.keyValue[key] = text.substring(0, text.lastIndexOf("\x00"));
+    const key2 = decodeText(keyData);
+    container.keyValue[key2] = kvdReader._nextUint8Array(keyValueByteLength - keyData.byteLength - 1);
+    if (key2.match(/^ktx/i)) {
+      const text = decodeText(container.keyValue[key2]);
+      container.keyValue[key2] = text.substring(0, text.lastIndexOf("\x00"));
     }
     const kvPadding = keyValueByteLength % 4 ? 4 - keyValueByteLength % 4 : 0;
     kvdReader._skip(kvPadding);
@@ -30297,10 +30348,10 @@ var EXTMeshoptCompression = class extends Extension {
   _encoderBufferViews = {};
   _encoderBufferViewData = {};
   _encoderBufferViewAccessors = {};
-  install(key, dependency) {
-    if (key === "meshopt.decoder")
+  install(key2, dependency) {
+    if (key2 === "meshopt.decoder")
       this._decoder = dependency;
-    if (key === "meshopt.encoder")
+    if (key2 === "meshopt.encoder")
       this._encoder = dependency;
     return this;
   }
@@ -30416,7 +30467,7 @@ var EXTMeshoptCompression = class extends Extension {
       if (!buffer)
         throw new Error(`${EXT_MESHOPT_COMPRESSION}: Missing buffer for accessor.`);
       const bufferIndex = this.document.getRoot().listBuffers().indexOf(buffer);
-      const key = [
+      const key2 = [
         usage,
         parentID,
         mode,
@@ -30424,13 +30475,13 @@ var EXTMeshoptCompression = class extends Extension {
         byteStride,
         bufferIndex
       ].join(":");
-      let bufferView = this._encoderBufferViews[key];
-      let bufferViewData = this._encoderBufferViewData[key];
-      let bufferViewAccessors = this._encoderBufferViewAccessors[key];
+      let bufferView = this._encoderBufferViews[key2];
+      let bufferViewData = this._encoderBufferViewData[key2];
+      let bufferViewAccessors = this._encoderBufferViewAccessors[key2];
       if (!bufferView || !bufferViewData) {
-        bufferViewAccessors = this._encoderBufferViewAccessors[key] = [];
-        bufferViewData = this._encoderBufferViewData[key] = [];
-        bufferView = this._encoderBufferViews[key] = {
+        bufferViewAccessors = this._encoderBufferViewAccessors[key2] = [];
+        bufferViewData = this._encoderBufferViewData[key2] = [];
+        bufferView = this._encoderBufferViews[key2] = {
           buffer: fallbackBufferIndex,
           target: WriterContext.USAGE_TO_TARGET[usage],
           byteOffset: 0,
@@ -30465,9 +30516,9 @@ var EXTMeshoptCompression = class extends Extension {
   }
   _prewriteBuffers(context) {
     const encoder = this._encoder;
-    for (const key in this._encoderBufferViews) {
-      const bufferView = this._encoderBufferViews[key];
-      const bufferViewData = this._encoderBufferViewData[key];
+    for (const key2 in this._encoderBufferViews) {
+      const bufferView = this._encoderBufferViews[key2];
+      const bufferViewData = this._encoderBufferViewData[key2];
       const buffer = this.document.getRoot().listBuffers()[bufferView.extensions[EXT_MESHOPT_COMPRESSION].buffer];
       const otherBufferViews = context.otherBufferViews.get(buffer) || [];
       const { count, byteStride, mode } = bufferView.extensions[EXT_MESHOPT_COMPRESSION];
@@ -30483,11 +30534,11 @@ var EXTMeshoptCompression = class extends Extension {
   }
   write(context) {
     let fallbackBufferByteOffset = 0;
-    for (const key in this._encoderBufferViews) {
-      const bufferView = this._encoderBufferViews[key];
-      const bufferViewData = this._encoderBufferViewData[key][0];
+    for (const key2 in this._encoderBufferViews) {
+      const bufferView = this._encoderBufferViews[key2];
+      const bufferViewData = this._encoderBufferViewData[key2][0];
       const bufferViewIndex = context.otherBufferViewsIndexMap.get(bufferViewData);
-      const bufferViewAccessors = this._encoderBufferViewAccessors[key];
+      const bufferViewAccessors = this._encoderBufferViewAccessors[key2];
       for (const accessorDef of bufferViewAccessors)
         accessorDef.bufferView = bufferViewIndex;
       const finalBufferViewDef = context.jsonDoc.json.bufferViews[bufferViewIndex];
@@ -30596,11 +30647,11 @@ var Schema = class extends ExtensionProperty {
   setVersion(version2) {
     return this.set("version", version2);
   }
-  setClass(key, value) {
-    return this.setRefMap("classes", key, value);
+  setClass(key2, value) {
+    return this.setRefMap("classes", key2, value);
   }
-  getClass(key) {
-    return this.getRefMap("classes", key);
+  getClass(key2) {
+    return this.getRefMap("classes", key2);
   }
   listClassKeys() {
     return this.listRefMapKeys("classes");
@@ -30608,11 +30659,11 @@ var Schema = class extends ExtensionProperty {
   listClassValues() {
     return this.listRefMapValues("classes");
   }
-  setEnum(key, value) {
-    return this.setRefMap("enums", key, value);
+  setEnum(key2, value) {
+    return this.setRefMap("enums", key2, value);
   }
-  getEnum(key) {
-    return this.getRefMap("enums", key);
+  getEnum(key2) {
+    return this.getRefMap("enums", key2);
   }
   listEnumKeys() {
     return this.listRefMapKeys("enums");
@@ -30640,11 +30691,11 @@ var Class2 = class extends ExtensionProperty {
   setDescription(description) {
     return this.set("description", description);
   }
-  setProperty(key, value) {
-    return this.setRefMap("properties", key, value);
+  setProperty(key2, value) {
+    return this.setRefMap("properties", key2, value);
   }
-  getProperty(key) {
-    return this.getRefMap("properties", key);
+  getProperty(key2) {
+    return this.getRefMap("properties", key2);
   }
   listPropertyKeys() {
     return this.listRefMapKeys("properties");
@@ -30843,11 +30894,11 @@ var PropertyTable = class extends ExtensionProperty {
   setCount(count) {
     return this.set("count", count);
   }
-  setProperty(key, value) {
-    return this.setRefMap("properties", key, value);
+  setProperty(key2, value) {
+    return this.setRefMap("properties", key2, value);
   }
-  getProperty(key) {
-    return this.getRefMap("properties", key);
+  getProperty(key2) {
+    return this.getRefMap("properties", key2);
   }
   listPropertyKeys() {
     return this.listRefMapKeys("properties");
@@ -30946,11 +30997,11 @@ var PropertyTexture = class extends ExtensionProperty {
   setClass(_class) {
     return this.set("class", _class);
   }
-  setProperty(key, value) {
-    return this.setRefMap("properties", key, value);
+  setProperty(key2, value) {
+    return this.setRefMap("properties", key2, value);
   }
-  getProperty(key) {
-    return this.getRefMap("properties", key);
+  getProperty(key2) {
+    return this.getRefMap("properties", key2);
   }
   listPropertyKeys() {
     return this.listRefMapKeys("properties");
@@ -31036,11 +31087,11 @@ var PropertyAttribute = class extends ExtensionProperty {
   setClass(_class) {
     return this.set("class", _class);
   }
-  setProperty(key, value) {
-    return this.setRefMap("properties", key, value);
+  setProperty(key2, value) {
+    return this.setRefMap("properties", key2, value);
   }
-  getProperty(key) {
-    return this.getRefMap("properties", key);
+  getProperty(key2) {
+    return this.getRefMap("properties", key2);
   }
   listPropertyKeys() {
     return this.listRefMapKeys("properties");
@@ -32164,12 +32215,12 @@ var KHRDracoMeshCompression = class extends Extension {
   _decoderModule = null;
   _encoderModule = null;
   _encoderOptions = {};
-  install(key, dependency) {
-    if (key === "draco3d.decoder") {
+  install(key2, dependency) {
+    if (key2 === "draco3d.decoder") {
       this._decoderModule = dependency;
       initDecoderModule(this._decoderModule);
     }
-    if (key === "draco3d.encoder") {
+    if (key2 === "draco3d.encoder") {
       this._encoderModule = dependency;
       initEncoderModule(this._encoderModule);
     }
@@ -38752,11 +38803,11 @@ class MetadataCollector {
     debug7(`streamInfo: type=${streamInfo.type ? TrackTypeValueToKeyMap[streamInfo.type] : "?"}, codec=${streamInfo.codecName}`);
     this.format.trackInfo.push(streamInfo);
   }
-  setFormat(key, value) {
-    debug7(`format: ${key} = ${value}`);
-    this.format[key] = value;
+  setFormat(key2, value) {
+    debug7(`format: ${key2} = ${value}`);
+    this.format[key2] = value;
     if (this.opts?.observer) {
-      this.opts.observer({ metadata: this, tag: { type: "format", id: key, value } });
+      this.opts.observer({ metadata: this, tag: { type: "format", id: key2, value } });
     }
   }
   setAudioOnly() {
@@ -39791,10 +39842,10 @@ async function getJson(fetch2, url2) {
     throw new LoginError(`${url2} returned ${response.status}`);
   return await response.json();
 }
-function endpoint(metadata, key) {
-  const value = metadata[key];
+function endpoint(metadata, key2) {
+  const value = metadata[key2];
   if (typeof value !== "string")
-    throw new LoginError(`the authorization server has no ${key}`);
+    throw new LoginError(`the authorization server has no ${key2}`);
   return value;
 }
 async function discover(fetch2, mcpUrl) {
@@ -40122,10 +40173,10 @@ var SHA256 = /^[0-9a-f]{64}$/;
 var THREAD_REF = /^refs\/heads\/thread\/[0-9A-Za-z][0-9A-Za-z_-]*$/;
 var LOCAL_HOSTS2 = new Set(["localhost", "127.0.0.1", "[::1]"]);
 var isObject3 = (value) => typeof value === "object" && value !== null && !Array.isArray(value);
-function string4(record2, key, pattern) {
-  const value = record2[key];
+function string4(record2, key2, pattern) {
+  const value = record2[key2];
   if (typeof value !== "string" || value === "" || pattern && !pattern.test(value)) {
-    throw new PulledError(`get_git_bundles: "${key}" is missing or malformed`);
+    throw new PulledError(`get_git_bundles: "${key2}" is missing or malformed`);
   }
   return value;
 }
@@ -40231,8 +40282,8 @@ function kitCommand(kitRoot, ...args) {
   ].join(" ");
 }
 var EXCLUDES = ["node_modules/", "/dist/", ".DS_Store"];
-async function set2(git, source, key, value) {
-  await gitOk(git, source, ["config", key, value]);
+async function set2(git, source, key2, value) {
+  await gitOk(git, source, ["config", key2, value]);
 }
 async function configureRepo(git, source, config2, author) {
   if (author) {
@@ -40482,31 +40533,31 @@ function parseConfig(text) {
     throw new ConfigError(`${CONFIG_FILE} is not an object`);
   const record2 = raw;
   const config2 = {};
-  for (const key of REQUIRED) {
-    const value = record2[key];
+  for (const key2 of REQUIRED) {
+    const value = record2[key2];
     if (typeof value !== "string" || value === "") {
-      throw new ConfigError(`${CONFIG_FILE}: "${key}" must be a non-empty string (a working directory from before git: clone it again)`);
+      throw new ConfigError(`${CONFIG_FILE}: "${key2}" must be a non-empty string (a working directory from before git: clone it again)`);
     }
-    config2[key] = value;
+    config2[key2] = value;
   }
-  for (const key of NULLABLE) {
-    const value = record2[key] ?? null;
+  for (const key2 of NULLABLE) {
+    const value = record2[key2] ?? null;
     if (value !== null && typeof value !== "string") {
-      throw new ConfigError(`${CONFIG_FILE}: "${key}" must be a string or null`);
+      throw new ConfigError(`${CONFIG_FILE}: "${key2}" must be a string or null`);
     }
-    config2[key] = value;
+    config2[key2] = value;
   }
-  for (const key of LISTS) {
-    const value = record2[key] ?? [];
+  for (const key2 of LISTS) {
+    const value = record2[key2] ?? [];
     if (!Array.isArray(value) || value.some((item) => typeof item !== "string")) {
-      throw new ConfigError(`${CONFIG_FILE}: "${key}" must be a list of strings`);
+      throw new ConfigError(`${CONFIG_FILE}: "${key2}" must be a list of strings`);
     }
-    config2[key] = value;
+    config2[key2] = value;
   }
   return config2;
 }
 function serializeConfig(config2) {
-  const ordered = Object.fromEntries([...REQUIRED, ...NULLABLE, ...LISTS].map((key) => [key, config2[key]]));
+  const ordered = Object.fromEntries([...REQUIRED, ...NULLABLE, ...LISTS].map((key2) => [key2, config2[key2]]));
   return `${JSON.stringify(ordered, null, 2)}
 `;
 }

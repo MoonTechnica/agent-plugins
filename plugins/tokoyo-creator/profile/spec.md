@@ -37,6 +37,7 @@ Platform 側の対応行は `generation_profiles(kind='game', sdk_version=2)`
 ├── skills/                  # Agent Skills（名前と説明が最初から見えている。`$<名前>` で使う）
 │   ├── game-design/         # 工程の正本（企画 brief・段階と完了条件・ジャンルの下限・rules.ts / tuning.ts）
 │   ├── game-art-direction/  # 見た目の合意（コンセプト画像・スタイルガイド・素材の判定表）
+│   ├── game-level-design/   # ステージ/マップ（体験・進行・空間候補・仮組み・到達/進行検査・選定）
 │   ├── game-playtest/       # 自分で遊んで確かめる（rubric・ルール検査 assets/playtest-rules.mjs・前の版の試遊結果）
 │   ├── game-controls/       # PC とスマホの操作（入力キット assets/input.ts・ジャンル別の割り当て）
 │   ├── game-screen-layout/  # 画面の追従・HUD・タイトル / ポーズ / リザルト
@@ -56,6 +57,7 @@ Platform 側の対応行は `generation_profiles(kind='game', sdk_version=2)`
 ├── input/                   # 前の版・今の掲載情報（listing.json）・前の版の試遊の結果（playtest-report.json）・作業ブランチの役割とmain（branch.json）・マージの材料（instructions.md §4.0）
 └── outputs/                 # ここに置いたものだけが Platform に渡る
 ```
+
 
 ## 2. 読む順序
 
