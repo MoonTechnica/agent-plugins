@@ -42,6 +42,38 @@ description: ゲームの絵と音を用意する。CC0 のフリー素材の探
 
 ## 2. 作り方
 
+### 制作画面の素材一覧
+
+新しいゲームでは`design/game-assets.json`を作る。以後の変更では実装と一緒に更新する。
+利用者が選びたくなる自機/敵/背景/効果音/BGMなどを名前付きの対象として記録する。
+ファイルを持たないコードのモデルや合成音も省かない。見えない内部の数式や補助関数は列挙しない。
+コンセプトアート・設定画・参考画像も、実在する画像を同じ一覧に記録する。
+`purposes`は`["game"]`（ゲーム素材）/`["reference"]`（制作資料）/`["game","reference"]`（兼用）。
+省略した旧項目はゲーム素材。コンセプトを背景や掲載カバーにも使う場合は、同じIDの用途を増やす。
+ゲーム素材として採用していない参考画像は制作資料だけにし、実モデルのプレビューに使わない。
+
+```json
+{"version":1,"items":[
+  {"id":"player-plane","name":"自機","description":"プレイヤーが操縦する飛行機","kind":"model_3d","sources":[{"path":"src/view.ts","symbol":"jet"}]},
+  {"id":"launch-sound","name":"ミサイルの発射音","description":"発射時に鳴る音","kind":"audio","sources":[{"path":"src/sound.ts"}]},
+  {"id":"concept-key-art","name":"完成イメージ","description":"画風と構図の制作基準","kind":"image","purposes":["reference"],"sources":[{"path":"design/concept/key-art.png"}],"thumbnail_path":"design/concept/key-art.png"}
+]}
+```
+
+- idは英数字/`_`/`-`で80文字まで。対象を直しても維持し、削除後に別の対象へ再利用しない。旧制作記録の行を移す場合は、行の名前のUTF-8 SHA256先頭24桁に`legacy-`を付けたIDを保つ。名前は一覧内で一意、100文字まで。
+- kindは`model_3d`/`image`/`audio`。sourcesは実在する相対ファイルパス、symbolは任意の関数などの目印。
+- `purposes`の要素は1〜2個で重複不可。設定画や参考画像には`reference`を指定する。
+  既存の`design/concept/key-art`/`hero`/`title`を一覧へ移すときのIDはそれぞれ
+  `concept-key-art`/`concept-hero`/`concept-title`を維持する。PNGからWebPへ変えてもIDは同じ。
+- 素材ツールのファイルを使う場合はその`asset_id`を添え、sourceには使っているコード/設定を指す。
+- descriptionは利用者に伝わる用途（1000文字まで）。Storage/コード生成/ツール名/関数名は書かない。
+- 最大500項目・256 KiB。一覧はソースでcommitし、`dist/`へコピーしない。Kitが形と参照先を検査する。
+- 対象を選んだ発話は内部の入力で渡された安定IDから同じ対象を解決し、変更後もIDと参照先を保つ。名前だけが一致する別IDへ置き換えない。見つからない場合は推測しない。
+- 制作資料の修正はその画像・設定を更新する。ゲームへの採用や関連モデルの変更も依頼されている場合は、
+  資料を美術の基準にして実装を更新する。兼用の画像を変更したら、背景・カバーなど各用途での見え方を確認する。
+- `thumbnail_path`は対象そのものの画像、または実モデルを撮影した実在する画像を指す。
+  制作資料の画像はその画像を表示し、3Dモデルの実プレビューをコンセプト画像で代用しない。
+
 以下は§1で生成・自作を選んだ場合の手順。ライブラリ取得は§3.5、モデリングは `$game-3d-studio` に従う。
 
 | 作りたいもの | 手順 | 置き方 |
