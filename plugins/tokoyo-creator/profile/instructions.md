@@ -42,7 +42,7 @@
 | `$game-screen-layout` | **必ず**。どの画面の形でも崩れない画面・HUD・タイトル・ポーズ・リザルト。画面の端まで描いて HUD と操作部だけをセーフエリアの内側に置く（`manifest.json` の `safeArea: "app"`。§3.1）。結果を人に見せたくなる遊びならリザルトに「共有」（`app.share.capture` / `app.ui.openShare`） |
 | `$game-ux` | **必ず**。遊べる体験: 最初の 1 手を画面で示す・最初の課題は必ず成功できる、入力への手応え（ヒットストップ・揺れ・パーティクル・音）、読める文字とコントラスト、色だけ・音だけに頼らない、点滅と揺れの上限と reduced-motion、リザルトとすぐの再挑戦、効果音 / BGM の分離ミュートと設定の保存（`app.store`） |
 | `$game-listing` | **必ず**。公開ページの掲載情報を `listing/` に用意する。トップバナーはゲームタイトルをロゴ風に組み込んだキービジュアル、アイコンは小さくても識別できる専用の構図で生成し、最終画像を開いて確認する。初回は全部作り、2 回目以降は中身と合わなくなった項目だけ直す |
-| `$game-asset-tools` | 絵や音を用意するとき（素材ツールがあるときは必ず） |
+| `$game-asset-tools` | 絵や音を用意/変更するとき。現行素材の参照検索、基準画像と原型の再利用、レシピ実行と差分制作（素材ツールがあるときは必ず） |
 | `$game-phaser` | **2D を同梱の Phaser 4 で作ると決めたとき**（§4.2。素材の読み込み・入力・画面・物理の Platform との継ぎ目） |
 | `$game-3d-and-bundles` | 3D で描くとき・ステージが複数あるとき・素材が大きいとき |
 | `$game-3d-studio` | Blender で 3D の素材を作るとき（GLB のモデリング・手直し・リグとアニメーション・3D から 2D のスプライト・ベイク） |
@@ -60,6 +60,10 @@
 代表場面を実装/変更したら `$game-playtest` references/visual-observation.md の制作中の目的付き試遊で
 実行→画像観察→局所修正→同条件で再確認する。コンセプトは利用者と方向を共有する資料として維持し、実画面の証拠と分ける。
 
+素材を調べる/変更するときは`$game-asset-tools` references/efficient-production.mdの共有CLIを使う。
+`node <kit>/sdk/app-sdk/build-config/kit.mjs asset-context <source-dir> [id…]`は現行素材の短い一覧/参照先、
+`asset-recipe <source-dir> <recipe.json>`は保存した決定的な制作スクリプトの実行/検証済み出力の再利用。
+source-dirは`./source`。SDKのCLIと作業ディレクトリ側の`scripts/kit.mjs`を混同しない。
 ### 進め方
 
 - **手元では利用者と話せる。** 遊びの説明の大事なところ（ソロか対戦か・操作・見た目）が本当に読み取れないときだけ

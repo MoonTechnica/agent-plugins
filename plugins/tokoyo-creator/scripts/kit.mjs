@@ -39565,7 +39565,7 @@ async function buildDistIndex(dist, { entrypoint }) {
 // frontend/packages/app-sdk/build-config/game-assets.ts
 import { lstat, readFile, realpath } from "node:fs/promises";
 import { isAbsolute, join, relative } from "node:path";
-async function validateGameAssetCatalog(source) {
+async function readGameAssetCatalog(source) {
   const root = await realpath(source);
   let bytes;
   try {
@@ -39578,7 +39578,7 @@ async function validateGameAssetCatalog(source) {
     bytes = await readFile(path);
   } catch (error51) {
     if (error51.code === "ENOENT")
-      return;
+      return null;
     throw error51;
   }
   const catalog = gameAssetCatalogSchema.parse(JSON.parse(bytes.toString("utf8")));
@@ -39599,6 +39599,10 @@ async function validateGameAssetCatalog(source) {
       throw new Error(`catalog source must be a file inside the source: ${path}`);
     }
   }
+  return catalog;
+}
+async function validateGameAssetCatalog(source) {
+  await readGameAssetCatalog(source);
 }
 
 // frontend/packages/app-sdk/build-config/kit-build.ts

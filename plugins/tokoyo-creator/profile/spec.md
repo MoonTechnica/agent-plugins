@@ -41,7 +41,7 @@ Platform 側の対応行は `generation_profiles(kind='game', sdk_version=2)`
 │   ├── game-playtest/       # 自分で遊んで確かめる（rubric・ルール検査 assets/playtest-rules.mjs・前の版の試遊結果）
 │   ├── game-controls/       # PC とスマホの操作（入力キット assets/input.ts・ジャンル別の割り当て）
 │   ├── game-screen-layout/  # 画面の追従・HUD・タイトル / ポーズ / リザルト
-│   ├── game-asset-tools/    # 画像生成と素材ツール（MCP）
+│   ├── game-asset-tools/    # 参照検索CLI・制作レシピ・画像生成と素材ツール（MCP）
 │   ├── game-phaser/         # 同梱の Phaser 4 で 2D を作るときの決まり（素材・入力・画面・物理）
 │   ├── game-3d-and-bundles/ # Babylon.js・バンドルの分割・台帳からの参照・メモリ
 │   ├── game-3d-studio/      # Blender で 3D の素材を作る（モデリング・リグ・リターゲット・3D から 2D）
