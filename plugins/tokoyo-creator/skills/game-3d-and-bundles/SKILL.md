@@ -5,6 +5,7 @@ description: 3D のゲーム（同梱の Babylon.js の WebGPUEngine。WebGPU �
 
 # 3D と大きいゲーム
 
+実装前に`$game-design` references/performance-risk.md §0を読み、次のBabylon指針を基本実装へ適用する。
 全画面shader・雲/霧・透明描画の重なり・動的影を設計/追加するときは、
 `$game-design` references/performance-risk.md を先に読む。実装を広げる前に小さく実描画を比較し、懸念を利用者へ伝える。
 
@@ -131,6 +132,30 @@ Inspectorの独立した診断UIは参考にするが、KitではInspector/CDN i
 `new Texture(app.assets.url(path), scene)` で読む（spec §10）。Babylon の既定 CDN URL に任せない（外部通信は不可）。
 PNG をそのまま大量の 3D テクスチャにしない。GLB の `KHR_texture_basisu` も同じデコーダーを使う。
 
+### 性能の基本実装（同梱Babylonの型/公式資料で確認する）
+
+- 静的な反復物はgeometry/materialを共有し、通常instanceかthin instancesを選ぶ。
+  thin instancesは地域×モデルでまとめる。まとまり単位のカリングなので全世界を一つにしない。
+  個別操作/拾う物/独立骨格は同じ方式へ押し込まない。
+- 遠方のモデルには用途に応じたLODを用意する。mesh LODとは別に骨格animation/AI/physicsの活動範囲と頻度を決める。
+  表示meshをそのまま複雑な衝突形状にせず、単純なshapeを選ぶ（`$game-physics`）。
+- 空の親はTransformNode。動かないmeshのみfreezeWorldMatrix、不変materialのみfreezeを候補にする。
+  変更が必要な場合は解除し、freezeActiveMeshes/snapshot renderingを動的worldへ一律適用しない。
+  pointer moveの全mesh pickingが不要ならskipPointerMovePickingを候補にし、必要なhover/選択を保つ。
+- 粒子は有限capacityと発生率/寿命/emitter数を決める。大量の装飾はGPUParticleSystemを候補にし、
+  同梱版のIsSupportedと必要な機能を確認する。CPU版fallbackは同じ大量capacityを引き継がない。
+  GPU化しても大きな透明粒子の重なり/描画負荷は残る。遠方/不可視の装飾は停止/間引き、終了時に所有systemを解放する。
+- 動的shadowはcaster/receiver/距離/解像度を限定し、静的な光は焼き込みを検討する。
+  多段の全画面処理・反射/RTT・巨大な半透明煙を無制限に増やさない。品質段階でも作品の明暗/手掛かりを保つ。
+- DPR上限と内部描画サイズを先に決める。追加最適化で解像度を変える場合はCPU/GPU負荷を分けて判断し、
+  短い負荷変動で上下を繰り返さない。SceneOptimizerの既定presetでmesh mergeや全影/particles無効化を自動適用しない。
+
+一次情報: [シーン最適化](https://doc.babylonjs.com/features/featuresDeepDive/scene/optimize_your_scene)、
+[thin instances](https://doc.babylonjs.com/features/featuresDeepDive/mesh/copies/thinInstances)、
+[LOD](https://doc.babylonjs.com/features/featuresDeepDive/mesh/LOD)、
+[GPU particles](https://doc.babylonjs.com/features/featuresDeepDive/particles/particle_system/gpu_particles)。
+最新資料の例の個数をスマホの予算や同梱版の保証とせず、基本実装後に代表場面を実描画して追加最適化する。
+
 ## 3. メモリ（スマートフォンで落ちないために）
 
 スマートフォンのブラウザは、**使えるメモリを超えるとエラーを出さずにページを閉じる**（iOS は上限を公表していない）。
@@ -145,7 +170,7 @@ PNG をそのまま大量の 3D テクスチャにしない。GLB の `KHR_textu
 
 - **検証は「起動前の分 + 同時に持つバンドル（同じ `group` の合計。`group` が無ければいちばん大きい 1 つ）」を見積もり、
   512 MiB を超えると `MEMORY_ESTIMATE_LARGE`、768 MiB を超えると `MEMORY_ESTIMATE_VERY_LARGE` の警告を出す。**
-  警告が出たら下のどれかで減らして作り直す。2〜3 GB の端末でも動かしたいなら 256 MiB に収める。
+  警告が出たら下のどれかで減らして作り直す。低メモリ端末向けに256 MiB等を素材予算の初期候補にできるが、実機総量や動作保証ではない。
 - **テクスチャは 1 辺 1024px まで**を基本にする（2048px は画面の主役 1〜2 枚だけ）。
   UI・アイコン・遠くのものは 512px 以下。縦横は 2 のべき乗にする。
 - **ステージは 1 つずつ読む。** 次のステージの `app.bundles.load()` の前に、今のステージを片付ける:

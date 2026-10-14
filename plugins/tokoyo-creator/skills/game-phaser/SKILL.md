@@ -5,6 +5,8 @@ description: 同梱の 2D ゲームエンジン Phaser 4 で作るときの Plat
 
 # 2D のゲームエンジン（同梱の Phaser 4）
 
+実装前に`$game-design` references/performance-risk.md §0と、このSkill §8の性能指針を読む。
+基本対策を最初から適用し、実描画後に改善すべき箇所へ追加最適化する。
 多数の粒子・重なる透明描画・全画面filter・大量NPCを設計/追加するときは、
 `$game-design` references/performance-risk.md を先に読む。実描画の比較と事前警告を省かない。
 
@@ -190,6 +192,13 @@ Scene内の可変状態はconstructorだけでなく`init()`で初期化する�
 
 ### 長時間・大量オブジェクト
 
+- ParticleEmitterは同梱`particles`公式Skill/型でmaxParticles（総pool数）とmaxAliveParticles（同時alive数）を確認し、
+  発生頻度/寿命/emitter数も有限にする。大きな透明粒子の重なりを抑え、遠方の装飾を間引く。
+  reserveは必要量だけ。最大数の無条件事前確保やemitterの毎frame作成を避け、停止/再利用/終了時解放を管理する。
+- SpriteGPULayerは静的/低頻度更新の非対話背景の候補。通常SpriteのAIや個別bodyまで高速化すると扱わない。
+  大きなbufferの保持/更新コストを含めて比較する。
+- filtersは必要な領域/回数へ絞る。多数objectへの個別の全画面filter、毎frame変わらないGraphicsの再生成を避け、
+  静的複雑描画はtexture化/再利用を候補にする。深いContainerを増やす前に用途を確認し、描画順/入力を保つ。
 - TilemapLayerのcameraカリングを利用。GPU layerは内容変更頻度と端末で比較し全mapを毎frame再uploadしない。
   [Phaser4 Rendering Concepts](https://phaser.io/tutorials/phaser-4-rendering-concepts)もmobileで常に有利とはしていない。
 - atlasと描画状態をまとめる。大量数値はBitmapText候補、日本語全文字を巨大atlasへ一律変換しない。
@@ -200,6 +209,8 @@ Scene内の可変状態はconstructorだけでなく`init()`で初期化する�
 - Phaser TimeStep/Arcade固定stepへ第二のclockを被せない。pause/resumeで計測基準をreset。
   実frame間隔は `@workspace/app-sdk/runtime` のcreateFrameStatsで記録できる。
 - RPGは `$game-design` references/rpg.md、地域寿命は `$game-open-world`。
+- Scale Managerの論理サイズとbackbuffer/表示サイズを記録する。画質調整で入力/カメラ/physicsの座標を変えない。
+  APIの正本は同梱4の`scale-and-responsive`/型。Phaser 3のresolutionやpipeline設定を推測で移植しない。
 
 照明・normal map・色調・filters を決める前に `$game-art-direction` の references/visual-direction.md §4 を読む。
 素材の粒度と焼き込んだ光を揃え、HUD の読みやすさを保つ。実画面の比較は同 §6。

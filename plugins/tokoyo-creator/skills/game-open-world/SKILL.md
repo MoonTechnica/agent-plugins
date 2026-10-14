@@ -5,6 +5,8 @@ description: 広い世界を局所的に読み込み、解放して長く遊べ�
 
 # オープンワールド・長時間探索
 
+実装前に`$game-design` references/performance-risk.md §0を読む。地域読み込み/活動範囲/資源寿命を
+最初から設計し、その上で実描画を測って必要な追加最適化を行う。世界を広げてから基本対策を後付けしない。
 RPGの進行は `$game-design` references/rpg.md。SDK APIの正本は `<kit>/sdk/app-sdk/spec.md`。
 地域の役割・接続・配置・生成候補の選定は `$game-level-design`。このSkillは採用した世界の読み込み・活動範囲・保存を扱う。
 エンジンAPIは同梱版の型/公式Skill。存在しないThree.js APIをBabylon/Phaserへ持ち込まない。
@@ -24,6 +26,8 @@ references/transitions-and-map.md。地域/部屋・bundle・chunkを同じ単�
 - 中心チャンク/進行方向が変わった時にqueueを更新する。全候補を毎frame配列化/sortしない。
 - 近傍NPCの感知/経路探索だけ更新し、時間分散と要求上限を持つ。不可視meshにも計算が残り得る。
 - 表示と衝突が準備できるまで未ロード地域へ進めない。teleportはロード画面と進捗を用意する。
+- 徒歩だけでなく、その作品で可能な最大移動速度/急な方向転換/境界往復を先読み設計に含める。
+  霧で隠しただけでmesh/physics/AIの処理が減ったとは扱わず、活動範囲とLODを別に管理する。
 
 ## 2. 時間予算と取消
 
