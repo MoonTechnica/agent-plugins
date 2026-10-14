@@ -160,6 +160,16 @@ Arcade / Matter は端末ごとに結果が同じになる約束が無い。対�
 
 ## 7. 止める・再開・共有
 
+開発メニューはゲーム側の独立panel/DOM、または別UI Sceneへ置く。通常開始は本編のTitle/Game Scene経路を共有する。
+UI Sceneを重ねる場合はゲームSceneだけをpauseし、UIの更新・描画を維持する。ゲームのpointer入力と共有入力キットも
+止めて、同じtap/開始キーが背景へ通らないことを確認する。全Gameを止めて開発UIまで操作不能にしない。
+Hostのpause/holdが残る間は独自の閉じる操作だけで再開しない。正確な状態遷移は同梱公式`scenes` Skillと型で確認する。
+
+Scene内の可変状態はconstructorだけでなく`init()`で初期化する。Scene外のlistener、SDK購読、自分で追加したtimer等は
+`SHUTDOWN`で外し、最終破棄は`DESTROY`でも漏れなく行う。共有texture等を一律破棄しない。
+開発caseの再起動はSDK actionで新Scopeを発行する。`this.scene.restart()`だけでは保存・seed・旧Launchの分離を満たさない。
+ケース定義・readyの時点は `$game-playtest` references/development-preview.md。
+
 - **手応え**（`cameras.main.shake`・tween の伸び縮み・`particles` の `explode`・ヒットストップ）は `$game-ux` の
   references/feedback.md §4。揺れとパーティクルの量に `effects` を掛け、`cameras.main.flash` の全画面フラッシュは使わない。
 

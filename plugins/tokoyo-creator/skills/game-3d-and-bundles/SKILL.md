@@ -73,6 +73,17 @@ function leaveStage2() {
 
 ## 2. 3D（Kit の Babylon.js）
 
+開発UIは独立したDOM panel、または必要時に既存Babylon GUIへ重ねる。通常開始は本編の開始Scene/状態遷移を共有する。
+メニューを開いたらゲームの入力・自前simulationを止め、描画とUI操作を維持する。自動で進むSceneのanimation/physicsも
+使っている場合は明示的に止め、再開時は元の有効状態を戻す。自前`onBeforeRenderObservable`やtimerは別途停止判定が必要。
+カメラ入力はゲームの操作設計に必要なものだけ有効にし、文字入力・menu操作と競合させない。
+Hostのpause/holdが残る間はUIを閉じただけでゲームを再開しない。
+
+case終了時は所有render callbackを外し、DOM/listener/SDK購読/observerと、そのcaseが所有するScene・GUI・資源を解放する。
+共有Engineを使う場合は別case/UIのloopや資源を停止・破棄しない。再起動はSDK actionで新Scopeを作る。
+Inspectorの独立した診断UIは参考にするが、KitではInspector/CDN importは許可されていないため追加しない。
+ケース定義・readyの時点は `$game-playtest` references/development-preview.md。
+
 **材質・光・影・露出を決める前に `$game-art-direction` の references/visual-direction.md §5 を読む。**
 背景色だけで明暗を判断せず、直接光・環境照明・発光材質・露出を合わせる。素材の粗さと模様の尺度を揃え、
 重要な光の caster / receiver を指定する。WebGL2 でも作品の明暗と手掛かりを維持し、同 §6 で得られた実画面と基準を比較する。
