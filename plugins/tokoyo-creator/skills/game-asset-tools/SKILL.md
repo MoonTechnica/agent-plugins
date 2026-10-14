@@ -3,6 +3,8 @@ name: game-asset-tools
 description: ゲームの絵と音を用意する。CC0 のフリー素材の探し方と取り込み方、画像の作り方（内蔵の画像生成、無い環境では generate_image）、素材ツール（MCP）の使い方と予算、透過キャラクター・連番アニメ・アニメ付き 3D・効果音・BGM・動画の手順、自分で作った素材の登録（upload_asset。大きい物は台帳から参照）、失敗したときの対処を扱う。画像・キャラクター・背景・モーション・効果音・BGM・3D モデルを用意するとき、素材ツールが使えるときに使う。assets, sprites, stock assets, CC0, sound effects, music, budget.
 ---
 
+キャラ・機能アイテム・敵・仕掛けを変更したら `$game-playtest` の `references/development-preview.md` に従い、本編factoryを使う試験ケースを更新する。試験場のためだけの新規有料素材を作らず、共通の素材hashを両Artifactで再利用する。
+
 # 絵と音の用意（画像生成 + 素材ツール）
 
 **画像の作り方は環境で 2 通りある。** それ以外の規則はどちらでも同じ。

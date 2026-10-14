@@ -9,6 +9,11 @@ Platform 側の対応行は `generation_profiles(kind='game', sdk_version=2)`
 
 ## 1. 置かれているもの
 
+開発プレビューの制作契約は`skills/game-playtest/references/development-preview.md`。
+`sdk/app-sdk/build-config/kit.mjs debug-catalog` / `debug-validate`でカタログと参照を検査する。
+本番`dist/`と開発`debug-dist/`は別成果物。通常開始・stage/preset・本編factoryの試験場を維持する。
+Debug MenuのUIは各ゲームの`debug/`に作成する。SDKは検査・通信・結果・timeoutを共有し、Platformは認可・専用Scopeと開発起動を担当する。ゲームごとの配置や試験表示を全作品共通画面へ固定しない。
+
 手元では、読むもの（`<kit>` = Creator Kit）と作業ディレクトリ（`./`）が分かれている。`<kit>` の下は
 次の図の `sdk/` `profile/` `skills/` と同じ形で、ほかに `scripts/kit.mjs`（Kit の CLI）がある。
 作業ディレクトリは `.tokoyo.json`・`source/`（作るプロジェクト）・`input/`・`outputs/`・`assets-cache/`（`instructions.md` §8）。

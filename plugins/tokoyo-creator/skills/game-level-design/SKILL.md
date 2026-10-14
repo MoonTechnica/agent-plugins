@@ -3,6 +3,8 @@ name: game-level-design
 description: ステージ・マップ・コース・ダンジョン・アリーナを設計、生成、改善する。進行と空間を分け、小さな候補を比較して到達・難易度・実画面を検査する。RPGの地域切替、メトロイドバニアの部屋/能力/再探索、実ステージとマップメニューの対応、単画面/エンドレスにも使う。level design, map menu, minimap, RPG, metroidvania, blockout.
 ---
 
+ステージ・入口・能力・イベントを変えたら `$game-playtest` の `references/development-preview.md` に従い、影響する到達時presetと安定IDの開発ケースを更新する。専用Scopeで初期条件から検査し、本番の進行を読み込まない。
+
 # ステージ・マップを作る
 
 **体験の意図 → 進行の構造 → 空間の候補 → 遊べる仮組み → 検査と選定 → 素材化 → 再確認**。

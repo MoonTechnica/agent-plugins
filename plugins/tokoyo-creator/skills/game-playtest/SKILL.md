@@ -3,6 +3,8 @@ name: game-playtest
 description: 作ったゲームを自分で遊んで確かめ、直す。核が遊べる形になったときと、仕上げの前に使う。design/playtest.md の確かめる項目（rubric）の作り方、ルールを node で回す検査（assets/playtest-rules.mjs をコピーして使う）、利用者が頼んだときだけ Platform にしっかりした試遊を頼むこと、前の版の試遊結果（input/playtest-report.json）の読み方、直す順序を扱う。playtest, rubric, self-test, headless, simulation, autoplay, bug triage.
 ---
 
+制作中のケース起動、Test Level、本編処理の再利用、開発用コマンドと分離ビルドは `references/development-preview.md` を読む。カタログ検査と実際の描画・操作の結果は分けて報告する。
+
 # 自分で遊んで確かめる
 
 ビルドが通ることと遊べることは別。**操作が効かない・勝ち負けが起きない・状態が進まない**は、コードを読んでも見つからない。

@@ -31,6 +31,11 @@
 2. `<kit>/sdk/app-sdk/spec.md` を読む（**App の API 契約。正本**）
 3. `<kit>/sdk/sample-app/` を読む（最小実装。**構成はこれに倣う**）
 4. **Skill を使う**（`<kit>/skills/`。下の表）。
+   遊べる核・stage・キャラ・機能アイテムを作る/変えるときは `$game-playtest` の
+   `references/development-preview.md` を読み、本編処理から開発ケース・preset・試験場を作る。
+   `debug-catalog` / `debug-validate`を同梱Kitで実行する。通常開始ケースは新規ゲームで必須。
+   **メニューUIもゲームリポジトリ内の`debug/`へ作る**。作品のステージ構成・状態表示・試験操作に合わせ、SDKの型付き操作を使う。
+   開発入口と専用素材は本番`dist/`へ含めない。開発対応の出力には`debug-dist.tar.gz`も別に提出する。
 5. **`./input/` を見る**（§4.0）。前の版があれば、それを土台にして続きを作る。
 | Skill | いつ |
 |---|---|
@@ -132,6 +137,7 @@ source-dirは`./source`。SDKのCLIと作業ディレクトリ側の`scripts/kit
 |---|---|
 | `source.bundle` | `kit.mjs pack` が作る、取り込んだ head（`base_commit_oid`）からの新しい commit（git の bundle）。次のターンとリミックスの土台。**掲載情報の `listing/`（`$game-listing`）を必ず commit に含める**。自分で作らない |
 | `dist.tar.gz` | **配信用 Artifact**。下の構成を**書庫の根**に置いて固める |
+| `debug-dist.tar.gz` | **開発専用Artifact**。対応対象のゲームでは必須。Document read/write要求は今回対象外として本番のみ。`debug-dist/`の中身を別書庫の根に固める。公開版へコピーしない |
 | `build-report.json` | `{ "manifest": <manifest.json と同じ JSON>, "buildConfig": { ... }, "notes": ["…"], "listingRequested": ["title"] }`（`notes` は実装できなかった要求・Skill と食い違った点・掲載情報を直した理由・性能の懸念と測定環境/未確認。無ければ省く。`listingRequested` は利用者が手で直した掲載情報の項目を、依頼どおりに変えたときだけ。`$game-listing` §5。利用者が試遊を明確に頼んだときだけ `"playtest": { "level": "thorough" }`。`$game-playtest` §3） |
 
 `dist.tar.gz` の中身（`tar -C dist -czf ../outputs/dist.tar.gz .` 相当。**`dist/` を入れ子にしない**）:
@@ -231,7 +237,7 @@ ai/<key>.md          # ゲーム内 AI の指示文（`ai.chat` のときだけ�
    プロジェクトのディレクトリで:
 
    ```sh
-   node /workspace/sdk/app-sdk/build-config/kit.mjs build
+   node /workspace/sdk/app-sdk/build-config/kit.mjs build .
    ```
    手元では `source/` の上（作業ディレクトリ）で `node <kit>/scripts/kit.mjs build`（中身は同じ。§8.3）。
 

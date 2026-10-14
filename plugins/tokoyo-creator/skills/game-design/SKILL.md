@@ -3,6 +3,8 @@ name: game-design
 description: ゲームを作る工程の正本。依頼を受けたら最初に使う。企画（design/brief.md）の書き方、工程の順序と各段階の完了条件、ジャンルごとに「完成している」と感じる下限、遊びのルールを rules.ts / 調整値を tuning.ts に分ける形、仕上げ（polish）と出荷前のチェックを扱う。game design, brief, core loop, scope, genre minimum, tuning, polish, ship checklist.
 ---
 
+遊べる核ができたら `$game-playtest` の `references/development-preview.md` を読み、通常開始ケースと本編factoryを使う代表試験場を用意する。メニューUIは作品に合わせてゲームリポジトリ内の`debug/`へ作り、SDKの型付き操作でHostの認可・専用Scopeに接続する。本番成果物へ含めない。Document read/write要求は今回の対象外。
+
 # ゲームの作り方（工程と企画）
 
 プロのゲーム開発の順序で作る: **核を決める → 絵で合意する → 素材を設計する → 醜いまま遊べる形にする →

@@ -188,11 +188,11 @@ var require_common = __commonJS((exports, module) => {
       let enableOverride = null;
       let namespacesCache;
       let enabledCache;
-      function debug(...args) {
-        if (!debug.enabled) {
+      function debug2(...args) {
+        if (!debug2.enabled) {
           return;
         }
-        const self2 = debug;
+        const self2 = debug2;
         const curr = Number(new Date);
         const ms = curr - (prevTime || curr);
         self2.diff = ms;
@@ -222,12 +222,12 @@ var require_common = __commonJS((exports, module) => {
         const logFn = self2.log || createDebug.log;
         logFn.apply(self2, args);
       }
-      debug.namespace = namespace;
-      debug.useColors = createDebug.useColors();
-      debug.color = createDebug.selectColor(namespace);
-      debug.extend = extend2;
-      debug.destroy = createDebug.destroy;
-      Object.defineProperty(debug, "enabled", {
+      debug2.namespace = namespace;
+      debug2.useColors = createDebug.useColors();
+      debug2.color = createDebug.selectColor(namespace);
+      debug2.extend = extend2;
+      debug2.destroy = createDebug.destroy;
+      Object.defineProperty(debug2, "enabled", {
         enumerable: true,
         configurable: false,
         get: () => {
@@ -245,9 +245,9 @@ var require_common = __commonJS((exports, module) => {
         }
       });
       if (typeof createDebug.init === "function") {
-        createDebug.init(debug);
+        createDebug.init(debug2);
       }
-      return debug;
+      return debug2;
     }
     function extend2(namespace, delimiter) {
       const newDebug = createDebug(this.namespace + (typeof delimiter === "undefined" ? ":" : delimiter) + namespace);
@@ -752,11 +752,11 @@ var require_node = __commonJS((exports, module) => {
   function load() {
     return process.env.DEBUG;
   }
-  function init(debug) {
-    debug.inspectOpts = {};
+  function init(debug2) {
+    debug2.inspectOpts = {};
     const keys = Object.keys(exports.inspectOpts);
     for (let i = 0;i < keys.length; i++) {
-      debug.inspectOpts[keys[i]] = exports.inspectOpts[keys[i]];
+      debug2.inspectOpts[keys[i]] = exports.inspectOpts[keys[i]];
     }
   }
   module.exports = require_common()(exports);
@@ -2439,7 +2439,7 @@ function tryParseApeHeader(metadata, tokenizer, options) {
   const apeParser = new APEv2Parser(metadata, tokenizer, options);
   return apeParser.tryParseApeHeader();
 }
-var import_debug, debug, tagFormat = "APEv2", preamble = "APETAGEX", ApeContentError, APEv2Parser;
+var import_debug2, debug2, tagFormat = "APEv2", preamble = "APETAGEX", ApeContentError, APEv2Parser;
 var init_APEv2Parser = __esm(() => {
   init_lib2();
   init_lib();
@@ -2447,8 +2447,8 @@ var init_APEv2Parser = __esm(() => {
   init_Util();
   init_ParseError();
   init_APEv2Token();
-  import_debug = __toESM(require_src(), 1);
-  debug = import_debug.default("music-metadata:parser:APEv2");
+  import_debug2 = __toESM(require_src(), 1);
+  debug2 = import_debug2.default("music-metadata:parser:APEv2");
   ApeContentError = class ApeContentError extends makeUnexpectedFileContentError("APEv2") {
   };
   APEv2Parser = class APEv2Parser extends BasicParser {
@@ -2465,7 +2465,7 @@ var init_APEv2Parser = __esm(() => {
       const apeBuf = new Uint8Array(TagFooter.len);
       const position = tokenizer.position;
       if (offset <= TagFooter.len) {
-        debug(`Offset is too small to read APE footer: offset=${offset}`);
+        debug2(`Offset is too small to read APE footer: offset=${offset}`);
         return;
       }
       if (offset > TagFooter.len) {
@@ -2474,9 +2474,9 @@ var init_APEv2Parser = __esm(() => {
         const tagFooter = TagFooter.get(apeBuf, 0);
         if (tagFooter.ID === "APETAGEX") {
           if (tagFooter.flags.isHeader) {
-            debug(`APE Header found at offset=${offset - TagFooter.len}`);
+            debug2(`APE Header found at offset=${offset - TagFooter.len}`);
           } else {
-            debug(`APE Footer found at offset=${offset - TagFooter.len}`);
+            debug2(`APE Footer found at offset=${offset - TagFooter.len}`);
             offset -= tagFooter.size;
           }
           return { footer: tagFooter, offset };
@@ -2494,7 +2494,7 @@ var init_APEv2Parser = __esm(() => {
     }
     async tryParseApeHeader() {
       if (this.tokenizer.fileInfo.size && this.tokenizer.fileInfo.size - this.tokenizer.position < TagFooter.len) {
-        debug("No APEv2 header found, end-of-file reached");
+        debug2("No APEv2 header found, end-of-file reached");
         return;
       }
       const footer = await this.tokenizer.peekToken(TagFooter);
@@ -2502,7 +2502,7 @@ var init_APEv2Parser = __esm(() => {
         await this.tokenizer.ignore(TagFooter.len);
         return this.parseTags(footer);
       }
-      debug(`APEv2 header not found at offset=${this.tokenizer.position}`);
+      debug2(`APEv2 header not found at offset=${this.tokenizer.position}`);
       if (this.tokenizer.fileInfo.size) {
         const remaining = this.tokenizer.fileInfo.size - this.tokenizer.position;
         const buffer = new Uint8Array(remaining);
@@ -2525,7 +2525,7 @@ var init_APEv2Parser = __esm(() => {
     async parseTags(footer) {
       const keyBuffer = new Uint8Array(256);
       let bytesRemaining = footer.size - TagFooter.len;
-      debug(`Parse APE tags at offset=${this.tokenizer.position}, size=${bytesRemaining}`);
+      debug2(`Parse APE tags at offset=${this.tokenizer.position}, size=${bytesRemaining}`);
       for (let i = 0;i < footer.fields; i++) {
         if (bytesRemaining < TagItemHeader.len) {
           this.metadata.addWarning(`APEv2 Tag-header: ${footer.fields - i} items remaining, but no more tag data to read.`);
@@ -2573,11 +2573,11 @@ var init_APEv2Parser = __esm(() => {
             }
             break;
           case DataType.external_info:
-            debug(`Ignore external info ${key2}`);
+            debug2(`Ignore external info ${key2}`);
             await this.tokenizer.ignore(tagItemHeader.size);
             break;
           case DataType.reserved:
-            debug(`Ignore external info ${key2}`);
+            debug2(`Ignore external info ${key2}`);
             this.metadata.addWarning(`APEv2 header declares a reserved datatype for "${key2}"`);
             await this.tokenizer.ignore(tagItemHeader.size);
             break;
@@ -2651,14 +2651,14 @@ async function hasID3v1Header(tokenizer) {
   }
   return false;
 }
-var import_debug2, debug2, Genres, Iid3v1Token, ID3v1Parser;
+var import_debug3, debug3, Genres, Iid3v1Token, ID3v1Parser;
 var init_ID3v1Parser = __esm(() => {
   init_lib2();
   init_lib3();
   init_APEv2Parser();
   init_Util();
-  import_debug2 = __toESM(require_src(), 1);
-  debug2 = import_debug2.default("music-metadata:parser:ID3v1");
+  import_debug3 = __toESM(require_src(), 1);
+  debug3 = import_debug3.default("music-metadata:parser:ID3v1");
   Genres = [
     "Blues",
     "Classic Rock",
@@ -2888,7 +2888,7 @@ var init_ID3v1Parser = __esm(() => {
     }
     async parse() {
       if (!this.tokenizer.fileInfo.size) {
-        debug2("Skip checking for ID3v1 because the file-size is unknown");
+        debug3("Skip checking for ID3v1 because the file-size is unknown");
         return;
       }
       if (this.apeHeader && this.tokenizer.supportsRandomAccess()) {
@@ -2898,12 +2898,12 @@ var init_ID3v1Parser = __esm(() => {
       }
       const offset = this.tokenizer.fileInfo.size - Iid3v1Token.len;
       if (this.tokenizer.position > offset) {
-        debug2("Already consumed the last 128 bytes");
+        debug3("Already consumed the last 128 bytes");
         return;
       }
       const header = await this.tokenizer.readToken(Iid3v1Token, offset);
       if (header) {
-        debug2("ID3v1 header found at: pos=%s", this.tokenizer.fileInfo.size - Iid3v1Token.len);
+        debug3("ID3v1 header found at: pos=%s", this.tokenizer.fileInfo.size - Iid3v1Token.len);
         const props = ["title", "artist", "album", "comment", "track", "year"];
         for (const id of props) {
           if (header[id] && header[id] !== "") {
@@ -2915,7 +2915,7 @@ var init_ID3v1Parser = __esm(() => {
           await this.addTag("genre", genre);
         }
       } else {
-        debug2("ID3v1 header not found at: pos=%s", this.tokenizer.fileInfo.size - Iid3v1Token.len);
+        debug3("ID3v1 header not found at: pos=%s", this.tokenizer.fileInfo.size - Iid3v1Token.len);
       }
     }
     async addTag(id, value) {
@@ -3269,7 +3269,7 @@ class FrameParser {
     let output = [];
     const nullTerminatorLength = FrameParser.getNullTerminatorLength(encoding);
     let fzero;
-    debug4(`Parsing tag type=${type}, encoding=${encoding}, bom=${bom}`);
+    debug5(`Parsing tag type=${type}, encoding=${encoding}, bom=${bom}`);
     switch (type !== "TXXX" && type[0] === "T" ? "T*" : type) {
       case "T*":
       case "GRP1":
@@ -3493,7 +3493,7 @@ class FrameParser {
         break;
       }
       case "CHAP": {
-        debug4("Reading CHAP");
+        debug5("Reading CHAP");
         fzero = findZero(uint8Array, defaultEnc);
         const chapter = {
           label: decodeString(uint8Array.subarray(0, fzero), defaultEnc),
@@ -3513,9 +3513,9 @@ class FrameParser {
         break;
       }
       case "CTOC": {
-        debug4("Reading CTOC");
+        debug5("Reading CTOC");
         const idEnd = findZero(uint8Array, defaultEnc);
-        const label = decodeString(uint8Array.subarray(0, idEnd), defaultEnc);
+        const label2 = decodeString(uint8Array.subarray(0, idEnd), defaultEnc);
         offset = idEnd + 1;
         const flags = uint8Array[offset++];
         const topLevel = (flags & 2) !== 0;
@@ -3529,7 +3529,7 @@ class FrameParser {
           offset += end + 1;
         }
         const toc = {
-          label,
+          label: label2,
           flags: { topLevel, ordered },
           childElementIds,
           frames: new Map
@@ -3546,7 +3546,7 @@ class FrameParser {
         break;
       }
       default:
-        debug4(`Warning: unsupported id3v2-tag-type: ${type}`);
+        debug5(`Warning: unsupported id3v2-tag-type: ${type}`);
         break;
     }
     return output;
@@ -3636,7 +3636,7 @@ class FrameParser {
 function makeUnexpectedMajorVersionError(majorVer) {
   throw new Id3v2ContentError(`Unexpected majorVer: ${majorVer}`);
 }
-var import_debug4, debug4, defaultEnc = "latin1", urlEnc, Id3v2ContentError;
+var import_debug5, debug5, defaultEnc = "latin1", urlEnc, Id3v2ContentError;
 var init_FrameParser = __esm(() => {
   init_lib3();
   init_Util();
@@ -3646,8 +3646,8 @@ var init_FrameParser = __esm(() => {
   init_FrameHeader();
   init_ID3v2ChapterToken();
   init_ID3v2Token();
-  import_debug4 = __toESM(require_src(), 1);
-  debug4 = import_debug4.default("music-metadata:id3v2:frame-parser");
+  import_debug5 = __toESM(require_src(), 1);
+  debug5 = import_debug5.default("music-metadata:id3v2:frame-parser");
   urlEnc = { encoding: defaultEnc, bom: false };
   Id3v2ContentError = class Id3v2ContentError extends makeUnexpectedFileContentError("id3v2") {
   };
@@ -3992,7 +3992,7 @@ var exports_AiffParser = {};
 __export(exports_AiffParser, {
   AIFFParser: () => AIFFParser
 });
-var import_debug5, debug5, AIFFParser;
+var import_debug6, debug6, AIFFParser;
 var init_AiffParser = __esm(() => {
   init_lib();
   init_lib3();
@@ -4001,8 +4001,8 @@ var init_AiffParser = __esm(() => {
   init_iff();
   init_AiffToken();
   init_AiffToken();
-  import_debug5 = __toESM(require_src(), 1);
-  debug5 = import_debug5.default("music-metadata:parser:aiff");
+  import_debug6 = __toESM(require_src(), 1);
+  debug6 = import_debug6.default("music-metadata:parser:aiff");
   AIFFParser = class AIFFParser extends BasicParser {
     constructor() {
       super(...arguments);
@@ -4030,7 +4030,7 @@ var init_AiffParser = __esm(() => {
       this.metadata.setAudioOnly();
       try {
         while (!this.tokenizer.fileInfo.size || this.tokenizer.fileInfo.size - this.tokenizer.position >= Header2.len) {
-          debug5(`Reading AIFF chunk at offset=${this.tokenizer.position}`);
+          debug6(`Reading AIFF chunk at offset=${this.tokenizer.position}`);
           const chunkHeader = await this.tokenizer.readToken(Header2);
           const nextChunk = 2 * Math.round(chunkHeader.chunkSize / 2);
           const bytesRead = await this.readData(chunkHeader);
@@ -4038,7 +4038,7 @@ var init_AiffParser = __esm(() => {
         }
       } catch (err) {
         if (err instanceof EndOfStreamError) {
-          debug5("End-of-stream");
+          debug6("End-of-stream");
         } else {
           throw err;
         }
@@ -4078,7 +4078,7 @@ var init_AiffParser = __esm(() => {
         case "ANNO":
           return this.readTextChunk(header);
         default:
-          debug5(`Ignore chunk id=${header.chunkID}, size=${header.chunkSize}`);
+          debug6(`Ignore chunk id=${header.chunkID}, size=${header.chunkSize}`);
           return 0;
       }
     }
@@ -4632,15 +4632,15 @@ var exports_AsfParser = {};
 __export(exports_AsfParser, {
   AsfParser: () => AsfParser
 });
-var import_debug6, debug6, headerType = "asf", maxAsfMetadataObjectSize, AsfParser;
+var import_debug7, debug7, headerType = "asf", maxAsfMetadataObjectSize, AsfParser;
 var init_AsfParser = __esm(() => {
   init_lib();
   init_type();
   init_AsfGuid();
   init_AsfObject();
   init_AsfObject();
-  import_debug6 = __toESM(require_src(), 1);
-  debug6 = import_debug6.default("music-metadata:parser:ASF");
+  import_debug7 = __toESM(require_src(), 1);
+  debug7 = import_debug7.default("music-metadata:parser:ASF");
   maxAsfMetadataObjectSize = 16 * 1024 * 1024;
   AsfParser = class AsfParser extends BasicParser {
     async parse() {
@@ -4657,7 +4657,7 @@ var init_AsfParser = __esm(() => {
       let tags;
       for (let index = 0;index < numberOfObjectHeaders; ++index) {
         const { header, payloadSize } = await this.readObjectHeader(remainingHeaderSize, "header");
-        debug6("header GUID=%s", header.objectId.str);
+        debug7("header GUID=%s", header.objectId.str);
         switch (header.objectId.str) {
           case FilePropertiesObject.guid.str: {
             this.validateAllocationSize(payloadSize, "File Properties Object");
@@ -4718,12 +4718,12 @@ var init_AsfParser = __esm(() => {
             await this.ignorePayload(payloadSize, "Stream Bitrate Properties Object");
             break;
           case AsfGuid_default.PaddingObject.str:
-            debug6("Padding: %s bytes", payloadSize);
+            debug7("Padding: %s bytes", payloadSize);
             await this.ignorePayload(payloadSize, "Padding Object");
             break;
           default:
             this.metadata.addWarning(`Ignore ASF-Object-GUID: ${header.objectId.str}`);
-            debug6("Ignore ASF-Object-GUID: %s", header.objectId.str);
+            debug7("Ignore ASF-Object-GUID: %s", header.objectId.str);
             await this.ignorePayload(payloadSize, `object ${header.objectId.str}`);
         }
         remainingHeaderSize -= header.objectSize;
@@ -4840,7 +4840,7 @@ __export(exports_DsdiffParser, {
   DsdiffParser: () => DsdiffParser,
   DsdiffContentParseError: () => DsdiffContentParseError
 });
-var import_debug8, debug8, DsdiffContentParseError, DsdiffParser;
+var import_debug9, debug9, DsdiffContentParseError, DsdiffParser;
 var init_DsdiffParser = __esm(() => {
   init_lib();
   init_lib3();
@@ -4848,8 +4848,8 @@ var init_DsdiffParser = __esm(() => {
   init_ID3v2Parser();
   init_ParseError();
   init_DsdiffToken();
-  import_debug8 = __toESM(require_src(), 1);
-  debug8 = import_debug8.default("music-metadata:parser:aiff");
+  import_debug9 = __toESM(require_src(), 1);
+  debug9 = import_debug9.default("music-metadata:parser:aiff");
   DsdiffContentParseError = class DsdiffContentParseError extends makeUnexpectedFileContentError("DSDIFF") {
   };
   DsdiffParser = class DsdiffParser extends BasicParser {
@@ -4872,18 +4872,18 @@ var init_DsdiffParser = __esm(() => {
     async readFmt8Chunks(remainingSize) {
       while (remainingSize >= ChunkHeader64.len) {
         const chunkHeader = await this.tokenizer.readToken(ChunkHeader64);
-        debug8(`Chunk id=${chunkHeader.chunkID}`);
+        debug9(`Chunk id=${chunkHeader.chunkID}`);
         await this.readData(chunkHeader);
         remainingSize -= BigInt(ChunkHeader64.len) + chunkHeader.chunkSize;
       }
     }
     async readData(header) {
-      debug8(`Reading data of chunk[ID=${header.chunkID}, size=${header.chunkSize}]`);
+      debug9(`Reading data of chunk[ID=${header.chunkID}, size=${header.chunkSize}]`);
       const p0 = this.tokenizer.position;
       switch (header.chunkID.trim()) {
         case "FVER": {
           const version2 = await this.tokenizer.readToken(UINT32_LE);
-          debug8(`DSDIFF version=${version2}`);
+          debug9(`DSDIFF version=${version2}`);
           break;
         }
         case "PROP": {
@@ -4909,20 +4909,20 @@ var init_DsdiffParser = __esm(() => {
           }
           break;
         default:
-          debug8(`Ignore chunk[ID=${header.chunkID}, size=${header.chunkSize}]`);
+          debug9(`Ignore chunk[ID=${header.chunkID}, size=${header.chunkSize}]`);
           break;
       }
       const remaining = header.chunkSize - BigInt(this.tokenizer.position - p0);
       if (remaining > 0) {
-        debug8(`After Parsing chunk, remaining ${remaining} bytes`);
+        debug9(`After Parsing chunk, remaining ${remaining} bytes`);
         await this.tokenizer.ignore(Number(remaining));
       }
     }
     async handleSoundPropertyChunks(remainingSize) {
-      debug8(`Parsing sound-property-chunks, remainingSize=${remainingSize}`);
+      debug9(`Parsing sound-property-chunks, remainingSize=${remainingSize}`);
       while (remainingSize > 0) {
         const sndPropHeader = await this.tokenizer.readToken(ChunkHeader64);
-        debug8(`Sound-property-chunk[ID=${sndPropHeader.chunkID}, size=${sndPropHeader.chunkSize}]`);
+        debug9(`Sound-property-chunk[ID=${sndPropHeader.chunkID}, size=${sndPropHeader.chunkSize}]`);
         const p0 = this.tokenizer.position;
         switch (sndPropHeader.chunkID.trim()) {
           case "FS": {
@@ -4952,25 +4952,25 @@ var init_DsdiffParser = __esm(() => {
             const minutes = await this.tokenizer.readToken(UINT8);
             const seconds = await this.tokenizer.readToken(UINT8);
             const samples = await this.tokenizer.readToken(UINT32_BE);
-            debug8(`ABSS ${hours}:${minutes}:${seconds}.${samples}`);
+            debug9(`ABSS ${hours}:${minutes}:${seconds}.${samples}`);
             break;
           }
           case "LSCO": {
             const lsConfig = await this.tokenizer.readToken(UINT16_BE);
-            debug8(`LSCO lsConfig=${lsConfig}`);
+            debug9(`LSCO lsConfig=${lsConfig}`);
             break;
           }
           default:
-            debug8(`Unknown sound-property-chunk[ID=${sndPropHeader.chunkID}, size=${sndPropHeader.chunkSize}]`);
+            debug9(`Unknown sound-property-chunk[ID=${sndPropHeader.chunkID}, size=${sndPropHeader.chunkSize}]`);
             await this.tokenizer.ignore(Number(sndPropHeader.chunkSize));
         }
         const remaining = sndPropHeader.chunkSize - BigInt(this.tokenizer.position - p0);
         if (remaining > 0) {
-          debug8(`After Parsing sound-property-chunk ${sndPropHeader.chunkSize}, remaining ${remaining} bytes`);
+          debug9(`After Parsing sound-property-chunk ${sndPropHeader.chunkSize}, remaining ${remaining} bytes`);
           await this.tokenizer.ignore(Number(remaining));
         }
         remainingSize -= BigInt(ChunkHeader64.len) + sndPropHeader.chunkSize;
-        debug8(`Parsing sound-property-chunks, remainingSize=${remainingSize}`);
+        debug9(`Parsing sound-property-chunks, remainingSize=${remainingSize}`);
       }
       if (this.metadata.format.lossless && this.metadata.format.sampleRate && this.metadata.format.numberOfChannels && this.metadata.format.bitsPerSample) {
         const bitrate = this.metadata.format.sampleRate * this.metadata.format.numberOfChannels * this.metadata.format.bitsPerSample;
@@ -4978,29 +4978,29 @@ var init_DsdiffParser = __esm(() => {
       }
     }
     async handleChannelChunks(remainingSize) {
-      debug8(`Parsing channel-chunks, remainingSize=${remainingSize}`);
+      debug9(`Parsing channel-chunks, remainingSize=${remainingSize}`);
       const channels = [];
       while (remainingSize >= FourCcToken.len) {
         const channelId = await this.tokenizer.readToken(FourCcToken);
-        debug8(`Channel[ID=${channelId}]`);
+        debug9(`Channel[ID=${channelId}]`);
         channels.push(channelId);
         remainingSize -= BigInt(FourCcToken.len);
       }
-      debug8(`Channels: ${channels.join(", ")}`);
+      debug9(`Channels: ${channels.join(", ")}`);
       return channels;
     }
   };
 });
 
 // frontend/node_modules/music-metadata/lib/id3v2/AbstractID3Parser.js
-var import_debug9, debug9, AbstractID3Parser;
+var import_debug10, debug10, AbstractID3Parser;
 var init_AbstractID3Parser = __esm(() => {
   init_lib();
   init_ID3v1Parser();
   init_ID3v2Parser();
   init_ID3v2Token();
-  import_debug9 = __toESM(require_src(), 1);
-  debug9 = import_debug9.default("music-metadata:parser:ID3");
+  import_debug10 = __toESM(require_src(), 1);
+  debug10 = import_debug10.default("music-metadata:parser:ID3");
   AbstractID3Parser = class AbstractID3Parser extends BasicParser {
     constructor() {
       super(...arguments);
@@ -5014,7 +5014,7 @@ var init_AbstractID3Parser = __esm(() => {
         await this.parseID3v2();
       } catch (err) {
         if (err instanceof EndOfStreamError) {
-          debug9("End-of-stream");
+          debug10("End-of-stream");
         } else {
           throw err;
         }
@@ -5025,7 +5025,7 @@ var init_AbstractID3Parser = __esm(() => {
     }
     async parseID3v2() {
       await this.tryReadId3v2Headers();
-      debug9("End of ID3v2 header, go to MPEG-parser: pos=%s", this.tokenizer.position);
+      debug10("End of ID3v2 header, go to MPEG-parser: pos=%s", this.tokenizer.position);
       await this.postId3v2Parse();
       if (this.options.skipPostHeaders && this.metadata.hasAny()) {
         this.finalize();
@@ -5038,7 +5038,7 @@ var init_AbstractID3Parser = __esm(() => {
     async tryReadId3v2Headers() {
       const id3Header = await this.tokenizer.peekToken(ID3v2Header);
       if (id3Header.fileIdentifier === "ID3") {
-        debug9("Found ID3v2 header, pos=%s", this.tokenizer.position);
+        debug10("Found ID3v2 header, pos=%s", this.tokenizer.position);
         await this.id3parser.parse(this.metadata, this.tokenizer, this.options);
         return this.tryReadId3v2Headers();
       }
@@ -5089,15 +5089,15 @@ __export(exports_DsfParser, {
   DsfParser: () => DsfParser,
   DsdContentParseError: () => DsdContentParseError
 });
-var import_debug10, debug10, DsdContentParseError, DsfParser;
+var import_debug11, debug11, DsdContentParseError, DsfParser;
 var init_DsfParser = __esm(() => {
   init_AbstractID3Parser();
   init_ID3v2Parser();
   init_ID3v2Token();
   init_ParseError();
   init_DsfChunk();
-  import_debug10 = __toESM(require_src(), 1);
-  debug10 = import_debug10.default("music-metadata:parser:DSF");
+  import_debug11 = __toESM(require_src(), 1);
+  debug11 = import_debug11.default("music-metadata:parser:DSF");
   DsdContentParseError = class DsdContentParseError extends makeUnexpectedFileContentError("DSD") {
   };
   DsfParser = class DsfParser extends AbstractID3Parser {
@@ -5119,10 +5119,10 @@ var init_DsfParser = __esm(() => {
       }
       await this.parseChunks(dsdChunk.fileSize - chunkHeader.size);
       if (dsdChunk.metadataPointer === 0n) {
-        debug10("No ID3v2 tag present");
+        debug11("No ID3v2 tag present");
         return;
       }
-      debug10(`expect ID3v2 at offset=${dsdChunk.metadataPointer}`);
+      debug11(`expect ID3v2 at offset=${dsdChunk.metadataPointer}`);
       const metadataOffset = dsdChunk.metadataPointer - BigInt(this.tokenizer.position - p0);
       if (metadataOffset < 0n || metadataOffset > BigInt(Number.MAX_SAFE_INTEGER) || dsdChunk.metadataPointer + BigInt(ID3v2Header.len) > dsdChunk.fileSize) {
         throw new DsdContentParseError(`Invalid metadata pointer: ${dsdChunk.metadataPointer}`);
@@ -5134,7 +5134,7 @@ var init_DsfParser = __esm(() => {
       const chunkHeaderSize = BigInt(ChunkHeader.len);
       while (bytesRemaining >= chunkHeaderSize) {
         const chunkHeader = await this.tokenizer.readToken(ChunkHeader);
-        debug10(`Parsing chunk name=${chunkHeader.id} size=${chunkHeader.size}`);
+        debug11(`Parsing chunk name=${chunkHeader.id} size=${chunkHeader.size}`);
         if (chunkHeader.size < chunkHeaderSize) {
           throw new DsdContentParseError(`Invalid ${chunkHeader.id} chunk size: ${chunkHeader.size}`);
         }
@@ -5324,13 +5324,13 @@ class VorbisStream {
   async addTag(id, value) {
     if (id === "METADATA_BLOCK_PICTURE" && typeof value === "string") {
       if (this.options.skipCovers) {
-        debug11("Ignore picture");
+        debug12("Ignore picture");
         return;
       }
       value = VorbisPictureToken.fromBase64(value);
-      debug11(`Push picture: id=${id}, format=${value.format}`);
+      debug12(`Push picture: id=${id}, format=${value.format}`);
     } else {
-      debug11(`Push tag: id=${id}, value=${value}`);
+      debug12(`Push tag: id=${id}, value=${value}`);
     }
     await this.metadata.addTag("vorbis", id, value);
   }
@@ -5343,7 +5343,7 @@ class VorbisStream {
   parseFirstPage(_header, pageData) {
     this.metadata.setFormat("codec", "Vorbis I");
     this.metadata.setFormat("hasAudio", true);
-    debug11("Parse first page");
+    debug12("Parse first page");
     const commonHeader = CommonHeader.get(pageData, 0);
     if (commonHeader.vorbis !== "vorbis") {
       throw new VorbisContentError("Metadata does not look like Vorbis");
@@ -5353,14 +5353,14 @@ class VorbisStream {
       this.metadata.setFormat("sampleRate", idHeader.sampleRate);
       this.metadata.setFormat("bitrate", idHeader.bitrateNominal);
       this.metadata.setFormat("numberOfChannels", idHeader.channelMode);
-      debug11("sample-rate=%s[hz], bitrate=%s[b/s], channel-mode=%s", idHeader.sampleRate, idHeader.bitrateNominal, idHeader.channelMode);
+      debug12("sample-rate=%s[hz], bitrate=%s[b/s], channel-mode=%s", idHeader.sampleRate, idHeader.bitrateNominal, idHeader.channelMode);
     } else {
       throw new VorbisContentError("First Ogg page should be type 1: the identification header");
     }
   }
   async parseFullPage(pageData) {
     const commonHeader = CommonHeader.get(pageData, 0);
-    debug11("Parse full page: type=%s, byteLength=%s", commonHeader.packetType, pageData.byteLength);
+    debug12("Parse full page: type=%s, byteLength=%s", commonHeader.packetType, pageData.byteLength);
     switch (commonHeader.packetType) {
       case 3:
         return this.parseUserCommentList(pageData, CommonHeader.len);
@@ -5381,14 +5381,14 @@ class VorbisStream {
     this.isMetadataComplete = true;
   }
 }
-var import_debug11, debug11, VorbisContentError;
+var import_debug12, debug12, VorbisContentError;
 var init_VorbisStream = __esm(() => {
   init_lib3();
   init_ParseError();
   init_Vorbis();
   init_VorbisDecoder();
-  import_debug11 = __toESM(require_src(), 1);
-  debug11 = import_debug11.default("music-metadata:parser:ogg:vorbis1");
+  import_debug12 = __toESM(require_src(), 1);
+  debug12 = import_debug12.default("music-metadata:parser:ogg:vorbis1");
   VorbisContentError = class VorbisContentError extends makeUnexpectedFileContentError("Vorbis") {
   };
 });
@@ -5440,7 +5440,7 @@ var exports_FlacParser = {};
 __export(exports_FlacParser, {
   FlacParser: () => FlacParser
 });
-var import_debug12, debug12, FlacContentError, FlacParser;
+var import_debug13, debug13, FlacContentError, FlacParser;
 var init_FlacParser = __esm(() => {
   init_lib3();
   init_FourCC();
@@ -5450,8 +5450,8 @@ var init_FlacParser = __esm(() => {
   init_VorbisStream();
   init_ParseError();
   init_FlacToken();
-  import_debug12 = __toESM(require_src(), 1);
-  debug12 = import_debug12.default("music-metadata:parser:FLAC");
+  import_debug13 = __toESM(require_src(), 1);
+  debug13 = import_debug13.default("music-metadata:parser:FLAC");
   FlacContentError = class FlacContentError extends makeUnexpectedFileContentError("FLAC") {
   };
   FlacParser = class FlacParser extends AbstractID3Parser {
@@ -5475,7 +5475,7 @@ var init_FlacParser = __esm(() => {
       }
     }
     async parseDataBlock(blockHeader) {
-      debug12(`blockHeader type=${blockHeader.type}, length=${blockHeader.length}`);
+      debug13(`blockHeader type=${blockHeader.type}, length=${blockHeader.length}`);
       switch (blockHeader.type) {
         case BlockType.STREAMINFO:
           return this.readBlockStreamInfo(blockHeader.length);
@@ -5603,7 +5603,7 @@ class EbmlIterator {
           case ParseAction.ReadNext:
             {
               if (element.id === 524531317) {}
-              debug13(`Read element: name=${getElementPath(child)}{id=0x${element.id.toString(16)}, container=${!!child.container}} at position=${elementPosition}`);
+              debug14(`Read element: name=${getElementPath(child)}{id=0x${element.id.toString(16)}, container=${!!child.container}} at position=${elementPosition}`);
               if (child.container) {
                 const childEnd = Math.min(posDone, this.tokenizer.fileInfo.size ?? Number.POSITIVE_INFINITY, element.len >= 0 ? this.tokenizer.position + element.len : posDone);
                 const res = await this.parseContainer(child, childEnd, listener);
@@ -5631,18 +5631,18 @@ class EbmlIterator {
             }
             break;
           case ParseAction.SkipElement:
-            debug13(`Go to next element: name=${getElementPath(child)}, element.id=0x${element.id}, container=${!!child.container} at position=${elementPosition}`);
+            debug14(`Go to next element: name=${getElementPath(child)}, element.id=0x${element.id}, container=${!!child.container} at position=${elementPosition}`);
             break;
           case ParseAction.IgnoreElement:
-            debug13(`Ignore element: name=${getElementPath(child)}, element.id=0x${element.id}, container=${!!child.container} at position=${elementPosition}`);
+            debug14(`Ignore element: name=${getElementPath(child)}, element.id=0x${element.id}, container=${!!child.container} at position=${elementPosition}`);
             await this.tokenizer.ignore(element.len);
             break;
           case ParseAction.SkipSiblings:
-            debug13(`Ignore remaining container, at: name=${getElementPath(child)}, element.id=0x${element.id}, container=${!!child.container} at position=${elementPosition}`);
+            debug14(`Ignore remaining container, at: name=${getElementPath(child)}, element.id=0x${element.id}, container=${!!child.container} at position=${elementPosition}`);
             await this.tokenizer.ignore(posDone - this.tokenizer.position);
             break;
           case ParseAction.TerminateParsing:
-            debug13(`Terminate parsing at element: name=${getElementPath(child)}, element.id=0x${element.id}, container=${!!child.container} at position=${elementPosition}`);
+            debug14(`Terminate parsing at element: name=${getElementPath(child)}, element.id=0x${element.id}, container=${!!child.container} at position=${elementPosition}`);
             return tree;
         }
       } else {
@@ -5651,7 +5651,7 @@ class EbmlIterator {
             await this.tokenizer.ignore(element.len);
             break;
           default:
-            debug13(`parseEbml: parent=${getElementPath(dtdElement)}, unknown child: id=${element.id.toString(16)} at position=${elementPosition}`);
+            debug14(`parseEbml: parent=${getElementPath(dtdElement)}, unknown child: id=${element.id.toString(16)} at position=${elementPosition}`);
             await this.tokenizer.ignore(element.len);
         }
       }
@@ -5764,15 +5764,15 @@ function getElementPath(element) {
   }
   return path + element.name;
 }
-var import_debug13, debug13, EbmlContentError, ParseAction;
+var import_debug14, debug14, EbmlContentError, ParseAction;
 var init_EbmlIterator = __esm(() => {
   init_lib();
   init_lib3();
   init_lib3();
   init_ParseError();
   init_types2();
-  import_debug13 = __toESM(require_src(), 1);
-  debug13 = import_debug13.default("music-metadata:parser:ebml");
+  import_debug14 = __toESM(require_src(), 1);
+  debug14 = import_debug14.default("music-metadata:parser:ebml");
   EbmlContentError = class EbmlContentError extends makeUnexpectedFileContentError("EBML") {
   };
   ParseAction = {
@@ -6062,13 +6062,13 @@ var exports_MatroskaParser = {};
 __export(exports_MatroskaParser, {
   MatroskaParser: () => MatroskaParser
 });
-var import_debug14, debug14, MatroskaParser;
+var import_debug15, debug15, MatroskaParser;
 var init_MatroskaParser = __esm(() => {
   init_EbmlIterator();
   init_MatroskaDtd();
   init_types();
-  import_debug14 = __toESM(require_src(), 1);
-  debug14 = import_debug14.default("music-metadata:parser:matroska");
+  import_debug15 = __toESM(require_src(), 1);
+  debug15 = import_debug15.default("music-metadata:parser:matroska");
   MatroskaParser = class MatroskaParser extends BasicParser {
     constructor() {
       super(...arguments);
@@ -6078,19 +6078,19 @@ var init_MatroskaParser = __esm(() => {
     async parse() {
       const containerSize = this.tokenizer.fileInfo.size ?? Number.MAX_SAFE_INTEGER;
       const matroskaIterator = new EbmlIterator(this.tokenizer);
-      debug14("Initializing DTD end MatroskaIterator");
+      debug15("Initializing DTD end MatroskaIterator");
       await matroskaIterator.iterate(matroskaDtd, containerSize, {
         startNext: (element) => {
           switch (element.id) {
             case 475249515:
-              debug14(`Skip element: name=${element.name}, id=0x${element.id.toString(16)}`);
+              debug15(`Skip element: name=${element.name}, id=0x${element.id.toString(16)}`);
               return ParseAction.IgnoreElement;
             case 524531317:
               if (this.flagUseIndexToSkipClusters && this.seekHead) {
                 const index = this.seekHead.seek.find((index2) => index2.position + this.seekHeadOffset > this.tokenizer.position);
                 if (index) {
                   const ignoreSize = index.position + this.seekHeadOffset - this.tokenizer.position;
-                  debug14(`Use index to go to next position, ignoring ${ignoreSize} bytes`);
+                  debug15(`Use index to go to next position, ignoring ${ignoreSize} bytes`);
                   this.tokenizer.ignore(ignoreSize);
                   return ParseAction.SkipElement;
                 }
@@ -6101,7 +6101,7 @@ var init_MatroskaParser = __esm(() => {
           }
         },
         elementValue: async (element, value, offset) => {
-          debug14(`Received: name=${element.name}, value=${value}`);
+          debug15(`Received: name=${element.name}, value=${value}`);
           switch (element.id) {
             case 17026:
               this.metadata.setFormat("container", `EBML/${value}`);
@@ -6201,7 +6201,7 @@ class FixedLengthAtom {
       throw new Mp4ContentError(`Atom ${atomId} expected to be ${expLen}, but specifies ${len} bytes long.`);
     }
     if (len > expLen) {
-      debug15(`Warning: atom ${atomId} expected to be ${expLen}, but was actually ${len} bytes long.`);
+      debug16(`Warning: atom ${atomId} expected to be ${expLen}, but was actually ${len} bytes long.`);
     }
     this.len = len;
   }
@@ -6369,7 +6369,7 @@ class ChapterText {
   }
 }
 function readTokenTable(buf, token, off, remainingLen, numberOfEntries) {
-  debug15(`remainingLen=${remainingLen}, numberOfEntries=${numberOfEntries} * token-len=${token.len}`);
+  debug16(`remainingLen=${remainingLen}, numberOfEntries=${numberOfEntries} * token-len=${token.len}`);
   if (remainingLen === 0) {
     return [];
   }
@@ -6457,7 +6457,7 @@ class TrackRunBox {
     }
     for (let n = 0;n < trun.sampleCount; ++n) {
       if (dynOffset >= this.len) {
-        debug15("TrackRunBox size mismatch");
+        debug16("TrackRunBox size mismatch");
         break;
       }
       const sample = {};
@@ -6514,14 +6514,14 @@ class ChapterTrackReferenceBox {
     return trackIds;
   }
 }
-var import_debug15, debug15, Mp4ContentError, Header3, ExtendedSize, ftyp, SecondsSinceMacEpoch, SecondsSinceMacEpoch64, MdhdAtom, MvhdAtom, stsdHeader, SoundSampleDescriptionVersion, SoundSampleDescriptionV0, TimeToSampleToken, SttsAtom, SampleToChunkToken, StscAtom, StcoAtom;
+var import_debug16, debug16, Mp4ContentError, Header3, ExtendedSize, ftyp, SecondsSinceMacEpoch, SecondsSinceMacEpoch64, MdhdAtom, MvhdAtom, stsdHeader, SoundSampleDescriptionVersion, SoundSampleDescriptionV0, TimeToSampleToken, SttsAtom, SampleToChunkToken, StscAtom, StcoAtom;
 var init_AtomToken = __esm(() => {
   init_lib3();
   init_FourCC();
   init_Util();
   init_ParseError();
-  import_debug15 = __toESM(require_src(), 1);
-  debug15 = import_debug15.default("music-metadata:parser:MP4:atom");
+  import_debug16 = __toESM(require_src(), 1);
+  debug16 = import_debug16.default("music-metadata:parser:MP4:atom");
   Mp4ContentError = class Mp4ContentError extends makeUnexpectedFileContentError("MP4") {
   };
   Header3 = {
@@ -6721,7 +6721,7 @@ class Atom {
     if (remaining < Header3.len) {
       throw new Mp4ContentError("Truncated atom header");
     }
-    debug16(`Reading next token on offset=${offset}...`);
+    debug17(`Reading next token on offset=${offset}...`);
     const header = await tokenizer.readToken(Header3);
     const extended = header.length === 1n;
     if (extended) {
@@ -6743,7 +6743,7 @@ class Atom {
     }
     const payloadLength = length2 - headerLength;
     const atomBean = new Atom(header, extended, parent, payloadLength);
-    debug16(`parse atom name=${atomBean.atomPath}, extended=${atomBean.extended}, offset=${offset}, len=${atomBean.header.length}`);
+    debug17(`parse atom name=${atomBean.atomPath}, extended=${atomBean.extended}, offset=${offset}, len=${atomBean.header.length}`);
     await atomBean.readData(tokenizer, dataHandler, payloadLength);
     return atomBean;
   }
@@ -6803,12 +6803,12 @@ class Atom {
     }
   }
 }
-var import_debug16, debug16;
+var import_debug17, debug17;
 var init_Atom = __esm(() => {
   init_AtomToken();
   init_AtomToken();
-  import_debug16 = __toESM(require_src(), 1);
-  debug16 = import_debug16.default("music-metadata:parser:MP4:Atom");
+  import_debug17 = __toESM(require_src(), 1);
+  debug17 = import_debug17.default("music-metadata:parser:MP4:Atom");
 });
 
 // frontend/node_modules/music-metadata/lib/mp4/MP4Parser.js
@@ -6829,7 +6829,7 @@ function isAudioTrack(track) {
   }
   return !!ssd.description && ssd.description.numAudioChannels > 0;
 }
-var import_debug17, debug17, tagFormat2 = "iTunes", encoderDict, MP4Parser;
+var import_debug18, debug18, tagFormat2 = "iTunes", encoderDict, MP4Parser;
 var init_MP4Parser = __esm(() => {
   init_lib2();
   init_lib3();
@@ -6839,8 +6839,8 @@ var init_MP4Parser = __esm(() => {
   init_Atom();
   init_AtomToken();
   init_AtomToken();
-  import_debug17 = __toESM(require_src(), 1);
-  debug17 = import_debug17.default("music-metadata:parser:MP4");
+  import_debug18 = __toESM(require_src(), 1);
+  debug18 = import_debug18.default("music-metadata:parser:MP4");
   encoderDict = {
     raw: {
       lossy: false,
@@ -6946,7 +6946,7 @@ var init_MP4Parser = __esm(() => {
               types.push(value);
             }
           }
-          debug17(`ftyp: ${types.join("/")}`);
+          debug18(`ftyp: ${types.join("/")}`);
           const x = types.filter(distinct).join("/");
           this.metadata.setFormat("container", x);
         },
@@ -6994,14 +6994,14 @@ var init_MP4Parser = __esm(() => {
           const token = await this.tokenizer.peekToken(Header3);
           if (token.name === "\x00\x00\x00\x00") {
             const errMsg = `Error at offset=${this.tokenizer.position}: box.id=0`;
-            debug17(errMsg);
+            debug18(errMsg);
             this.addWarning(errMsg);
             break;
           }
         } catch (error51) {
           if (error51 instanceof Error) {
             const errMsg = `Error at offset=${this.tokenizer.position}: ${error51.message}`;
-            debug17(errMsg);
+            debug18(errMsg);
             this.addWarning(errMsg);
           } else {
             throw error51;
@@ -7049,12 +7049,12 @@ var init_MP4Parser = __esm(() => {
         if (audioTrack.media.header && audioTrack.media.header.timeScale > 0) {
           audioTrack.sampleRate = audioTrack.media.header.timeScale;
           if (audioTrack.media.header.duration > 0) {
-            debug17("Using duration defined on audio track");
+            debug18("Using duration defined on audio track");
             audioTrack.samples = audioTrack.media.header.duration;
             audioTrack.duration = audioTrack.samples / audioTrack.sampleRate;
           }
           if (audioTrack.fragments.length > 0) {
-            debug17("Calculate duration defined in track fragments");
+            debug18("Calculate duration defined in track fragments");
             let totalTimeUnits = 0;
             audioTrack.sizeInBytes = 0;
             for (const fragment of audioTrack.fragments) {
@@ -7135,7 +7135,7 @@ var init_MP4Parser = __esm(() => {
         }
         return this.atomParsers[atom.header.name](remaining);
       }
-      debug17(`No parser for atom path=${atom.atomPath}, payload-len=${remaining}, ignoring atom`);
+      debug18(`No parser for atom path=${atom.atomPath}, payload-len=${remaining}, ignoring atom`);
       await this.tokenizer.ignore(remaining);
     }
     getTrackDescription() {
@@ -7146,7 +7146,7 @@ var init_MP4Parser = __esm(() => {
       await this.metadata.addTag(tagFormat2, id, value);
     }
     addWarning(message) {
-      debug17(`Warning: ${message}`);
+      debug18(`Warning: ${message}`);
       this.metadata.addWarning(message);
     }
     parseMetadataItemData(metaAtom) {
@@ -7197,7 +7197,7 @@ var init_MP4Parser = __esm(() => {
               break;
             }
             default:
-              debug17(`unknown proprietary value type for: ${metaAtom.atomPath}`);
+              debug18(`unknown proprietary value type for: ${metaAtom.atomPath}`);
           }
           break;
         case 1:
@@ -7301,11 +7301,11 @@ var init_MP4Parser = __esm(() => {
           case "dinf":
           case "vmhd":
           case "smhd":
-            debug17(`Ignoring: ${child.header.name}`);
+            debug18(`Ignoring: ${child.header.name}`);
             await this.tokenizer.ignore(payLoadLength);
             break;
           default: {
-            debug17(`Unexpected track box: ${child.header.name}`);
+            debug18(`Unexpected track box: ${child.header.name}`);
             await this.tokenizer.ignore(payLoadLength);
           }
         }
@@ -7335,7 +7335,7 @@ var init_MP4Parser = __esm(() => {
             break;
           }
           default: {
-            debug17(`Unexpected box: ${child.header.name}`);
+            debug18(`Unexpected box: ${child.header.name}`);
             await this.tokenizer.ignore(payLoadLength);
           }
         }
@@ -7355,10 +7355,10 @@ var init_MP4Parser = __esm(() => {
           if (description.length >= offset + SoundSampleDescriptionV0.len) {
             ssd.description = SoundSampleDescriptionV0.get(description, offset);
           } else {
-            debug17(`Warning: sound-sample-description too short: ${description.length} bytes`);
+            debug18(`Warning: sound-sample-description too short: ${description.length} bytes`);
           }
         } else {
-          debug17(`Warning: sound-sample-description ${version2} not implemented`);
+          debug18(`Warning: sound-sample-description ${version2} not implemented`);
         }
       }
       return ssd;
@@ -7381,14 +7381,14 @@ var init_MP4Parser = __esm(() => {
         }
         await this.tokenizer.ignore(nextChunkLen);
         const title = await this.readToken(new ChapterText(sampleSize));
-        debug17(`Chapter ${i + 1}: ${title}`);
+        debug18(`Chapter ${i + 1}: ${title}`);
         const chapter = {
           title,
           timeScale: chapterTrack.media.header ? chapterTrack.media.header.timeScale : 0,
           start,
           sampleOffset: this.findSampleOffset(track, this.tokenizer.position)
         };
-        debug17(`Chapter title=${chapter.title}, offset=${chapter.sampleOffset}/${track.header.duration}`);
+        debug18(`Chapter title=${chapter.title}, offset=${chapter.sampleOffset}/${track.header.duration}`);
         chapters.push(chapter);
       }
       this.metadata.setFormat("chapters", chapters);
@@ -7620,19 +7620,19 @@ class MpegFrameHeader {
     }
   }
   parseAdtsHeader(buf, off) {
-    debug18("layer=0 => ADTS");
+    debug19("layer=0 => ADTS");
     this.version = this.versionIndex === 2 ? 4 : 2;
     this.container = `ADTS/MPEG-${this.version}`;
     const profileIndex = getBitAllignedNumber(buf, off + 2, 0, 2);
     this.codec = "AAC";
     this.codecProfile = MPEG4.AudioObjectTypes[profileIndex];
-    debug18(`MPEG-4 audio-codec=${this.codec}`);
+    debug19(`MPEG-4 audio-codec=${this.codec}`);
     const samplingFrequencyIndex = getBitAllignedNumber(buf, off + 2, 2, 4);
     this.samplingRate = MPEG4.SamplingFrequencies[samplingFrequencyIndex];
-    debug18(`sampling-rate=${this.samplingRate}`);
+    debug19(`sampling-rate=${this.samplingRate}`);
     const channelIndex = getBitAllignedNumber(buf, off + 2, 7, 3);
     this.mp4ChannelConfig = MPEG4_ChannelConfigurations[channelIndex];
-    debug18(`channel-config=${this.mp4ChannelConfig ? this.mp4ChannelConfig.join("+") : "?"}`);
+    debug19(`channel-config=${this.mp4ChannelConfig ? this.mp4ChannelConfig.join("+") : "?"}`);
     this.frameLength = getBitAllignedNumber(buf, off + 3, 6, 2) << 11;
   }
   calcBitrate() {
@@ -7655,7 +7655,7 @@ class MpegFrameHeader {
 function getVbrCodecProfile(vbrScale) {
   return `V${Math.floor((100 - vbrScale) / 10)}`;
 }
-var import_debug18, debug18, MpegContentError, maxPeekLen = 1024, MPEG4, MPEG4_ChannelConfigurations, FrameHeader, MpegParser;
+var import_debug19, debug19, MpegContentError, maxPeekLen = 1024, MPEG4, MPEG4_ChannelConfigurations, FrameHeader, MpegParser;
 var init_MpegParser = __esm(() => {
   init_lib();
   init_lib3();
@@ -7663,8 +7663,8 @@ var init_MpegParser = __esm(() => {
   init_AbstractID3Parser();
   init_ParseError();
   init_XingTag();
-  import_debug18 = __toESM(require_src(), 1);
-  debug18 = import_debug18.default("music-metadata:parser:mpeg");
+  import_debug19 = __toESM(require_src(), 1);
+  debug19 = import_debug19.default("music-metadata:parser:mpeg");
   MpegContentError = class MpegContentError extends makeUnexpectedFileContentError("MPEG") {
   };
   MPEG4 = {
@@ -7768,14 +7768,14 @@ var init_MpegParser = __esm(() => {
         }
       } catch (err) {
         if (err instanceof EndOfStreamError) {
-          debug18("End-of-stream");
+          debug19("End-of-stream");
           if (this.calculateEofDuration) {
             if (this.samplesPerFrame !== null) {
               const numberOfSamples = this.frameCount * this.samplesPerFrame;
               this.metadata.setFormat("numberOfSamples", numberOfSamples);
               if (this.metadata.format.sampleRate) {
                 const duration4 = numberOfSamples / this.metadata.format.sampleRate;
-                debug18(`Calculate duration at EOF: ${duration4} sec.`, duration4);
+                debug19(`Calculate duration at EOF: ${duration4} sec.`, duration4);
                 this.metadata.setFormat("duration", duration4);
               }
             }
@@ -7802,7 +7802,7 @@ var init_MpegParser = __esm(() => {
             this.metadata.setFormat("numberOfSamples", numberOfSamples);
             if (format.sampleRate && !format.duration) {
               const duration4 = numberOfSamples / format.sampleRate;
-              debug18("Calculate CBR duration based on file size: %s", duration4);
+              debug19("Calculate CBR duration based on file size: %s", duration4);
               this.metadata.setFormat("duration", duration4);
             }
           }
@@ -7822,9 +7822,9 @@ var init_MpegParser = __esm(() => {
             this.buf_frame_header[0] = MpegFrameHeader.SyncByte1;
             this.buf_frame_header[1] = this.syncPeek.buf[bo];
             await this.tokenizer.ignore(bo);
-            debug18(`Sync at offset=${this.tokenizer.position - 1}, frameCount=${this.frameCount}`);
+            debug19(`Sync at offset=${this.tokenizer.position - 1}, frameCount=${this.frameCount}`);
             if (this.syncFrameCount === this.frameCount) {
-              debug18(`Re-synced MPEG stream, frameCount=${this.frameCount}`);
+              debug19(`Re-synced MPEG stream, frameCount=${this.frameCount}`);
               this.frameCount = 0;
               this.frame_size = 0;
             }
@@ -7873,14 +7873,14 @@ var init_MpegParser = __esm(() => {
       this.metadata.setFormat("numberOfChannels", header.channelMode === "mono" ? 1 : 2);
       this.metadata.setFormat("bitrate", header.bitrate);
       if (this.frameCount < 20 * 1e4) {
-        debug18("offset=%s MP%s bitrate=%s sample-rate=%s", this.tokenizer.position - 4, header.layer, header.bitrate, header.samplingRate);
+        debug19("offset=%s MP%s bitrate=%s sample-rate=%s", this.tokenizer.position - 4, header.layer, header.bitrate, header.samplingRate);
       }
       const slot_size = header.calcSlotSize();
       if (slot_size === null) {
         throw new MpegContentError("invalid slot_size");
       }
       const samples_per_frame = header.calcSamplesPerFrame();
-      debug18(`samples_per_frame=${samples_per_frame}`);
+      debug19(`samples_per_frame=${samples_per_frame}`);
       const bps = samples_per_frame / 8;
       if (header.bitrate !== null && header.samplingRate != null) {
         const fsize = bps * header.bitrate / header.samplingRate + (header.padding ? slot_size : 0);
@@ -7932,7 +7932,7 @@ var init_MpegParser = __esm(() => {
         const bytesPerFrame = this.frameCount === 0 ? 0 : this.totalDataLength / this.frameCount;
         const bitrate = 8 * bytesPerFrame * framesPerSec + 0.5;
         this.metadata.setFormat("bitrate", bitrate);
-        debug18(`frame-count=${this.frameCount}, size=${header.frameLength} bytes, bit-rate=${bitrate}`);
+        debug19(`frame-count=${this.frameCount}, size=${header.frameLength} bytes, bit-rate=${bitrate}`);
       }
       await this.tokenizer.ignore(header.frameLength > 7 ? header.frameLength - 7 : 1);
       if (this.frameCount === 3) {
@@ -8021,7 +8021,7 @@ var init_MpegParser = __esm(() => {
       if (infoTag.streamSize && this.audioFrameHeader && infoTag.numFrames !== null) {
         const duration4 = this.audioFrameHeader.calcDuration(infoTag.numFrames);
         this.metadata.setFormat("duration", duration4);
-        debug18("Get duration from Xing header: %s", this.metadata.format.duration);
+        debug19("Get duration from Xing header: %s", this.metadata.format.duration);
         return infoTag;
       }
       const frameDataLeft = this.frame_size - this.offset;
@@ -8132,14 +8132,14 @@ var init_StreamVersion7 = __esm(() => {
 });
 
 // frontend/node_modules/music-metadata/lib/musepack/sv7/MpcSv7Parser.js
-var import_debug19, debug19, MpcSv7Parser;
+var import_debug20, debug20, MpcSv7Parser;
 var init_MpcSv7Parser = __esm(() => {
   init_APEv2Parser();
   init_MusepackConentError();
   init_BitReader();
   init_StreamVersion7();
-  import_debug19 = __toESM(require_src(), 1);
-  debug19 = import_debug19.default("music-metadata:parser:musepack");
+  import_debug20 = __toESM(require_src(), 1);
+  debug20 = import_debug20.default("music-metadata:parser:musepack");
   MpcSv7Parser = class MpcSv7Parser extends BasicParser {
     constructor() {
       super(...arguments);
@@ -8152,7 +8152,7 @@ var init_MpcSv7Parser = __esm(() => {
       if (header.signature !== "MP+") {
         throw new MusepackContentError("Unexpected magic number");
       }
-      debug19(`stream-version=${header.streamMajorVersion}.${header.streamMinorVersion}`);
+      debug20(`stream-version=${header.streamMajorVersion}.${header.streamMinorVersion}`);
       this.metadata.setFormat("container", "Musepack, SV7");
       this.metadata.setFormat("sampleRate", header.sampleFrequency);
       const numberOfSamples = 1152 * (header.frameCount - 1) + header.lastFrameLength;
@@ -8164,7 +8164,7 @@ var init_MpcSv7Parser = __esm(() => {
       const version2 = await this.bitreader.read(8);
       this.metadata.setFormat("codec", (version2 / 100).toFixed(2));
       await this.skipAudioData(header.frameCount);
-      debug19(`End of audio stream, switching to APEv2, offset=${this.tokenizer.position}`);
+      debug20(`End of audio stream, switching to APEv2, offset=${this.tokenizer.position}`);
       return tryParseApeHeader(this.metadata, this.tokenizer, this.options);
     }
     async skipAudioData(frameCount) {
@@ -8203,11 +8203,11 @@ class StreamReader2 {
   }
   async readStreamHeader(size) {
     const streamHeader = {};
-    debug20(`Reading SH at offset=${this.tokenizer.position}`);
+    debug21(`Reading SH at offset=${this.tokenizer.position}`);
     const part1 = await this.tokenizer.readToken(SH_part1);
     size -= SH_part1.len;
     Object.assign(streamHeader, part1);
-    debug20(`SH.streamVersion = ${part1.streamVersion}`);
+    debug21(`SH.streamVersion = ${part1.streamVersion}`);
     const sampleCount = await this.readVariableSizeField();
     size -= sampleCount.len;
     streamHeader.sampleCount = sampleCount.value;
@@ -8230,12 +8230,12 @@ class StreamReader2 {
     return this.readVariableSizeField(len + 1, n << 7);
   }
 }
-var import_debug20, debug20, PacketKey, SH_part1, SH_part3;
+var import_debug21, debug21, PacketKey, SH_part1, SH_part3;
 var init_StreamVersion8 = __esm(() => {
   init_lib3();
   init_Util();
-  import_debug20 = __toESM(require_src(), 1);
-  debug20 = import_debug20.default("music-metadata:parser:musepack:sv8");
+  import_debug21 = __toESM(require_src(), 1);
+  debug21 = import_debug21.default("music-metadata:parser:musepack:sv8");
   PacketKey = new StringType(2, "latin1");
   SH_part1 = {
     len: 5,
@@ -8261,14 +8261,14 @@ var init_StreamVersion8 = __esm(() => {
 });
 
 // frontend/node_modules/music-metadata/lib/musepack/sv8/MpcSv8Parser.js
-var import_debug21, debug21, MpcSv8Parser;
+var import_debug22, debug22, MpcSv8Parser;
 var init_MpcSv8Parser = __esm(() => {
   init_APEv2Parser();
   init_FourCC();
   init_MusepackConentError();
   init_StreamVersion8();
-  import_debug21 = __toESM(require_src(), 1);
-  debug21 = import_debug21.default("music-metadata:parser:musepack");
+  import_debug22 = __toESM(require_src(), 1);
+  debug22 = import_debug22.default("music-metadata:parser:musepack");
   MpcSv8Parser = class MpcSv8Parser extends BasicParser {
     constructor() {
       super(...arguments);
@@ -8286,7 +8286,7 @@ var init_MpcSv8Parser = __esm(() => {
       const sv8reader = new StreamReader2(this.tokenizer);
       do {
         const header = await sv8reader.readPacketHeader();
-        debug21(`packet-header key=${header.key}, payloadLength=${header.payloadLength}`);
+        debug22(`packet-header key=${header.key}, payloadLength=${header.payloadLength}`);
         switch (header.key) {
           case "SH": {
             const sh = await sv8reader.readStreamHeader(header.payloadLength);
@@ -8325,27 +8325,27 @@ var exports_MusepackParser = {};
 __export(exports_MusepackParser, {
   MusepackParser: () => MusepackParser
 });
-var import_debug22, debug22, MusepackParser;
+var import_debug23, debug23, MusepackParser;
 var init_MusepackParser = __esm(() => {
   init_lib3();
   init_AbstractID3Parser();
   init_MusepackConentError();
   init_MpcSv7Parser();
   init_MpcSv8Parser();
-  import_debug22 = __toESM(require_src(), 1);
-  debug22 = import_debug22.default("music-metadata:parser:musepack");
+  import_debug23 = __toESM(require_src(), 1);
+  debug23 = import_debug23.default("music-metadata:parser:musepack");
   MusepackParser = class MusepackParser extends AbstractID3Parser {
     async postId3v2Parse() {
       const signature = await this.tokenizer.peekToken(new StringType(3, "latin1"));
       let mpcParser;
       switch (signature) {
         case "MP+": {
-          debug22("Stream-version 7");
+          debug23("Stream-version 7");
           mpcParser = new MpcSv7Parser(this.metadata, this.tokenizer, this.options);
           break;
         }
         case "MPC": {
-          debug22("Stream-version 8");
+          debug23("Stream-version 8");
           mpcParser = new MpcSv8Parser(this.metadata, this.tokenizer, this.options);
           break;
         }
@@ -8374,10 +8374,10 @@ class FlacStream {
     }
   }
   calculateDuration() {
-    debug23("duration calculation not implemented");
+    debug24("duration calculation not implemented");
   }
   async parseFirstPage(_header, pageData) {
-    debug23("First Ogg/FLAC page");
+    debug24("First Ogg/FLAC page");
     const fourCC = await FourCcToken.get(pageData, 9);
     if (fourCC.toString() !== "fLaC") {
       throw new Error("Invalid FLAC preamble");
@@ -8386,7 +8386,7 @@ class FlacStream {
     await this.parseDataBlock(blockHeader, pageData.subarray(13 + BlockHeader.len));
   }
   async parseDataBlock(blockHeader, pageData) {
-    debug23(`blockHeader type=${blockHeader.type}, length=${blockHeader.length}`);
+    debug24(`blockHeader type=${blockHeader.type}, length=${blockHeader.length}`);
     switch (blockHeader.type) {
       case BlockType.STREAMINFO: {
         const streamInfo = BlockStreamInfo.get(pageData, 0);
@@ -8415,14 +8415,14 @@ class FlacStream {
     return Promise.resolve();
   }
 }
-var import_debug23, debug23;
+var import_debug24, debug24;
 var init_FlacStream = __esm(() => {
   init_FourCC();
   init_FlacParser();
   init_FlacToken();
   init_Vorbis();
-  import_debug23 = __toESM(require_src(), 1);
-  debug23 = import_debug23.default("music-metadata:parser:ogg:theora");
+  import_debug24 = __toESM(require_src(), 1);
+  debug24 = import_debug24.default("music-metadata:parser:ogg:theora");
 });
 
 // frontend/node_modules/music-metadata/lib/ogg/OggToken.js
@@ -8578,19 +8578,19 @@ var init_Speex = __esm(() => {
 });
 
 // frontend/node_modules/music-metadata/lib/ogg/speex/SpeexStream.js
-var import_debug24, debug24, SpeexStream;
+var import_debug25, debug25, SpeexStream;
 var init_SpeexStream = __esm(() => {
   init_VorbisStream();
   init_Speex();
-  import_debug24 = __toESM(require_src(), 1);
-  debug24 = import_debug24.default("music-metadata:parser:ogg:speex");
+  import_debug25 = __toESM(require_src(), 1);
+  debug25 = import_debug25.default("music-metadata:parser:ogg:speex");
   SpeexStream = class SpeexStream extends VorbisStream {
     constructor(metadata, options, _tokenizer) {
       super(metadata, options);
       this.commentHeaderParsed = false;
     }
     parseFirstPage(_header, pageData) {
-      debug24("First Ogg/Speex page");
+      debug25("First Ogg/Speex page");
       const speexHeader = Header5.get(pageData, 0);
       this.metadata.setFormat("codec", `Speex ${speexHeader.version}`);
       this.metadata.setFormat("numberOfChannels", speexHeader.nb_channels);
@@ -8605,7 +8605,7 @@ var init_SpeexStream = __esm(() => {
         return;
       }
       this.commentHeaderParsed = true;
-      debug24("Parse Ogg/Speex comment header");
+      debug25("Parse Ogg/Speex comment header");
       await this.parseUserCommentList(pageData, 0);
     }
   };
@@ -8644,10 +8644,10 @@ class TheoraStream {
     }
   }
   calculateDuration() {
-    debug25("duration calculation not implemented");
+    debug26("duration calculation not implemented");
   }
   async parseFirstPage(_header, pageData) {
-    debug25("First Ogg/Theora page");
+    debug26("First Ogg/Theora page");
     this.metadata.setFormat("codec", "Theora");
     const idHeader = IdentificationHeader2.get(pageData, 0);
     this.metadata.setFormat("bitrate", idHeader.nombr);
@@ -8657,11 +8657,11 @@ class TheoraStream {
     return Promise.resolve();
   }
 }
-var import_debug25, debug25;
+var import_debug26, debug26;
 var init_TheoraStream = __esm(() => {
   init_Theora();
-  import_debug25 = __toESM(require_src(), 1);
-  debug25 = import_debug25.default("music-metadata:parser:ogg:theora");
+  import_debug26 = __toESM(require_src(), 1);
+  debug26 = import_debug26.default("music-metadata:parser:ogg:theora");
 });
 
 // frontend/node_modules/music-metadata/lib/ogg/OggParser.js
@@ -8681,35 +8681,35 @@ class OggStream {
   }
   async parsePage(tokenizer, header) {
     this.pageNumber = header.pageSequenceNo;
-    debug26("serial=%s page#=%s, Ogg.id=%s", header.streamSerialNumber, header.pageSequenceNo, header.capturePattern);
+    debug27("serial=%s page#=%s, Ogg.id=%s", header.streamSerialNumber, header.pageSequenceNo, header.capturePattern);
     const segmentTable = await tokenizer.readToken(new SegmentTable(header));
-    debug26("totalPageSize=%s", segmentTable.totalPageSize);
+    debug27("totalPageSize=%s", segmentTable.totalPageSize);
     const pageData = await tokenizer.readToken(new Uint8ArrayType(segmentTable.totalPageSize));
-    debug26("firstPage=%s, lastPage=%s, continued=%s", header.headerType.firstPage, header.headerType.lastPage, header.headerType.continued);
+    debug27("firstPage=%s, lastPage=%s, continued=%s", header.headerType.firstPage, header.headerType.lastPage, header.headerType.continued);
     if (header.headerType.firstPage) {
       this.metadata.setFormat("container", "Ogg");
       const idData = pageData.subarray(0, 7);
       const asciiId = Array.from(idData).filter((b) => b >= 32 && b <= 126).map((b) => String.fromCharCode(b)).join("");
       switch (asciiId) {
         case "vorbis":
-          debug26(`Set Ogg stream serial ${header.streamSerialNumber}, codec=Vorbis`);
+          debug27(`Set Ogg stream serial ${header.streamSerialNumber}, codec=Vorbis`);
           this.pageConsumer = new VorbisStream(this.metadata, this.options);
           break;
         case "OpusHea":
-          debug26("Set page consumer to Ogg/Opus");
+          debug27("Set page consumer to Ogg/Opus");
           this.pageConsumer = new OpusStream(this.metadata, this.options, tokenizer);
           break;
         case "Speex  ":
-          debug26("Set page consumer to Ogg/Speex");
+          debug27("Set page consumer to Ogg/Speex");
           this.pageConsumer = new SpeexStream(this.metadata, this.options, tokenizer);
           break;
         case "fishead":
         case "theora":
-          debug26("Set page consumer to Ogg/Theora");
+          debug27("Set page consumer to Ogg/Theora");
           this.pageConsumer = new TheoraStream(this.metadata, this.options, tokenizer);
           break;
         case "FLAC":
-          debug26("Set page consumer to Vorbis");
+          debug27("Set page consumer to Vorbis");
           this.pageConsumer = new FlacStream(this.metadata, this.options, tokenizer);
           break;
         default:
@@ -8726,7 +8726,7 @@ class OggStream {
     }
   }
 }
-var import_debug26, OggContentError, debug26, OggParser;
+var import_debug27, OggContentError, debug27, OggParser;
 var init_OggParser = __esm(() => {
   init_lib();
   init_lib3();
@@ -8737,10 +8737,10 @@ var init_OggParser = __esm(() => {
   init_SpeexStream();
   init_TheoraStream();
   init_VorbisStream();
-  import_debug26 = __toESM(require_src(), 1);
+  import_debug27 = __toESM(require_src(), 1);
   OggContentError = class OggContentError extends makeUnexpectedFileContentError("Ogg") {
   };
-  debug26 = import_debug26.default("music-metadata:parser:ogg");
+  debug27 = import_debug27.default("music-metadata:parser:ogg");
   OggParser = class OggParser extends BasicParser {
     constructor() {
       super(...arguments);
@@ -8765,13 +8765,13 @@ var init_OggParser = __esm(() => {
           await stream.parsePage(this.tokenizer, header);
           if (stream.pageNumber > 12 && [...this.streams.values()].every((stream2) => stream2.pageConsumer?.isMetadataComplete !== false) && !(this.options.duration && [...this.streams.values()].find((stream2) => stream2.pageConsumer?.durationOnLastPage))) {
             stoppedEarly = true;
-            debug26("Stop processing Ogg stream");
+            debug27("Stop processing Ogg stream");
             break;
           }
         } while (![...this.streams.values()].every((item) => item.closed));
       } catch (err) {
         if (err instanceof EndOfStreamError) {
-          debug26("Reached end-of-stream");
+          debug27("Reached end-of-stream");
           enfOfStream = true;
         } else if (err instanceof OggContentError) {
           this.metadata.addWarning(`Corrupt Ogg content at ${this.tokenizer.position}`);
@@ -8931,7 +8931,7 @@ var exports_WaveParser = {};
 __export(exports_WaveParser, {
   WaveParser: () => WaveParser
 });
-var import_debug27, debug27, WaveParser;
+var import_debug28, debug28, WaveParser;
 var init_WaveParser = __esm(() => {
   init_lib();
   init_lib3();
@@ -8941,8 +8941,8 @@ var init_WaveParser = __esm(() => {
   init_BwfChunk();
   init_WaveChunk();
   init_WaveChunk();
-  import_debug27 = __toESM(require_src(), 1);
-  debug27 = import_debug27.default("music-metadata:parser:RIFF");
+  import_debug28 = __toESM(require_src(), 1);
+  debug28 = import_debug28.default("music-metadata:parser:RIFF");
   WaveParser = class WaveParser extends BasicParser {
     constructor() {
       super(...arguments);
@@ -8952,7 +8952,7 @@ var init_WaveParser = __esm(() => {
     }
     async parse() {
       const riffHeader = await this.tokenizer.readToken(Header6);
-      debug27(`pos=${this.tokenizer.position}, parse: chunkID=${riffHeader.chunkID}`);
+      debug28(`pos=${this.tokenizer.position}, parse: chunkID=${riffHeader.chunkID}`);
       if (riffHeader.chunkID !== "RIFF") {
         return;
       }
@@ -8982,7 +8982,7 @@ var init_WaveParser = __esm(() => {
           this.metadata.addWarning("Data chunk size exceeds file size");
         }
         this.header = header;
-        debug27(`pos=${this.tokenizer.position}, readChunk: chunkID=RIFF/WAVE/${header.chunkID}`);
+        debug28(`pos=${this.tokenizer.position}, readChunk: chunkID=RIFF/WAVE/${header.chunkID}`);
         switch (header.chunkID) {
           case "CSET": {
             if (header.chunkSize < 8) {
@@ -9007,7 +9007,7 @@ var init_WaveParser = __esm(() => {
             const fmt = await this.tokenizer.readToken(new Format(header));
             let subFormat = WaveFormatNameMap[fmt.wFormatTag];
             if (!subFormat) {
-              debug27(`WAVE/non-PCM format=${fmt.wFormatTag}`);
+              debug28(`WAVE/non-PCM format=${fmt.wFormatTag}`);
               subFormat = `non-PCM (${fmt.wFormatTag})`;
             }
             this.metadata.setFormat("codec", subFormat);
@@ -9062,30 +9062,30 @@ var init_WaveParser = __esm(() => {
             break;
           }
           case "\x00\x00\x00\x00":
-            debug27(`Ignore padding chunk: RIFF/${header.chunkID} of ${header.chunkSize} bytes`);
+            debug28(`Ignore padding chunk: RIFF/${header.chunkID} of ${header.chunkSize} bytes`);
             this.metadata.addWarning(`Ignore chunk: RIFF/${header.chunkID}`);
             await this.tokenizer.ignore(header.chunkSize);
             break;
           default:
-            debug27(`Ignore chunk: RIFF/${header.chunkID} of ${header.chunkSize} bytes`);
+            debug28(`Ignore chunk: RIFF/${header.chunkID} of ${header.chunkSize} bytes`);
             this.metadata.addWarning(`Ignore chunk: RIFF/${header.chunkID}`);
             await this.tokenizer.ignore(header.chunkSize);
         }
         if (this.header.chunkSize % 2 === 1) {
-          debug27("Read odd padding byte");
+          debug28("Read odd padding byte");
           await this.tokenizer.ignore(1);
         }
       }
     }
     async parseListTag(listHeader) {
       const listType = await this.tokenizer.readToken(new StringType(4, "latin1"));
-      debug27("pos=%s, parseListTag: chunkID=RIFF/WAVE/LIST/%s", this.tokenizer.position, listType);
+      debug28("pos=%s, parseListTag: chunkID=RIFF/WAVE/LIST/%s", this.tokenizer.position, listType);
       switch (listType) {
         case "INFO":
           return this.parseRiffInfoTags(listHeader.chunkSize - 4);
         default:
           this.metadata.addWarning(`Ignore chunk: RIFF/WAVE/LIST/${listType}`);
-          debug27(`Ignoring chunkID=RIFF/WAVE/LIST/${listType}`);
+          debug28(`Ignoring chunkID=RIFF/WAVE/LIST/${listType}`);
           return this.tokenizer.ignore(listHeader.chunkSize - 4).then();
       }
     }
@@ -9213,7 +9213,7 @@ __export(exports_WavPackParser, {
   WavPackParser: () => WavPackParser,
   WavPackContentError: () => WavPackContentError
 });
-var import_debug28, debug28, WavPackContentError, WavPackParser;
+var import_debug29, debug29, WavPackContentError, WavPackParser;
 var init_WavPackParser = __esm(() => {
   init_lib3();
   init_uint8array_extras();
@@ -9221,8 +9221,8 @@ var init_WavPackParser = __esm(() => {
   init_FourCC();
   init_ParseError();
   init_WavPackToken();
-  import_debug28 = __toESM(require_src(), 1);
-  debug28 = import_debug28.default("music-metadata:parser:WavPack");
+  import_debug29 = __toESM(require_src(), 1);
+  debug29 = import_debug29.default("music-metadata:parser:WavPack");
   WavPackContentError = class WavPackContentError extends makeUnexpectedFileContentError("WavPack") {
   };
   WavPackParser = class WavPackParser extends BasicParser {
@@ -9246,7 +9246,7 @@ var init_WavPackParser = __esm(() => {
         if (header.BlockID !== "wvpk") {
           throw new WavPackContentError("Invalid WavPack Block-ID");
         }
-        debug28(`WavPack header blockIndex=${header.blockIndex}, len=${BlockHeaderToken.len}`);
+        debug29(`WavPack header blockIndex=${header.blockIndex}, len=${BlockHeaderToken.len}`);
         if (header.blockIndex === 0 && !this.metadata.format.container) {
           this.metadata.setFormat("container", "WavPack");
           this.metadata.setFormat("lossless", !header.flags.isHybrid);
@@ -9276,12 +9276,12 @@ var init_WavPackParser = __esm(() => {
         const dataSizeInWords = await this.tokenizer.readNumber(id.largeBlock ? UINT24_LE : UINT8);
         const data = new Uint8Array(dataSizeInWords * 2 - (id.isOddSize ? 1 : 0));
         await this.tokenizer.readBuffer(data);
-        debug28(`Metadata Sub-Blocks functionId=0x${id.functionId.toString(16)}, id.largeBlock=${id.largeBlock},data-size=${data.length}`);
+        debug29(`Metadata Sub-Blocks functionId=0x${id.functionId.toString(16)}, id.largeBlock=${id.largeBlock},data-size=${data.length}`);
         switch (id.functionId) {
           case 0:
             break;
           case 14: {
-            debug28("ID_DSD_BLOCK");
+            debug29("ID_DSD_BLOCK");
             const mp = 1 << UINT8.get(data, 0);
             const samplingRate = header.flags.samplingRate * mp * 8;
             if (!header.flags.isDSD) {
@@ -9292,20 +9292,20 @@ var init_WavPackParser = __esm(() => {
             break;
           }
           case 36:
-            debug28("ID_ALT_TRAILER: trailer for non-wav files");
+            debug29("ID_ALT_TRAILER: trailer for non-wav files");
             break;
           case 38:
             this.metadata.setFormat("audioMD5", data);
             break;
           case 47:
-            debug28(`ID_BLOCK_CHECKSUM: checksum=${uint8ArrayToHex2(data)}`);
+            debug29(`ID_BLOCK_CHECKSUM: checksum=${uint8ArrayToHex2(data)}`);
             break;
           default:
-            debug28(`Ignore unsupported meta-sub-block-id functionId=0x${id.functionId.toString(16)}`);
+            debug29(`Ignore unsupported meta-sub-block-id functionId=0x${id.functionId.toString(16)}`);
             break;
         }
         remaining -= MetadataIdToken.len + (id.largeBlock ? UINT24_LE.len : UINT8.len) + dataSizeInWords * 2;
-        debug28(`remainingLength=${remaining}`);
+        debug29(`remainingLength=${remaining}`);
         if (id.isOddSize) {
           this.tokenizer.ignore(1);
         }
@@ -9396,16 +9396,16 @@ function splitFlag(flag) {
 // frontend/packages/creator-kit/src/commands.ts
 import { createHash as createHash4 } from "node:crypto";
 import { existsSync as existsSync6 } from "node:fs";
-import { cp, mkdir as mkdir4, readdir as readdir4, readFile as readFile7, rm as rm4, writeFile as writeFile5 } from "node:fs/promises";
+import { cp as cp2, mkdir as mkdir5, readdir as readdir4, readFile as readFile8, rm as rm4, writeFile as writeFile5 } from "node:fs/promises";
 import { homedir } from "node:os";
-import { dirname as dirname3, join as join8 } from "node:path";
+import { dirname as dirname3, join as join9 } from "node:path";
 
 // frontend/packages/app-sdk/build-config/kit-build.ts
 import { spawn } from "node:child_process";
 import { existsSync } from "node:fs";
-import { readdir, readFile as readFile2, rm, writeFile } from "node:fs/promises";
+import { cp, mkdir, readdir, readFile as readFile3, rm, writeFile } from "node:fs/promises";
 import { createRequire as createRequire2 } from "node:module";
-import { dirname, join as join2, relative as relative2 } from "node:path";
+import { dirname, join as join3, relative as relative2 } from "node:path";
 
 // frontend/node_modules/zod/v4/classic/external.js
 var exports_external = {};
@@ -24097,6 +24097,162 @@ var commerceProductPageSchema = exports_external.strictObject({
   items: exports_external.array(commerceProductSchema).max(50),
   nextCursor: exports_external.uuid().nullable()
 });
+// frontend/packages/app-protocol/src/debug.ts
+var DEBUG_CATALOG_PATH = "debug/catalog.json";
+var DEBUG_CATALOG_MAX_BYTES = 512 * 1024;
+var debugIdSchema = exports_external.string().regex(/^[a-z][a-z0-9_]{0,63}$/);
+var label = exports_external.strictObject({ ja: exports_external.string().min(1).max(128), en: exports_external.string().min(1).max(128) });
+var debugInputSchema = exports_external.discriminatedUnion("type", [
+  exports_external.strictObject({ type: exports_external.literal("none") }),
+  exports_external.strictObject({ type: exports_external.literal("boolean") }),
+  exports_external.strictObject({
+    type: exports_external.literal("enum"),
+    values: exports_external.array(debugIdSchema).min(1).max(100).refine((v) => new Set(v).size === v.length)
+  }),
+  exports_external.strictObject({
+    type: exports_external.literal("number"),
+    min: exports_external.number().finite(),
+    max: exports_external.number().finite(),
+    step: exports_external.number().finite().positive()
+  }).refine((v) => v.max >= v.min)
+]);
+var debugCommandSchema = exports_external.strictObject({
+  id: debugIdSchema,
+  label,
+  input: debugInputSchema
+});
+var debugCaseSchema = exports_external.strictObject({
+  id: debugIdSchema,
+  kind: exports_external.enum(["stage", "character", "item", "enemy", "mechanic"]),
+  label,
+  description: label.optional(),
+  stageId: debugIdSchema.optional(),
+  entryId: debugIdSchema.optional(),
+  subjectId: debugIdSchema.optional(),
+  presetId: debugIdSchema,
+  seed: exports_external.int().min(-2147483648).max(2147483647),
+  bundles: exports_external.array(debugIdSchema).max(16),
+  commands: exports_external.array(debugIdSchema).max(64)
+}).refine((v) => v.kind === "stage" ? !!v.stageId && !!v.entryId && !v.subjectId : !!v.subjectId);
+var debugCatalogSchema = exports_external.strictObject({
+  version: exports_external.literal(1),
+  cases: exports_external.array(debugCaseSchema).min(1).max(1000),
+  commands: exports_external.array(debugCommandSchema).max(64)
+}).superRefine((v, ctx) => {
+  const commands = new Set(v.commands.map((c) => c.id));
+  if (commands.size !== v.commands.length || new Set(v.cases.map((c) => c.id)).size !== v.cases.length)
+    ctx.addIssue({ code: "custom", message: "duplicate debug ID" });
+  for (const c of v.cases)
+    if (new Set(c.commands).size !== c.commands.length || c.commands.some((id) => !commands.has(id)))
+      ctx.addIssue({ code: "custom", message: "undeclared or duplicate case command" });
+});
+var debugIdsSchema = exports_external.array(debugIdSchema).max(1000);
+var debugDefinitionsSchema = exports_external.strictObject({
+  stages: exports_external.record(debugIdSchema, debugIdsSchema),
+  subjects: exports_external.strictObject({
+    character: debugIdsSchema.optional(),
+    item: debugIdsSchema.optional(),
+    enemy: debugIdsSchema.optional(),
+    mechanic: debugIdsSchema.optional()
+  }),
+  bundles: debugIdsSchema
+});
+var debugLaunchSchema = exports_external.strictObject({
+  caseId: debugIdSchema,
+  seed: exports_external.int().min(-2147483648).max(2147483647),
+  catalogVersion: exports_external.literal(1)
+});
+var debugCommandMessageSchema = exports_external.strictObject({
+  type: exports_external.literal("debug_command"),
+  launchId: exports_external.uuid(),
+  requestId: exports_external.uuid(),
+  commandId: debugIdSchema,
+  value: exports_external.union([exports_external.boolean(), exports_external.number().finite(), debugIdSchema, exports_external.null()])
+});
+var debugResultMessageSchema = exports_external.strictObject({
+  type: exports_external.literal("debug_result"),
+  launchId: exports_external.uuid(),
+  requestId: exports_external.uuid(),
+  status: exports_external.enum(["succeeded", "failed"]),
+  code: exports_external.enum([
+    "INVALID_COMMAND",
+    "INVALID_INPUT",
+    "BUSY",
+    "NOT_READY",
+    "TAINTED",
+    "TIMED_OUT",
+    "HANDLER_FAILED",
+    "REQUEST_REUSED",
+    "EXPIRED"
+  ]).optional()
+}).refine((v) => v.status === "failed" ? !!v.code : v.code === undefined);
+var debugRegisteredMessageSchema = exports_external.strictObject({
+  type: exports_external.literal("debug_registered"),
+  launchId: exports_external.uuid(),
+  caseId: debugIdSchema,
+  catalogVersion: exports_external.literal(1),
+  commands: exports_external.array(debugIdSchema).max(64)
+});
+var debugReadyMessageSchema = exports_external.strictObject({
+  type: exports_external.literal("debug_ready"),
+  launchId: exports_external.uuid(),
+  caseId: debugIdSchema
+});
+var debugResumedMessageSchema = exports_external.strictObject({
+  type: exports_external.literal("debug_resumed"),
+  launchId: exports_external.uuid()
+});
+var debugFailMessageSchema = exports_external.strictObject({
+  type: exports_external.literal("debug_fail"),
+  launchId: exports_external.uuid(),
+  code: exports_external.enum(["INVALID_PRESET", "LOAD_FAILED", "UNSUPPORTED_CASE", "REGISTRATION_FAILED"])
+});
+var debugNavigationActionSchema = exports_external.discriminatedUnion("type", [
+  exports_external.strictObject({
+    type: exports_external.literal("start_case"),
+    caseId: debugIdSchema,
+    seed: exports_external.int().min(-2147483648).max(2147483647)
+  }),
+  exports_external.strictObject({ type: exports_external.literal("restart_case") }),
+  exports_external.strictObject({ type: exports_external.literal("normal_play") })
+]);
+var debugActionSchema = exports_external.discriminatedUnion("type", [
+  ...debugNavigationActionSchema.options,
+  exports_external.strictObject({ type: exports_external.literal("menu"), open: exports_external.boolean() }),
+  exports_external.strictObject({
+    type: exports_external.literal("command"),
+    commandId: debugIdSchema,
+    value: exports_external.union([exports_external.boolean(), exports_external.number().finite(), debugIdSchema, exports_external.null()])
+  })
+]);
+var debugActionMessageSchema = exports_external.strictObject({
+  type: exports_external.literal("debug_action"),
+  launchId: exports_external.uuid(),
+  requestId: exports_external.uuid(),
+  action: debugActionSchema
+});
+var debugActionResultMessageSchema = exports_external.strictObject({
+  type: exports_external.literal("debug_action_result"),
+  launchId: exports_external.uuid(),
+  requestId: exports_external.uuid(),
+  status: exports_external.enum(["succeeded", "failed"]),
+  code: exports_external.enum([
+    "INVALID_COMMAND",
+    "INVALID_INPUT",
+    "INVALID_ACTION",
+    "ACTION_FAILED",
+    "BUSY",
+    "NOT_READY",
+    "TAINTED",
+    "TIMED_OUT",
+    "HANDLER_FAILED",
+    "REQUEST_REUSED",
+    "EXPIRED"
+  ]).optional()
+}).refine((v) => v.status === "failed" ? !!v.code : v.code === undefined);
+function requiresDevelopmentArtifact(manifest) {
+  return !manifest.capabilities.some((value) => value === "documents.read" || value === "documents.write");
+}
 // frontend/packages/app-protocol/src/errors.ts
 var ERROR_CODES = [
   "UNAUTHORIZED",
@@ -24157,8 +24313,7 @@ var slotSchema = exports_external.int().min(1);
 var nonceSchema = exports_external.string().length(32);
 var initMessageSchema = exports_external.strictObject({
   type: exports_external.literal("init"),
-  nonce: nonceSchema,
-  launchId: exports_external.uuid()
+  nonce: nonceSchema
 });
 var helloMessageSchema = exports_external.strictObject({
   type: exports_external.literal("hello"),
@@ -24203,7 +24358,12 @@ var contextPayloadSchema = exports_external.strictObject({
   documentId: exports_external.uuid().optional()
 });
 var notBothSpaceAndPractice = (value) => value.space === undefined || value.practice === undefined;
-var contextMessageSchema = contextPayloadSchema.extend({ type: exports_external.literal("context") }).refine(notBothSpaceAndPractice, "space and practice are exclusive");
+var contextMessageSchema = contextPayloadSchema.extend({
+  type: exports_external.literal("context"),
+  executionMode: exports_external.enum(["production", "playtest", "debug"]),
+  launchId: exports_external.uuid(),
+  debug: debugLaunchSchema.optional()
+}).refine(notBothSpaceAndPractice, "space and practice are exclusive").refine((v) => v.executionMode === "debug" ? !!v.debug && !!v.launchId && !v.space && !v.documentId : v.debug === undefined, "invalid development context");
 var contextUpdateMessageSchema = contextPayloadSchema.partial().extend({ type: exports_external.literal("context_update") }).refine(notBothSpaceAndPractice, "space and practice are exclusive");
 function isArrayBuffer(value) {
   return Object.prototype.toString.call(value) === "[object ArrayBuffer]";
@@ -24408,6 +24568,8 @@ var lifecycleMessageSchema = exports_external.strictObject({
   event: exports_external.enum(["pause", "resume"])
 });
 var hostToShellMessageSchema = exports_external.union([
+  debugActionResultMessageSchema,
+  debugCommandMessageSchema,
   contextMessageSchema,
   contextUpdateMessageSchema,
   artifactMessageSchema,
@@ -24425,6 +24587,12 @@ var spaceEndedMessageSchema = exports_external.strictObject({
   type: exports_external.literal("space_ended")
 });
 var shellToHostMessageSchema = exports_external.union([
+  debugActionMessageSchema,
+  debugRegisteredMessageSchema,
+  debugReadyMessageSchema,
+  debugResultMessageSchema,
+  debugFailMessageSchema,
+  debugResumedMessageSchema,
   helloMessageSchema,
   opMessageSchema,
   bundleRequestMessageSchema,
@@ -24850,6 +25018,34 @@ function validateStatic(files, options = {}) {
   const byPath = new Map(files.map((file2) => [file2.path, file2]));
   const errors3 = [];
   const warnings = [];
+  const debugFile = byPath.get(DEBUG_CATALOG_PATH);
+  if (options.artifactFlavor === "debug") {
+    if (!debugFile || debugFile.size > DEBUG_CATALOG_MAX_BYTES)
+      errors3.push({
+        code: "DEBUG_CATALOG_MISSING",
+        message: "development Artifact requires a bounded catalog"
+      });
+    else {
+      try {
+        debugCatalogSchema.parse(JSON.parse(decode3(debugFile)));
+      } catch (error51) {
+        errors3.push({
+          code: "DEBUG_CATALOG_INVALID",
+          message: String(error51),
+          path: DEBUG_CATALOG_PATH
+        });
+      }
+    }
+  } else {
+    for (const file2 of files) {
+      if (file2.path.startsWith("debug/") || file2.path.startsWith("bundles/debug_") || file2.path.endsWith(".js") && /\bapp\s*\.\s*debug\s*\./.test(decode3(file2)))
+        errors3.push({
+          code: "DEBUG_IN_PRODUCTION",
+          message: "production Artifact contains development contract or files",
+          path: file2.path
+        });
+    }
+  }
   const manifestFile = byPath.get(MANIFEST_PATH);
   if (!manifestFile) {
     throw new Error(`app-validator: the artifact has no ${MANIFEST_PATH}`);
@@ -24859,6 +25055,13 @@ function validateStatic(files, options = {}) {
     manifest = normalizeManifest(JSON.parse(decode3(manifestFile)));
   } catch (cause) {
     throw new Error(`app-validator: ${MANIFEST_PATH} is not a valid manifest: ${cause}`);
+  }
+  if (options.artifactFlavor === "debug" && !requiresDevelopmentArtifact(manifest)) {
+    errors3.push({
+      code: "INVALID_DEBUG_CATALOG",
+      message: "Document development previews are outside Phase 1–3",
+      path: DEBUG_CATALOG_PATH
+    });
   }
   errors3.push(...checkStoreSchema(options.previousStoreSchema ?? null, manifest.storeSchema, manifest.storeSchemaVersion));
   const entrypoint = byPath.get(manifest.entrypoint);
@@ -29949,8 +30152,8 @@ var FeatureID = class extends ExtensionProperty {
   getLabel() {
     return this.get("label");
   }
-  setLabel(label) {
-    return this.set("label", label);
+  setLabel(label2) {
+    return this.set("label", label2);
   }
   getAttribute() {
     return this.get("attribute");
@@ -34836,7 +35039,7 @@ async function getLyricsHeaderLength(tokenizer) {
 
 // frontend/node_modules/music-metadata/lib/ParserFactory.js
 var import_content_type = __toESM(require_dist(), 1);
-var import_debug29 = __toESM(require_src(), 1);
+var import_debug30 = __toESM(require_src(), 1);
 
 // frontend/node_modules/file-type/index.js
 init_lib();
@@ -34847,7 +35050,7 @@ init_core();
 
 // frontend/node_modules/@tokenizer/inflate/lib/ZipHandler.js
 init_lib3();
-var import_debug3 = __toESM(require_src(), 1);
+var import_debug4 = __toESM(require_src(), 1);
 
 // frontend/node_modules/@tokenizer/inflate/lib/ZipToken.js
 init_lib3();
@@ -34925,7 +35128,7 @@ function signatureToArray(signature) {
   UINT32_LE.put(signatureBytes, 0, signature);
   return signatureBytes;
 }
-var debug3 = import_debug3.default("tokenizer:inflate");
+var debug4 = import_debug4.default("tokenizer:inflate");
 var syncBufferSize = 256 * 1024;
 var ddSignatureArray = signatureToArray(Signature.DataDescriptor);
 var eocdSignatureBytes = signatureToArray(Signature.EndOfCentralDirectory);
@@ -34955,14 +35158,14 @@ class ZipHandler {
   }
   async readCentralDirectory() {
     if (!this.tokenizer.supportsRandomAccess()) {
-      debug3("Cannot reading central-directory without random-read support");
+      debug4("Cannot reading central-directory without random-read support");
       return;
     }
-    debug3("Reading central-directory...");
+    debug4("Reading central-directory...");
     const pos = this.tokenizer.position;
     const offset = await this.findEndOfCentralDirectoryLocator();
     if (offset > 0) {
-      debug3("Central-directory 32-bit signature found");
+      debug4("Central-directory 32-bit signature found");
       const eocdHeader = await this.tokenizer.readToken(EndOfCentralDirectoryRecordToken, offset);
       const files = [];
       this.tokenizer.setPosition(eocdHeader.offsetOfStartOfCd);
@@ -34975,7 +35178,7 @@ class ZipHandler {
         await this.tokenizer.ignore(entry.extraFieldLength);
         await this.tokenizer.ignore(entry.fileCommentLength);
         files.push(entry);
-        debug3(`Add central-directory file-entry: n=${n + 1}/${files.length}: filename=${files[n].filename}`);
+        debug4(`Add central-directory file-entry: n=${n + 1}/${files.length}: filename=${files[n].filename}`);
       }
       this.tokenizer.setPosition(pos);
       return files;
@@ -34999,7 +35202,7 @@ class ZipHandler {
       if (zipHeader.dataDescriptor && zipHeader.compressedSize === 0) {
         const chunks = [];
         let len = syncBufferSize;
-        debug3("Compressed-file-size unknown, scanning for next data-descriptor-signature....");
+        debug4("Compressed-file-size unknown, scanning for next data-descriptor-signature....");
         let nextHeaderIndex = -1;
         while (nextHeaderIndex < 0 && len === syncBufferSize) {
           len = await this.tokenizer.peekBuffer(this.syncBuffer, { mayBeLess: true });
@@ -35013,22 +35216,22 @@ class ZipHandler {
             await this.tokenizer.ignore(size);
           }
         }
-        debug3(`Found data-descriptor-signature at pos=${this.tokenizer.position}`);
+        debug4(`Found data-descriptor-signature at pos=${this.tokenizer.position}`);
         if (next.handler) {
           await this.inflate(zipHeader, mergeArrays(chunks), next.handler);
         }
       } else {
         if (next.handler) {
-          debug3(`Reading compressed-file-data: ${zipHeader.compressedSize} bytes`);
+          debug4(`Reading compressed-file-data: ${zipHeader.compressedSize} bytes`);
           fileData = new Uint8Array(zipHeader.compressedSize);
           await this.tokenizer.readBuffer(fileData);
           await this.inflate(zipHeader, fileData, next.handler);
         } else {
-          debug3(`Ignoring compressed-file-data: ${zipHeader.compressedSize} bytes`);
+          debug4(`Ignoring compressed-file-data: ${zipHeader.compressedSize} bytes`);
           await this.tokenizer.ignore(zipHeader.compressedSize);
         }
       }
-      debug3(`Reading data-descriptor at pos=${this.tokenizer.position}`);
+      debug4(`Reading data-descriptor at pos=${this.tokenizer.position}`);
       if (zipHeader.dataDescriptor) {
         const dataDescriptor = await this.tokenizer.readToken(DataDescriptor);
         if (dataDescriptor.signature !== 134695760) {
@@ -35061,7 +35264,7 @@ class ZipHandler {
     if (zipHeader.compressedMethod !== 8) {
       throw new Error(`Unsupported ZIP compression method: ${zipHeader.compressedMethod}`);
     }
-    debug3(`Decompress filename=${zipHeader.filename}, compressed-size=${fileData.length}`);
+    debug4(`Decompress filename=${zipHeader.filename}, compressed-size=${fileData.length}`);
     const uncompressedData = await ZipHandler.decompressDeflateRaw(fileData);
     return cb(uncompressedData);
   }
@@ -37793,7 +37996,7 @@ var asfParserLoader = {
 };
 
 // frontend/node_modules/music-metadata/lib/common/MetadataCollector.js
-var import_debug7 = __toESM(require_src(), 1);
+var import_debug8 = __toESM(require_src(), 1);
 
 // frontend/node_modules/music-metadata/lib/lrc/LyricsParser.js
 init_type();
@@ -38787,7 +38990,7 @@ function isUnique(alias) {
 
 // frontend/node_modules/music-metadata/lib/common/MetadataCollector.js
 init_Util();
-var debug7 = import_debug7.default("music-metadata:collector");
+var debug8 = import_debug8.default("music-metadata:collector");
 var TagPriority = [
   "matroska",
   "APEv2",
@@ -38832,11 +39035,11 @@ class MetadataCollector {
     return Object.keys(this.native).length > 0;
   }
   addStreamInfo(streamInfo) {
-    debug7(`streamInfo: type=${streamInfo.type ? TrackTypeValueToKeyMap[streamInfo.type] : "?"}, codec=${streamInfo.codecName}`);
+    debug8(`streamInfo: type=${streamInfo.type ? TrackTypeValueToKeyMap[streamInfo.type] : "?"}, codec=${streamInfo.codecName}`);
     this.format.trackInfo.push(streamInfo);
   }
   setFormat(key2, value) {
-    debug7(`format: ${key2} = ${value}`);
+    debug8(`format: ${key2} = ${value}`);
     this.format[key2] = value;
     if (this.opts?.observer) {
       this.opts.observer({ metadata: this, tag: { type: "format", id: key2, value } });
@@ -38852,7 +39055,7 @@ class MetadataCollector {
     }
   }
   async addTag(tagType2, tagId, value) {
-    debug7(`tag ${tagType2}.${tagId} = ${value}`);
+    debug8(`tag ${tagType2}.${tagId} = ${value}`);
     if (!this.native[tagType2]) {
       this.registerTagType(tagType2);
       this.native[tagType2] = [];
@@ -39020,7 +39223,7 @@ class MetadataCollector {
     }
   }
   setGenericTag(tagType2, tag) {
-    debug7(`common.${tag.id} = ${tag.value}`);
+    debug8(`common.${tag.id} = ${tag.value}`);
     const prio0 = this.commonOrigin[tag.id] || 1000;
     const prio1 = this.originPriority[tagType2];
     if (isSingleton(tag.id)) {
@@ -39028,20 +39231,20 @@ class MetadataCollector {
         this.common[tag.id] = tag.value;
         this.commonOrigin[tag.id] = prio1;
       } else {
-        return debug7(`Ignore native tag (singleton): ${tagType2}.${tag.id} = ${tag.value}`);
+        return debug8(`Ignore native tag (singleton): ${tagType2}.${tag.id} = ${tag.value}`);
       }
     } else {
       if (prio1 === prio0) {
         if (!isUnique(tag.id) || this.common[tag.id].indexOf(tag.value) === -1) {
           this.common[tag.id].push(tag.value);
         } else {
-          debug7(`Ignore duplicate value: ${tagType2}.${tag.id} = ${tag.value}`);
+          debug8(`Ignore duplicate value: ${tagType2}.${tag.id} = ${tag.value}`);
         }
       } else if (prio1 < prio0) {
         this.common[tag.id] = [tag.value];
         this.commonOrigin[tag.id] = prio1;
       } else {
-        return debug7(`Ignore native tag (list): ${tagType2}.${tag.id} = ${tag.value}`);
+        return debug8(`Ignore native tag (list): ${tagType2}.${tag.id} = ${tag.value}`);
       }
     }
     if (this.opts?.observer) {
@@ -39161,7 +39364,7 @@ var wavpackParserLoader = {
 };
 
 // frontend/node_modules/music-metadata/lib/ParserFactory.js
-var debug29 = import_debug29.default("music-metadata:parser:factory");
+var debug30 = import_debug30.default("music-metadata:parser:factory");
 function parseHttpContentType(contentType) {
   const type = import_content_type.default.parse(contentType);
   const mime = parse5(type.type);
@@ -39199,10 +39402,10 @@ class ParserFactory {
   }
   async parse(tokenizer, parserLoader, opts) {
     if (tokenizer.supportsRandomAccess()) {
-      debug29("tokenizer supports random-access, scanning for appending headers");
+      debug30("tokenizer supports random-access, scanning for appending headers");
       await scanAppendingHeaders(tokenizer, opts);
     } else {
-      debug29("tokenizer does not support random-access, cannot scan for appending headers");
+      debug30("tokenizer does not support random-access, cannot scan for appending headers");
     }
     if (!parserLoader) {
       const buf = new Uint8Array(4100);
@@ -39213,24 +39416,24 @@ class ParserFactory {
         parserLoader = this.findLoaderForExtension(tokenizer.fileInfo.path);
       }
       if (!parserLoader) {
-        debug29("Guess parser on content...");
+        debug30("Guess parser on content...");
         await tokenizer.peekBuffer(buf, { mayBeLess: true });
         const guessedType = await fileTypeFromBuffer(buf, { mpegOffsetTolerance: 10 });
         if (!guessedType?.mime) {
           throw new CouldNotDetermineFileTypeError("Failed to determine audio format");
         }
-        debug29(`Guessed file type is mime=${guessedType.mime}, extension=${guessedType.ext}`);
+        debug30(`Guessed file type is mime=${guessedType.mime}, extension=${guessedType.ext}`);
         parserLoader = this.findLoaderForContentType(guessedType.mime);
         if (!parserLoader) {
           throw new UnsupportedFileTypeError(`Guessed MIME-type not supported: ${guessedType.mime}`);
         }
       }
     }
-    debug29(`Loading ${parserLoader.parserType} parser...`);
+    debug30(`Loading ${parserLoader.parserType} parser...`);
     const metadata = new MetadataCollector(opts);
     const ParserImpl = await parserLoader.load();
     const parser = new ParserImpl(metadata, tokenizer, opts ?? {});
-    debug29(`Parser ${parserLoader.parserType} loaded`);
+    debug30(`Parser ${parserLoader.parserType} loaded`);
     await parser.parse();
     if (metadata.format.trackInfo) {
       if (metadata.format.hasAudio === undefined) {
@@ -39257,7 +39460,7 @@ class ParserFactory {
     try {
       mime = parseHttpContentType(httpContentType);
     } catch (_err) {
-      debug29(`Invalid HTTP Content-Type header value: ${httpContentType}`);
+      debug30(`Invalid HTTP Content-Type header value: ${httpContentType}`);
       return;
     }
     const subType = mime.subtype.indexOf("x-") === 0 ? mime.subtype.substring(2) : mime.subtype;
@@ -39562,20 +39765,50 @@ async function buildDistIndex(dist, { entrypoint }) {
   });
 }
 
-// frontend/packages/app-sdk/build-config/game-assets.ts
+// frontend/packages/app-sdk/build-config/debug-catalog.ts
 import { lstat, readFile, realpath } from "node:fs/promises";
-import { isAbsolute, join, relative } from "node:path";
+import { join } from "node:path";
+async function readLocalJson(source, path, maxBytes) {
+  const root = await realpath(source), file2 = join(root, path);
+  const metadata = await lstat(file2);
+  if (!metadata.isFile() || await realpath(file2) !== file2 || metadata.size > maxBytes)
+    throw new Error(`debug data must be a bounded regular file: ${path}`);
+  return JSON.parse(await readFile(file2, "utf8"));
+}
+async function readDebugCatalog(source) {
+  return debugCatalogSchema.parse(await readLocalJson(source, DEBUG_CATALOG_PATH, DEBUG_CATALOG_MAX_BYTES));
+}
+async function validateDebugCatalog(source) {
+  const catalog = await readDebugCatalog(source);
+  const definitions = debugDefinitionsSchema.parse(await readLocalJson(source, "debug/definitions.json", DEBUG_CATALOG_MAX_BYTES));
+  for (const c of catalog.cases) {
+    if (c.kind === "stage" ? !definitions.stages?.[c.stageId]?.includes(c.entryId) : !definitions.subjects?.[c.kind]?.includes(c.subjectId))
+      throw new Error(`debug case ${c.id}: unknown subject or entry`);
+    if (c.bundles.some((b) => !definitions.bundles?.includes(b)))
+      throw new Error(`debug case ${c.id}: unknown bundle`);
+    const preset = await readLocalJson(source, `debug/presets/${c.presetId}.json`, 1024 * 1024);
+    if (!Number.isInteger(preset.schemaVersion) || Number(preset.schemaVersion) < 1)
+      throw new Error(`debug case ${c.id}: missing preset schemaVersion`);
+  }
+  if (!catalog.cases.some((c) => c.id === "normal_start" && c.kind === "stage"))
+    throw new Error("debug catalog requires normal_start case");
+  return catalog;
+}
+
+// frontend/packages/app-sdk/build-config/game-assets.ts
+import { lstat as lstat2, readFile as readFile2, realpath as realpath2 } from "node:fs/promises";
+import { isAbsolute, join as join2, relative } from "node:path";
 async function readGameAssetCatalog(source) {
-  const root = await realpath(source);
+  const root = await realpath2(source);
   let bytes;
   try {
-    const path = join(source, GAME_ASSET_CATALOG_PATH);
-    const metadata = await lstat(path);
-    if (!metadata.isFile() || await realpath(path) !== join(root, GAME_ASSET_CATALOG_PATH))
+    const path = join2(source, GAME_ASSET_CATALOG_PATH);
+    const metadata = await lstat2(path);
+    if (!metadata.isFile() || await realpath2(path) !== join2(root, GAME_ASSET_CATALOG_PATH))
       throw new Error("asset catalog must be a regular file without symlink ancestors");
     if (metadata.size > GAME_ASSET_CATALOG_MAX_BYTES)
       throw new Error("asset catalog exceeds size limit");
-    bytes = await readFile(path);
+    bytes = await readFile2(path);
   } catch (error51) {
     if (error51.code === "ENOENT")
       return null;
@@ -39587,15 +39820,15 @@ async function readGameAssetCatalog(source) {
     ...item.thumbnail_path ? [item.thumbnail_path] : []
   ]));
   for (const path of paths) {
-    const target = join(source, path);
+    const target = join2(source, path);
     let resolved;
     try {
-      resolved = await realpath(target);
+      resolved = await realpath2(target);
     } catch (error51) {
       throw new Error(`catalog source is missing: ${path}`, { cause: error51 });
     }
     const within = relative(root, resolved);
-    if (within === ".." || within.startsWith("../") || isAbsolute(within) || resolved !== join(root, path) || !(await lstat(target)).isFile()) {
+    if (within === ".." || within.startsWith("../") || isAbsolute(within) || resolved !== join2(root, path) || !(await lstat2(target)).isFile()) {
       throw new Error(`catalog source must be a file inside the source: ${path}`);
     }
   }
@@ -39613,28 +39846,57 @@ var GAME_BUILD_SCRIPT = "build.mjs";
 var DEFAULT_BUILD_SCRIPT = "default-build.mjs";
 var MANIFEST_PATH2 = "manifest.json";
 async function kitBuild(source) {
+  await rm(join3(source, "debug-dist"), { recursive: true, force: true });
+  const sourceManifest = manifestSchema.parse(JSON.parse(await readFile3(join3(source, MANIFEST_PATH2), "utf8")));
+  const hasDebug = requiresDevelopmentArtifact(sourceManifest);
+  if (hasDebug) {
+    if (!existsSync(join3(source, "debug/entry.ts")))
+      throw new KitBuildError("game builds require development source and normal_start");
+    await validateDebugCatalog(source);
+  }
   await validateGameAssetCatalog(source);
-  const dist = join2(source, "dist");
+  const dist = join3(source, "dist");
   await rm(dist, { recursive: true, force: true });
-  const gameScript = join2(source, GAME_BUILD_SCRIPT);
+  const gameScript = join3(source, GAME_BUILD_SCRIPT);
   await runNode(existsSync(gameScript) ? gameScript : defaultBuildScript(source), source);
-  const manifestPath = join2(dist, MANIFEST_PATH2);
+  const manifestPath = join3(dist, MANIFEST_PATH2);
   if (!existsSync(manifestPath)) {
     throw new KitBuildError(`the build left no ${MANIFEST_PATH2} at the root of dist/`);
   }
   await copyBundleRefs(source, dist);
-  const manifest = JSON.parse(await readFile2(manifestPath, "utf8"));
+  const manifest = JSON.parse(await readFile3(manifestPath, "utf8"));
   if (typeof manifest.entrypoint !== "string") {
     throw new KitBuildError(`dist/${MANIFEST_PATH2} has no entrypoint`);
   }
   const index = await buildDistIndex(await readDist(dist), { entrypoint: manifest.entrypoint });
-  await writeFile(join2(dist, ARTIFACT_INDEX_PATH), `${JSON.stringify(index, null, 2)}
+  await writeFile(join3(dist, ARTIFACT_INDEX_PATH), `${JSON.stringify(index, null, 2)}
 `);
-  return { dist, artifactHash: index.artifactHash };
+  if ((await readDist(dist)).some((f) => f.path.startsWith("debug/") || f.path.startsWith("bundles/debug_")))
+    throw new KitBuildError("production Artifact contains development-only files");
+  if (!hasDebug)
+    return { dist, artifactHash: index.artifactHash };
+  const debugDist = join3(source, "debug-dist");
+  await cp(dist, debugDist, { recursive: true });
+  await rm(join3(debugDist, ARTIFACT_INDEX_PATH), { force: true });
+  await mkdir(join3(debugDist, "debug"), { recursive: true });
+  await cp(join3(source, "debug/catalog.json"), join3(debugDist, "debug/catalog.json"));
+  if (existsSync(join3(source, "debug/assets")))
+    await cp(join3(source, "debug/assets"), join3(debugDist, "debug/assets"), { recursive: true });
+  await runNode(join3(dirname(defaultBuildScript(source)), "debug-build.mjs"), source);
+  const debugIndex = await buildDistIndex(await readDist(debugDist), {
+    entrypoint: manifest.entrypoint
+  });
+  await writeFile(join3(debugDist, ARTIFACT_INDEX_PATH), `${JSON.stringify(debugIndex, null, 2)}
+`);
+  return {
+    dist,
+    artifactHash: index.artifactHash,
+    debug: { dist: debugDist, artifactHash: debugIndex.artifactHash }
+  };
 }
 function defaultBuildScript(source) {
-  const config2 = createRequire2(join2(source, "package.json")).resolve("@workspace/app-sdk/build-config");
-  return join2(dirname(config2), DEFAULT_BUILD_SCRIPT);
+  const config2 = createRequire2(join3(source, "package.json")).resolve("@workspace/app-sdk/build-config");
+  return join3(dirname(config2), DEFAULT_BUILD_SCRIPT);
 }
 function runNode(script, cwd) {
   return new Promise((resolve, reject) => {
@@ -39649,12 +39911,12 @@ function runNode(script, cwd) {
   });
 }
 async function copyBundleRefs(source, dist) {
-  const path = join2(source, BUNDLE_REFS_SOURCE_PATH);
+  const path = join3(source, BUNDLE_REFS_SOURCE_PATH);
   if (!existsSync(path))
     return;
   let document2;
   try {
-    document2 = JSON.parse(await readFile2(path, "utf8"));
+    document2 = JSON.parse(await readFile3(path, "utf8"));
   } catch (error51) {
     throw new KitBuildError(`${BUNDLE_REFS_SOURCE_PATH} is not JSON: ${String(error51)}`);
   }
@@ -39662,7 +39924,7 @@ async function copyBundleRefs(source, dist) {
   if (!parsed.success) {
     throw new KitBuildError(`${BUNDLE_REFS_SOURCE_PATH} must be {"refs": {"bundles/<name>/<file>": "<asset id>"}}`);
   }
-  await writeFile(join2(dist, BUNDLE_REFS_PATH), `${JSON.stringify(parsed.data, null, 2)}
+  await writeFile(join3(dist, BUNDLE_REFS_PATH), `${JSON.stringify(parsed.data, null, 2)}
 `);
 }
 async function readDist(dist) {
@@ -39671,10 +39933,10 @@ async function readDist(dist) {
   for (const entry of entries) {
     if (!entry.isFile())
       continue;
-    const absolute = join2(entry.parentPath, entry.name);
+    const absolute = join3(entry.parentPath, entry.name);
     files.push({
       path: relative2(dist, absolute).split("\\").join("/"),
-      bytes: new Uint8Array(await readFile2(absolute))
+      bytes: new Uint8Array(await readFile3(absolute))
     });
   }
   return files;
@@ -39751,8 +40013,8 @@ function openInBrowser(url2) {
 }
 
 // frontend/packages/creator-kit/src/check.ts
-async function checkDist(archive) {
-  const { report } = await validateArchive(archive, {}, "unresolved");
+async function checkDist(archive, artifactFlavor = "production") {
+  const { report } = await validateArchive(archive, { artifactFlavor }, "unresolved");
   return { passed: report.passed, summary: summarize(report), report };
 }
 function summarize(report) {
@@ -39879,9 +40141,9 @@ var decoder2 = new TextDecoder;
 // frontend/packages/creator-kit/src/login.ts
 import { createHash, randomBytes } from "node:crypto";
 import { existsSync as existsSync2 } from "node:fs";
-import { chmod, mkdir, readFile as readFile3, rename, writeFile as writeFile2 } from "node:fs/promises";
+import { chmod, mkdir as mkdir2, readFile as readFile4, rename, writeFile as writeFile2 } from "node:fs/promises";
 import { createServer } from "node:http";
-import { join as join3 } from "node:path";
+import { join as join4 } from "node:path";
 var DEFAULT_MCP_URL = "https://tokoyo.games/mcp/creator";
 var REDIRECT_URI = "http://127.0.0.1:43126/callback";
 var REFRESH_MARGIN_MS = 60000;
@@ -39892,10 +40154,10 @@ class LoginError extends Error {
   name = "LoginError";
 }
 async function readLogins(configDir) {
-  const path = join3(configDir, CREDENTIALS_FILE);
+  const path = join4(configDir, CREDENTIALS_FILE);
   if (!existsSync2(path))
     return {};
-  const parsed = JSON.parse(await readFile3(path, "utf8"));
+  const parsed = JSON.parse(await readFile4(path, "utf8"));
   return parsed.logins ?? {};
 }
 async function writeLogin(configDir, mcpUrl, login) {
@@ -39904,8 +40166,8 @@ async function writeLogin(configDir, mcpUrl, login) {
     delete logins[mcpUrl];
   else
     logins[mcpUrl] = login;
-  await mkdir(configDir, { recursive: true, mode: 448 });
-  const path = join3(configDir, CREDENTIALS_FILE);
+  await mkdir2(configDir, { recursive: true, mode: 448 });
+  const path = join4(configDir, CREDENTIALS_FILE);
   const temporary = `${path}.${process.pid}.tmp`;
   await writeFile2(temporary, `${JSON.stringify({ logins }, null, 2)}
 `, { mode: 384 });
@@ -40094,8 +40356,8 @@ function loopbackAuthorize(openUrl) {
 
 // frontend/packages/creator-kit/src/pack.ts
 import { createHash as createHash2 } from "node:crypto";
-import { lstat as lstat2, readdir as readdir2, readFile as readFile4 } from "node:fs/promises";
-import { join as join4 } from "node:path";
+import { lstat as lstat3, readdir as readdir2, readFile as readFile5 } from "node:fs/promises";
+import { join as join5 } from "node:path";
 
 // frontend/packages/creator-kit/src/tar.ts
 import { gzipSync } from "node:zlib";
@@ -40167,17 +40429,17 @@ class PackError extends Error {
 async function collectFiles(root) {
   const files = [];
   const walk = async (relative3) => {
-    const entries = await readdir2(join4(root, relative3), { withFileTypes: true });
+    const entries = await readdir2(join5(root, relative3), { withFileTypes: true });
     for (const entry of entries) {
       const path = relative3 === "" ? entry.name : `${relative3}/${entry.name}`;
-      const info = await lstat2(join4(root, path));
+      const info = await lstat3(join5(root, path));
       if (info.isSymbolicLink()) {
         throw new PackError(`${path} is a symbolic link; Platform rejects links, copy the file instead`);
       }
       if (info.isDirectory())
         await walk(path);
       else if (info.isFile()) {
-        files.push({ path, bytes: new Uint8Array(await readFile4(join4(root, path))) });
+        files.push({ path, bytes: new Uint8Array(await readFile5(join5(root, path))) });
       }
     }
   };
@@ -40344,8 +40606,8 @@ var REMOTE_REFS = "refs/remotes/tokoyo";
 
 // frontend/packages/creator-kit/src/repo.ts
 import { existsSync as existsSync3 } from "node:fs";
-import { appendFile, mkdir as mkdir2, readFile as readFile5, rm as rm2, writeFile as writeFile3 } from "node:fs/promises";
-import { join as join5 } from "node:path";
+import { appendFile, mkdir as mkdir3, readFile as readFile6, rm as rm2, writeFile as writeFile3 } from "node:fs/promises";
+import { join as join6 } from "node:path";
 class RepoError extends Error {
   name = "RepoError";
 }
@@ -40353,7 +40615,7 @@ var SDK_FILTER = "tokoyo-sdk";
 function kitCommand(kitRoot, ...args) {
   return [
     shellQuote(process.execPath),
-    shellQuote(join5(kitRoot, "scripts", "kit.mjs")),
+    shellQuote(join6(kitRoot, "scripts", "kit.mjs")),
     ...args
   ].join(" ");
 }
@@ -40392,12 +40654,12 @@ async function configureRepo(git, source, config2, author) {
   await set2(git, source, `branch.${branch}.remote`, ".");
   await set2(git, source, `branch.${branch}.merge`, trackingRef(config2.thread_ref));
   await set2(git, source, `branch.${branch}.rebase`, "true");
-  const info = join5(source, ".git", "info");
-  await mkdir2(info, { recursive: true });
-  await writeFile3(join5(info, "attributes"), `package.json filter=${SDK_FILTER}
+  const info = join6(source, ".git", "info");
+  await mkdir3(info, { recursive: true });
+  await writeFile3(join6(info, "attributes"), `package.json filter=${SDK_FILTER}
 `);
-  const excludePath = join5(info, "exclude");
-  const excluded = existsSync3(excludePath) ? (await readFile5(excludePath, "utf8")).split(`
+  const excludePath = join6(info, "exclude");
+  const excluded = existsSync3(excludePath) ? (await readFile6(excludePath, "utf8")).split(`
 `) : [];
   const missing = EXCLUDES.filter((line) => !excluded.includes(line));
   if (missing.length > 0)
@@ -40411,12 +40673,12 @@ async function requireGitLfs(git, cwd) {
   }
 }
 function requireRepo(source) {
-  if (!existsSync3(join5(source, ".git"))) {
+  if (!existsSync3(join6(source, ".git"))) {
     throw new RepoError(`${source} is not a git repository; run kit.mjs clone in a new directory`);
   }
 }
 async function requireClean(git, source, what) {
-  if (existsSync3(join5(source, ".git", "rebase-merge")) || existsSync3(join5(source, ".git", "rebase-apply"))) {
+  if (existsSync3(join6(source, ".git", "rebase-merge")) || existsSync3(join6(source, ".git", "rebase-apply"))) {
     throw new RepoError("a git rebase is in progress in source/; finish it (git rebase --continue) first");
   }
   if (await gitOk(git, source, ["status", "--porcelain"]) !== "") {
@@ -40426,13 +40688,13 @@ async function requireClean(git, source, what) {
 async function fetchBundles(git, source, pulled, already, download2) {
   const listed = new Set(pulled.bundles.map((bundle2) => bundle2.sha256));
   const fetched = already.filter((sha) => listed.has(sha));
-  const dir = join5(source, ".git", "tokoyo-bundles");
-  await mkdir2(dir, { recursive: true });
+  const dir = join6(source, ".git", "tokoyo-bundles");
+  await mkdir3(dir, { recursive: true });
   for (const bundle2 of fetchOrder(pulled.bundles)) {
     if (fetched.includes(bundle2.sha256))
       continue;
     const bytes = await download2(`bundle ${bundle2.seq}`, bundle2.url, bundle2.sha256);
-    const file2 = join5(dir, `${bundle2.sha256}.bundle`);
+    const file2 = join6(dir, `${bundle2.sha256}.bundle`);
     await writeFile3(file2, bytes);
     try {
       await gitOk(git, source, [
@@ -40489,9 +40751,9 @@ async function integrate(git, source, threadRef) {
 import { spawnSync } from "node:child_process";
 import { createHash as createHash3 } from "node:crypto";
 import { existsSync as existsSync4 } from "node:fs";
-import { mkdir as mkdir3, mkdtemp, readdir as readdir3, readFile as readFile6, rm as rm3, writeFile as writeFile4 } from "node:fs/promises";
+import { mkdir as mkdir4, mkdtemp, readdir as readdir3, readFile as readFile7, rm as rm3, writeFile as writeFile4 } from "node:fs/promises";
 import { tmpdir } from "node:os";
-import { join as join6 } from "node:path";
+import { join as join7 } from "node:path";
 var SDK_DIR = "sdk";
 var SDK_SHA_FILE = ".sdk-sha256";
 var ARCHIVE_ROOT_DEPTH = 1;
@@ -40503,7 +40765,7 @@ class SdkError extends Error {
   name = "SdkError";
 }
 async function setupSdk(options) {
-  const sdk = join6(options.kitRoot, SDK_DIR);
+  const sdk = join7(options.kitRoot, SDK_DIR);
   const expected = options.sha256.toLowerCase();
   if (await recordedSha(sdk) === expected)
     return "unchanged";
@@ -40512,19 +40774,19 @@ async function setupSdk(options) {
   if (actual !== expected) {
     throw new SdkError(`the SDK archive's sha256 is ${actual}, expected ${expected}; nothing was changed`);
   }
-  const scratch = await mkdtemp(join6(tmpdir(), "kit-sdk-"));
+  const scratch = await mkdtemp(join7(tmpdir(), "kit-sdk-"));
   try {
-    const path = join6(scratch, "sdk.tgz");
+    const path = join7(scratch, "sdk.tgz");
     await writeFile4(path, archive);
     await rm3(sdk, { recursive: true, force: true });
-    await mkdir3(sdk, { recursive: true });
+    await mkdir4(sdk, { recursive: true });
     untar(path, sdk);
     for (const required2 of ["app-sdk/spec.md", "package.json", KIT_LOCKFILE]) {
-      if (!existsSync4(join6(sdk, required2)))
+      if (!existsSync4(join7(sdk, required2)))
         throw new SdkError(`the SDK archive has no ${required2}`);
     }
     await (options.install ?? npmCi)(sdk);
-    await writeFile4(join6(sdk, SDK_SHA_FILE), `${expected}
+    await writeFile4(join7(sdk, SDK_SHA_FILE), `${expected}
 `);
   } finally {
     await rm3(scratch, { recursive: true, force: true });
@@ -40532,10 +40794,10 @@ async function setupSdk(options) {
   return "installed";
 }
 async function recordedSha(sdk) {
-  const path = join6(sdk, SDK_SHA_FILE);
+  const path = join7(sdk, SDK_SHA_FILE);
   if (!existsSync4(path))
     return null;
-  return (await readFile6(path, "utf8")).trim();
+  return (await readFile7(path, "utf8")).trim();
 }
 function untar(archive, into) {
   const result = spawnSync("tar", [
@@ -40565,8 +40827,8 @@ async function npmCi(sdk) {
   }
 }
 async function listSdkDirs(kitRoot) {
-  const sdk = join6(kitRoot, SDK_DIR);
-  if (!existsSync4(join6(sdk, "app-sdk"))) {
+  const sdk = join7(kitRoot, SDK_DIR);
+  if (!existsSync4(join7(sdk, "app-sdk"))) {
     throw new SdkError("the SDK is not set up; call the MCP tool get_sdk and run `kit.mjs setup --sdk-url <url> --sha256 <sha256>`");
   }
   const entries = await readdir3(sdk, { withFileTypes: true });
@@ -40575,7 +40837,7 @@ async function listSdkDirs(kitRoot) {
 
 // frontend/packages/creator-kit/src/workdir.ts
 import { existsSync as existsSync5 } from "node:fs";
-import { dirname as dirname2, join as join7 } from "node:path";
+import { dirname as dirname2, join as join8 } from "node:path";
 var CONFIG_FILE = ".tokoyo.json";
 var WORKDIR_DIRS = {
   source: "source",
@@ -40639,7 +40901,7 @@ function serializeConfig(config2) {
 }
 function locateWorkdir(start) {
   for (let current = start;; current = dirname2(current)) {
-    if (existsSync5(join7(current, CONFIG_FILE)))
+    if (existsSync5(join8(current, CONFIG_FILE)))
       return current;
     if (dirname2(current) === current)
       return null;
@@ -40705,7 +40967,7 @@ class CommandError extends Error {
 }
 function defaultConfigDir() {
   const xdg = process.env.XDG_CONFIG_HOME;
-  return join8(xdg && xdg !== "" ? xdg : join8(homedir(), ".config"), "tokoyo");
+  return join9(xdg && xdg !== "" ? xdg : join9(homedir(), ".config"), "tokoyo");
 }
 async function readStdin() {
   const chunks = [];
@@ -40782,47 +41044,47 @@ async function setup(context, flags) {
     sha256: flags.sha256,
     download: context.download
   });
-  print(context, { status, sdk: join8(context.kitRoot, SDK_DIR) });
+  print(context, { status, sdk: join9(context.kitRoot, SDK_DIR) });
 }
 async function kitVersion(kitRoot) {
-  const manifest = join8(kitRoot, ".claude-plugin", "plugin.json");
+  const manifest = join9(kitRoot, ".claude-plugin", "plugin.json");
   if (!existsSync6(manifest))
     throw new CommandError(`${manifest} is missing; reinstall the Creator Kit`);
-  const version2 = JSON.parse(await readFile7(manifest, "utf8")).version;
+  const version2 = JSON.parse(await readFile8(manifest, "utf8")).version;
   if (typeof version2 !== "string")
     throw new CommandError(`${manifest} has no version`);
   return version2;
 }
 async function readConfig(workdir) {
-  return parseConfig(await readFile7(join8(workdir, CONFIG_FILE), "utf8"));
+  return parseConfig(await readFile8(join9(workdir, CONFIG_FILE), "utf8"));
 }
 async function saveConfig(workdir, config2) {
-  await writeFile5(join8(workdir, CONFIG_FILE), serializeConfig(config2));
+  await writeFile5(join9(workdir, CONFIG_FILE), serializeConfig(config2));
 }
-var sourceOf = (workdir) => join8(workdir, WORKDIR_DIRS.source);
+var sourceOf = (workdir) => join9(workdir, WORKDIR_DIRS.source);
 var AGENTS_TITLE = agentsMd("").split(`
 `)[0];
 async function writeAgentFiles(workdir, kitRoot) {
-  const agents = join8(workdir, "AGENTS.md");
-  if (!existsSync6(agents) || (await readFile7(agents, "utf8")).startsWith(AGENTS_TITLE)) {
+  const agents = join9(workdir, "AGENTS.md");
+  if (!existsSync6(agents) || (await readFile8(agents, "utf8")).startsWith(AGENTS_TITLE)) {
     await writeFile5(agents, agentsMd(kitRoot));
   }
-  const claude = join8(workdir, "CLAUDE.md");
+  const claude = join9(workdir, "CLAUDE.md");
   if (!existsSync6(claude))
     await writeFile5(claude, CLAUDE_MD);
 }
 async function copySampleApp(kitRoot, source) {
-  const sample = join8(kitRoot, SDK_DIR, "sample-app");
+  const sample = join9(kitRoot, SDK_DIR, "sample-app");
   const packages = await sdkPackages(kitRoot);
-  await cp(sample, source, { recursive: true, force: true });
-  const manifest = await readFile7(join8(sample, "package.json"), "utf8");
-  await writeFile5(join8(source, "package.json"), newAppPackageJson(manifest, packages, kitRoot));
+  await cp2(sample, source, { recursive: true, force: true });
+  const manifest = await readFile8(join9(sample, "package.json"), "utf8");
+  await writeFile5(join9(source, "package.json"), newAppPackageJson(manifest, packages, kitRoot));
 }
 async function sdkPackages(kitRoot) {
   const packages = new Map;
   for (const dir of await listSdkDirs(kitRoot)) {
-    const manifest = join8(kitRoot, SDK_DIR, dir, "package.json");
-    const name = existsSync6(manifest) ? JSON.parse(await readFile7(manifest, "utf8")).name : dir;
+    const manifest = join9(kitRoot, SDK_DIR, dir, "package.json");
+    const name = existsSync6(manifest) ? JSON.parse(await readFile8(manifest, "utf8")).name : dir;
     packages.set(typeof name === "string" ? name : dir, dir);
   }
   return packages;
@@ -40856,20 +41118,20 @@ async function fetchVerified(context, name, url3, sha256) {
 var PLAYTEST_REPORT = "playtest-report.json";
 var PLAYTEST_DIR = "playtest";
 async function replacePlaytest(context, workdir, playtest) {
-  const input = join8(workdir, WORKDIR_DIRS.input);
-  await rm4(join8(input, PLAYTEST_REPORT), { force: true });
-  await rm4(join8(input, PLAYTEST_DIR), { recursive: true, force: true });
+  const input = join9(workdir, WORKDIR_DIRS.input);
+  await rm4(join9(input, PLAYTEST_REPORT), { force: true });
+  await rm4(join9(input, PLAYTEST_DIR), { recursive: true, force: true });
   if (playtest === null)
     return;
   const report = JSON.parse(new TextDecoder().decode(await context.download(playtest.url)));
-  await mkdir4(join8(input, PLAYTEST_DIR), { recursive: true });
+  await mkdir5(join9(input, PLAYTEST_DIR), { recursive: true });
   const names = [];
   for (const [index, shot] of playtest.screenshots.entries()) {
     const name = `${PLAYTEST_DIR}/${index + 1}.png`;
-    await writeFile5(join8(input, name), await context.download(shot));
+    await writeFile5(join9(input, name), await context.download(shot));
     names.push(name);
   }
-  await writeFile5(join8(input, PLAYTEST_REPORT), `${JSON.stringify({ ...report, screenshots: names }, null, 2)}
+  await writeFile5(join9(input, PLAYTEST_REPORT), `${JSON.stringify({ ...report, screenshots: names }, null, 2)}
 `);
 }
 var bundleDownloader = (context) => (name, url3, sha256) => fetchVerified(context, name, url3, sha256);
@@ -40877,7 +41139,7 @@ var NEXT_EDIT = "change source/, git commit, then kit.mjs build → kit.mjs pack
 async function clone2(context, flags) {
   const pulled = parsePulled(flags.bundles);
   const workdir = context.cwd;
-  const path = join8(workdir, CONFIG_FILE);
+  const path = join9(workdir, CONFIG_FILE);
   if (existsSync6(path)) {
     const existing = await readConfig(workdir);
     if (existing.app_id !== pulled.app_id) {
@@ -40892,7 +41154,7 @@ async function clone2(context, flags) {
   await requireGitLfs(context.git, workdir);
   await listSdkDirs(context.kitRoot);
   for (const dir of Object.values(WORKDIR_DIRS))
-    await mkdir4(join8(workdir, dir), { recursive: true });
+    await mkdir5(join9(workdir, dir), { recursive: true });
   const branch = threadBranch(pulled.thread_ref);
   await gitOk(context.git, workdir, ["init", "-q", "-b", branch, source]);
   await gitOk(context.git, source, ["lfs", "install", "--local"]);
@@ -41034,16 +41296,16 @@ async function pack(context) {
     throw new CommandError("no new commits since the head kit.mjs pull took (base_commit_oid); git commit first");
   }
   await assertCanonicalRefs(context.git, source, tip);
-  const outputs = join8(workdir, WORKDIR_DIRS.outputs);
-  const reportPath = join8(outputs, "build-report.json");
+  const outputs = join9(workdir, WORKDIR_DIRS.outputs);
+  const reportPath = join9(outputs, "build-report.json");
   if (!existsSync6(reportPath)) {
     throw new CommandError("outputs/build-report.json is missing; write it first (instructions.md §2)");
   }
-  const dist = join8(source, "dist");
+  const dist = join9(source, "dist");
   if (!existsSync6(dist))
     throw new CommandError("source/dist is missing; kit.mjs build first");
-  await mkdir4(outputs, { recursive: true });
-  const bundlePath = join8(outputs, "source.bundle");
+  await mkdir5(outputs, { recursive: true });
+  const bundlePath = join9(outputs, "source.bundle");
   await gitOk(context.git, source, [
     "bundle",
     "create",
@@ -41053,12 +41315,21 @@ async function pack(context) {
     ...base === null ? [] : [`^${base}`]
   ]);
   const distArchive = buildDistArchive(await collectFiles(dist));
-  await writeFile5(join8(outputs, "dist.tar.gz"), distArchive);
+  await writeFile5(join9(outputs, "dist.tar.gz"), distArchive);
+  const debugDist = join9(source, "debug-dist");
+  let developmentFiles = {};
+  if (existsSync6(debugDist)) {
+    const archive = buildDistArchive(await collectFiles(debugDist));
+    await writeFile5(join9(outputs, "debug-dist.tar.gz"), archive);
+    developmentFiles = { "debug-dist.tar.gz": describeFile(archive) };
+  } else
+    await rm4(join9(outputs, "debug-dist.tar.gz"), { force: true });
   print(context, {
     files: {
-      "source.bundle": describeFile(new Uint8Array(await readFile7(bundlePath))),
+      ...developmentFiles,
+      "source.bundle": describeFile(new Uint8Array(await readFile8(bundlePath))),
       "dist.tar.gz": describeFile(distArchive),
-      "build-report.json": describeFile(new Uint8Array(await readFile7(reportPath)))
+      "build-report.json": describeFile(new Uint8Array(await readFile8(reportPath)))
     },
     session_id: config2.session_id,
     commit_oid: tip,
@@ -41069,13 +41340,20 @@ async function pack(context) {
 }
 async function check2(context) {
   const workdir = await findWorkdir(context.cwd);
-  const path = join8(workdir, WORKDIR_DIRS.outputs, "dist.tar.gz");
+  const path = join9(workdir, WORKDIR_DIRS.outputs, "dist.tar.gz");
   if (!existsSync6(path))
     throw new CheckFailed("outputs/dist.tar.gz is missing; run kit.mjs pack first");
-  const result = await checkDist(new Uint8Array(await readFile7(path)));
+  const result = await checkDist(new Uint8Array(await readFile8(path)));
   if (!result.passed)
     throw new CheckFailed(result.summary);
   context.stdout(result.summary);
+  const development = join9(workdir, WORKDIR_DIRS.outputs, "debug-dist.tar.gz");
+  if (existsSync6(development)) {
+    const checked = await checkDist(new Uint8Array(await readFile8(development)), "debug");
+    if (!checked.passed)
+      throw new CheckFailed(checked.summary);
+    context.stdout(checked.summary);
+  }
 }
 async function uploadOutputs(context, flags) {
   const workdir = await findWorkdir(context.cwd);
@@ -41096,11 +41374,17 @@ async function uploadOutputs(context, flags) {
   if (lfs.code !== 0) {
     throw new CommandError(`uploading the LFS files failed: ${lfs.stderr.trim()} (not logged in? run kit.mjs login)`);
   }
-  for (const [name, contentType] of Object.entries(OUTPUT_FILES)) {
-    const bytes = new Uint8Array(await readFile7(join8(workdir, WORKDIR_DIRS.outputs, name)));
+  const outputFiles = {
+    ...OUTPUT_FILES,
+    ...existsSync6(join9(workdir, WORKDIR_DIRS.outputs, "debug-dist.tar.gz")) ? { "debug-dist.tar.gz": "application/gzip" } : {}
+  };
+  if ("debug-dist.tar.gz" in outputFiles && typeof urls["debug-dist.tar.gz"] !== "string")
+    throw new CommandError("--urls has no URL for debug-dist.tar.gz");
+  for (const [name, contentType] of Object.entries(outputFiles)) {
+    const bytes = new Uint8Array(await readFile8(join9(workdir, WORKDIR_DIRS.outputs, name)));
     await upload(name, urls[name], bytes, contentType, context.fetch);
   }
-  print(context, { uploaded: Object.keys(OUTPUT_FILES) });
+  print(context, { uploaded: Object.keys(outputFiles) });
 }
 async function link(context) {
   const workdir = await findWorkdir(context.cwd);
@@ -41118,10 +41402,10 @@ async function link(context) {
   for (const path of tracked.split("\x00")) {
     if (!(path === "package.json" || path.endsWith("/package.json")))
       continue;
-    const file2 = join8(source, ...path.split("/"));
+    const file2 = join9(source, ...path.split("/"));
     if (!existsSync6(file2))
       continue;
-    await writeFile5(file2, localizeSdkRefs(await readFile7(file2, "utf8"), context.kitRoot, sdkDirs));
+    await writeFile5(file2, localizeSdkRefs(await readFile8(file2, "utf8"), context.kitRoot, sdkDirs));
     if (await gitTest(context.git, source, ["diff", "--quiet", "--", path])) {
       await gitOk(context.git, source, ["add", "--", path]);
     }
@@ -41177,8 +41461,8 @@ async function addAsset(context, flags) {
   }
   const workdir = await findWorkdir(context.cwd);
   const bytes = await fetchVerified(context, path, flags.url, flags.sha256);
-  const target = join8(sourceOf(workdir), ...segments);
-  await mkdir4(dirname3(target), { recursive: true });
+  const target = join9(sourceOf(workdir), ...segments);
+  await mkdir5(dirname3(target), { recursive: true });
   await writeFile5(target, bytes);
   print(context, {
     path,
