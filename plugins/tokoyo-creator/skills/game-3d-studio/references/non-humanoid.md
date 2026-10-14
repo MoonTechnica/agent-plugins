@@ -4,6 +4,9 @@
 
 ## 1. 専用AIを優先する
 
+入力と形状の診断は [model-quality.md](model-quality.md) を先に使う。
+翼/膜/指/脚の隙間を一律のリメッシュで消さず、骨格を付ける前に必要な可動部を保つ。
+
 1. `$game-art-direction` §3に従いライブラリを調査し、合うモデルが無ければBlenderでのモデリングを評価、難しければ `generate_model_3d` で形を作る（非人型ではrig=false）。既存のリグ・必要なクリップが体型と動作に合う場合は再利用し、不足分だけ以下で補う。
 2. `rig_model_3d(name, asset_id, rig_type)`で体型に合うTripo v2.5のリグを作る。無料rig-checkで体型一致を確認してから有料リグを依頼する。入力GLBは150 MB以下。
 3. `animate_model_3d(name, asset_id, animations, animate_in_place=true)`へ**rig_model_3dのready成果物**を渡す。体型に合う下記の公式presetだけを使う。
