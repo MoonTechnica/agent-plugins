@@ -4,6 +4,10 @@
 入力の解禁は `$game-controls` §3、制作中の実画像確認は `$game-playtest` references/visual-observation.md。
 既存ゲームは現在の美術と構造を土台に局所修正する。単一のテンプレートに置き換えない。
 
+タイトルは `$game-listing` references/title-logo.md の独立した透過ロゴを再利用する。
+`assets/title-logo.png` を `app.assets.url` で読み、背景・開始操作と分離して配置する。
+掲載画像からロゴを切り抜いたり、画面ごとにロゴを再生成したりしない。
+
 ## 1. 最も使う操作を主役にする
 
 - 初回は「遊ぶ」/「新しく始める」。有効な保存がある進行型は「続きから」を主操作にし、復帰先を短く添える。
