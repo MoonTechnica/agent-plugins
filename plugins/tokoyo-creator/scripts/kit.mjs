@@ -9394,7 +9394,7 @@ function splitFlag(flag) {
 }
 
 // frontend/packages/creator-kit/src/commands.ts
-import { createHash as createHash4 } from "node:crypto";
+import { createHash as createHash5 } from "node:crypto";
 import { existsSync as existsSync6 } from "node:fs";
 import { cp as cp2, mkdir as mkdir5, readdir as readdir4, readFile as readFile8, rm as rm4, writeFile as writeFile5 } from "node:fs/promises";
 import { homedir } from "node:os";
@@ -23687,10 +23687,10 @@ config(en_default());
 var ARTIFACT_ARCHIVE_MAX_BYTES = 200 * 1024 * 1024;
 var ARTIFACT_MAX_BYTES = 4 * 1024 * 1024 * 1024;
 var ARTIFACT_ARCHIVE_UNPACKED_MAX_BYTES = 1024 * 1024 * 1024;
-var ARTIFACT_FILE_MAX_BYTES = 30 * 1024 * 1024;
+var ARTIFACT_FILE_MAX_BYTES = 64 * 1024 * 1024;
 var ARTIFACT_MAX_FILES = 20000;
 var ARTIFACT_LEDGER_FILE_MAX_BYTES = 256 * 1024 * 1024;
-var ARTIFACT_INITIAL_MAX_BYTES = 20 * 1024 * 1024;
+var ARTIFACT_INITIAL_MAX_BYTES = 64 * 1024 * 1024;
 var ARTIFACT_INITIAL_WARN_BYTES = 10 * 1024 * 1024;
 var ARTIFACT_MEMORY_WARN_BYTES = 512 * 1024 * 1024;
 var ARTIFACT_MEMORY_STRONG_WARN_BYTES = 768 * 1024 * 1024;
@@ -23872,6 +23872,18 @@ var deviceManifestSchema = exports_external.strictObject({
   motion: deviceFeatureSchema.optional(),
   pointerLock: deviceFeatureSchema.optional()
 });
+var GODOT_VERSION = "4.5.1";
+var godotManifestSchema = exports_external.strictObject({
+  version: exports_external.literal(GODOT_VERSION),
+  web: exports_external.strictObject({
+    glue: artifactPathSchema.refine((path) => path.startsWith("assets/") && path.endsWith(".js")),
+    wasm: artifactPathSchema.refine((path) => path.startsWith("assets/") && path.endsWith(".wasm")),
+    pack: artifactPathSchema.refine((path) => path.startsWith("assets/") && path.endsWith(".pck"))
+  }),
+  native: exports_external.strictObject({
+    pack: artifactPathSchema.refine((path) => /^bundles\/godot_native\/.+\.pck$/.test(path))
+  })
+});
 var manifestSchema = exports_external.strictObject({
   manifestVersion: exports_external.literal(MANIFEST_VERSION).default(MANIFEST_VERSION),
   kind: exports_external.string().min(1).max(64),
@@ -23893,7 +23905,23 @@ var manifestSchema = exports_external.strictObject({
   ai: aiManifestSchema.nullable().default(null),
   renderer: rendererSchema.default("webgpu"),
   device: deviceManifestSchema.default({}),
-  safeArea: safeAreaModeSchema.optional()
+  safeArea: safeAreaModeSchema.optional(),
+  godot: godotManifestSchema.optional()
+}).superRefine((manifest, ctx) => {
+  if (!manifest.godot)
+    return;
+  if (manifest.renderer !== "webgl2")
+    ctx.addIssue({
+      code: "custom",
+      path: ["renderer"],
+      message: "Godot Web requires Compatibility/WebGL2"
+    });
+  if (manifest.bundles.godot_native?.load !== "demand")
+    ctx.addIssue({
+      code: "custom",
+      path: ["bundles", "godot_native"],
+      message: "native packs require a demand-only bundle"
+    });
 });
 function sortKeysDeep(value) {
   if (Array.isArray(value)) {
@@ -23916,15 +23944,18 @@ function normalizeManifest(input) {
 // frontend/packages/app-protocol/src/artifact-hash.ts
 var ARTIFACT_HASH_VERSION = "artifact-hash/v1";
 var SHA256_HEX = /^[0-9a-f]{64}$/;
-async function sha256Hex(bytes) {
+var webDigest = (bytes) => crypto.subtle.digest("SHA-256", bytes);
+async function sha256Hex(bytes, hash2) {
   const input = bytes instanceof Uint8Array ? bytes : new Uint8Array(bytes);
-  const digest = await crypto.subtle.digest("SHA-256", input);
+  const digest = await hash2(input);
+  if (digest.byteLength !== 32)
+    throw new Error("app-protocol: SHA256 must return 32 bytes");
   return Array.from(new Uint8Array(digest), (byte) => byte.toString(16).padStart(2, "0")).join("");
 }
-async function hashArtifactFile(bytes) {
-  return sha256Hex(bytes);
+async function hashArtifactFile(bytes, hash2 = webDigest) {
+  return sha256Hex(bytes, hash2);
 }
-async function computeArtifactHash(files) {
+async function computeArtifactHash(files, hash2 = webDigest) {
   if (files.length === 0) {
     throw new Error("app-protocol: an artifact must contain at least one file");
   }
@@ -23946,7 +23977,7 @@ async function computeArtifactHash(files) {
   return sha256Hex(new TextEncoder().encode(`${ARTIFACT_HASH_VERSION}
 ${lines.join(`
 `)}
-`));
+`), hash2);
 }
 var ARTIFACT_INDEX_PATH = ".artifact-index.json";
 var SERVER_BUNDLE_PATH = "server.bundle.js";
@@ -24308,6 +24339,9 @@ var gameAssetCatalogSchema = exports_external.object({
     thumbnail_path: sourcePath.nullable().optional()
   }).strict()).max(500)
 }).strict().refine((catalog) => new Set(catalog.items.map((item) => item.id)).size === catalog.items.length && new Set(catalog.items.map((item) => item.name)).size === catalog.items.length);
+// frontend/packages/app-protocol/src/godot-runtime.ts
+var GODOT_WEB_GLUE_SHA256 = "8a7c7d57f7da69bb71da9de302480b87e4c7ecb467ce643665b4a288683cd18f";
+var GODOT_WEB_WASM_SHA256 = "6498359ba889796a0d95a2f71113ac184badc0f2d84cf28f4103c7e399d2d547";
 // frontend/packages/app-protocol/src/messages.ts
 var slotSchema = exports_external.int().min(1);
 var nonceSchema = exports_external.string().length(32);
@@ -24862,6 +24896,9 @@ function checkDocumentDefaults(schema) {
   }
   return findings;
 }
+// frontend/packages/app-validator/src/static.ts
+import { createHash } from "node:crypto";
+
 // frontend/packages/app-validator/src/store-schema.ts
 function sameDefinition2(a, b) {
   if (a === null || b === null)
@@ -24907,6 +24944,7 @@ var ALLOWED_EXTENSIONS = new Set([
   ".css",
   ".json",
   ".wasm",
+  ".pck",
   ".png",
   ".jpg",
   ".jpeg",
@@ -25056,6 +25094,7 @@ function validateStatic(files, options = {}) {
   } catch (cause) {
     throw new Error(`app-validator: ${MANIFEST_PATH} is not a valid manifest: ${cause}`);
   }
+  const trustedGodot = validateGodotReferences(manifest, byPath, errors3);
   if (options.artifactFlavor === "debug" && !requiresDevelopmentArtifact(manifest)) {
     errors3.push({
       code: "INVALID_DEBUG_CATALOG",
@@ -25071,7 +25110,7 @@ function validateStatic(files, options = {}) {
       message: `the manifest points at "${manifest.entrypoint}", which is not in the artifact`,
       path: manifest.entrypoint
     });
-  } else if (manifest.gamepad !== "none" && !decode3(entrypoint).includes("getGamepads")) {
+  } else if (!trustedGodot && manifest.gamepad !== "none" && !decode3(entrypoint).includes("getGamepads")) {
     errors3.push({
       code: "GAMEPAD_DECLARED_BUT_UNUSED",
       message: `the manifest declares gamepad "${manifest.gamepad}" but "${manifest.entrypoint}" never calls getGamepads()`,
@@ -25124,6 +25163,8 @@ function validateStatic(files, options = {}) {
       continue;
     if (manifest.space && file2.path === manifest.space.server)
       continue;
+    if (trustedGodot && file2.path === manifest.godot?.web.glue)
+      continue;
     const source = decode3(file2);
     for (const rule of CODE_RULES) {
       if (!rule.pattern.test(source))
@@ -25145,8 +25186,46 @@ function validateStatic(files, options = {}) {
   const aiPrompts = validateFeatures(manifest, files, options, errors3, warnings);
   return { manifest, errors: errors3, warnings, aiPrompts };
 }
+function validateGodotReferences(manifest, byPath, errors3) {
+  if (!manifest.godot)
+    return false;
+  const resources = [
+    [manifest.godot.web.glue, ".js"],
+    [manifest.godot.web.wasm, ".wasm"],
+    [manifest.godot.web.pack, ".pck"],
+    [manifest.godot.native.pack, ".pck"]
+  ];
+  for (const [path, extension] of resources) {
+    if (!byPath.has(path)) {
+      errors3.push({ code: "GODOT_FILE_MISSING", message: "Godot resource is missing", path });
+    }
+    if (extensionOf(path) !== extension) {
+      errors3.push({
+        code: "GODOT_FILE_TYPE",
+        message: `Godot resource must use ${extension}`,
+        path
+      });
+    }
+  }
+  let trusted = true;
+  for (const [path, expected] of [
+    [manifest.godot.web.glue, GODOT_WEB_GLUE_SHA256],
+    [manifest.godot.web.wasm, GODOT_WEB_WASM_SHA256]
+  ]) {
+    const file2 = byPath.get(path);
+    if (!file2 || createHash("sha256").update(file2.bytes).digest("hex") !== expected) {
+      trusted = false;
+      errors3.push({
+        code: "GODOT_RUNTIME_HASH",
+        message: "Godot runtime must match the pinned official release",
+        path
+      });
+    }
+  }
+  return trusted;
+}
 function clientSources(manifest, files) {
-  return files.filter((file2) => [".js", ".mjs", ".html"].includes(extensionOf(file2.path))).filter((file2) => !(manifest.space && file2.path === manifest.space.server)).map(decode3);
+  return files.filter((file2) => [".js", ".mjs", ".html"].includes(extensionOf(file2.path))).filter((file2) => !(manifest.space && file2.path === manifest.space.server)).filter((file2) => file2.path !== manifest.godot?.web.glue).map(decode3);
 }
 var DEVICE_FEATURES = ["camera", "microphone", "motion", "pointerLock"];
 var DEVICE_USAGE = {
@@ -39850,7 +39929,7 @@ async function kitBuild(source) {
   const sourceManifest = manifestSchema.parse(JSON.parse(await readFile3(join3(source, MANIFEST_PATH2), "utf8")));
   const hasDebug = requiresDevelopmentArtifact(sourceManifest);
   if (hasDebug) {
-    if (!existsSync(join3(source, "debug/entry.ts")))
+    if (!existsSync(join3(source, "debug/entry.ts")) && !existsSync(join3(source, "godot/project.godot")))
       throw new KitBuildError("game builds require development source and normal_start");
     await validateDebugCatalog(source);
   }
@@ -40139,7 +40218,7 @@ var encoder = new TextEncoder;
 var decoder2 = new TextDecoder;
 
 // frontend/packages/creator-kit/src/login.ts
-import { createHash, randomBytes } from "node:crypto";
+import { createHash as createHash2, randomBytes } from "node:crypto";
 import { existsSync as existsSync2 } from "node:fs";
 import { chmod, mkdir as mkdir2, readFile as readFile4, rename, writeFile as writeFile2 } from "node:fs/promises";
 import { createServer } from "node:http";
@@ -40252,7 +40331,7 @@ async function login(mcpUrl, deps) {
     client_id: clientId,
     redirect_uri: REDIRECT_URI,
     state,
-    code_challenge: base64url3(createHash("sha256").update(verifier).digest()),
+    code_challenge: base64url3(createHash2("sha256").update(verifier).digest()),
     code_challenge_method: "S256"
   }).toString();
   const code = await deps.authorize(url2.toString(), REDIRECT_URI, state);
@@ -40355,7 +40434,7 @@ function loopbackAuthorize(openUrl) {
 }
 
 // frontend/packages/creator-kit/src/pack.ts
-import { createHash as createHash2 } from "node:crypto";
+import { createHash as createHash3 } from "node:crypto";
 import { lstat as lstat3, readdir as readdir2, readFile as readFile5 } from "node:fs/promises";
 import { join as join5 } from "node:path";
 
@@ -40453,7 +40532,7 @@ function buildDistArchive(files) {
   return gzipTar(files.filter((file2) => file2.path !== ARTIFACT_INDEX_PATH));
 }
 function describeFile(bytes) {
-  return { size: bytes.byteLength, sha256: createHash2("sha256").update(bytes).digest("hex") };
+  return { size: bytes.byteLength, sha256: createHash3("sha256").update(bytes).digest("hex") };
 }
 
 // frontend/packages/creator-kit/src/package-refs.ts
@@ -40749,7 +40828,7 @@ async function integrate(git, source, threadRef) {
 
 // frontend/packages/creator-kit/src/sdk.ts
 import { spawnSync } from "node:child_process";
-import { createHash as createHash3 } from "node:crypto";
+import { createHash as createHash4 } from "node:crypto";
 import { existsSync as existsSync4 } from "node:fs";
 import { mkdir as mkdir4, mkdtemp, readdir as readdir3, readFile as readFile7, rm as rm3, writeFile as writeFile4 } from "node:fs/promises";
 import { tmpdir } from "node:os";
@@ -40770,7 +40849,7 @@ async function setupSdk(options) {
   if (await recordedSha(sdk) === expected)
     return "unchanged";
   const archive = await options.download(options.sdkUrl);
-  const actual = createHash3("sha256").update(archive).digest("hex");
+  const actual = createHash4("sha256").update(archive).digest("hex");
   if (actual !== expected) {
     throw new SdkError(`the SDK archive's sha256 is ${actual}, expected ${expected}; nothing was changed`);
   }
@@ -41109,7 +41188,7 @@ function newAppPackageJson(text, packages, kitRoot) {
 }
 async function fetchVerified(context, name, url3, sha256) {
   const bytes = await context.download(url3);
-  const actual = createHash4("sha256").update(bytes).digest("hex");
+  const actual = createHash5("sha256").update(bytes).digest("hex");
   if (sha256 !== undefined && actual !== sha256.toLowerCase()) {
     throw new CommandError(`${name}: sha256 is ${actual}, expected ${sha256}; nothing was changed`);
   }

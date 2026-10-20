@@ -49,6 +49,7 @@
 | `$game-ux` | **必ず**。遊べる体験: 最初の 1 手を画面で示す・最初の課題は必ず成功できる、入力への手応え（ヒットストップ・揺れ・パーティクル・音）、読める文字とコントラスト、色だけ・音だけに頼らない、点滅と揺れの上限と reduced-motion、リザルトとすぐの再挑戦、効果音 / BGM の分離ミュートと設定の保存（`app.store`） |
 | `$game-listing` | **必ず**。公開ページの掲載情報を `listing/` に用意する。トップバナーはゲームタイトルをロゴ風に組み込んだキービジュアル、アイコンは小さくても識別できる専用の構図で生成し、最終画像を開いて確認する。初回は全部作り、2 回目以降は中身と合わなくなった項目だけ直す |
 | `$game-asset-tools` | 絵や音を用意/変更するとき。現行素材の参照検索、基準画像と原型の再利用、レシピ実行と差分制作（素材ツールがあるときは必ず） |
+| `$game-godot` | **Godot PoC が明示された制作、または既存 `manifest.json` に `godot` があるとき**。同じサービスのビルド・Artifact・Webプレビュー経路を使用する。既存JS作品を無断変換しない |
 | `$game-phaser` | **2D を同梱の Phaser 4 で作ると決めたとき**（§4.2。素材の読み込み・入力・画面・物理の Platform との継ぎ目） |
 | `$game-3d-and-bundles` | 3D で描くとき・ステージが複数あるとき・素材が大きいとき |
 | `$game-3d-studio` | 3Dモデルを調達/生成/加工するときは references/model-quality.md（入力・用途別修復・リトポロジー/ベイク・変形と完成GLBの実再生）。Blenderでのモデリング・リグ・モーション・3Dから2Dも扱う |
@@ -158,12 +159,12 @@ bundle-refs.json     # 台帳から参照する素材の一覧（ビルドが so
 ai/<key>.md          # ゲーム内 AI の指示文（`ai.chat` のときだけ。`ai/schemas/*.json` も。`$game-ai`）
 ```
 
-- 合計 **4 GiB**・**20,000 ファイル**・**バンドル 1 つ 256 MiB** まで。そのうち書庫（`dist.tar.gz`）は**圧縮後 200 MiB・展開後 1 GiB・1 ファイル 30 MiB** まで。
+- 合計 **4 GiB**・**20,000 ファイル**・**バンドル 1 つ 256 MiB** まで。そのうち書庫（`dist.tar.gz`）は**圧縮後 200 MiB・展開後 1 GiB・1 ファイル 64 MiB** まで。
 - **大きい素材（1 ファイル数 MiB 以上の音・3D・動画）は書庫に入れず、素材台帳から参照する。** 素材を `upload_asset` / 生成ツールで台帳に載せ、
   `source/bundles.refs.json` に `{"refs": {"bundles/<名前>/<ファイル>": "<asset_id>"}}` と書く（そのパスのファイルは `dist/` に置かない）。
   ビルドが `dist/bundle-refs.json` に写し、Platform が台帳の中身を `bundles/` のそのパスで配る。ゲームのコードは書庫のファイルと同じく
   `app.assets.url('bundles/<名前>/<ファイル>')` で読む。1 つ 256 MiB まで（`$game-3d-and-bundles` §1）。
-- **`bundles/` の外（起動前に全部届く分）は 20 MiB まで**。10 MiB を超えると警告になる
+- **`bundles/` の外（起動前に全部届く分）は 64 MiB まで**。10 MiB を超えると警告になる
   （スマートフォンの回線で起動を待たせる）。大きい素材は `bundles/` へ。
 - 絶対パス・`..`・シンボリックリンク・同じパスの重複は取り込みで落とされる。
 - ファイル名は英数字と `.` `_` `-` と `/` だけを使う。
@@ -226,6 +227,12 @@ ai/<key>.md          # ゲーム内 AI の指示文（`ai.chat` のときだけ�
 
 ### 4.1 新しく作るとき
 
+**Godot PoC が明示されている、または既存 `manifest.json` に `godot` がある場合は `$game-godot` を先に読む。**
+以下の JS 用 `sample-app/`・`src/main.ts`・`server/main.ts` の構成に置き換えず、
+`<kit>/sdk/sample-godot/` の `godot/` と manifest・package・debug catalog を土台にする。
+ルールと調整値の責務分離は GDScript の別ファイルで行い、TypeScript を重複実装しない。
+`kit build`・ソース commit・Artifact と掲載情報の提出は以下と同じ経路を必ず使う。
+
 0. `$game-design` の段階 1〜3（企画・見た目の合意・素材の設計）を先に済ませる。
 1. `<kit>/sdk/sample-app/` を土台にして、**同じ構成**（`src/main.ts` / `server/main.ts` /
    `manifest.json` / `package.json`）でプロジェクトを作る。sample-app の `package.json` の `scripts` は使わない（消してよい）。
@@ -261,6 +268,9 @@ ai/<key>.md          # ゲーム内 AI の指示文（`ai.chat` のときだけ�
 ### 4.2 道具を選ぶ（エンジン・描画・物理）
 
 Kit には描画と物理の道具が全部入っている。**どれを使うかは、作りたいゲームに合わせてゲームごとに選ぶ**（既定は無い）。
+ただし **Godot を指定された制作では Godot 4.5.1 に固定**する。`renderer: "webgl2"` と
+Godot 用 manifest 宣言を維持し、2D/3D/物理は Godot 内で作る。以下の JS エンジン選択表は適用しない。
+ネイティブでも動かすため、Web の SDK 連携は `$game-godot` のガードを守り、ゲーム進行を JavaScript のみに依存させない。
 
 | 道具 | 何か | 向くゲームの例 |
 |---|---|---|
@@ -278,7 +288,7 @@ Kit には描画と物理の道具が全部入っている。**どれを使う�
    （SDK の MIGRATION.md。`build-report.json` の `notes` に書く）。
 4. **組み合わせてよい**（Babylon.js + Havok、Phaser + Rapier 2D）。ただし 1 つの canvas を 2 つのエンジンで描かない。
    重さは足し算になる。Phaser 約 1.4 MB、Rapier 2D 約 3.3 MiB に加えて、Havok は同梱の WASM を配る。
-   起動前に届くものは 20 MiB の上限に数える。
+   起動前に届くものは 64 MiB の上限に数える。
 5. 選んだ道具と理由を `build-report.json` の `notes` に 1 行書く。
 6. `manifest.json` の `renderer` を選んだ道具に合わせる: Babylon.js は `"webgpu"`、Phaser は `"webgl"`、Canvas 2D は `"canvas2d"`。
 

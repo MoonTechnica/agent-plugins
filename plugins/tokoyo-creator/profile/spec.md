@@ -48,6 +48,7 @@ Debug MenuのUIは各ゲームの`debug/`に作成する。SDKは検査・通信
 │   ├── game-screen-layout/  # 画面の追従・HUD・タイトル / ポーズ / リザルト
 │   ├── game-asset-tools/    # 参照検索CLI・制作レシピ・画像生成と素材ツール（MCP）
 │   ├── game-phaser/         # 同梱の Phaser 4 で 2D を作るときの決まり（素材・入力・画面・物理）
+│   ├── game-godot/          # サービス内Godot制作・Web/native出力・既存SDKとプレビューの接続
 │   ├── game-3d-and-bundles/ # Babylon.js・バンドルの分割・台帳からの参照・メモリ
 │   ├── game-3d-studio/      # Blender で 3D の素材を作る（モデリング・リグ・リターゲット・3D から 2D）
 │   ├── game-physics/        # 3D は Babylon / Havok、2D は Rapier 決定版で物理

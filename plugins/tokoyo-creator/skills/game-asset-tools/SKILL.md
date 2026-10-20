@@ -193,7 +193,7 @@ Smart Topologyや複数視点等を公式サイトで見つけても、現行ツ
   （GLB は `type=model/gltf-binary`、動画は `type=video/mp4`）でアップロードし、`get_asset` を呼ぶと確定する。
   **1 つ 256 MiB まで**。持ち込みの枠（`upload`）を 1 回使い、生成の枠は減らない。
 - **大きい素材（1 ファイル数 MiB 以上の音・3D・動画）はゲームに同梱しない。** 台帳に載せた `asset_id` を
-  `source/bundles.refs.json` で参照する（書庫の 1 ファイルは 30 MiB まで。書き方は `$game-3d-and-bundles` §1）。
+  `source/bundles.refs.json` で参照する（書庫の 1 ファイルは 64 MiB まで。書き方は `$game-3d-and-bundles` §1）。
 - 素材の保存量はアカウントで 20 GiB まで（超えると `STORAGE_QUOTA_EXCEEDED`）。同じ物を何度も上げない。
 
 ## 5. 待ち時間
@@ -263,7 +263,7 @@ Smart Topologyや複数視点等を公式サイトで見つけても、現行ツ
 
 - **動画をゲームで流すとき**: ファイルは取得せず、`source/bundles.refs.json` に
   `{"refs": {"bundles/intro/opening.mp4": "<asset_id>"}}` と書いて台帳から参照し、`manifest.json` の `bundles` に `intro` を宣言する
-  （書庫にも初期ダウンロードの 20 MiB にも入らない。`$game-3d-and-bundles` §1）。
+  （書庫にも初期ダウンロードの 64 MiB にも入らない。`$game-3d-and-bundles` §1）。
   `app.bundles.load('intro')` の後、`app.assets.url()` が返す URL（Host が渡す blob URL）を `<video>` に渡す:
 
   ```js

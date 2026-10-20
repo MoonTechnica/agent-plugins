@@ -38,7 +38,7 @@ import Phaser from 'phaser'
 
 - `manifest.json` に **`"renderer": "webgl"`**（Phaser 4 は WebGL で描く）。違うと検証が `RENDERER_MISMATCH` を出す。
 - `type: Phaser.WEBGL` にする。`Phaser.AUTO` は WebGL が無いと Canvas に落ちるが、Canvas の描画は v4 で非推奨で見た目が変わる。
-- build-config が Kit の Phaser を `app.bundle.js` に取り込む（約 1.4 MB。起動前に届く 20 MiB に数える）。
+- build-config が Kit の Phaser を `app.bundle.js` に取り込む（約 1.4 MB。起動前に届く 64 MiB に数える）。
   `phaser/src/*` のような内部の import はビルドが落ちる。入口は `phaser` だけ。
 - 対戦のサーバー（`server/main.ts`）では **Phaser を import しない**（サーバーに画面は無い。検証が `SERVER_IMPORTS_PHASER` で落とす）。
 
