@@ -1,0 +1,16 @@
+{
+  "hooks": {
+    "PreToolUse": [
+      {
+        "matcher": "mcp__plugin_fdpocket-creator_fdpocket__begin_build",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "node \"${CLAUDE_PLUGIN_ROOT}/scripts/kit.mjs\" check",
+            "timeout": 120
+          }
+        ]
+      }
+    ]
+  }
+}

@@ -1,7 +1,7 @@
 {
-  "name": "tokoyo-plugins",
+  "name": "moon-technica",
   "interface": {
-    "displayName": "TOKOYO.games Plugins"
+    "displayName": "Moon Technica"
   },
   "plugins": [
     {
@@ -9,6 +9,18 @@
       "source": {
         "source": "local",
         "path": "./plugins/tokoyo-creator"
+      },
+      "policy": {
+        "installation": "AVAILABLE",
+        "authentication": "ON_INSTALL"
+      },
+      "category": "Productivity"
+    },
+    {
+      "name": "fdpocket-creator",
+      "source": {
+        "source": "local",
+        "path": "./plugins/fdpocket-creator"
       },
       "policy": {
         "installation": "AVAILABLE",

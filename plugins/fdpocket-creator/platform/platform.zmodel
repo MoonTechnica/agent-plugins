@@ -1,0 +1,194 @@
+// Platform の基底 ZModel（data-model.md §3.2）。Kit が配り、Project は編集できない（kit generate が Kit の版で上書きし、
+// 検証は Kit の版との差分を拒否する）。
+//
+// User と Workspace は Project の業務モデルから relation を張られるので、ZenStack が要求する逆向きの relation を
+// Project 側で足せるよう **mixin（type）** で配る。Project の schema.zmodel は次のように宣言する:
+//
+//   model User with PlatformUser { documents Document[] }          // 足せるのは逆向きの relation だけ
+//   model Workspace with PlatformWorkspace { documents Document[] }
+//
+// このファイルは Project の User / Workspace を参照するので schema.zmodel を import する（相互 import）。
+// mixin の中では before() を使えないため、変えられない識別子はフィールド単位の @deny('update', true) で守る。
+import "schema"
+
+// 利用者の削除の後も、法令・会計のために行を残すモデル（lifecycle.md §3.3）。User への relation は SetNull にして
+// 名義だけを外す。reason は残す理由、days は残す日数（1〜3650）。検証が形を確かめ、審査 Agent が理由を読む
+attribute @@platform.retain(reason: String, days: Int)
+
+// auth() の型（data-model.md §3.3）。Gateway が $setAuth で渡す。権限の判定は auth().permissions?[name == '…']
+type Permission {
+  name String
+}
+
+type Auth {
+  id           String
+  globalUserId String
+  appSlug      String          // Gateway が設定する呼び出し元 App。App 専用 Storage の境界にも使う
+  permissions  Permission[]
+  isAnonymous  Boolean
+  // 本人がブロックした人の User.id（スーパーアプリ共通のブロック。compliance.md §4）。利用者の投稿を読ませる
+  // モデルは @@deny('read', authorId in auth().blockedUserIds) で隠す（validator が UGC_BLOCK_FILTER_MISSING を出す）
+  blockedUserIds String[]
+  @@auth
+}
+
+type PlatformUser {
+  id           String   @id                                  // Project 内 ID（uuid）。globalUserId とは別
+  globalUserId String   @unique @deny('update', true)        // "{iss}:{sub}"。Gateway が bootstrap で作る
+  displayName  String?
+  avatarUrl    String?
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  memberships  Membership[]
+  roles        UserProjectRole[]
+  appStates    AppUserState[]
+  files        StorageFile[] @relation("owner")
+
+  @@allow('read', auth() != null)                            // Project 内の全ユーザーが他人の表示名を読める
+  @@allow('update', auth().id == id)                         // 表示名・アバターは本人だけ
+  // create / delete は Gateway の bootstrap と purge だけ（policy を通さない内部クライアント）
+}
+
+type PlatformWorkspace {
+  id        String   @id @default(uuid())
+  name      String
+  createdAt DateTime @default(now())
+
+  members   Membership[]
+  files     StorageFile[]
+
+  @@allow('read', members?[userId == auth().id])
+  @@allow('create', auth() != null && auth().permissions?[name == 'workspace.create'])
+  @@allow('update,delete', members?[userId == auth().id && role in ['owner', 'admin']])
+}
+
+// App ごとのオンボーディング状態（Design Doc §5.4）
+model AppUserState {
+  userId      String
+  appSlug     String                                         // project_version_apps.slug
+  onboardedAt DateTime?
+  state       Json?
+  user        User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@id([userId, appSlug])
+  @@allow('read,update', auth().id == userId)
+  @@allow('create', auth().id == userId)
+}
+
+model Membership {
+  workspaceId String
+  userId      String
+  role        String                                         // owner | admin | editor | viewer
+  createdAt   DateTime  @default(now())
+  workspace   Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  user        User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@id([workspaceId, userId])
+  @@index([userId])
+  @@allow('read', workspace.members?[userId == auth().id])
+  @@allow('create,update,delete', workspace.members?[userId == auth().id && role in ['owner', 'admin']])
+  @@deny('create', role == 'owner' && !(workspace.members?[userId == auth().id && role == 'owner']))
+  @@deny('update,delete', role == 'owner' && !(workspace.members?[userId == auth().id && role == 'owner']))
+  @@allow('post-update', true)
+  @@deny('post-update', before().workspaceId != workspaceId || before().userId != userId)
+  // 自己昇格後の Membership を「既存 owner」の根拠にしない。
+  @@deny('post-update', role == 'owner' && before().role != 'owner' && (userId == auth().id || !(workspace.members?[userId == auth().id && role == 'owner'])))
+}
+
+// Project 全体の Role（例: project.admin）
+model ProjectRole {
+  id          String @id @default(uuid())
+  name        String @unique
+  permissions RolePermission[]
+  users       UserProjectRole[]
+
+  @@allow('read', auth() != null)
+  @@allow('create,update,delete', auth().permissions?[name == 'roles.manage'])
+}
+
+model RolePermission {
+  roleId     String
+  permission String                                          // 'users.manage' | 'app.access.admin' | …
+  role       ProjectRole @relation(fields: [roleId], references: [id], onDelete: Cascade)
+
+  @@id([roleId, permission])
+  @@allow('read', auth() != null)
+  @@allow('create,delete', auth().permissions?[name == 'roles.manage'])
+}
+
+model UserProjectRole {
+  userId String
+  roleId String
+  user   User        @relation(fields: [userId], references: [id], onDelete: Cascade)
+  role   ProjectRole @relation(fields: [roleId], references: [id], onDelete: Cascade)
+
+  @@id([userId, roleId])
+  @@allow('read', auth().id == userId || auth().permissions?[name == 'users.manage'])
+  @@allow('create,delete', auth().permissions?[name == 'users.manage'])
+}
+
+// R2 のメタデータ（storage.md §3）。作成と状態の遷移は Gateway の Storage API だけ（内部クライアント + 監査）
+model StorageFile {
+  id           String     @id @default(uuid())
+  bucket       String                                        // 論理バケット名（project.yaml の buckets）
+  objectKey    String     @unique                            // Gateway が生成。クライアントは選べない
+  ownerId      String
+  workspaceId  String?
+  uploaderApp  String                                        // Gateway が設定。専用 objectKey と組み合わせて App 境界を固定
+  visibility   String     @default('private')                // private | workspace | public
+  status       String     @default('initiated')              // initiated | uploading | validating | active | deleting | deleted
+  originalName String?
+  contentType  String?
+  sizeBytes    Int?
+  checksum     String?
+  version      Int        @default(1)
+  createdAt    DateTime   @default(now())
+  updatedAt    DateTime   @updatedAt
+  // 本人の削除で行を残さない: erase（Gateway の /internal/erase）が R2 の削除を積んでから先に消す（lifecycle.md §3.3）
+  owner        User       @relation("owner", fields: [ownerId], references: [id], onDelete: Restrict)
+  workspace    Workspace? @relation(fields: [workspaceId], references: [id])
+  grants       StorageGrant[]
+
+  @@index([ownerId])
+  @@index([workspaceId])
+  @@index([bucket, status])
+  @@deny('read,delete', contains(objectKey, '/apps/') && uploaderApp != auth().appSlug)
+  @@allow('read', status == 'active' && (ownerId == auth().id || (visibility == 'workspace' && workspace.members?[userId == auth().id]) || visibility == 'public' || grants?[principalType == 'user' && principalId == auth().id]))
+  @@allow('delete', ownerId == auth().id || workspace.members?[userId == auth().id && role in ['owner', 'admin']])
+  @@allow('post-update', true)                               // post-update の deny は allow と対で書く（PoC §3.1）
+  @@deny('post-update', before().objectKey != objectKey || before().bucket != bucket || before().uploaderApp != uploaderApp)
+}
+
+model StorageGrant {
+  fileId        String
+  principalType String                                       // user | workspace
+  principalId   String
+  permission    String                                       // read | write
+  file          StorageFile @relation(fields: [fileId], references: [id], onDelete: Cascade)
+
+  @@id([fileId, principalType, principalId, permission])
+  @@deny('all', contains(file.objectKey, '/apps/') && file.uploaderApp != auth().appSlug)
+  @@allow('read', file.ownerId == auth().id || (principalType == 'user' && principalId == auth().id))
+  @@allow('create,delete', file.ownerId == auth().id)
+}
+
+// Project 内の監査（Gateway が書く。Agent は読むだけの UI を作れる）
+model AuditEvent {
+  id        String   @id @default(uuid())
+  at        DateTime @default(now())
+  requestId String
+  appSlug   String
+  actorId   String?
+  action    String
+  resource  String?
+  decision  String                                           // allow | deny
+  reason    String?
+  // 判定に使った版のポリシー（project_versions.policy_version）。ポリシーの判定でない記録（user.bootstrap・
+  // storage の後片付け）は null。既存の Project には次の版の `kit db diff` で列が入る（tasks/0489）
+  policyVersion String?
+
+  @@index([at])
+  @@index([actorId, at])
+  @@allow('read', auth().permissions?[name == 'audit.read'])
+}

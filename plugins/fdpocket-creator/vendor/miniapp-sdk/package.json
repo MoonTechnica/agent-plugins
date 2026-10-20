@@ -1,0 +1,60 @@
+{
+  "name": "@workspace/miniapp-sdk",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "Kit が置くビルド済みのパッケージ。編集しない（kit generate / kit build が Kit の版に戻す）。",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "default": "./dist/index.js"
+    },
+    "./react": {
+      "types": "./dist/react/index.d.ts",
+      "default": "./dist/react/index.js"
+    },
+    "./server": {
+      "types": "./dist/server/index.d.ts",
+      "default": "./dist/server/index.js"
+    },
+    "./vite": {
+      "types": "./dist/vite.d.ts",
+      "default": "./dist/vite.js"
+    }
+  },
+  "dependencies": {
+    "@workspace/project-protocol": "workspace:*",
+    "@zenstackhq/client-helpers": "3.9.7",
+    "@zenstackhq/orm": "3.9.7",
+    "@zenstackhq/schema": "3.9.7",
+    "@zenstackhq/tanstack-query": "3.9.7"
+  },
+  "peerDependencies": {
+    "@tailwindcss/vite": "^4",
+    "@tanstack/react-query": "^5",
+    "@tanstack/router-plugin": "^1",
+    "@vitejs/plugin-react": "^6",
+    "react": "^19",
+    "vite": "^8"
+  },
+  "peerDependenciesMeta": {
+    "@tailwindcss/vite": {
+      "optional": true
+    },
+    "@tanstack/react-query": {
+      "optional": true
+    },
+    "@tanstack/router-plugin": {
+      "optional": true
+    },
+    "@vitejs/plugin-react": {
+      "optional": true
+    },
+    "react": {
+      "optional": true
+    },
+    "vite": {
+      "optional": true
+    }
+  }
+}

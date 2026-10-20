@@ -1,0 +1,10 @@
+{
+  "name": "@workspace/db-schema",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "devDependencies": {
+    "@workspace/sdk": "workspace:*",
+    "@zenstackhq/orm": "3.9.7"
+  }
+}

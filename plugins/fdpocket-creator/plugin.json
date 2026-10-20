@@ -1,0 +1,22 @@
+{
+  "$schema": "https://agent-plugins.org/schemas/1.0.0/plugin.schema.json",
+  "name": "fdpocket-creator",
+  "version": "3.5.b0b7f0f9",
+  "description": "ミニアプリ（web と admin の App・データ・ファイル）を手元の Coding Agent で作る Creator Kit（Skills・SDK・Kit の CLI・Platform MCP）",
+  "author": {
+    "name": "Moon Technica"
+  },
+  "homepage": "https://app-sns.vercel.app",
+  "repository": "https://github.com/MoonTechnica/agent-plugins",
+  "license": "MIT-0",
+  "extensions": {
+    "com.openai": {
+      "hooks": "./hooks/hooks.json",
+      "interface": {
+        "displayName": "FDPocket Developer Kit",
+        "developerName": "Moon Technica",
+        "shortDescription": "FDPocketのミニアプリを作成・検証する開発キット"
+      }
+    }
+  }
+}

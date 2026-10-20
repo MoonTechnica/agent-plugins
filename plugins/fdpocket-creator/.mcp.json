@@ -1,0 +1,9 @@
+{
+  "mcpServers": {
+    "fdpocket": {
+      "type": "http",
+      "url": "${CREATOR_MCP_URL:-https://app-sns.vercel.app/mcp/creator}",
+      "oauth": { "callbackPort": 43125 }
+    }
+  }
+}

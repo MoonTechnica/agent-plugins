@@ -40212,7 +40212,7 @@ var CANONICAL_KIT_ROOT = "/workspace";
 
 // frontend/packages/creator-kit/src/kit-repo.ts
 var KIT_PLUGIN_NAME = "tokoyo-creator";
-var KIT_MARKETPLACE_NAME = "tokoyo-plugins";
+var KIT_MARKETPLACE_NAME = "moon-technica";
 var KIT_PLUGIN_ROOT = `plugins/${KIT_PLUGIN_NAME}`;
 var encoder = new TextEncoder;
 var decoder2 = new TextDecoder;
