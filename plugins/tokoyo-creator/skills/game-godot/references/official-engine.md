@@ -15,7 +15,23 @@ The service uses Godot **4.5.1 stable**, GDScript, Compatibility/WebGL 2 and emb
 | Headless import, script checks and exports | [Command line](https://docs.godotengine.org/en/4.5/tutorials/editor/command_line_tutorial.html) | Installed editor `--help`; Kit build entrypoint |
 | Device input | [Input reference](https://docs.godotengine.org/en/4.5/classes/class_input.html) plus the parent skill's `TokoyoDevice` contract | `Input`, `Image`, `ImageTexture`, `PackedByteArray`, `PackedFloat32Array` |
 
-## Offline signatures
+## Offline narrative text when the network is unavailable
+
+Environment setup installs a checksum-verified selection of unmodified official 4.5 reStructuredText sources under `${GODOT_TOOLCHAIN_DIR:-/opt/godot}/manual/`. The source commit is `33e08e14c517541fac3d9069e82fb3ee2fc99a10` from `godotengine/godot-docs`. Read the relevant file directly:
+
+- `tutorials/scripting/gdscript/gdscript_basics.rst`
+- `tutorials/scripting/gdscript/static_typing.rst`
+- `tutorials/best_practices/scene_organization.rst`
+- `tutorials/rendering/multiple_resolutions.rst`
+- `tutorials/physics/physics_introduction.rst`
+- `tutorials/performance/general_optimization.rst`
+- `tutorials/performance/using_multimesh.rst`
+- `tutorials/export/exporting_for_web.rst`
+- `tutorials/editor/command_line_tutorial.rst`
+
+These files contain narrative explanations and inline examples. Image files and Sphinx cross-reference targets outside this subset are omitted; this is not a complete rendered manual. Preserve `LICENSE.txt`, upstream `README.md`, `SOURCE.json` and `ATTRIBUTION.md` when copying the subset. Attribution is to Juan Linietsky, Ariel Manzur and the Godot community under CC BY 3.0; the separately generated engine API XML has its own engine licensing. Local environment preparation uses `devenv shell -- godot-prepare-docs`; generation should read installed files rather than retrying downloads or changing the toolchain.
+
+## Offline API signatures
 
 The environment setup runs the official editor's `--headless --doctool` to generate class XML in `${GODOT_TOOLCHAIN_DIR:-/opt/godot}/api/`. Base engine classes are in `doc/classes/`; module/language types use `modules/*/doc_classes/`. Search the class name, read the method arguments, return value, inherited class, properties and signals. Descriptions may be empty in generated XML: it is not a replacement for the manual's explanations.
 
