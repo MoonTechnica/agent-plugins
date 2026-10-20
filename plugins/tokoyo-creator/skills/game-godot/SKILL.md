@@ -19,6 +19,18 @@ The shared game-design, art, controls and playtest requirements still apply. Imp
 - Do not change the Platform build scripts or generated runtime glue. The existing `kit build` detects `godot/project.godot`, imports in an isolated temporary project and exports Web and native packs. It then produces the same artifact indexes and separate development Artifact as other games.
 - Run the normal profile build and source upload commands. Never submit an exported HTML document as the entrypoint. `app.bundle.js` is the fixed Platform bridge; `assets/godot/game.js`, `.wasm` and `.pck` are its web resources. `bundles/godot_native/game.pck` remains a demand bundle so the browser does not download the native pack.
 
+## Embedded mobile viewport and safe area
+
+The mobile Host publishes a JSON string on `get_tree().root.get_meta("tokoyo_host_viewport", "")`:
+
+```json
+{"width":393,"height":852,"safe":{"x":0,"y":59,"width":393,"height":759}}
+```
+
+All values use React Native points relative to the full Godot surface. Consume this metadata first on startup and each viewport `size_changed` signal; the Host refreshes metadata and emits that signal after layout or rotation. Validate finite positive frame dimensions, finite rectangle fields, positive safe area and full containment inside the frame. Map points into `get_viewport().get_visible_rect()` logical coordinates independently per axis; never apply RN points directly as Godot pixels. Keep world/background fullbleed and apply the resulting safe rectangle only to HUD/controls. Follow the sample implementation.
+
+For missing or invalid metadata, retain the full visible viewport as the safe fallback. Embedded LibGodot's DisplayServer rectangle may use RN points while the viewport uses logical coordinates and the screen transform maps to physical pixels. Do not combine these units blindly or resize the game from that rectangle: this caused a one-pixel HUD despite a valid DisplayServer rectangle. The sample relies on Host metadata for mobile safe areas. A separate standalone export may use native DisplayServer information only if it is supported and validated in that standalone environment. This metadata is a viewport contract, not native Store/save support.
+
 ## SDK boundary
 
 The current PoC bridge in Web is `JavaScriptBridge.get_interface("__tokoyoGodotBridge")`:
