@@ -77,7 +77,7 @@ When the push succeeds, the editor opens in your browser (the agent also prints 
 | Command | What it does |
 |---|---|
 | `/fdpocket-creator:new <idea>` | Start a new mini-app: creates it on the Platform, sets up a working directory, and places the template project. |
-| `/fdpocket-creator:pull <app_id or editor URL>` | Bring the latest version of an existing app to your machine. |
+| `/fdpocket-creator:pull <project_id or editor URL>` | Bring the latest version of an existing app to your machine. |
 | `/fdpocket-creator:dev [member\|admin\|anonymous]` | Run every app locally and open the development host page. |
 | `/fdpocket-creator:check` | Run the pre-push checks locally. |
 | `/fdpocket-creator:push <message>` | Check, then send your app to the Platform as a new draft. |
@@ -183,7 +183,7 @@ Any agent that supports Skills and remote MCP servers can use the Kit.
 
 **Make a new app** — `new` → describe and iterate (`dev` to try it) → `push` → open the editor URL, try it, publish.
 
-**Keep working on an app** — `pull <app_id>` → ask for changes → `push`. If the Platform moved on while you were working,
+**Keep working on an app** — `pull <project_id>` → ask for changes → `push`. If the Platform moved on while you were working,
 the agent rebases your commits onto it (like `git pull --rebase`) and resolves any conflicts.
 
 **Change the data model** — Ask in plain language. The agent edits `packages/db-schema/schema.zmodel`, runs `kit generate`

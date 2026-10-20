@@ -17,7 +17,7 @@ listing/
 
 ## 1. まず今の掲載情報を読む
 
-`./input/listing.json`（手元では `get_app` の `listing`）が**今の掲載情報**。
+`./input/listing.json`（手元では `get_project` の `listing`）が**今の掲載情報**。
 ソースの `listing/listing.json` より**こちらを優先する**（利用者が画面で直した値はこちらにしか無い）。
 
 | キー | 意味 |

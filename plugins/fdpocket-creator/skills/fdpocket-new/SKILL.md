@@ -10,9 +10,9 @@ description: ミニアプリを手元の Coding Agent で新しく作り始め�
 
 1. **持ち主を決める**: `whoami()` の `accounts` がチームを含むなら、どのアカウント（個人かチーム）のアプリにするかを利用者に聞く。
    個人なら `owner_account_id` は省く。
-2. **App を作る**: `create_app({ title, owner_account_id? })` → `app_id` / `session_id` / `editor_url`。`title` は依頼から短く付ける。
+2. **Project を作る**: `create_project({ title, owner_account_id? })` → `project_id` / `session_id` / `editor_url`。`title` は依頼から短く付ける。
 3. **作業ディレクトリを作る**: 今のディレクトリの下に、題名を英数字にした新しいディレクトリを作って移り、
-   `get_git_bundles({ app_id })` の結果の JSON をそのまま渡して `node <kit>/scripts/kit.mjs clone --bundles '<JSON>'`
+   `get_git_bundles({ project_id, session_id })` の結果の JSON をそのまま渡して `node <kit>/scripts/kit.mjs clone --bundles '<JSON>'`
    （`.tokoyo.json`・空の `source/`（git のリポジトリ）・`outputs/`・`AGENTS.md` ができる）。
 4. **Project を置く**: `node <kit>/scripts/kit.mjs new --name <英小文字とハイフンの名前> --title <表示名>`（管理画面が要らなければ `--apps web`）
    → `source/` で `bun install` → `node <kit>/scripts/kit.mjs generate` → テンプレートのまま一度 `git commit`。
