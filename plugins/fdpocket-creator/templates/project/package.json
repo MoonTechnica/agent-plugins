@@ -1,0 +1,18 @@
+{
+  "name": "{{PROJECT_NAME}}",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "workspaces": [
+    "apps/*",
+    "packages/*"
+  ],
+  "devDependencies": {
+    "@libsql/client": "0.18.0",
+    "@prisma/adapter-libsql": "6.19.3",
+    "@zenstackhq/cli": "3.9.7",
+    "miniflare": "4.20260730.0",
+    "prisma": "6.19.3",
+    "typescript": "6.0.3"
+  }
+}

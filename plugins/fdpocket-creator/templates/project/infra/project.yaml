@@ -1,0 +1,32 @@
+# Project の宣言（project-runtime.md §2）。Platform が検証・正規化して版に記録する。
+version: 1
+sdkVersion: 3
+apps:
+  web:
+    kind: web
+    access: public
+    displayName: { ja: "{{PROJECT_TITLE}}", en: "{{PROJECT_TITLE}}" }
+    capabilities:
+      models:
+        user: [read, update]
+        workspace: [read, create, update]
+        membership: [read, create, update, delete]
+        appUserState: [read, create, update]
+    anonymous: { allowed: false, write: false }
+  admin:
+    kind: web
+    access: restricted
+    requiredPermission: app.access.admin
+    displayName: { ja: "{{PROJECT_TITLE}} 管理", en: "{{PROJECT_TITLE}} Admin" }
+    capabilities:
+      models:
+        user: [read]
+        projectRole: [read, create, update, delete]
+        rolePermission: [read, create, delete]
+        userProjectRole: [read, create, delete]
+        auditEvent: [read]
+roles:
+  admin: [app.access.admin, users.manage, roles.manage, audit.read]
+  member: [workspace.create]
+defaultRoles: [member]
+ownerBootstrap: [admin]

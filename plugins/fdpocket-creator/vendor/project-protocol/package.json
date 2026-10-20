@@ -1,0 +1,37 @@
+{
+  "name": "@workspace/project-protocol",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "Kit が置くビルド済みのパッケージ。編集しない（kit generate / kit build が Kit の版に戻す）。",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "default": "./dist/index.js"
+    },
+    "./gateway-url": {
+      "types": "./dist/gateway-url.d.ts",
+      "default": "./dist/gateway-url.js"
+    },
+    "./network": {
+      "types": "./dist/network.d.ts",
+      "default": "./dist/network.js"
+    },
+    "./platform-dispatch": {
+      "types": "./dist/platform-dispatch.d.ts",
+      "default": "./dist/platform-dispatch.js"
+    },
+    "./schedules": {
+      "types": "./dist/schedules.d.ts",
+      "default": "./dist/schedules.js"
+    },
+    "./supabase-headers": {
+      "types": "./dist/supabase-headers.d.ts",
+      "default": "./dist/supabase-headers.js"
+    }
+  },
+  "dependencies": {
+    "croner": "10.0.1",
+    "zod": "4.6.5"
+  }
+}

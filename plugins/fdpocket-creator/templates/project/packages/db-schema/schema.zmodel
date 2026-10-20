@@ -1,0 +1,17 @@
+// Project のデータモデル（data-model.md §3.2）。基底（User / Workspace / Role / StorageFile …）は platform.zmodel
+// （kit generate が置く。編集しない）。User と Workspace には業務モデルへの逆向きの relation だけを足せる。
+import "platform"
+
+datasource db {
+  provider = 'sqlite'
+}
+
+plugin policy {
+  provider = '@zenstackhq/plugin-policy'
+}
+
+model User with PlatformUser {
+}
+
+model Workspace with PlatformWorkspace {
+}

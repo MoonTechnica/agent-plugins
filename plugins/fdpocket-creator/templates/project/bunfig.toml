@@ -1,0 +1,5 @@
+[install]
+# 公開から 7 日未満の版は解決しない（推移的な依存も。供給網の攻撃と出たばかりの不具合を避ける。sdk.md §5.2）
+minimumReleaseAge = 604800
+# 依存の install スクリプト（postinstall など）を動かさない
+ignoreScripts = true

@@ -4,13 +4,18 @@
     "name": "Moon Technica"
   },
   "metadata": {
-    "description": "TOKOYO.games のプラグイン"
+    "description": "Moon Technica の開発プラグイン"
   },
   "plugins": [
     {
       "name": "tokoyo-creator",
       "source": "./plugins/tokoyo-creator",
       "description": "TOKOYO.games のミニゲームを手元の Coding Agent で作る Creator Kit（Skills・SDK・検証器・Platform MCP）"
+    },
+    {
+      "name": "fdpocket-creator",
+      "source": "./plugins/fdpocket-creator",
+      "description": "ミニアプリ（web と admin の App・データ・ファイル）を手元の Coding Agent で作る Creator Kit（Skills・SDK・Kit の CLI・Platform MCP）"
     }
   ]
 }
