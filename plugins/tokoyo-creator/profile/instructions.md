@@ -49,7 +49,7 @@
 | `$game-ux` | **必ず**。遊べる体験: 最初の 1 手を画面で示す・最初の課題は必ず成功できる、入力への手応え（ヒットストップ・揺れ・パーティクル・音）、読める文字とコントラスト、色だけ・音だけに頼らない、点滅と揺れの上限と reduced-motion、リザルトとすぐの再挑戦、効果音 / BGM の分離ミュートと設定の保存（`app.store`） |
 | `$game-listing` | **必ず**。公開ページの掲載情報を `listing/` に用意する。トップバナーはゲームタイトルをロゴ風に組み込んだキービジュアル、アイコンは小さくても識別できる専用の構図で生成し、最終画像を開いて確認する。初回は全部作り、2 回目以降は中身と合わなくなった項目だけ直す |
 | `$game-asset-tools` | 絵や音を用意/変更するとき。現行素材の参照検索、基準画像と原型の再利用、レシピ実行と差分制作（素材ツールがあるときは必ず） |
-| `$game-godot` | **Godot PoC が明示された制作、または既存 `manifest.json` に `godot` があるとき**。同じサービスのビルド・Artifact・Webプレビュー経路を使用する。既存JS作品を無断変換しない |
+| `$game-godot` | **Godotで制作・修正するとき、または既存 `manifest.json` に `godot` があるとき**。固定版の公式資料と同梱API定義を優先し、同じサービスのビルド・Artifact・Web／ネイティブ経路を使う。既存JS作品を無断変換しない |
 | `$game-phaser` | **2D を同梱の Phaser 4 で作ると決めたとき**（§4.2。素材の読み込み・入力・画面・物理の Platform との継ぎ目） |
 | `$game-3d-and-bundles` | 3D で描くとき・ステージが複数あるとき・素材が大きいとき |
 | `$game-3d-studio` | 3Dモデルを調達/生成/加工するときは references/model-quality.md（入力・用途別修復・リトポロジー/ベイク・変形と完成GLBの実再生）。Blenderでのモデリング・リグ・モーション・3Dから2Dも扱う |
@@ -61,8 +61,9 @@
 | `$game-physics` | 物理で動くとき（落下・衝突・転がる・積む・跳ねる。同梱の Rapier。対戦でも同じ結果になる書き方） |
 | `$game-merge` | **`./input/merge-report.json` があるとき・リポジトリが `git merge` の途中（`MERGE_HEAD` がある）のとき**（2 つの版を合わせるターン。「合流する」も。新しく作らない。§4.0） |
 
-**記憶で書かない。** ここに挙げた文書と Skill に無い API・グローバル変数・外部 URL は存在しない。
-書いても静的検証（取り込み時）と実行時の CSP が落とすので、作り直しになる。
+**記憶で書かない。** Platform／App SDKのAPI・グローバル変数・通信先は、ここに挙げた契約で提供されるものだけを使う。
+Godot標準のクラス・メソッドは `$game-godot` の固定版公式資料・同梱API定義で確認する。
+未提供のPlatform APIや外部通信を足しても静的検証（取り込み時）と実行時の制約で失敗する。
 
 開始画面を作る/変更する時は `$game-ux` references/start-screen.md を読み、ジャンルと初回/再訪に合う入口を選ぶ。
 構図は `$game-screen-layout` §5 と `$game-art-direction` §6.1、入力の解禁と開始の分離は `$game-controls` §3。
@@ -227,7 +228,7 @@ ai/<key>.md          # ゲーム内 AI の指示文（`ai.chat` のときだけ�
 
 ### 4.1 新しく作るとき
 
-**Godot PoC が明示されている、または既存 `manifest.json` に `godot` がある場合は `$game-godot` を先に読む。**
+**Godotで制作する、または既存 `manifest.json` に `godot` がある場合は `$game-godot` と必要な公式参照を先に読む。**
 以下の JS 用 `sample-app/`・`src/main.ts`・`server/main.ts` の構成に置き換えず、
 `<kit>/sdk/sample-godot/` の `godot/` と manifest・package・debug catalog を土台にする。
 ルールと調整値の責務分離は GDScript の別ファイルで行い、TypeScript を重複実装しない。

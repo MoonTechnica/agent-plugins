@@ -1,12 +1,18 @@
 ---
 name: game-godot
-description: Build the approved Godot service-integration PoC using the fixed editor, existing kit build and Artifact pipeline.
+description: Create, extend and debug Godot 4.5.1 games with official engine references, the shared Kit build pipeline and the service's Web/native SDK adapters.
 ---
 
-# Godot service integration PoC
+# Godot game development and service integration
 
-Use for an explicitly requested Godot PoC or an existing game with `manifest.godot`.
+Use when creating or changing a Godot game, or when an existing game has `manifest.godot`.
 The shared game-design, art, controls and playtest requirements still apply. Implement engine-specific code with GDScript and Godot scenes rather than adding Phaser, Babylon or Rapier to this project.
+
+## Official sources first
+
+Read [official engine references](references/official-engine.md) for the feature being implemented and [implementation and validation](references/implementation.md) before changing gameplay. Prefer Godot's versioned official documentation and the installed editor's API signatures over third-party skills or remembered APIs. No Godot-maintained Agent Skill was found in the official site/organization search on 2026-10-20; this skill is a TOKOYO integration guide, not an official Godot skill. If an official skill becomes available, evaluate its pinned-engine compatibility before replacing generic guidance; keep service contracts here.
+
+The pinned toolchain exposes offline XML method/type references under `${GODOT_TOOLCHAIN_DIR:-/opt/godot}/api/`. Base classes are in `doc/classes/`; language/module classes are under `modules/*/doc_classes/`. Read the needed class and inherited classes, not the whole tree. The generated reference confirms signatures; consult the official narrative documentation for behavior and platform restrictions. Never upgrade the engine to match a newer tutorial.
 
 ## Source and fixed toolchain
 
@@ -60,3 +66,19 @@ All bridge calls must be conditional on `bridge != null`. Keep local gameplay an
 - Check a tall portrait and a wide landscape surface, then resize/rotate the same live game. Confirm the world reaches every edge, subjects retain their proportions and important framing, text and controls remain visible, and pointer/touch still hits the intended targets after resizing. Record actual captures and input results; a successful export does not establish orientation support.
 - Record initial download bytes, start time, frame time, draw calls and memory; compare the same scene and quality before/after optimization. Use shared mesh/material resources and bound their lifetime. Do not replace a visual test with a successful build.
 - If fixed Godot or the approved runtime is absent from the Sandbox snapshot, report the missing infrastructure. Never silently switch to a different engine or fabricate successful native/Web testing.
+
+
+## Permission-controlled devices (Web and embedded native)
+
+Keep the starter's `TokoyoDevice` autoload (`res://tokoyo_device.gd`, node `/root/TokoyoDevice`). Use this facade rather than native Godot sensor/capture APIs or direct JavaScript browser APIs: embedded and Web runtimes have different device support and the Host owns consent.
+
+- Declare `device.motion`, `device.camera`, or `device.microphone` capabilities plus matching `manifest.device` entries with a concrete `purpose` and `required`. Optional devices must retain usable touch/mouse alternatives.
+- Call `TokoyoDevice.start_motion()`, `start_camera({"width":320,"height":240,"fps":15,"facing":"user"})`, or `start_microphone({"sampleRate":16000})` from an explicit player action. Calls return a request ID; results arrive through `started(kind)`, `failed(kind,code,message)` and `stopped(kind,reason)` signals. A call is not permission approval. Show rejection/unavailability and retain fallback controls.
+- `motion_sample(sample)` carries `alpha`, `beta`, `gamma` in degrees, nullable gravity-inclusive `acceleration` in m/s², and `screenAngle` (0/90/180/270). Account for screen orientation and missing axes. This is not raw gyro angular velocity.
+- `camera_frame(texture)` supplies a reusable `ImageTexture`; display it locally without accumulating frame copies. `microphone_chunk(samples,sample_rate,seq,dropped)` supplies mono `PackedFloat32Array`; `microphone_level(rms)` provides volume. Treat dropped chunks as a discontinuity. Do not retain unbounded histories or send capture outside the device.
+- `stop(kind)` / `stop_all()` release devices. The Host stops capture on pause/background/disposal; restarting requires a fresh explicit request. Never bypass per-game explanation, OS consent, usage indicators or stop controls.
+- Web uses SDK streams and binary JavaScriptBridge copies. Native uses the same facade and request IDs through the approved Host provider. No device APIs are exposed as arbitrary OS access. Camera/audio bytes never travel as JSON or base64. The transport retains only the latest camera/motion sample and at most five audio chunks; older audio is counted in `dropped`.
+
+The native Host connects `request(json)` then calls `attach_host()` once and handles the returned JSON command array. Commands are `{id,action,kind,options}`. Deliver `{type,id,kind,...}` through `receive_event(json)` (`started`, `error` with `code/message`, `stopped` with `reason`, or `motion` with `sample`). Binary receivers are `receive_camera(id,rgba,width,height,seq)` and `receive_microphone(id,pcm_float32_le,sample_rate,seq,dropped,rms)`, both using `PackedByteArray`. Never reuse IDs across a stopped/restarted stream. Receivers discard stale IDs. This Host ABI is platform infrastructure; generated games consume the facade, not the Host internals.
+
+Verify permission denial and optional fallback, start/stop/restart, background/pause disposal, live orientation, and a visible camera frame/volume/motion result. Simulator/headless synthetic inputs verify decoding and lifecycle only; record real-device sensor/capture checks separately.
