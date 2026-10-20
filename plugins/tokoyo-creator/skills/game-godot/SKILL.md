@@ -35,33 +35,25 @@ The mobile Host publishes a JSON string on `get_tree().root.get_meta("tokoyo_hos
 
 All values use React Native points relative to the full Godot surface. Consume this metadata first on startup and each viewport `size_changed` signal; the Host refreshes metadata and emits that signal after layout or rotation. Validate finite positive frame dimensions, finite rectangle fields, positive safe area and full containment inside the frame. Map points into `get_viewport().get_visible_rect()` logical coordinates independently per axis; never apply RN points directly as Godot pixels. Keep world/background fullbleed and apply the resulting safe rectangle only to HUD/controls. Follow the sample implementation.
 
-For missing or invalid metadata, retain the full visible viewport as the safe fallback. Embedded LibGodot's DisplayServer rectangle may use RN points while the viewport uses logical coordinates and the screen transform maps to physical pixels. Do not combine these units blindly or resize the game from that rectangle: this caused a one-pixel HUD despite a valid DisplayServer rectangle. The sample relies on Host metadata for mobile safe areas. A separate standalone export may use native DisplayServer information only if it is supported and validated in that standalone environment. This metadata is a viewport contract, not native Store/save support.
+For missing or invalid metadata, retain the full visible viewport as the safe fallback. Embedded LibGodot's DisplayServer rectangle may use RN points while the viewport uses logical coordinates and the screen transform maps to physical pixels. Do not combine these units blindly or resize the game from that rectangle: this caused a one-pixel HUD despite a valid DisplayServer rectangle. The sample relies on Host metadata for mobile safe areas. A separate standalone export may use native DisplayServer information only if it is supported and validated in that standalone environment.
 
 ## SDK boundary
 
-The current PoC bridge in Web is `JavaScriptBridge.get_interface("__tokoyoGodotBridge")`:
+Keep the starter's `TokoyoApp` autoload (`res://tokoyo_app.gd`, `/root/TokoyoApp`). It provides a shared Web/native Store and lifecycle facade:
 
-- `isPaused()` gates simulation while the Host pauses the game.
-- `load()` returns the SDK Store data as a JSON string.
-- `save(json)` queues an SDK Store write with revision and request ID. `saveStatus()` reports `loading`, `loaded`, `saving`, `saved` or `failed`; show a failed save visibly.
+- `is_paused()` gates simulation while the Host pauses the game.
+- Read `data` after `store_loaded(data)` or when `save_status()` becomes `loaded`. Never overwrite a save while the initial read is pending or failed.
+- `save(value)` queues an SDK Store write with revision and request ID. `save_status()` reports `loading`, `loaded`, `saving`, `saved` or `failed`; show a failed save visibly. Listen for `store_saved` and `failed(code)` on native.
 - `report(json)` records measurements such as FPS, draw calls and static memory. These are measurements, not performance guarantees.
 
-Declare `store.read` and `store.write` and a matching Store schema when using this adapter. Native SDK bridging is separate work: the Web JavaScript bridge does not exist in native execution. Do not claim native saves, isolation or store approval based on a browser test.
+Declare `store.read` and `store.write` and a matching Store schema. The native Host calls the existing SDK Store implementation and owns Launch credentials; never place credentials or direct HTTP persistence in GDScript. Revision conflicts remain visible failures. Unsupported SDK operations must fail explicitly. Multiplayer, arbitrary SDK operations and development commands are not implied by the Store adapter. Do not claim isolation, store approval or native save verification from a browser test.
 
-Acquire that optional Web bridge without a platform-specific type annotation:
-
-```gdscript
-var bridge
-if OS.has_feature("web") and Engine.has_singleton("JavaScriptBridge"):
-    bridge = Engine.get_singleton("JavaScriptBridge").get_interface("__tokoyoGodotBridge")
-```
-
-All bridge calls must be conditional on `bridge != null`. Keep local gameplay and its visible state functional on native without the bridge. The sample labels native progress `native session`; this deliberately does not claim persistent SDK saves. Handle `InputEventScreenTouch` / `InputEventScreenDrag` as well as real mouse input, and exclude `InputEvent.DEVICE_ID_EMULATION` mouse presses when already counting touches. Report native performance through stdout using the same JSON measurements sent to the Web bridge.
+Web uses the fixed JavaScript bridge internally; native uses Host signal requests. Generated gameplay consumes `TokoyoApp`, not platform-specific bridge internals. Handle `InputEventScreenTouch` / `InputEventScreenDrag` as well as real mouse input, and exclude `InputEvent.DEVICE_ID_EMULATION` mouse presses when already counting touches.
 
 ## PoC scope and verification
 
 - No native extensions, C# or development resources inside the production Godot resource tree. The fixed builder rejects these. The first PoC uses one production scene and a development-only JS wrapper with the normal_start catalog case; its PCK contains no development code.
-- Do not invent new SDK operations or network access. Current automatic Store bridge is for the sample schema; changing schema or adding game operations needs the Platform adapter updated and tested.
+- Do not invent new SDK operations or network access. Use the declared Store schema and supported facade. Additional game operations need the Platform adapter updated and tested.
 - Verify Web with the actual Shell, including save/restore, pause/resume and scene rendering. Verify mobile through the existing Expo player with the downloaded native pack. Linux headless export alone does not verify rendering or iPhone performance.
 - Check a tall portrait and a wide landscape surface, then resize/rotate the same live game. Confirm the world reaches every edge, subjects retain their proportions and important framing, text and controls remain visible, and pointer/touch still hits the intended targets after resizing. Record actual captures and input results; a successful export does not establish orientation support.
 - Record initial download bytes, start time, frame time, draw calls and memory; compare the same scene and quality before/after optimization. Use shared mesh/material resources and bound their lifetime. Do not replace a visual test with a successful build.
