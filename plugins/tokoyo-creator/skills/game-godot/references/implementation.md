@@ -8,6 +8,27 @@ Inspect `project.godot`, main scene, attached scripts, autoloads, imported resou
 
 Use reusable scenes/resources for entities that share behavior or tuning. Keep UI, world simulation and platform adapters separate enough to test them independently. Avoid a global autoload for every object; use explicit references and signals where scene relationships call for them. Reuse the provided platform autoload instead of embedding service operations in gameplay scripts.
 
+## Scene-scoped service Editor
+
+The creation screen uses the official Web Editor with a service plugin, not a fork of Godot. The browser receives the selected scene's dependencies plus required project settings, Autoloads and global script classes. Other scenes' assets are not assumed to exist locally. Keep external references and source `.uid`/`.import` settings valid; the service prepares/imports dependencies before exposing changed scenes. Ordinary runtime `_ready()` code is not executed as an editor scene: use the game Preview for runtime-generated visuals rather than adding `@tool` indiscriminately.
+
+The browser's observation Editor uses the official 4.5.2 patch release to avoid the 4.5.1 image-import deadlock. Game generation, exports and playable Web/native runtimes remain pinned to 4.5.1; this viewer patch is not permission to upgrade game APIs or the build toolchain.
+
+For resource paths built from variables, configuration, or directory enumeration, maintain `godot/godot-editor.json` in the game repository. Paths are canonical relative paths inside the Godot root, without `res://`, wildcards, `..`, or hidden components. List shared boot resources under `resources` and scene-specific resources under `scenes`:
+
+```json
+{
+  "resources": ["data/item-catalog.json"],
+  "scenes": {
+    "scenes/forest.tscn": ["textures/forest/day.png", "textures/forest/night.png"]
+  }
+}
+```
+
+Update these lists when computed resource paths change. Include the complete finite set required by the relevant scene; do not list every asset as a workaround. The declaration controls editor source staging, not game export inclusion or filesystem permissions. Static discovery cannot guarantee arbitrary computed `load()` or `FileAccess` paths. Missing references remain visible errors; authors can select additional resources in the creation screen while correcting the declaration.
+
+The service may replace the editor iframe when changing scenes or removing no-longer-needed resources to release its previous runtime. It restores bounded view/selection state where possible. Edits made directly in this viewer are not written back to the game's source; AI and the normal source workflow remain authoritative.
+
 Use typed arguments/return values and typed collections where their values are known. JSON and optional JavaScript interfaces remain dynamic: validate their types before reading or casting. Do not infer a static type from an arbitrary `Variant` and assume it is safe. Check node/resource existence and report failures rather than silently disabling gameplay.
 
 Physics movement belongs in `_physics_process`; visual interpolation and UI updates may use `_process`. Apply `delta` to rates, but follow the documented movement API rather than multiplying velocity twice. Keep screen-touch and mouse handling from counting emulated mouse events twice.
