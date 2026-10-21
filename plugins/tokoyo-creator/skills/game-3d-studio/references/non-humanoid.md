@@ -86,5 +86,5 @@ if any(not any(g.group in weighted_groups and g.weight > 0 for g in v.groups)
 - Sandboxの `exports` 例: `{"path":"wolf.glb","kind":"model_3d","name":"wolf","require_rig":true,"required_animations":["Idle","Walk","Run"],"optimize":true}`。静止モデルやimageにはrequire_rigを指定しない。
 - 結果がrunningならget_3d_runで回収し、失敗ならlogを読んで修正する。静止モデルへ自動的に差し替えて終わらない。
 - statsのjoints / skins / animationsと**実際に再生したプレビュー**を確認。前・横・後ろから、脚滑り・地面貫通・尾や翼の崩れ・ループ継ぎ目を確認してから完成とする。静止プレビュー4方向だけではモーション検証にならない。
-- GLBをゲームのBabylon AnimationGroupで再生し、モバイルでも必要な動作が切り替わることを確認する。ポリゴン・テクスチャをゲーム向けに軽量化する。
+- GLBをゲームのGodot AnimationPlayerで再生し、モバイルでも必要な動作が切り替わることを確認する。ポリゴン・テクスチャをゲーム向けに軽量化する。
 - 形の生成は選んだfalモデルの原価、Blender処理は既存のSandbox実行時間・資源の実測料金でクレジットを消費する。専用リグ・モーションはTripo応答のcredits_consumedを実測記録（1 Tripo credit = $0.01、100分の1 credit単位で整数記録）し、TOKOYOクレジットへ既存の換算で反映する。公開目安はリグ$0.25、アニメ1本$0.10。Tripo残高とTOKOYO残高は別物。

@@ -15,7 +15,7 @@ description: ゲームの絵と音を用意する。CC0 のフリー素材の探
 | **内蔵の画像生成が無い**（手元のエージェントなど） | 素材ツール `generate_image(name, prompt, size, transparent)` で作る。透過は `transparent=true` で 1 回で済む。画像の枠を 1 回使う | 結果の `download_url` から取得する（§4） |
 
 透過・3D・音は素材ツール（MCP）で作る。何を既存素材（CC0。§3.5）で済ませ、何を作るかは `$game-art-direction` §3 の判定表で決める。
-**ツール一覧に素材ツール（`list_assets` など）が無いとき**は、絵は Canvas（Babylon.js）で描き、音は Web Audio で合成する。
+**ツール一覧に素材ツール（`list_assets` など）が無いとき**は、絵はGodotのNode2D/Control/meshで描き、音はGodotのAudioStreamで合成する。
 
 ## 1. 最初にやること（ツールを呼ぶ前に）
 
@@ -162,20 +162,9 @@ Smart Topologyや複数視点等を公式サイトで見つけても、現行ツ
   // 毎フレーム: frame = walk[Math.floor(time * 10) % walk.length]
   ```
 
-- **3D は結果の `animations`**（クリップ名の一覧）を Babylon の `AnimationGroup` で再生する（`$game-3d-and-bundles`）:
-
-  ```ts
-  import { loadModel } from '@workspace/app-sdk/3d'
-
-  async function loadHero() {
-    const hero = await loadModel('bundles/hero/hero.glb', scene)
-    hero.addAllToScene()
-    const walk = hero.animationGroups.find((group) => group.name === 'walk')
-    if (!walk) throw new Error('walk animation is missing')
-    walk.start(true)
-    return hero // 終了時に hero.dispose()
-  }
-  ```
+- **3Dは結果の`animations`**をGodotのAnimationPlayer/AnimationTreeで再生する。
+  GLBをimportしてシーンへ配置し、実際のクリップ名を確認する。終了時はシーンと保持したResource参照を解放する。
+  Web/nativeの本編でループ・変形・接地を確認する（`$game-3d-and-bundles`）。
 
   人型のアニメ集（`universal-animation-library`）は同じ骨格のモデル用。別のモデルに当てるなら
   `$game-3d-studio` で Blender 上でリターゲットして、対象モデルの GLB にクリップを含める。
@@ -239,7 +228,7 @@ Smart Topologyや複数視点等を公式サイトで見つけても、現行ツ
 1. 元の画像を素材にする（内蔵の画像生成の PNG なら `upload_image` → アップロード。§3 の 2.）。
 2. `convert_texture(name, asset_id, mode, mipmaps)` を呼ぶ。色のテクスチャは `mode: "color"`（既定）、
    法線マップは `mode: "normal"`。3D の面に貼るものは `mipmaps: true`（既定）、画面に等倍で出すだけなら `false`。
-3. 結果の `download_url` を `suggested_path`（`assets/<name>.ktx2`）に取得し、Babylon のテクスチャとして読む（spec §10 のコード）。
+3. 結果の `download_url` を `suggested_path`（`assets/<name>.ktx2`）に取得し、Godot固定版のimportで読み込む。未対応の圧縮形式を仮定せず、必要なら元画像を使う。
 
 - 画像の枠を 1 回使う（費用はかからない）。WebP の素材は変換できない。
 - 2D のスプライト・UI の画像は PNG / WebP のままでよい（`<img>` や Canvas で描くもの）。
@@ -274,7 +263,7 @@ Smart Topologyや複数視点等を公式サイトで見つけても、現行ツ
     video.playsInline = true
     video.muted = true // 自動で流すなら muted が要る。音を出すのは最初の操作の後（`$game-controls` §3）
     await video.play()
-    // 描画に使うなら毎フレーム ctx.drawImage(video, …) / Babylon.js は VideoTexture（video 要素と scene を渡す。型は同梱の @babylonjs/core/Materials/Textures/videoTexture）
+    // これはWeb専用SDK動画要素。Godot nativeへ直接渡せる契約ではないため、共通対応済みと説明しない。
     // 終わったら video.pause(); video.removeAttribute('src'); app.bundles.unload('intro')
     return video
   }

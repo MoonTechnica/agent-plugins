@@ -29,7 +29,7 @@
 `set_contribution_policy` を使う。貢献者の依頼では呼ばない。
 1. `<kit>/profile/spec.md` を読む（何がどこにあるか）
 2. `<kit>/sdk/app-sdk/spec.md` を読む（**App の API 契約。正本**）
-3. `<kit>/sdk/sample-app/` を読む（最小実装。**構成はこれに倣う**）
+3. Godotは`<kit>/sdk/sample-godot/`、オンライン対戦は`<kit>/sdk/sample-godot-multiplayer/`を読む。Godotの画面・入力はGDScript、対戦の権威あるルールは`server/main.ts`のdefineSpaceで書き、共有TokoyoSpaceで接続する。従来JS契約の最小例は`sample-app/`。
 4. **Skill を使う**（`<kit>/skills/`。下の表）。
    遊べる核・stage・キャラ・機能アイテムを作る/変えるときは `$game-playtest` の
    `references/development-preview.md` を読み、本編処理から開発ケース・preset・試験場を作る。
@@ -49,8 +49,7 @@
 | `$game-ux` | **必ず**。遊べる体験: 最初の 1 手を画面で示す・最初の課題は必ず成功できる、入力への手応え（ヒットストップ・揺れ・パーティクル・音）、読める文字とコントラスト、色だけ・音だけに頼らない、点滅と揺れの上限と reduced-motion、リザルトとすぐの再挑戦、効果音 / BGM の分離ミュートと設定の保存（`app.store`） |
 | `$game-listing` | **必ず**。公開ページの掲載情報を `listing/` に用意する。トップバナーはゲームタイトルをロゴ風に組み込んだキービジュアル、アイコンは小さくても識別できる専用の構図で生成し、最終画像を開いて確認する。初回は全部作り、2 回目以降は中身と合わなくなった項目だけ直す |
 | `$game-asset-tools` | 絵や音を用意/変更するとき。現行素材の参照検索、基準画像と原型の再利用、レシピ実行と差分制作（素材ツールがあるときは必ず） |
-| `$game-godot` | **Godotで制作・修正するとき、または既存 `manifest.json` に `godot` があるとき**。固定版の公式資料と同梱API定義を優先し、同じサービスのビルド・Artifact・Web／ネイティブ経路を使う。既存JS作品を無断変換しない |
-| `$game-phaser` | **2D を同梱の Phaser 4 で作ると決めたとき**（§4.2。素材の読み込み・入力・画面・物理の Platform との継ぎ目） |
+| `$game-godot` | **Godotで制作・修正するとき、または既存 `manifest.json` に `godot` があるとき**。固定版の公式資料と同梱API定義を優先し、同じサービスのビルド・Artifact・Web／ネイティブ経路を使う。既存の旧エンジン作品はGodotへ移行する |
 | `$game-3d-and-bundles` | 3D で描くとき・ステージが複数あるとき・素材が大きいとき |
 | `$game-3d-studio` | 3Dモデルを調達/生成/加工するときは references/model-quality.md（入力・用途別修復・リトポロジー/ベイク・変形と完成GLBの実再生）。Blenderでのモデリング・リグ・モーション・3Dから2Dも扱う |
 | `$game-multiplayer` | オンライン対戦（2〜8 人）のとき（§1） |
@@ -58,7 +57,7 @@
 | `$game-documents` | 非同期対戦（交代で 1 手ずつ・相手が同時にいない）・攻め合い・記録への挑戦・みんなで育てる世界のとき（`app.documents`。§1） |
 | `$game-open-world` | 広い世界を歩き回るとき（探索・冒険・サンドボックス。チャンクの読み込み・seed から作る世界・seed + 差分のセーブ・協力プレイの世界） |
 | `$game-ai` | ゲームの中で AI と話すとき（NPC との会話・案内役・物語や選択肢・クエストの生成。`app.ai`）。AI は遊びの味付けで、返事が来なくても遊べる作りにする |
-| `$game-physics` | 物理で動くとき（落下・衝突・転がる・積む・跳ねる。同梱の Rapier。対戦でも同じ結果になる書き方） |
+| `$game-physics` | 物理で動くとき（落下・衝突・転がる・積む・跳ねる。Godotの物理と、対戦サーバーの権威ある物理を分離する） |
 | `$game-merge` | **`./input/merge-report.json` があるとき・リポジトリが `git merge` の途中（`MERGE_HEAD` がある）のとき**（2 つの版を合わせるターン。「合流する」も。新しく作らない。§4.0） |
 
 **記憶で書かない。** Platform／App SDKのAPI・グローバル変数・通信先は、ここに挙げた契約で提供されるものだけを使う。
@@ -84,7 +83,7 @@ source-dirは`./source`。SDKのCLIと作業ディレクトリ側の`scripts/kit
 - **手元では利用者と話せる。** 遊びの説明の大事なところ（ソロか対戦か・操作・見た目）が本当に読み取れないときだけ
   短く聞く。細部は自分で決めて進め、§2 の出力まで完成させる。
 - **優先順位**: この文書と SDK の spec.md（出力の約束・禁止事項・API）> 元作者の貢献規約（貢献ブランチ）> 利用者の遊びの説明 > Skill の既定 >
-  同梱ライブラリの公式の文書（`<kit>/sdk/node_modules/phaser/skills/` など。一般の Web 向けなので、Platform の Skill と食い違ったら Skill に従う）。
+  固定版Godotの公式資料と同梱API定義（Platform固有の権限・配布契約はこのSkillを優先する）。
   利用者が操作や見た目を指定していれば Skill の既定より優先する（ただし PC とスマホの両方で遊べることは守る）。
 - Skill の規則に従ったせいで説明の要求を削った・変えたときは、`build-report.json` の `notes` に
   Skill 名・該当の規則・理由を 1 行で書く。
@@ -187,7 +186,7 @@ ai/<key>.md          # ゲーム内 AI の指示文（`ai.chat` のときだけ�
 | 外部 CDN の `<script>` / `<link>` / フォント / 画像 URL | `assets/` に同梱する |
 | `eval` / `new Function` / 文字列からのコード生成 | 素直に書く |
 | `__platform` への書き込み | 読むのも不要（`@workspace/app-sdk` を import する） |
-| 依存パッケージの追加（`npm install <名前>`・Kit に無いものを `package.json` に書く） | **Kit の lockfile にあるもの**（`<kit>/sdk/package.json`: Babylon.js（`@babylonjs/core` / `loaders` / `gui`）・Havok・meshoptimizer・Phaser 4・Rapier 2D の決定版・`@colyseus/schema`）**だけを使える。追加は禁止**（版は Kit が固定し、検証器と対戦サーバーも同じ版を前提にする。足しても次のターンでは入らない）。参照は `file:/workspace/sdk/node_modules/<名前>`（`$game-3d-and-bundles` / `$game-phaser` / `$game-physics`） |
+| 依存パッケージの追加 | Kitの固定lockfileだけを使う。Babylon core/Havok/Rapierはサーバー物理専用。Phaser・Babylon描画・JS codecは提供しない |
 | `manifest.json` に宣言していない Capability の API | 使うものを `capabilities` に宣言する |
 
 `externalNetwork` は常に `false`。広告・解析・外部ログインは入れられない。生成 AI は外部の API を直接呼べず、
@@ -240,9 +239,8 @@ ai/<key>.md          # ゲーム内 AI の指示文（`ai.chat` のときだけ�
 2. `package.json` の依存は **ローカルパス参照**のまま変えない
    （`"@workspace/app-sdk": "file:/workspace/sdk/app-sdk"` のように、Sandbox 上の実パスへ向ける。
    手元では `file:<kit>/sdk/app-sdk` の絶対パスにする。commit には git のフィルタが `/workspace` の形で入れる。§8）。
-   使う道具（§4.2）に合わせて足す: 3D は `$game-3d-and-bundles` §2 の `@babylonjs/core`、Phaser は `$game-phaser` §1 の `phaser`、
-   物理は `$game-physics` の Havok（3D）/ Rapier 2D。**rollup / typescript は `package.json` に書かない**（Kit が版を固定し、
-   `@workspace/app-sdk/build-config` から使う。書いても使われない）。
+   対戦サーバーで必要な場合だけ、固定のHavok/Rapier依存を参照する。描画はGodot。
+   **rollup / typescriptはKitが固定する**。ゲームの依存へ追加しない。
 3. バンドルは `@workspace/app-sdk/build-config` と `@workspace/app-server-sdk/build-config` を
    使う。SDK をバンドルに**含めない**ための設定なので、自前の設定に置き換えない。
    対戦では、画面（`src/main.ts`）が `server/main.ts` の定義を import して `app.space.join()` に渡す
@@ -266,39 +264,23 @@ ai/<key>.md          # ゲーム内 AI の指示文（`ai.chat` のときだけ�
    `manifest.json` が仕様どおり、ルールの検査が通る。`$game-playtest`）。
 5. 掲載情報を `listing/` に作る（`$game-listing`。ゲームが出来てから書くと、名前・説明・遊び方・画像が中身と合う）。
 6. `./outputs/` に 3 つのファイルを置く。
-### 4.2 道具を選ぶ（エンジン・描画・物理）
+### 4.2 制作エンジンとサーバー物理
 
-Kit には描画と物理の道具が全部入っている。**どれを使うかは、作りたいゲームに合わせてゲームごとに選ぶ**（既定は無い）。
-ただし **Godot を指定された制作では Godot 4.5.1 に固定**する。`renderer: "webgl2"` と
-Godot 用 manifest 宣言を維持し、2D/3D/物理は Godot 内で作る。以下の JS エンジン選択表は適用しない。
-ネイティブでも動かすため、Web の SDK 連携は `$game-godot` のガードを守り、ゲーム進行を JavaScript のみに依存させない。
+新規・継続制作はGodot 4.5.1に統一する。`$game-godot`を読み、2D/3Dの描画・ローカル物理・入力をGDScriptへ実装する。
+旧Phaser/Babylon作品はソースをGodotへ移行し、移行点と未対応機能を`build-report.json`へ記録する。
+JS描画エンジン・`@workspace/app-sdk/3d`・クライアントRapierは提供しない。
+manifestは`renderer: "webgl2"`とGodot宣言を維持し、Web/nativeを同じソースからexportする。
 
-| 道具 | 何か | 向くゲームの例 |
-|---|---|---|
-| **Phaser 4**（`$game-phaser`） | 2D のゲームエンジン。シーン・素材の読み込み・スプライトアニメ・トゥイーン・カメラ・タイルマップ・パーティクル・音・Arcade 物理 | 横スクロール・見下ろしのアクション・シューティング・タイルマップの RPG・動きの多い 2D パズル |
-| **Babylon.js**（`$game-3d-and-bundles`） | 3D の描画（`@workspace/app-sdk/3d` の `createEngine`） | 3D の空間を動く・3D のカメラ・オープンワールド |
-| **Canvas 2D**（ブラウザ標準） | 描画の API だけ | ボタン 1 つの反射ゲーム・盤面だけのゲームなど、動く物が少なくエンジンの仕組みが要らないもの |
-| **Babylon Physics V2 / Havok**（`$game-physics`） | 3D の物理 | 落下・衝突・積む・車・キャラクター。対戦はサーバーの結果を補間 |
-| **Rapier 2D**（`$game-physics`） | 2D の物理エンジン（決定版） | オンライン対戦の 2D 物理 |
-
-1. **利用者が道具を指定していたら従う**（「Phaser で」「3D で」「ドット絵の 2D で」）。
-2. 指定が無ければ、**遊びの中身から選ぶ**: 2D か 3D か・動く物の数・スクロールやカメラ・タイルマップ／アニメーション／
-   パーティクルの量・物理の要否・オンライン対戦か。上の表は目安で、固定の対応ではない。
-3. **前の版を続けるときは、その版が使っている道具を続ける**（`./input/`。§4.0）。乗り換えるのは利用者が
-   求めたときだけ。ただし Kit が廃止した旧 3D エンジンのソースは Babylon.js / Havok へ移行する
-   （SDK の MIGRATION.md。`build-report.json` の `notes` に書く）。
-4. **組み合わせてよい**（Babylon.js + Havok、Phaser + Rapier 2D）。ただし 1 つの canvas を 2 つのエンジンで描かない。
-   重さは足し算になる。Phaser 約 1.4 MB、Rapier 2D 約 3.3 MiB に加えて、Havok は同梱の WASM を配る。
-   起動前に届くものは 64 MiB の上限に数える。
-5. 選んだ道具と理由を `build-report.json` の `notes` に 1 行書く。
-6. `manifest.json` の `renderer` を選んだ道具に合わせる: Babylon.js は `"webgpu"`、Phaser は `"webgl"`、Canvas 2D は `"canvas2d"`。
+対戦の認可・マッチング・権威あるルール・結果処理は既存Spaceを維持する。`server/main.ts`はTypeScriptの`defineSpace`、
+画面は`TokoyoSpace`。3Dサーバー物理に限りBabylon NullEngine/Havok、2Dサーバー物理に固定Rapierを使える。
+Godot物理との決定的一致を前提にせず、位置と向きの補間だけを描画側で行う。`$game-multiplayer`と`$game-physics`を読む。
 
 ## 5. 絵と音
 
 **何を素材・生成・描画・3D モデリングのどれで用意するか**は `$game-art-direction` §3 の判定表で決め、`design/asset-manifest.md` に理由と一緒に書いてから作る。
 **基本の評価順は「アセットライブラリ → Blenderでのモデリング → 生成AI」。** まずMCPで合う素材を調べ、無ければ簡単に必要な品質までモデリングできるか判断し、難しいものには生成AIを使う。採用を強制する順位ではなく、重要キャラの固有性・承認済みの絵柄・必要な動作を優先する。汎用人型を主役へ無理に流用しない。詳細と理由の記録は `$game-art-direction` §3・§4。
 道具の使い方は `$game-asset-tools` に従う（画像生成と素材ツール）。
-素材ツールが無いときは、選んだ道具（Canvas / Phaser / Babylon.js）の描画と Web Audio の合成で作る。
+素材ツールが無いときは、Godotの描画とAudioStreamの合成で作る。
 
 ### 制作画面で選べる素材の記録
 

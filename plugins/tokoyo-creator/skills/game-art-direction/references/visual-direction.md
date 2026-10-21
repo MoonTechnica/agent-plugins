@@ -1,7 +1,7 @@
 # 世界観をプレイ画面へ落とす
 
 この資料は素材を選ぶとき、照明を組むとき、仕上げで読む。API の正本は Kit の固定版型定義とエンジンの公式資料。
-コードを書く前に使う API の型を確認し、Phaser 3 の記憶や別版のサンプルで補わない。
+コードを書く前に使う API の型を確認し、別版の記憶や別版のサンプルで補わない。
 
 ## 1. 判断の順序
 
@@ -61,37 +61,26 @@ Skill 本文の 5 行を短い要約として残し、必要な詳細を下へ�
 tint・パレット変換・全画面の color grading は形や描き方の違いを消せない。
 素材は中立的な照明で比較し、その後に作品の照明で見る。暗くして差を隠すだけにしない。
 
-## 4. 2D: Phaser 4 / Canvas 2D
+## 4. 2D: Godot
 
-### 手描きの陰影か動的照明か
+- 平面的な画風やpixel artは、描き込んだ影と色面で成立するか判断する。
+- 動く光が必要ならPointLight2D/DirectionalLight2D、遮蔽はLightOccluder2Dを用途で選ぶ。
+- normal mapの向き・凹凸の強さを揃え、素材内の陰影と実光を二重に強調しない。
+- HUDはCanvasLayerへ分離し、暗化・霧・揺れに巻き込まない。
+- 同時光源・透明描画・全画面処理を増やし過ぎず、重いshaderは必要な対象だけに使う。
+- pixel artはfilter・整数拡大・カメラ位置を揃え、移動時のちらつきも実画面で確認する。
 
-- 平面的な画風や小さな pixel art は、描き込んだ影と色面で成立するかを先に判断する。
-- 動く光や素材の凹凸への反応が必要なら、Phaser 4 の Lights Manager と normal map を検討する。
-  `lights.enable()`、`setAmbientColor`、`addLight` と、対象の `setLighting(true)` を使う。Kit の型で確認する。
-- 法線マップの向き・凹凸の強さを揃え、元画像の陰影と実光を二重に強調しない。
-- 照明は WebGL の機能。Canvas 2D に同じ機能があると仮定しない。Canvas の既存作品は既存の描画で基準を維持する。
-- normal map による self-shadowing と、壁が別の物へ落とす遮蔽影は別。光を置くだけで壁が光を遮るとは考えない。
+読み込み・画面・性能は`$game-godot`、`$game-screen-layout`、`$game-3d-and-bundles`に従う。
 
-### 色調・光の合成・ピクセル
-
-- Phaser 4 の `filters` で色調・Blend・Mask 等を扱う。必要なら Render Texture に描画をまとめる。
-  `setPipeline('Light2D')` / `postFX` / `preFX` は Phaser 3 の手順なので使わない。
-- フィルタの順序と適用範囲を決める。HUD は暗化・霧・発光に巻き込まれないレイヤー / カメラにする。
-- 同時光源と全画面処理を増やし過ぎない。全画面の重い処理より、必要な対象への処理を選ぶ。
-- pixel art は pixel scale・sampling・カメラ移動を揃える。`pixelArt: true` だけで異なる素材の粒度が揃うとは扱わない。
-  整数拡大が成立する表示条件と、移動時の輪郭のちらつきも実画面で確かめる。
-
-読み込み・画面・性能の規約は `$game-phaser` / `$game-screen-layout` に従う。
-
-## 5. 3D: Babylon.js
+## 5. 3D: Godot
 
 ### 直接光と環境照明
 
-- `clearColor` は背景色。黒くするだけでメッシュが暗くなるとは考えない。
+- 環境の背景色 は背景色。黒くするだけでメッシュが暗くなるとは考えない。
 - 主光源・補助光・PBR の環境テクスチャ・発光材質・露出を別々に確認する。
-  空の見た目と環境テクスチャによる照明は別。StandardMaterial の ambient と PBR の環境照明を混同しない。
+  空の見た目と環境テクスチャによる照明は別。材質の発光と環境照明を混同しない。
 - 室内のホラーに明るい屋外環境や強い均一の補助光を無条件で入れない。見えない物には局所的な補助や明暗差を作る。
-- 光の位置・範囲・減衰とモデルの尺度を合わせる。PBR と StandardMaterial の光の強さを同じ数値だけで比較しない。
+- 光の位置・範囲・減衰とモデルの尺度を合わせる。異なる材質 の光の強さを同じ数値だけで比較しない。
 
 ### 材質とテクスチャ
 
@@ -99,17 +88,17 @@ tint・パレット変換・全画面の color grading は形や描き方の違�
 - 木・石・布を一律に金属や鏡面にしない。湿りや強い反射は作品上の理由のある物だけにする。
 - glTF の base color / emissive RGB は sRGB、metallic-roughness は linear。roughness は G、metallic は B。
   normal / occlusion 等のデータを色として補正しない。GLB の正しい loader 設定を不用意に上書きしない。
-- KTX2 変換でも color / data の性質を維持する。読み込みは `$game-3d-and-bundles` の SDK helper、同梱デコーダーを使う。
+- KTX2 変換でも color / data の性質を維持する。Godotの固定版importで読み込み、Web/native双方の実描画を確認する。
 
 ### 影・露出・空気感
 
-- 重要な光に `ShadowGenerator` を設定し、caster と receiver を指定する。壁越しの光漏れと足元の接地を見る。
+- 重要なLight3Dに影を設定し、GeometryInstance3Dの影の設定を確認する。壁越しの光漏れと足元の接地を見る。
   bias / normal bias・影の投影範囲は acne と浮きを見て調整する。全光源に高解像度の影を付けない。
 - 形・材質・光を整えてから、露出・tone mapping・color grading を調整する。最初は固定露出で基準を作る。
 - image processing の適用場所を揃え、gamma / tone mapping の重複による白浮きを避ける。
 - 霧は奥行きや遠景を隠すために使い、近くの必要な手掛かりを潰さない。通常の霧を volumetric lighting と呼ばない。
 - bloom は意図した明部に使う。強い DOF・色収差・grain を世界観の代用品にしない。
-- WebGPU と WebGL2 で重要な形・明暗・手掛かりを維持する。飾りを減らす場合も、重要な遮蔽を消して全域を明るくしない。
+- WebとnativeのCompatibility renderer で重要な形・明暗・手掛かりを維持する。飾りを減らす場合も、重要な遮蔽を消して全域を明るくしない。
   型だけで描画互換性を保証せず、得られた画像で確認する。未確認の描画経路は未確認と報告する。
 
 標準マテリアルを先に使う。CDN・Inspector・独自の外部 shader compiler は追加しない。
@@ -142,7 +131,6 @@ tint・パレット変換・全画面の color grading は形や描き方の違�
 
 - [Valve: Illustrative Rendering in Team Fortress 2](https://cdn.fastly.steamstatic.com/apps/valve/2007/NPAR07_IllustrativeRenderingInTeamFortress2.pdf): 形・陰影・テクスチャと識別性。
 - [Playdead: INSIDE Rendering（GDC の公開概要）](https://www.gdcvault.com/play/1023002/Low-Complexity-High-Fidelity-INSIDE): 簡素な美術と照明・空気感。
-- [Phaser 4.2.1 LightsManager](https://raw.githubusercontent.com/phaserjs/phaser/v4.2.1/src/gameobjects/lights/LightsManager.js) / [Lighting](https://raw.githubusercontent.com/phaserjs/phaser/v4.2.1/src/gameobjects/components/Lighting.js): 固定版の照明。
-- [Phaser 4 FilterList](https://docs.phaser.io/api-documentation/4.0.0/class/gameobjects-components-filterlist): filters の範囲・順序・性能。
-- Babylon 公式原本: [Environment](https://raw.githubusercontent.com/BabylonJS/Documentation/master/content/features/featuresDeepDive/environment/environment_introduction.md)、[PBR](https://raw.githubusercontent.com/BabylonJS/Documentation/master/content/features/featuresDeepDive/materials/using/masterPBR.md)、[Shadows](https://raw.githubusercontent.com/BabylonJS/Documentation/master/content/features/featuresDeepDive/lights/shadows.md)、[DefaultRenderingPipeline](https://raw.githubusercontent.com/BabylonJS/Documentation/master/content/features/featuresDeepDive/postProcesses/defaultRenderingPipeline.md)、[ImageProcessing](https://github.com/BabylonJS/Documentation/blob/master/content/features/featuresDeepDive/materials/shaders/image_processing.md)。更新される文書なので Kit 固定版の型を優先して照合する。
 - [Khronos glTF 2.0 specification](https://raw.githubusercontent.com/KhronosGroup/glTF/main/specification/2.0/Specification.adoc): 材質と色空間。
+
+- [Godot 4.5 performance](https://docs.godotengine.org/en/4.5/tutorials/performance/index.html): 固定版の描画・CPU最適化。

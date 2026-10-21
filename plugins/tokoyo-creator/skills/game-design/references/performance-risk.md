@@ -7,8 +7,8 @@
 
 ## 0. 実装の出発点
 
-使う機能の同梱版の公式Skill/型と、Babylonは`$game-3d-and-bundles`、Phaserは`$game-phaser`を先に読む。
-公式資料の最新APIを同梱版へ無確認で写さず、Phaser 3や別エンジンの方式を混ぜない。
+固定Godot版の公式マニュアル/API定義と`$game-godot`、`$game-3d-and-bundles`を先に読む。
+公式資料の最新APIを同梱版へ無確認で写さず、別版や別エンジンの方式を混ぜない。
 ジャンル名ではなく、今回使う機能に次の原則を適用する。対象外の機能を追加する必要はない。
 
 | 領域 | 最初から適用する原則 |
@@ -61,10 +61,10 @@ CPU負荷へ解像度だけを下げるなど原因と異なる対策を繰り�
 2. 起動/初回shader compilation/地域読込と定常描画を分ける。数秒warm-up後、各条件を30–60秒程度測る。
    条件の順を替えて2–3回比較する。描画後の画面も確認し、演出やゲームが実際に動いていることを確かめる。
 3. **既存エンジンの実際のframeループ**へSDKの`createFrameStats`を一時的に入れ、
-   `performance.now()`を`record`する。Phaserの平滑化/制限後deltaやsimulationのdtは計測値に使わない。
+   `performance.now()`を`record`する。平滑化/制限後のdeltaやsimulationのdtは計測値に使わない。
    60秒程度の比較は`createFrameStats(10000)`を各条件で新しく作る。`snapshot()`のcount/p50/p95/p99/maxを保存する。
    pause/非表示区間は除外して時計をresetする。サンプルが足りない条件は測定不足とする。
-4. Babylon/Phaserの同梱版の公式Skill/型で、取得できる描画回数・活動object・texture/body等を併記する。
+4. Godotの固定版APIで、取得できる描画回数・活動object・texture/body等を併記する。
    CPU側処理時間、frame間隔、GPU時間、素材メモリ推定は別々に書く。
    GPU timerが利用できなければ「未測定」。CPUのrender呼び出し時間をGPU時間と呼ばない。
 5. 同じ場面で目標FPSのframe予算を継続的に超える、演出ありだけで停止が増える、資源数が往復ごとに増える場合は

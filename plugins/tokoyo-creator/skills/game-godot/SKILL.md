@@ -39,6 +39,8 @@ For missing or invalid metadata, retain the full visible viewport as the safe fa
 
 ## SDK boundary
 
+The iOS 26+ general-submission runtime runs one PCK per isolated native process. Its restricted engine reads mounted `res://` resources only: physical files, `user://` writes, additional packs, GDExtension/native handles, direct sockets/DNS, process/environment APIs and direct device capture are unavailable. Use the Host facades for persistence, multiplayer and consented devices. Dynamic GDScript retains those same restrictions; script-created threads and WorkerThreadPool callbacks are unavailable. Keep the PCK within 64 MiB, avoid long blocking callbacks (2 seconds), bound memory (512 MiB process footprint) and split heavy work across frames. Older supported iOS versions run the same game’s Web export in the existing isolated WebView Host; do not claim general native compatibility from a standalone Godot export or a Web test.
+
 Keep the starter's `TokoyoApp` autoload (`res://tokoyo_app.gd`, `/root/TokoyoApp`). It provides a shared Web/native Store and lifecycle facade:
 
 - `is_paused()` gates simulation while the Host pauses the game.
@@ -46,7 +48,7 @@ Keep the starter's `TokoyoApp` autoload (`res://tokoyo_app.gd`, `/root/TokoyoApp
 - `save(value)` queues an SDK Store write with revision and request ID. `save_status()` reports `loading`, `loaded`, `saving`, `saved` or `failed`; show a failed save visibly. Listen for `store_saved` and `failed(code)` on native.
 - `report(json)` records measurements such as FPS, draw calls and static memory. These are measurements, not performance guarantees.
 
-Declare `store.read` and `store.write` and a matching Store schema. The native Host calls the existing SDK Store implementation and owns Launch credentials; never place credentials or direct HTTP persistence in GDScript. Revision conflicts remain visible failures. Unsupported SDK operations must fail explicitly. Multiplayer, arbitrary SDK operations and development commands are not implied by the Store adapter. Do not claim isolation, store approval or native save verification from a browser test.
+Declare `store.read` and `store.write` and a matching Store schema when the game uses Store. Games that only use multiplayer do not need Store access. The native Host calls the existing SDK Store implementation and owns Launch credentials; never place credentials or direct HTTP persistence in GDScript. Revision conflicts remain visible failures. Unsupported SDK operations must fail explicitly. For online games read `$game-multiplayer`, start from `sample-godot-multiplayer`, and retain its `TokoyoSpace` autoload. It provides join/send/input/state/players/connection/finish over the existing authoritative Space server on Web and native. Native practice simulation and JS prediction/rollback are not exposed by this facade. Arbitrary SDK operations and development commands are not implied by these adapters. Do not claim isolation, store approval or native save verification from a browser test.
 
 Web uses the fixed JavaScript bridge internally; native uses Host signal requests. Generated gameplay consumes `TokoyoApp`, not platform-specific bridge internals. Handle `InputEventScreenTouch` / `InputEventScreenDrag` as well as real mouse input, and exclude `InputEvent.DEVICE_ID_EMULATION` mouse presses when already counting touches.
 

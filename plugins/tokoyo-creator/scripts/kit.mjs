@@ -9398,7 +9398,7 @@ import { createHash as createHash5 } from "node:crypto";
 import { existsSync as existsSync6 } from "node:fs";
 import { cp as cp2, mkdir as mkdir5, readdir as readdir4, readFile as readFile8, rm as rm4, writeFile as writeFile5 } from "node:fs/promises";
 import { homedir } from "node:os";
-import { dirname as dirname3, join as join9 } from "node:path";
+import { dirname as dirname3, join as join9, relative as relative3 } from "node:path";
 
 // frontend/packages/app-sdk/build-config/kit-build.ts
 import { spawn } from "node:child_process";
@@ -25013,7 +25013,6 @@ var CODE_RULES = [
     why: "a service worker would outlive the Launch and its capabilities"
   }
 ];
-var USES_PHASER = /["']Phaser v["']\s*\+|\bfrom\s*['"]phaser['"]|\brequire\s*\(\s*['"]phaser['"]\s*\)/;
 var SERVER_RULES = [
   {
     code: "SERVER_NODE_API",
@@ -25029,11 +25028,6 @@ var SERVER_RULES = [
     code: "SERVER_TIMERS",
     pattern: /(?<![.\w])set(?:Timeout|Interval)\s*\(/,
     why: "timers run outside the space: they keep firing after finish and escape the step budget; use tickRate / step and ctx.elapsedMs"
-  },
-  {
-    code: "SERVER_IMPORTS_PHASER",
-    pattern: USES_PHASER,
-    why: "Phaser is a screen-side engine and the space server has no DOM; keep the rules (and their physics: the bundled Rapier) free of Phaser"
   }
 ];
 var SERVER_ALLOWED_IMPORTS = new Set([
@@ -25236,8 +25230,6 @@ var DEVICE_USAGE = {
 };
 var USES_WEBGPU = /\bWebGPUEngine\b|\bWebGPURenderer\b|['"]three\/webgpu['"]|\bnavigator\s*\.\s*gpu\b/;
 var USES_WEBGL = /\bThinEngine\b|\bWebGLRenderer\b|getContext\s*\(\s*['"](?:webgl2?|experimental-webgl)['"]/;
-var PHASER_LOADER_URL = /\.load\s*\.\s*(?:setBaseURL|setPath|script|scripts|multiatlas|pack|plugin|scenePlugin|sceneFile)\s*\(|\.load\s*\.\s*[A-Za-z]+\s*\(\s*(?:'[^'\n]*'|"[^"\n]*"|`[^`\n]*`|[\w$.]+)\s*,\s*['"`](?!data:)/;
-var PHASER_V3_API = /\.setPipeline\s*\(|\.(?:postFX|preFX)\b|\bBitmapMask\b|\bGeom\s*\.\s*Point\b|\bMath\s*\.\s*PI2\b|\bGenerateTexture\b/;
 function validateFeatures(manifest, files, options, errors3, warnings) {
   const declares = (capability) => manifest.capabilities.includes(capability);
   const sources = clientSources(manifest, files);
@@ -25355,25 +25347,12 @@ function validateFeatures(manifest, files, options, errors3, warnings) {
   }
   const webgpu = uses(USES_WEBGPU);
   const webgl = uses(USES_WEBGL);
-  const phaser = uses(USES_PHASER);
-  const mismatch = manifest.renderer === "webgpu" && !webgpu || manifest.renderer === "webgl2" && (webgpu || phaser) || manifest.renderer === "webgl" && (webgpu || !(phaser || webgl)) || manifest.renderer === "canvas2d" && (webgpu || webgl || phaser);
+  const mismatch = manifest.renderer === "webgpu" && !webgpu || manifest.renderer === "webgl2" && webgpu || manifest.renderer === "webgl" && (webgpu || !webgl) || manifest.renderer === "canvas2d" && (webgpu || webgl);
   if (mismatch) {
-    const found = phaser ? 'uses Phaser (declare "webgl")' : webgpu ? "uses a WebGPU engine" : webgl ? "uses WebGLRenderer" : "creates neither a WebGPU engine nor a Phaser game";
+    const found = webgpu ? "uses a WebGPU engine" : webgl ? "uses WebGLRenderer" : "does not create a declared GPU context";
     warnings.push({
       code: "RENDERER_MISMATCH",
       message: `the manifest declares renderer "${manifest.renderer}" but the code ${found}`
-    });
-  }
-  if (phaser && uses(PHASER_LOADER_URL)) {
-    errors3.push({
-      code: "PHASER_LOADER_URL",
-      message: "pass the Phaser loader only URLs from app.assets.url(path) (e.g. this.load.image('hero', app.assets.url('assets/hero.png'))); setBaseURL / setPath / relative paths / external URLs / load.script / multiatlas / pack do not load inside the platform"
-    });
-  }
-  if (phaser && uses(PHASER_V3_API)) {
-    warnings.push({
-      code: "PHASER_V3_API",
-      message: "the code uses an API removed in Phaser 4 (setPipeline / postFX / preFX / BitmapMask / Geom.Point / Math.PI2 / GenerateTexture); see node_modules/phaser/skills/v3-to-v4-migration/SKILL.md"
     });
   }
   if (ai === null)
@@ -40207,7 +40186,7 @@ async function upload(name, url2, bytes, contentType, fetchImpl = globalThis.fet
 }
 
 // frontend/packages/creator-kit/src/revision.ts
-var KIT_REVISION = 5;
+var KIT_REVISION = 6;
 var CANONICAL_KIT_ROOT = "/workspace";
 
 // frontend/packages/creator-kit/src/kit-repo.ts
@@ -40836,7 +40815,12 @@ import { join as join7 } from "node:path";
 var SDK_DIR = "sdk";
 var SDK_SHA_FILE = ".sdk-sha256";
 var ARCHIVE_ROOT_DEPTH = 1;
-var NOT_PACKAGES = new Set(["node_modules", "sample-app"]);
+var NOT_PACKAGES = new Set([
+  "node_modules",
+  "sample-app",
+  "sample-godot",
+  "sample-godot-multiplayer"
+]);
 var KIT_LOCKFILE = "npm-shrinkwrap.json";
 var NPM_CI_ARGS = ["ci", "--ignore-scripts", "--no-audit", "--no-fund"];
 
@@ -41152,10 +41136,15 @@ async function writeAgentFiles(workdir, kitRoot) {
   if (!existsSync6(claude))
     await writeFile5(claude, CLAUDE_MD);
 }
-async function copySampleApp(kitRoot, source) {
-  const sample = join9(kitRoot, SDK_DIR, "sample-app");
+async function copyGodotSample(kitRoot, source) {
+  const sample = join9(kitRoot, SDK_DIR, "sample-godot");
   const packages = await sdkPackages(kitRoot);
-  await cp2(sample, source, { recursive: true, force: true });
+  const generated = new Set([".godot", "dist", "debug-dist", "outputs", "node_modules"]);
+  await cp2(sample, source, {
+    recursive: true,
+    force: true,
+    filter: (path) => !relative3(sample, path).split(/[\\/]/).some((part) => generated.has(part))
+  });
   const manifest = await readFile8(join9(sample, "package.json"), "utf8");
   await writeFile5(join9(source, "package.json"), newAppPackageJson(manifest, packages, kitRoot));
 }
@@ -41261,7 +41250,7 @@ async function clone2(context, flags) {
       pulled.head.commit_oid
     ]);
   } else {
-    await copySampleApp(context.kitRoot, source);
+    await copyGodotSample(context.kitRoot, source);
   }
   const base = pulled.head?.commit_oid ?? null;
   await saveConfig(workdir, { ...config2, base_commit_oid: base, fetched_bundles: fetched });

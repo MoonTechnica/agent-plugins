@@ -18,7 +18,7 @@ SDKの型付き操作と検査・結果・timeoutを使い、ケース切替はH
 ステージ/試験場の直行は明示したcaseだけで行う。対象が未生成のcommandは実行可能と表示しない。
 通常の初回開始、開発入口→閉じる→開始、ステージ直行→ケース再起動→通常試遊の復帰を確認する。
 
-Phaserは`$game-phaser` §7、Babylon.jsは`$game-3d-and-bundles` §2の開発UIと破棄の注意を読む。
+Godotでは`$game-godot`と`$game-3d-and-bundles`の開発シーン・資源寿命の契約を読む。
 
 ## 核が遊べるとき
 

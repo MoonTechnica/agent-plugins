@@ -32,10 +32,12 @@ Debug MenuのUIは各ゲームの`debug/`に作成する。SDKは検査・通信
 │   │   ├── types/
 │   │   ├── src/             # defineSpace の実体と createLocalSpace（ルールをサーバー無しで動かす）
 │   │   └── build-config/
-│   ├── sample-app/          # 上の 2 つを使った最小の実例（動く形）
+│   ├── sample-app/          # 従来JS契約の最小例
+│   ├── sample-godot/        # Godot Web/nativeの描画・保存・端末API
+│   ├── sample-godot-multiplayer/ # Godot Web/native対戦。GDScript画面とdefineSpaceサーバー
 │   ├── package.json         # 使える第三者ライブラリ（版は完全一致）
 │   ├── npm-shrinkwrap.json  # その lockfile（integrity。setup が npm ci で入れる）
-│   └── node_modules/        # Babylon.js（core / loaders / gui） / Phaser 4（phaser/skills/ に公式の Skill）/ Havok / meshoptimizer / Rapier 2D の決定版 / @colyseus/schema（これ以外は無い）
+│   └── node_modules/        # サーバー物理用Babylon core / Havok / Rapier 2D の決定版 / @colyseus/schema（これ以外は無い）
 ├── profile/
 │   ├── spec.md              # この文書
 │   └── instructions.md      # 作業手順と出力の約束
@@ -47,11 +49,10 @@ Debug MenuのUIは各ゲームの`debug/`に作成する。SDKは検査・通信
 │   ├── game-controls/       # PC とスマホの操作（入力キット assets/input.ts・ジャンル別の割り当て）
 │   ├── game-screen-layout/  # 画面の追従・HUD・タイトル / ポーズ / リザルト
 │   ├── game-asset-tools/    # 参照検索CLI・制作レシピ・画像生成と素材ツール（MCP）
-│   ├── game-phaser/         # 同梱の Phaser 4 で 2D を作るときの決まり（素材・入力・画面・物理）
 │   ├── game-godot/          # サービス内Godot制作・Web/native出力・既存SDKとプレビューの接続
-│   ├── game-3d-and-bundles/ # Babylon.js・バンドルの分割・台帳からの参照・メモリ
+│   ├── game-3d-and-bundles/ # Godot素材・バンドルの分割・台帳からの参照・メモリ
 │   ├── game-3d-studio/      # Blender で 3D の素材を作る（モデリング・リグ・リターゲット・3D から 2D）
-│   ├── game-physics/        # 3D は Babylon / Havok、2D は Rapier 決定版で物理
+│   ├── game-physics/        # Godot物理とSpaceサーバー物理の分離
 │   ├── game-open-world/     # 広い世界（チャンク・seed・地域ごとのバンドル）
 │   ├── game-multiplayer/    # オンライン対戦（2〜8 人・役割・予測・練習モード）
 │   ├── game-leaderboard/    # ランキング（ボードの決め方・送る瞬間・順位表の表示）
@@ -82,13 +83,13 @@ Debug MenuのUIは各ゲームの`debug/`に作成する。SDKは検査・通信
 |---|---|---|
 | `manifest.json` の `kind` | `"game"` | この Profile の対象 |
 | `manifest.json` の `sdkVersion` | `2` | 配る SDK の版。Platform はこれ以外を受け付けない |
-| `manifest.json` の `renderer` | 選んだ道具（`instructions.md` §4.2）に合わせる: Babylon.js（`@workspace/app-sdk/3d` の `createEngine`）は `"webgpu"`、Phaser 4 は `"webgl"`、Canvas 2D は `"canvas2d"` | 3D の既定は `WebGPUEngine` / `Engine`（WebGPU が無い端末では自動で WebGL2）。省略すると `"webgpu"` |
+| `manifest.json` の `renderer` | `"webgl2"`とGodot宣言 | Web/native共通のGodot 4.5.1 Compatibility renderer |
 | `manifest.json` の `runtimeVersion` | `1` | Shell の版。Platform が互換表で解決する |
 | 対戦人数 | 2〜8（`{ "min", "max" }` か役割ごとの `roles`） | Platform の範囲。9 人以上・1 人の対戦は受け付けない（一人で遊ばせるなら練習モード） |
 | 個人のセーブ（`app.store`） | 1 件 **1 MiB** まで（送る JSON の長さ。`blob` 型は gzip + base64 の後）・書き込みは毎分 12 回。大きな値は `blob` に置き、世界は seed + 変えたところだけ、オートセーブは 1 分に 1 回 | Platform の上限（`<kit>/sdk/app-sdk/spec.md` §3.2） |
 | 外部通信 | 不可（`externalNetwork: false`） | Shell の CSP が `default-src 'none'` |
 | 端末の機能（傾き・マウス固定・カメラ・マイク） | `capabilities` と `device` に宣言し、傾き・マウス固定は入力キット（`$game-controls`）の `tilt` / `pointerLock`、カメラ・マイクは `app.device.camera` / `microphone` を使う。`required` は原則 `false` | Platform が宣言と呼び出しを突き合わせる。宣言の無い機能は iframe で使えない（`<kit>/sdk/app-sdk/spec.md` §8.4） |
-| 依存の追加 | 不可（Kit の lockfile にあるもの = `sdk/package.json` の Babylon.js（`@babylonjs/core` / `loaders` / `gui`）・Havok・meshoptimizer・Phaser 4・Rapier 2D の決定版・`@colyseus/schema` だけが使える） | 版は Kit が固定し、検証器・対戦サーバーも同じ版を前提にする。足しても次のターンの Sandbox では入らない |
+| 依存の追加 | Kitの固定lockfileだけ。Babylon core/Havok/Rapierはサーバー物理専用 | 描画はGodot。JS描画エンジン・codec・client物理は同梱しない |
 
 ## 4. 仕様と食い違いが出たとき
 

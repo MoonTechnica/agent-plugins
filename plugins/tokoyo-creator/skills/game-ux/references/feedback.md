@@ -3,7 +3,7 @@
 `SKILL.md` §2 の 4 種類の出来事に、何をどれだけ出すか。数値は**既定の目安**で、遊びに合わせて上下してよい。
 ただし `SKILL.md` §5 の上限（画面の 20% 以上の点滅は 1 秒に 3 回まで・赤の全画面禁止）は超えない。
 
-目次: 1 量の表 / 2 共通の作り（`effects` とヒットストップ）/ 3 Canvas 2D / 4 Phaser 4 / 5 Babylon.js / 6 効果音の 3 種類
+目次: 1 量の表 / 2 共通の作り（`effects` とヒットストップ）/ 3 Canvas 2D / 4 Godotの2D/3D / 6 効果音の 3 種類
 
 ## 1. 量の表
 
@@ -86,28 +86,13 @@ function burst(x: number, y: number, color: string) {
 
 伸び縮みは描くときに `ctx.scale(sx, sy)`（足元を基準にするなら、足元へ `translate` してから `scale`）。
 
-## 4. Phaser 4
+## 4. Godotの2D/3D
 
-公式 Skill の `cameras` / `particles` / `tweens` / `time-and-timers`（`<kit>/sdk/node_modules/phaser/skills/`）が API の正本。
-
-| 手応え | 書き方 |
-|---|---|
-| 揺れ | `this.cameras.main.shake(250, 0.008 * effects)`（`effects === 0` なら呼ばない）。HUD は別のカメラか `setScrollFactor(0)` で揺れの外に置く |
-| 点滅 | 当たった物に `sprite.setTintFill(0xffffff)` → 100ms 後に `clearTint()`。全画面の `cameras.main.flash` は使わない |
-| 伸び縮み | `this.tweens.add({ targets: sprite, scaleX: 1.2, scaleY: 0.8, duration: 75, yoyo: true, ease: 'Cubic.easeOut' })` |
-| パーティクル | 起動時に `this.add.particles(0, 0, 'spark', { lifespan: 400, speed: { min: 80, max: 240 }, scale: { start: 1, end: 0 }, emitting: false })` を 1 つ作り、`emitter.explode(Math.round(10 * effects), x, y)` |
-| 浮かぶ数字 | `this.add.text(x, y, '+10', …)` を `tweens.add({ y: y - 40, alpha: 0, duration: 600, onComplete: () => t.destroy() })` |
-| ヒットストップ | 始めるときに `this.physics.pause()` と `this.tweens.pauseAll()`、`update` で `this.hitstop -= delta` し 0 以下で `resume()` / `resumeAll()`。その間はゲームの更新を飛ばし、`input.endFrame()` は呼ぶ。`time.delayedCall` で戻さない（`time.paused` と絡む） |
-
-## 5. Babylon.js
-
-| 手応え | 書き方 |
-|---|---|
-| 揺れ | カメラの位置に `trauma² × maxOffset × 乱数`（`maxOffset` は 0.1〜0.3 ワールド単位）を毎フレーム足して描き、描いたら元に戻す。三人称なら `camera.rotation.z` に 2° 以内も可。**一人称は揺らさない**（`SKILL.md` §5） |
-| 点滅 | 当たったメッシュの `StandardMaterial.emissiveColor` / `PBRMaterial.emissiveColor` を 100ms だけ白に |
-| 伸び縮み | メッシュの `scaling.set(1.2, 0.8, 1.2)` → 150ms でイージングして 1 へ |
-| パーティクル | Babylon の `ParticleSystem` か小さな `Sprite` を 10 個前後。使い回す（毎回 new しない） |
-| ヒットストップ | `engine.runRenderLoop` の中でゲームの `dt` を 0 にして `scene.render()` だけ続ける（Canvas 2D と同じ） |
+固定版GodotのAPI定義を確認する。揺れはカメラの表示offsetへ上限付きで加え、HUDは別CanvasLayerへ置く。
+伸び縮みと点滅は対象NodeのTweenで実装し、Node破棄時に停止する。全画面flashを使わない。
+粒子はGPUParticles2D/3D等を上限付きで再利用し、不要なエフェクトと音をシーン終了時に解放する。
+ヒットストップはローカルの演出に限定し、オンラインの権威あるサーバーtickや入力送信を止めない。
+reduced-motionとeffects=0では揺れを止め、視覚だけ・音だけで必須情報を伝えない。
 
 ## 6. 効果音の 3 種類
 

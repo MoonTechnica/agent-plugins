@@ -36,10 +36,8 @@ resize()
 - `resize` は回転・全画面の切り替えでも来る。**大きさを起動時の 1 回だけで決めない。**
 - 全画面はゲームから出さない（`requestFullscreen()` を呼ばない）。Platform の枠の全画面ボタンが出す。
   **カメラ / マイクを使うゲームでは呼んでもブラウザに断られる**（使用中の表示を隠さないため、Platform が枠ごと全画面にする）。
-- **Phaser 4 は自前の `resize()` を書かず Scale Manager を使う**: 方式 A（§2）は `Phaser.Scale.FIT`、方式 B は
-  `Phaser.Scale.EXPAND`（どちらも `autoCenter: Phaser.Scale.CENTER_BOTH`、基準の大きさは縦 720×1280 / 横 1280×720 のように大きめ）。
-  `RESIZE` は画素が CSS の px と 1:1 になってスマホでぼけるので使わない。配置の決め直しは `this.scale.on('resize', …)`（`$game-phaser` §5）。
-- Babylon.js は `createEngine(canvas)` の DPR 上限を使う（3D は描く画素がそのまま重さになる。`$game-3d-and-bundles` §2）。
+- Godotのviewport/stretchと`TokoyoApp`のhost viewport契約を使い、worldはfullbleed、HUDだけsafe area内へ配置する。
+
   canvas の CSS を `width: 100%; height: 100%` にし、`resize` で `engine.resize()`（カメラの縦横比はエンジンが反映）。
 - `manifest.json` の `orientation` は**実際に合う向き**を書く（`portrait` / `landscape` / `any`）。
   ただし Platform は向きを固定しない。**違う向きでも遊べる**レイアウトにする（§2）。
@@ -105,8 +103,7 @@ resize()
 ## 4. 文字
 
 - **大きさ・コントラスト・背板と縁取りの数値は `$game-ux` §3**（本文 16px・プレイ中の数字 24px・4.5:1）。
-- `ctx.font` の大きさは CSS px で指定する（`setTransform` 済みなら DPR は不要）。Phaser は基準の大きさで書くので
-  縮めて表示される分を見込む（`$game-phaser` §5）。
+- GodotのUI themeのfont sizeと実際の表示倍率を確認し、小さい端末でも読める大きさにする。
 - 画面幅に比例して文字を大きくしない。大きさの段を決めて使う（見出し 28〜36px / 本文 16px / 補足 12〜14px）。
 - 長い文は行を折り返す。
 - 文言は日本語。
@@ -153,7 +150,6 @@ async function shareResult(score: number) {
   let captureId: string | undefined
   try {
     // 描いた直後、同じ処理の中で呼ぶ（await を挟まない）。後で呼ぶと WebGL / WebGPU の画面は真っ黒になる
-    // Phaser は自分のループで描くので、game.events.once(Phaser.Core.Events.POST_RENDER, …) の中で呼ぶ（$game-phaser §7）
     ;({ captureId } = await app.share.capture(canvas))
   } catch (error) {
     console.warn('share.capture failed', error) // 撮れなくてもリンクだけで共有を続ける

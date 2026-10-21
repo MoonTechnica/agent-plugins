@@ -75,7 +75,7 @@ Decimateは減面、Voxel Remeshは表面の再構成、Retopologyは用途に�
    テクスチャ寸法、容量を確認する。APIの目標ポリゴン数とGLBの三角形数を混同しない。
 2. 利用できるGLB検査で形式と参照を確認する。Sandboxでリグ/動作を要求する出力には
    `require_rig: true`と`required_animations`を指定する。形式合格は変形品質の保証ではない。
-3. 完成GLBを本編のBabylonローダーとAnimationGroupで再生する。前/横/後ろと必要な曲げ/ひねり、
+3. 完成GLBを本編のGodot importとAnimationPlayerで再生する。前/横/後ろと必要な曲げ/ひねり、
    代表動作の接地・ループ・切替を確認する。4方向の静止プレビューだけで動作を確認済みにしない。
 4. 重い部分を区別して既存の減面/LOD/材質共有/KTX2/meshopt/量子化を選ぶ。
    統合で可動部を壊さず、圧縮や量子化後にも輪郭・模様・変形を比較する。

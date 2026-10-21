@@ -40,7 +40,13 @@ Things to know up front:
 - `git` 2.38 or later and [Git LFS](https://git-lfs.com) (`source/` is a git repository; images, sounds and 3D models are stored with LFS)
 - `tar` (built in on macOS and Linux; Windows 10 and later ships `tar.exe`)
 - A registered TOKOYO.games account (an anonymous guest account is not enough). You sign in through the browser the first time.
-- Network access: the Kit runs `npm ci` to install SDK dependencies such as Babylon.js.
+- Godot **4.5.1 stable** and its Web export templates, installed before building. Put the executable on `PATH`,
+  or set `GODOT_BIN` to its absolute path. SDK `setup` installs npm dependencies, not the Godot toolchain.
+- Network access: the Kit runs `npm ci` for the fixed SDK and server physics dependencies.
+
+New games start from `sample-godot/`: GDScript and Godot scenes provide the same game source for Web and native.
+For online games, use the shared `sample-godot-multiplayer/` contract and the existing Space Server.
+`sample-app/` is a common SDK test fixture; Phaser and Babylon rendering templates are no longer provided.
 
 ## Quick start (Claude Code)
 
@@ -256,5 +262,5 @@ You can copy Kit content, such as the sample code in the Skills, into your own g
 - The npm packages bundled in `plugins/tokoyo-creator/scripts/kit.mjs` follow their own licenses
   (see [`plugins/tokoyo-creator/THIRD_PARTY_NOTICES.md`](plugins/tokoyo-creator/THIRD_PARTY_NOTICES.md)).
 - The SDK unpacked into `sdk/` is fetched from the Platform and is not covered by this repository's license
-  (the bundled Babylon.js is Apache-2.0).
+  (Godot is MIT with third-party notices; Babylon core remains Apache-2.0 for server physics).
 - Use of the "TOKOYO.games" name and logo is not licensed.

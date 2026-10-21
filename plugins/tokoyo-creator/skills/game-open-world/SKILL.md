@@ -9,7 +9,7 @@ description: 広い世界を局所的に読み込み、解放して長く遊べ�
 最初から設計し、その上で実描画を測って必要な追加最適化を行う。世界を広げてから基本対策を後付けしない。
 RPGの進行は `$game-design` references/rpg.md。SDK APIの正本は `<kit>/sdk/app-sdk/spec.md`。
 地域の役割・接続・配置・生成候補の選定は `$game-level-design`。このSkillは採用した世界の読み込み・活動範囲・保存を扱う。
-エンジンAPIは同梱版の型/公式Skill。存在しないThree.js APIをBabylon/Phaserへ持ち込まない。
+エンジンAPIは固定版Godotの公式マニュアル/API定義で確認する。JSのbundle契約をnativeのPCKへ自動適用しない。
 世界規模・活動NPC・生成・描画方式を決める段階で `$game-design` references/performance-risk.md を読み、
 懸念を先に伝え、代表的な地域の最小試作を実描画して比較する。広げてから負荷を調べない。
 
@@ -38,7 +38,7 @@ import { createWorkQueue, createFrameStats } from '@workspace/app-sdk/runtime'
 const work = createWorkQueue({ maxPending: 128, maxSteps: 32 })
 const frames = createFrameStats()
 function frame() {
-  frames.record(performance.now()) // Phaserの平滑化deltaを計測に使わない
+  frames.record(performance.now()) // 平滑化されたsimulation deltaを実frame時間の計測に使わない
   work.tick(2)                    // 調整用初期値。同期step自体は中断できない
   // 既存engineのupdate/renderを続ける。第二のRAFを作らない
 }
@@ -61,11 +61,8 @@ bundles/<地域>/へ素材/定義を置きmanifestへ宣言。使う前にapp.bu
 Cacheありの先読みは永続cacheへ、なしの場合はHost保持32MiB予算。decode/GPUメモリとは別。
 
 - 地域専用資源と常駐/共有資源を分け、最後の利用者が共有資源を解放する。
-- **Babylon**: 地域meshはmesh.dispose()。共有material/textureを地域退出時に破棄しない。
-  container複製を解放してから所有containerをdispose。霧はscene.fogMode/fogStart/fogEnd、clipはcamera.maxZ。
-  thin instancesは地域×モデル単位。収集物は通常instance/pool。freezeActiveMeshes()を常時既定にしない。
-- **Phaser**: GameObject/layer/map/body→専用TextureManager/cache/audioの順に片付ける。
-  Scene sleepは解放ではない。SHUTDOWNで外部listener/timerを解除。共通atlasは最後まで保持。
+- Godotの地域Nodeはqueue_free()し、autoload・signal・キャッシュがResource参照を保持していないか調べる。
+  共有material/textureは最後の利用者が解放する。MultiMeshは地域×モデル単位にし、活動範囲を制限する。
 - engine資源を片付けてからapp.bundles.unload(name)。URL revokeだけではGPU/audioは解放されない。
 - loading中unloadは旧loadを拒否し、不要な後着をURL化しない。再loadは未完了の同じ不変bundleに合流する。
   複数地域が同じbundleを借りるなら利用者数を管理し、最後の利用者だけunloadする。
@@ -88,7 +85,7 @@ Cacheありの先読みは永続cacheへ、なしの場合はHost保持32MiB予�
 素材の静的概算＋保持チャンク集合＋旧新地域の重複＋decode/upload＋手続き生成＋骨格/RTT/保存snapshotを計上する。
 groupは同時保持の宣言であり実行時の保持数を強制しない。見積もりは実機安全性の保証ではない。
 
-- 3D textureはKTX2候補。圧縮対応時とRGBA fallbackを別計上。Phaser Loader対応を確認せず一律要求しない。
+- 3D textureは固定版Godotのimport設定で圧縮し、Web/nativeの実際のGPU資源量と非圧縮時の上限を別計上する。
 - 単色/頂点色で済む地形はtexture不要。長いBGMはstreaming、短い効果音は共有decode。
 - 512/768MiBは素材警告の目安。OS総メモリ上限ではない。対象端末でruntime資源の頭打ちを確認する。
 
