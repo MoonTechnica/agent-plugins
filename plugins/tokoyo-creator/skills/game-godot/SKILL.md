@@ -48,14 +48,41 @@ Keep the starter's `TokoyoApp` autoload (`res://tokoyo_app.gd`, `/root/TokoyoApp
 - `save(value)` queues an SDK Store write with revision and request ID. `save_status()` reports `loading`, `loaded`, `saving`, `saved` or `failed`; show a failed save visibly. Listen for `store_saved` and `failed(code)` on native.
 - `report(json)` records measurements such as FPS, draw calls and static memory. These are measurements, not performance guarantees.
 
-Declare `store.read` and `store.write` and a matching Store schema when the game uses Store. Games that only use multiplayer do not need Store access. The native Host calls the existing SDK Store implementation and owns Launch credentials; never place credentials or direct HTTP persistence in GDScript. Revision conflicts remain visible failures. Unsupported SDK operations must fail explicitly. For online games read `$game-multiplayer`, start from `sample-godot-multiplayer`, and retain its `TokoyoSpace` autoload. It provides join/send/input/state/players/connection/finish over the existing authoritative Space server on Web and native. Native practice simulation and JS prediction/rollback are not exposed by this facade. Arbitrary SDK operations and development commands are not implied by these adapters. Do not claim isolation, store approval or native save verification from a browser test.
+Declare `store.read` and `store.write` and a matching Store schema when the game uses Store. Games that only use multiplayer do not need Store access. The native Host calls the existing SDK Store implementation and owns Launch credentials; never place credentials or direct HTTP persistence in GDScript. Revision conflicts remain visible failures. Unsupported SDK operations must fail explicitly. For online games read `$game-multiplayer`, start from `sample-godot-multiplayer`, and retain its `TokoyoSpace` autoload. It provides join/send/input/state/players/connection/finish over the existing authoritative Space server on Web and native. Native practice simulation and JS prediction/rollback are not exposed by this facade. Do not claim isolation, store approval or native save verification from a browser test.
+
+### Service facades on `TokoyoApp`
+
+Keep the starter's `tokoyo_documents.gd`, `tokoyo_leaderboard.gd`, `tokoyo_ai.gd`, `tokoyo_commerce.gd`, `tokoyo_ui.gd` and `tokoyo_debug.gd` next to `tokoyo_app.gd`; `TokoyoApp` instantiates them as `TokoyoApp.documents`, `.leaderboard`, `.ai`, `.commerce`, `.ui` and `.debug`. All of them use one request/reply channel (`TokoyoApp.call_op`) that is identical on Web and native, so gameplay code never touches bridge internals. Every method takes an optional trailing `Callable` that receives `(ok: bool, result_or_code: Variant)`: on success `result` is the SDK result (Dictionary / Array / null), on failure it is the SDK error code (`FORBIDDEN`, `INVALID_ACTION`, `RATE_LIMITED`, `REVISION_CONFLICT`, `QUOTA_EXCEEDED`, `RUNTIME_UNSUPPORTED`, `INTERNAL`, …). Requests sent before the Host attaches queue up to 64; later ones fail as `RATE_LIMITED`.
+
+| Facade | Capabilities in `manifest.json` | Methods and signals |
+|---|---|---|
+| `documents` | `documents.read` / `documents.write` + `documentSchema` | `create`, `join_open`, `fetch`, `list`, `update(record_id, patch, expected_revision)`, `finish`, `leave`, `subscribe` / `unsubscribe`, `launch_record_id`; signal `changed(record_id, revision, kind)` while subscribed |
+| `leaderboard` | `leaderboard.read` / `leaderboard.write` + `leaderboards` | `submit(board, score, options)`, `list`, `around_me`, `me` |
+| `ai` | `ai.chat` + `manifest.ai` | `chat({conversation, message, instructions?, schema?, stream?})` returns the request id; signal `token(request_id, text)` for streamed deltas; `cancel`, `reset`, `balance`. `QUOTA_EXCEEDED` means the player is out of coins |
+| `commerce` | `commerce.purchase` | `list_products`, `request_purchase(product_id, request_key)` (the Host shows the confirmation; the result carries the server receipt), `get_receipt` |
+| `ui` | `share.capture`, `ui.openInvite`, `ui.openShare`; `open_credits` follows `ai.chat` | `capture(image)` / `capture_viewport(viewport)` encode a JPEG (long edge 1600px) and return `{captureId}`; `open_invite(record_id)`, `open_share({captureId, text})`, `open_credits()` |
+| `debug` | none (development launches only) | see the development preview section below |
+
+Entries never include avatar images (`avatarUrl` is always null); draw initials from `displayName`. Keep saved request keys for purchases and document writes so a retry returns the same receipt or revision instead of a duplicate. Document revisions and leaderboard seasons are enforced by the Platform; the facade only forwards them.
+
+### Development preview from GDScript
+
+Development launches (the creation screen's test menu) run the separate development Artifact and expect the game to drive the menu contract itself; the Platform no longer registers an empty menu on the game's behalf:
+
+1. Keep `debug/catalog.json`, `debug/definitions.json` and `debug/presets/*.json` in the game repository. Declare each command (`id`, bilingual `label`, `input` of type `none` / `boolean` / `enum` / `number`) and list the command ids on the cases that support them. `normal_start` must remain the normal start of the game.
+2. On startup call `TokoyoApp.debug.fetch_launch(callback)`. Production launches answer `null`; development launches answer `{caseId, seed}` and cache it in `TokoyoApp.debug.launch`. Use the case to jump to a stage or test subject only when the id is not `normal_start`.
+3. Connect `TokoyoApp.debug.command(request_id, command_id, value)`, call `TokoyoApp.debug.register(commands)` with the launched case's command definitions, and after the registration callback succeeds call `TokoyoApp.debug.ready()`. Answer every command with `TokoyoApp.debug.complete(request_id, ok, code)` within the Host's 10-second limit; an unanswered or thrown command taints the session.
+4. Report unrecoverable setup problems with `TokoyoApp.debug.fail("LOAD_FAILED" | "INVALID_PRESET" | "UNSUPPORTED_CASE" | "REGISTRATION_FAILED")`.
+5. Navigation and in-game menu intents go through `TokoyoApp.debug.action({type: "restart_case"})`, `{type: "normal_play"}`, `{type: "start_case", caseId, seed}`, `{type: "menu", open}` or `{type: "command", commandId, value}`. Any in-game development panel lives in the game's own scenes and must stay out of the production resource tree (`godot/` cannot contain `debug` directories).
+
+The starter's `main.gd` shows the whole flow with `reset_taps` / `set_taps`. Verify a development launch in the creation screen on Web and in the Expo preview; a successful export or headless parse does not establish that commands reach the game.
 
 Web uses the fixed JavaScript bridge internally; native uses Host signal requests. Generated gameplay consumes `TokoyoApp`, not platform-specific bridge internals. Handle `InputEventScreenTouch` / `InputEventScreenDrag` as well as real mouse input, and exclude `InputEvent.DEVICE_ID_EMULATION` mouse presses when already counting touches.
 
 ## PoC scope and verification
 
 - No native extensions, C# or development resources inside the production Godot resource tree. The fixed builder rejects these. The first PoC uses one production scene and a development-only JS wrapper with the normal_start catalog case; its PCK contains no development code.
-- Do not invent new SDK operations or network access. Use the declared Store schema and supported facade. Additional game operations need the Platform adapter updated and tested.
+- Do not invent new SDK operations or network access. Use the declared capabilities and the facades above. Additional game operations need the Platform adapter updated and tested.
 - Verify Web with the actual Shell, including save/restore, pause/resume and scene rendering. Verify mobile through the existing Expo player with the downloaded native pack. Linux headless export alone does not verify rendering or iPhone performance.
 - Check a tall portrait and a wide landscape surface, then resize/rotate the same live game. Confirm the world reaches every edge, subjects retain their proportions and important framing, text and controls remain visible, and pointer/touch still hits the intended targets after resizing. Record actual captures and input results; a successful export does not establish orientation support.
 - Record initial download bytes, start time, frame time, draw calls and memory; compare the same scene and quality before/after optimization. Use shared mesh/material resources and bound their lifetime. Do not replace a visual test with a successful build.

@@ -24339,6 +24339,25 @@ var gameAssetCatalogSchema = exports_external.object({
     thumbnail_path: sourcePath.nullable().optional()
   }).strict()).max(500)
 }).strict().refine((catalog) => new Set(catalog.items.map((item) => item.id)).size === catalog.items.length && new Set(catalog.items.map((item) => item.name)).size === catalog.items.length);
+// frontend/packages/app-protocol/src/godot-ops.mjs
+var IMAGE_TYPES = new Set(["image/jpeg", "image/png", "image/webp"]);
+var DEBUG_FAIL_CODES = new Set([
+  "INVALID_PRESET",
+  "LOAD_FAILED",
+  "UNSUPPORTED_CASE",
+  "REGISTRATION_FAILED"
+]);
+var DEBUG_RESULT_CODES = new Set([
+  "INVALID_COMMAND",
+  "INVALID_INPUT",
+  "BUSY",
+  "NOT_READY",
+  "TAINTED",
+  "TIMED_OUT",
+  "HANDLER_FAILED",
+  "REQUEST_REUSED",
+  "EXPIRED"
+]);
 // frontend/packages/app-protocol/src/godot-runtime.ts
 var GODOT_WEB_GLUE_SHA256 = "8a7c7d57f7da69bb71da9de302480b87e4c7ecb467ce643665b4a288683cd18f";
 var GODOT_WEB_WASM_SHA256 = "6498359ba889796a0d95a2f71113ac184badc0f2d84cf28f4103c7e399d2d547";

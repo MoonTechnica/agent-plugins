@@ -39,6 +39,12 @@ Measure the affected scene before optimizing and repeat under the same viewport,
 
 Use MultiMesh for many compatible repeated instances when draw-call reduction is relevant. It changes culling behavior: divide large worlds into suitable groups instead of putting the entire world into one instance collection. Choose camera framing, lighting, shadows, transparency and texture sizes for the actual mobile workload. Do not impose an arbitrary low-quality preset on every game.
 
+## Service facades and development commands
+
+`TokoyoApp.documents`, `.leaderboard`, `.ai`, `.commerce`, `.ui` and `.debug` wrap the Platform SDK over the same channel on Web and native (see the parent skill's table). Keep service calls in a thin adapter layer or the scene that owns the feature, not scattered through gameplay scripts, and treat every callback failure code as a visible state: a failed save, submit or purchase must not look successful. Streamed AI text arrives through `TokoyoApp.ai.token` and must be bounded on screen; cancel the request when the player leaves the conversation.
+
+For development commands, read the case from `TokoyoApp.debug.fetch_launch`, register the catalog commands, answer each `command` signal with `complete`, then call `ready`. The headless `scripts/godot/facade-smoke.gd` in the service repository exercises this contract without a network; in a game repository, run the development launch from the creation screen and confirm that a command actually changes the running game.
+
 ## Parse, build and run
 
 Use the pinned editor already in the environment. For a changed standalone script, `godot --headless --path <game>/godot --script res://path.gd --check-only` checks parsing. It does not prove scene wiring or runtime behavior. Import the actual project and run the normal `kit build` command from the generation profile, which creates both Web and native packs and validates the normal/development Artifacts.
