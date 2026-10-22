@@ -1,6 +1,7 @@
 ---
 name: fdpocket-proposals
 description: 自分のミニアプリ（main）に届いた提案を読み、コメントし、マージするか見送る。Platform MCP（fdpocket）の list_proposals / get_proposal / get_proposal_inputs / comment_proposal / merge_proposal / close_proposal と git を使う。「届いた提案を見て」「レビューして」「マージして」のときに使う。review, merge, maintainer.
+user-invocable: false
 ---
 
 # 届いた提案を読んで決める

@@ -170,44 +170,49 @@ MCP のツールが返す URL は署名付きで短命なので、受け取っ�
 | `assets-cache/` | 素材ツールの `download_url` から取った画像。`kit.mjs assets add --url <download_url> --sha256 <sha256> --path <source/ からの相対パス>` で `source/` に置いて commit する |
 | `outputs/` | 送る 3 つ（`source.bundle`・`dist.tar.gz`・`build-report.json`） |
 
-git と Git LFS（`git lfs version`）・Bun・Node 22.12 以上が要る。commit の作者は `clone` が Platform の決めた本人（`get_git_bundles` の `author`）にしてある。
+git と Git LFS（`git lfs version`）・Bun・Node 22.12 以上が要る。`node <kit>/scripts/kit.mjs doctor` で一度に確かめられ、
+足りないものの直し方（`fix`）と Kit の更新の有無が出る。commit の作者は `clone` が Platform の決めた本人（`get_git_bundles` の `author`）にしてある。
 **作者を変えない**（`user.name` / `user.email` を書き換えない・他人の commit を `--author` で作らない）。
 
 ### 8.2 素材ツール
 
 画像のツール（`generate_image` など）は `fdpocket` の同名のツールで、**どれも `project_id`（`.tokoyo.json` の `app_id`）と `session_id` を渡す**。
-LFS の実体を上げ下ろしするので、最初に一度 `node <kit>/scripts/kit.mjs login` でログインしておく（ブラウザで許可する。MCP のログインとは別）。
+`kit.mjs clone` / `pull` / `push` と LFS の実体の上げ下ろしは、Kit 自身のログイン（`kit.mjs login`。MCP のログインとは別）で
+Platform を呼ぶ。ログインしていなければ最初にブラウザで許可を求められる（一度だけ）。
 
 MCP の `project_id` は Project の内部 ID。`.tokoyo.json` のキー名は互換性のため `app_id` のままなので、その値を `project_id` に渡す。`editor_url` は返却値をそのまま使い、URL のパスから ID を推測しない。
 
 ### 8.3 取得 → 作る → 検査 → 送信
 
-1. **取得**: `get_git_bundles({ project_id, session_id })` の結果の JSON をそのまま渡す。作業ディレクトリがまだ無ければ新しいディレクトリで
-   `kit.mjs clone --bundles '<JSON>'`、あれば `kit.mjs pull --bundles '<JSON>'`（`git pull --rebase` と同じ）。
+1. **取得**: 作業ディレクトリがまだ無ければ新しいディレクトリで `kit.mjs clone --project-id <project_id> --session-id <session_id>`、
+   あれば `kit.mjs pull`（`git pull --rebase` と同じ）。どちらも Kit が `get_git_bundles` を呼ぶ
+   （`get_git_bundles` の結果の JSON を `--bundles '<JSON>'` で渡してもよい）。
    `pull` は commit していない変更があると断るので、先に `git commit` する。結果の `status` が `conflict` なら §8.4。
    空の Project なら §5 の `kit.mjs new` から。
 2. **作る**: §3 の工程。`source/` で `bun install`、ZModel を変えたら `kit.mjs generate` → `kit.mjs db diff`、`kit.mjs dev` で確かめる。区切りごとに `git commit` する。
-3. **出力**: 変更を `git commit` し、`kit.mjs build` で `source/dist/` を作り、`source/listing/` の掲載情報を用意し（今の値は `get_project` の `listing`）、
-   `outputs/build-report.json` を書き（spec §11）、`kit.mjs pack` を実行する。
-   `pack` は `begin_build` に渡す引数（`files`・`commit_oid`・`base_commit_oid` ほか）を JSON で出す。
-4. **検査**: `kit.mjs check`（落ちたら終了コード 2 と理由。Plugin の hook も `begin_build` の前に同じものを走らせる）。落ちたら直して 3. から。
+3. **出力の申告**: 変更を `git commit` し、`source/listing/` の掲載情報を用意し（今の値は `get_project` の `listing`）、
+   `outputs/build-report.json` に申告（`notes`・`listingRequested`・`stage`）を書く（spec §11。`project`・`apps`・`schemaVersion`・
+   `migrations` は `kit push` が build の結果から埋める）。貢献のブランチなら `get_contribution_policy` で規約を読み、差分全体が守っているか確かめる。
+4. **送信**: `kit.mjs push --message "<利用者向けの 1 行の説明>"`（貢献のブランチは `--policy-revision <確かめた revision>`、この会話で最初の送信なら
+   `--open`）。`kit push` は `kit.mjs build` → `pack` → `check`（落ちたら終了コード 2 と理由。直して commit し 4. から）→ `begin_build` →
+   アップロード（LFS → 3 点）→ `submit_build` → `get_build` を `ready` / `failed` / `cancelled` まで（10 分で打ち切り）→ `ready` なら取り込み直す、
+   を 1 回で行い、結果を JSON で出す。Platform が断ったときはコードと次の手順がエラーに出る（§8.4・§8.5）。
    通っても Platform 側で必ず検証される。
-5. **送信**: `begin_build({ project_id, session_id, message, request_key, ...pack の出力 })` → 返った `upload_urls` を
-   `kit.mjs upload --urls '<upload_urls の JSON>'` → `submit_build({ job_id })` → `get_build({ job_id })` を 3 秒ごとに
-   `ready` / `failed` / `cancelled` になるまで呼ぶ（10 分で打ち切り、利用者に伝える）。`message` は利用者向けの 1 行の説明、
-   `request_key` は送信ごとに新しい UUID（同じ送信のやり直しには同じ値）。
-6. **結果**: `ready` かつ `landed: true` なら、制作画面を `kit.mjs open --url <editor_url>` で開く（この会話で最初に `ready` になったときだけ）。
-   開けたかどうかに関わらず、**`editor_url` を返事の最後に目立つ形で毎回示す**（例: 「▶ 制作画面で試す: <editor_url>」）。そのあと 1. の `pull` で
-   取り込み直す。`failed` なら `validation[].report_url` を取得して読み、直して 3. から。
+5. **結果**: `status: "ready"` なら、**`editor_url` を返事の最後に目立つ形で毎回示す**（例: 「▶ 制作画面で試す: <editor_url>」。
+   `--open` を付けたときは制作画面も開く）。`status: "failed"` なら `reports[].report_url` を取得して読み、直して commit し 4. から。
+   `status: "timed_out"` は利用者に伝え、後で `get_build({ job_id })` を見る。`kit_update` があれば Kit の更新を勧める。
+6. **手で送る場合**（Kit から Platform へ接続できない環境など）: `kit.mjs build` → `kit.mjs pack`（`begin_build` の引数を出す）→ `kit.mjs check` →
+   `begin_build({ project_id, session_id, message, request_key, ...pack の出力 })` → `kit.mjs upload --urls '<upload_urls の JSON>'` →
+   `submit_build({ job_id })` → `get_build({ job_id })` を 3 秒ごと。`request_key` は送信ごとに新しい UUID（同じ送信のやり直しには同じ値）。
 
 ### 8.4 先に進んでいたとき（`STALE_BASE`）
 
 `begin_build` / `submit_build` が `STALE_BASE` を返したら、スレッドの head が取り込んだ後に進んでいる。普通の git と同じく載せ直す:
 
-1. `get_git_bundles({ project_id, session_id })` → `kit.mjs pull --bundles '<JSON>'`。
+1. `kit.mjs pull`。
 2. `status` が `conflict` なら衝突を解き（`git diff` で両方の変更を見る。依頼の意図を残す）、`git add` → `git rebase --continue`。
    `packages/db-schema/pending/generated.sql` の衝突は解かずに `kit.mjs db diff` で作り直す。
-3. §8.3 の 2. から送り直す。
+3. `kit.mjs push` で送り直す。
 
 main の参照権限がある場合は、同じ `session_id` の `get_git_bundles` の `main` があれば `refs/remotes/tokoyo/heads/main` が最新の main。
 必要なら main を自分のブランチへ `git merge` し、衝突を解いて確かめてから送る。pull だけでブランチを main に置き換えない。
@@ -219,7 +224,8 @@ main の参照権限がある場合は、同じ `session_id` の `get_git_bundle
 | `SDK_VERSION_DEPRECATED`（`kit_outdated`） | Kit が古い。利用者に Kit の更新（Claude Code: `/plugin marketplace update`、Codex: プラグインの更新）を頼み、更新後に `kit.mjs link` で作業ディレクトリを新しい Kit へ向けてから `kit.mjs generate` |
 | `BUNDLE_REJECTED`（`author_mismatch`） | 本人以外の作者の commit がある。`git rebase --exec 'git commit --amend --no-edit --reset-author' <base_commit_oid>` で直して 3. から |
 | `BUNDLE_REJECTED`（ほか） | `pull` で取り込み直してから 3. から |
-| `LFS_OBJECT_MISSING` | `kit.mjs login` してから `kit.mjs upload` をやり直す |
+| `LFS_OBJECT_MISSING` | `kit.mjs login` してから `kit.mjs push` をやり直す |
+| Kit のコマンドが環境のエラーで止まる（`bun` が見つからない・`mise ERROR` など） | `kit.mjs doctor` を実行し、`fix` のとおり利用者に直してもらう |
 | `get_build` が `failed`（取り込みの検査のコード） | `kit.mjs check` で同じ検査を回して直し、3. から |
 | `QUOTA_EXCEEDED` / `RATE_LIMITED` | 少し待つよう利用者に伝える。何度も送り直さない |
 | `FORBIDDEN` | この App を編集できない。利用者に確認する |

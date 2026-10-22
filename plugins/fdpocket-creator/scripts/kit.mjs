@@ -62990,8 +62990,10 @@ class ArgsError extends Error {
   name = "ArgsError";
 }
 var COMMANDS = {
-  clone: { required: ["bundles"], optional: ["mcp-url"] },
-  pull: { required: ["bundles"], optional: [] },
+  clone: { required: [], optional: ["bundles", "project-id", "session-id", "mcp-url"] },
+  pull: { required: [], optional: ["bundles"] },
+  push: { required: ["message"], optional: ["policy-revision", "request-key"], switches: ["open"] },
+  doctor: { required: [], optional: [] },
   "fetch-review": { required: ["inputs"], optional: [] },
   new: { required: ["name"], optional: ["title", "apps"] },
   generate: { required: [], optional: [] },
@@ -68473,7 +68475,7 @@ ${untracked.code === 0 ? untracked.stdout : ""}`.split(`
 }
 
 // frontend/packages/miniapp-kit/src/commands.ts
-import { createHash as createHash8 } from "node:crypto";
+import { createHash as createHash8, randomUUID as randomUUID2 } from "node:crypto";
 import { existsSync as existsSync23 } from "node:fs";
 import { mkdir as mkdir13, readdir as readdir11, readFile as readFile20, writeFile as writeFile14 } from "node:fs/promises";
 import { homedir } from "node:os";
@@ -76049,6 +76051,26 @@ async function viteBuild({ appDir, env }) {
   return run(process.execPath, [resolveViteBin(appDir), "build", "--logLevel", "warn"], appDir, env);
 }
 
+// frontend/packages/miniapp-kit/src/build-report.ts
+function completeBuildReport(input) {
+  const existing = input.existing ?? {};
+  const report2 = {
+    project: $parse(input.projectYaml),
+    apps: Object.fromEntries(Object.entries(input.apps).map(([slug, app]) => [slug, { entry: `dist/${app.entry}` }])),
+    schemaVersion: input.schemaVersion,
+    migrations: input.pendingFiles.map((name3) => `pending/${name3}`)
+  };
+  for (const key of ["notes", "listingRequested"]) {
+    if (existing[key] !== undefined)
+      report2[key] = existing[key];
+  }
+  report2.stage = existing.stage ?? "build";
+  const revision = input.policyRevision ?? existing.policy_revision;
+  if (revision !== undefined)
+    report2.policy_revision = revision;
+  return report2;
+}
+
 // frontend/packages/miniapp-kit/src/credential.ts
 function parseCredentialRequest(text) {
   const request = {};
@@ -79376,6 +79398,99 @@ var viteDev = async ({ slug, appDir, port, env }) => {
   throw new DevError(`vite for ${slug} did not start on port ${port} within 60 seconds`);
 };
 
+// frontend/packages/miniapp-kit/src/doctor.ts
+import { spawn as spawn6 } from "node:child_process";
+var NODE_MINIMUM = [22, 12];
+async function runDoctor(deps) {
+  const checks3 = [
+    nodeCheck(deps.nodeVersion),
+    await toolCheck(deps, "git", ["--version"], "install git (https://git-scm.com/downloads)"),
+    await toolCheck(deps, "git-lfs", ["lfs", "version"], "install Git LFS (https://git-lfs.com), then run: git lfs install", "git"),
+    await bunCheck(deps)
+  ];
+  if (deps.workdir) {
+    checks3.push(deps.workdir.loggedIn ? { name: "login", ok: true, detail: "logged in" } : {
+      name: "login",
+      ok: false,
+      detail: "not logged in (needed for pull, push, LFS and the real AI in kit dev)",
+      fix: "node <kit>/scripts/kit.mjs login (approve in the browser)"
+    }, deps.workdir.gatewayUrl ? { name: "gateway", ok: true, detail: deps.workdir.gatewayUrl } : {
+      name: "gateway",
+      ok: false,
+      detail: ".tokoyo.json has no gateway_url (kit build and the real AI need it)",
+      fix: "node <kit>/scripts/kit.mjs pull"
+    });
+  }
+  checks3.push(kitCheck(await deps.kitUpdate()));
+  return { ok: checks3.every((check4) => check4.ok), checks: checks3 };
+}
+function nodeCheck(version3) {
+  const [major = 0, minor = 0] = version3.split(".").map(Number);
+  const ok = major > NODE_MINIMUM[0] || major === NODE_MINIMUM[0] && minor >= NODE_MINIMUM[1];
+  return ok ? { name: "node", ok, detail: version3 } : {
+    name: "node",
+    ok,
+    detail: version3,
+    fix: `install Node ${NODE_MINIMUM.join(".")} or newer (https://nodejs.org)`
+  };
+}
+async function toolCheck(deps, name3, args, fix, command = name3) {
+  const result = await tryExec(deps, command, args);
+  if (result.code === 0)
+    return { name: name3, ok: true, detail: firstLine(result.stdout) };
+  return { name: name3, ok: false, detail: firstLine(result.stderr) || "not found", fix };
+}
+async function bunCheck(deps) {
+  const result = await tryExec(deps, "bun", ["--version"]);
+  if (result.code === 0)
+    return { name: "bun", ok: true, detail: firstLine(result.stdout) };
+  const detail = result.stderr.trim().split(`
+`).slice(0, 2).join(" / ") || "not found";
+  const fix = /mise/i.test(result.stderr) ? "set a Bun version for mise: mise use -g bun@latest (or install Bun from https://bun.sh)" : /asdf/i.test(result.stderr) ? "set a Bun version for asdf: asdf set -u bun latest (or install Bun from https://bun.sh)" : "install Bun (https://bun.sh) and make sure `bun` is on PATH";
+  return { name: "bun", ok: false, detail, fix };
+}
+function kitCheck(update) {
+  if (update.status === "outdated") {
+    return {
+      name: "kit",
+      ok: true,
+      warning: true,
+      detail: `${update.current} (latest ${update.latest})`,
+      ...update.update ? { fix: update.update } : {}
+    };
+  }
+  return {
+    name: "kit",
+    ok: true,
+    detail: update.status === "latest" ? `${update.current} (latest)` : `${update.current} (could not check)`
+  };
+}
+async function tryExec(deps, command, args) {
+  try {
+    return await deps.exec(command, args);
+  } catch (error51) {
+    if (error51 instanceof Error && "code" in error51 && error51.code === "ENOENT") {
+      return { code: 127, stdout: "", stderr: "" };
+    }
+    throw error51;
+  }
+}
+var firstLine = (text) => text.trim().split(`
+`)[0] ?? "";
+var execCommand = (command, args) => new Promise((resolve3, reject) => {
+  const child = spawn6(command, [...args], { stdio: ["ignore", "pipe", "pipe"] });
+  const stdout = [];
+  const stderr = [];
+  child.stdout.on("data", (chunk) => stdout.push(chunk));
+  child.stderr.on("data", (chunk) => stderr.push(chunk));
+  child.on("error", reject);
+  child.on("close", (code) => resolve3({
+    code: code ?? 1,
+    stdout: Buffer.concat(stdout).toString("utf8"),
+    stderr: Buffer.concat(stderr).toString("utf8")
+  }));
+});
+
 // frontend/packages/miniapp-kit/src/http.ts
 class HttpError extends Error {
   name = "HttpError";
@@ -79408,6 +79523,38 @@ var KIT_MARKETPLACE_NAME = "moon-technica";
 var KIT_PLUGIN_ROOT = `plugins/${KIT_PLUGIN_NAME}`;
 var encoder7 = new TextEncoder;
 var decoder2 = new TextDecoder;
+
+// frontend/packages/miniapp-kit/src/kit-update.ts
+var UPDATE_STEPS = [
+  `Claude Code: /plugin marketplace update ${KIT_MARKETPLACE_NAME} → /plugin update ${KIT_PLUGIN_NAME}@${KIT_MARKETPLACE_NAME} → /reload-plugins`,
+  "Codex: update the plugin from the plugin list",
+  "then run kit.mjs link in each working directory"
+].join("; ");
+function latestManifestUrl(repository) {
+  const match2 = /^https:\/\/github\.com\/([\w.-]+)\/([\w.-]+?)(?:\.git)?\/?$/.exec(repository);
+  if (!match2)
+    return null;
+  return `https://raw.githubusercontent.com/${match2[1]}/${match2[2]}/main/${KIT_PLUGIN_ROOT}/.claude-plugin/plugin.json`;
+}
+async function checkKitUpdate(input) {
+  const url2 = input.repository ? latestManifestUrl(input.repository) : null;
+  if (!url2)
+    return { status: "unknown", current: input.current };
+  try {
+    const response = await (input.fetch ?? globalThis.fetch)(url2, {
+      signal: AbortSignal.timeout(input.timeoutMs ?? 3000)
+    });
+    if (!response.ok)
+      return { status: "unknown", current: input.current };
+    const latest = (await response.json()).version;
+    if (typeof latest !== "string")
+      return { status: "unknown", current: input.current };
+    return latest === input.current ? { status: "latest", current: input.current, latest } : { status: "outdated", current: input.current, latest, update: UPDATE_STEPS };
+  } catch (error51) {
+    console.error(`kit: could not check for a newer Kit (${String(error51)})`);
+    return { status: "unknown", current: input.current };
+  }
+}
 
 // frontend/packages/miniapp-kit/src/login.ts
 import { createHash as createHash7, randomBytes as randomBytes2 } from "node:crypto";
@@ -79623,6 +79770,106 @@ function loopbackAuthorize(openUrl) {
       }, (error51) => finish(error51 instanceof Error ? error51 : new Error(String(error51))));
     });
   });
+}
+
+// frontend/packages/miniapp-kit/src/mcp-client.ts
+class McpToolError extends Error {
+  tool;
+  code;
+  reason;
+  details;
+  name = "McpToolError";
+  constructor(tool, code, reason, details, message2) {
+    super(message2);
+    this.tool = tool;
+    this.code = code;
+    this.reason = reason;
+    this.details = details;
+  }
+}
+
+class McpAuthError extends Error {
+  name = "McpAuthError";
+}
+var PROTOCOL_VERSION = "2025-06-18";
+function createMcpClient(options2) {
+  const send = options2.fetch ?? globalThis.fetch;
+  let id = 0;
+  return {
+    async call(tool, args) {
+      id += 1;
+      const response = await send(options2.url, {
+        method: "POST",
+        headers: {
+          authorization: `Bearer ${await options2.token()}`,
+          "content-type": "application/json",
+          accept: "application/json, text/event-stream",
+          "mcp-protocol-version": PROTOCOL_VERSION
+        },
+        body: JSON.stringify({
+          jsonrpc: "2.0",
+          id,
+          method: "tools/call",
+          params: { name: tool, arguments: args }
+        })
+      });
+      if (response.status === 401 || response.status === 403) {
+        throw new McpAuthError(`${tool}: the login was not accepted (HTTP ${response.status})`);
+      }
+      if (!response.ok)
+        throw new Error(`${tool}: HTTP ${response.status}`);
+      const message2 = await readMessage(response, tool);
+      if (message2.error)
+        throw new Error(`${tool}: ${message2.error.message ?? "JSON-RPC error"}`);
+      const result = message2.result ?? {};
+      if (result.isError)
+        throw toolError(tool, textOf2(result));
+      if (result.structuredContent !== undefined)
+        return result.structuredContent;
+      const text = textOf2(result);
+      try {
+        return JSON.parse(text);
+      } catch (error51) {
+        if (error51 instanceof SyntaxError)
+          throw new Error(`${tool}: the result is not JSON`);
+        throw error51;
+      }
+    }
+  };
+}
+async function readMessage(response, tool) {
+  const text = await response.text();
+  const type = response.headers.get("content-type") ?? "";
+  const payload = type.includes("text/event-stream") ? text.split(`
+`).filter((line) => line.startsWith("data:")).map((line) => line.slice(5).trim()).at(-1) : text;
+  if (!payload)
+    throw new Error(`${tool}: the response is empty`);
+  try {
+    return JSON.parse(payload);
+  } catch (error51) {
+    if (error51 instanceof SyntaxError)
+      throw new Error(`${tool}: the response is not JSON-RPC`);
+    throw error51;
+  }
+}
+function textOf2(result) {
+  const content = Array.isArray(result.content) ? result.content : [];
+  return content.map((part) => typeof part === "object" && part !== null && ("text" in part) ? String(part.text) : "").join("");
+}
+function toolError(tool, text) {
+  const body = text.replace(/^Error executing tool [^:]+:\s*/, "");
+  try {
+    const parsed = JSON.parse(body);
+    if (typeof parsed.error === "string") {
+      const reason = typeof parsed.reason === "string" ? parsed.reason : undefined;
+      return new McpToolError(tool, parsed.error, reason, parsed, `${tool}: ${parsed.error}${reason ? ` (${reason})` : ""}`);
+    }
+  } catch (error51) {
+    if (!(error51 instanceof SyntaxError))
+      throw error51;
+  }
+  const code = /^([A-Z][A-Z0-9_]+)\b/.exec(body)?.[1] ?? "TOOL_ERROR";
+  return new McpToolError(tool, code, undefined, {}, `${tool}: ${body}`);
 }
 
 // frontend/packages/miniapp-kit/src/new.ts
@@ -79872,6 +80119,122 @@ function trackingRef(threadRef) {
   return `${REMOTE_REFS}/${threadRef.slice("refs/".length)}`;
 }
 var REMOTE_REFS = "refs/remotes/tokoyo";
+
+// frontend/packages/miniapp-kit/src/push.ts
+class PushError extends Error {
+  code;
+  name = "PushError";
+  constructor(code, message2) {
+    super(message2);
+    this.code = code;
+  }
+}
+var POLL_INTERVAL_MS = 3000;
+var POLL_LIMIT_MS = 10 * 60000;
+var DONE = new Set(["ready", "failed", "cancelled"]);
+async function runPush(steps, options2) {
+  await steps.build();
+  const packed = await steps.pack();
+  await steps.check();
+  const policy = options2.policyRevision === undefined ? {} : { policy_revision: options2.policyRevision };
+  const begun = await refused(() => steps.mcp.call("begin_build", {
+    project_id: packed.project_id,
+    session_id: packed.session_id,
+    base_commit_oid: packed.base_commit_oid,
+    commit_oid: packed.commit_oid,
+    request_key: options2.requestKey ?? steps.newRequestKey(),
+    message: options2.message,
+    kit_version: packed.kit_version,
+    kit_revision: packed.kit_revision,
+    files: packed.files,
+    ...policy
+  }));
+  await steps.upload(begun.upload_urls);
+  await refused(() => steps.mcp.call("submit_build", { job_id: begun.job_id, ...policy }));
+  const now2 = steps.now ?? Date.now;
+  const deadline = now2() + POLL_LIMIT_MS;
+  for (;; ) {
+    const build = await steps.mcp.call("get_build", {
+      job_id: begun.job_id
+    });
+    const status = String(build.status);
+    if (DONE.has(status))
+      return finish(steps, begun.job_id, build, options2);
+    if (now2() >= deadline) {
+      return {
+        status: "timed_out",
+        job_id: begun.job_id,
+        next: `still ${status} after 10 minutes; tell the creator and check later with get_build({ job_id: "${begun.job_id}" })`
+      };
+    }
+    await steps.sleep(POLL_INTERVAL_MS);
+  }
+}
+async function finish(steps, jobId, build, options2) {
+  const editorUrl = typeof build.editor_url === "string" ? build.editor_url : undefined;
+  if (build.status === "ready") {
+    const landed = build.landed === true;
+    const opened = landed && options2.open && editorUrl ? await steps.openEditor(editorUrl) : false;
+    const pulled = await steps.pull();
+    return {
+      status: "ready",
+      job_id: jobId,
+      landed,
+      version_id: build.project_version_id ?? null,
+      ...editorUrl ? { editor_url: editorUrl } : {},
+      opened,
+      pulled,
+      next: editorUrl ? `show the creator this link to try it: ${editorUrl}${opened ? "" : " (not opened in a browser)"}` : "ready"
+    };
+  }
+  const reports = Array.isArray(build.validation) ? build.validation.map((stage) => ({
+    stage: stage.stage,
+    status: stage.status,
+    report_url: stage.report_url
+  })) : [];
+  return {
+    status: build.status === "cancelled" ? "cancelled" : "failed",
+    job_id: jobId,
+    error_code: build.error_code ?? null,
+    reports,
+    ...editorUrl ? { editor_url: editorUrl } : {},
+    next: build.status === "cancelled" ? "the push was cancelled; push again when ready" : "download each failed report_url, read it, fix the problems (kit.mjs check runs the same static checks), commit, then kit.mjs push again"
+  };
+}
+async function refused(call) {
+  try {
+    return await call();
+  } catch (error51) {
+    if (!(error51 instanceof McpToolError))
+      throw error51;
+    throw new PushError(error51.code, `${error51.message}. ${nextStep(error51)}`);
+  }
+}
+function nextStep(error51) {
+  switch (error51.code) {
+    case "STALE_BASE":
+      return "The thread moved ahead: run kit.mjs pull (resolve conflicts if any, git rebase --continue), then kit.mjs push again";
+    case "CONTRIBUTION_POLICY_CHANGED": {
+      const revision = error51.details.revision;
+      return `Read the latest rules with get_contribution_policy, confirm the whole change follows them (refuse if it does not), then kit.mjs push --policy-revision ${revision ?? "<revision>"}`;
+    }
+    case "BUNDLE_REJECTED":
+      return error51.reason === "author_mismatch" ? 'Commits by someone else are included: git rebase --exec "git commit --amend --no-edit --reset-author" <base_commit_oid>, then kit.mjs push again' : "Run kit.mjs pull, then kit.mjs push again";
+    case "LFS_OBJECT_MISSING":
+      return "Run kit.mjs login, then kit.mjs push again";
+    case "SDK_VERSION_DEPRECATED":
+      return "The Kit is outdated: ask the creator to update the plugin (kit.mjs doctor shows how), then kit.mjs link and kit.mjs generate";
+    case "QUOTA_EXCEEDED":
+    case "RATE_LIMITED":
+      return "Tell the creator to wait a little; do not push again repeatedly";
+    case "FORBIDDEN":
+      return "This account cannot edit this app; ask the creator";
+    case "INVALID_ACTION":
+      return "Something else is running (a merge or generation); check get_project running_job / merge_in_progress and wait";
+    default:
+      return "See instructions.md §8.5";
+  }
+}
 
 // frontend/packages/miniapp-kit/src/repo.ts
 import { existsSync as existsSync19 } from "node:fs";
@@ -80741,6 +81104,10 @@ async function runCommand(args, context) {
         return await clone4(context, flags);
       case "pull":
         return await pull(context, flags);
+      case "push":
+        return await push(context, flags);
+      case "doctor":
+        return await doctor(context);
       case "fetch-review":
         return await fetchReview(context, flags);
       case "new":
@@ -80775,8 +81142,11 @@ async function runCommand(args, context) {
         return codexConfig(context);
     }
   } catch (error51) {
-    if (error51 instanceof RepoError || error51 instanceof PulledError || error51 instanceof GenerateError || error51 instanceof NewProjectError || error51 instanceof BuildError || error51 instanceof DevError || error51 instanceof DbError || error51 instanceof VendorError) {
+    if (error51 instanceof RepoError || error51 instanceof PulledError || error51 instanceof GenerateError || error51 instanceof NewProjectError || error51 instanceof BuildError || error51 instanceof DevError || error51 instanceof DbError || error51 instanceof VendorError || error51 instanceof PushError || error51 instanceof McpToolError) {
       throw new CommandError(error51.message);
+    }
+    if (error51 instanceof McpAuthError) {
+      throw new CommandError(`${error51.message}; run kit.mjs login`);
     }
     throw error51;
   }
@@ -80821,7 +81191,17 @@ async function fetchVerified(context, name3, url3, sha2562) {
 var bundleDownloader = (context) => (name3, url3, sha2562) => fetchVerified(context, name3, url3, sha2562);
 var NEXT_EDIT = "change source/, git commit, then kit.mjs pack";
 async function clone4(context, flags) {
-  const pulled = parsePulled(flags.bundles);
+  let bundles = flags.bundles;
+  if (bundles === undefined) {
+    if (!flags["project-id"] || !flags["session-id"]) {
+      throw new CommandError("pass --project-id and --session-id (create_project / create_branch return them), or --bundles");
+    }
+    bundles = await fetchBundleList(context, mcpUrlOf(flags["mcp-url"]), {
+      project_id: flags["project-id"],
+      session_id: flags["session-id"]
+    });
+  }
+  const pulled = parsePulled(bundles);
   const workdir = context.cwd;
   const path = join34(workdir, CONFIG_FILE);
   if (existsSync23(path)) {
@@ -80881,7 +81261,10 @@ async function clone4(context, flags) {
 async function pull(context, flags) {
   const workdir = await findWorkdir(context.cwd);
   const config3 = await readConfig(workdir);
-  const pulled = parsePulled(flags.bundles);
+  const pulled = parsePulled(flags.bundles ?? await fetchBundleList(context, config3.mcp_url, {
+    project_id: config3.app_id,
+    session_id: config3.session_id
+  }));
   if (pulled.project_id !== config3.app_id || pulled.thread_ref !== config3.thread_ref) {
     throw new CommandError(`these bundles are App ${pulled.project_id}'s (${pulled.thread_ref}), but ${workdir} is App ${config3.app_id} (${config3.thread_ref})`);
   }
@@ -80908,6 +81291,117 @@ async function pull(context, flags) {
     base_commit_oid: base,
     fetched: added,
     next: result.status === "conflict" ? "resolve the conflicts in source/, git add them, git rebase --continue, then kit.mjs pack" : NEXT_EDIT
+  });
+}
+function mcpFor(context, mcpUrl) {
+  return createMcpClient({
+    url: mcpUrl,
+    fetch: context.fetch,
+    token: async () => {
+      const token2 = await accessToken(mcpUrl, context);
+      if (token2 !== null)
+        return token2;
+      console.error(`kit: not logged in to ${mcpUrl}; opening the browser to log in`);
+      const stored = await login(mcpUrl, context);
+      if (stored.access_token === null)
+        throw new CommandError("the login did not return a token");
+      return stored.access_token;
+    }
+  });
+}
+async function fetchBundleList(context, mcpUrl, args) {
+  return JSON.stringify(await mcpFor(context, mcpUrl).call("get_git_bundles", args));
+}
+async function quietly(context, run2) {
+  const lines = [];
+  await run2({ ...context, stdout: (line) => lines.push(line) });
+  const last = lines.at(-1);
+  return last === undefined ? {} : JSON.parse(last);
+}
+async function push(context, flags) {
+  const workdir = await findWorkdir(context.cwd);
+  const config3 = await readConfig(workdir);
+  const revision = flags["policy-revision"];
+  if (revision !== undefined && !/^\d+$/.test(revision)) {
+    throw new CommandError("--policy-revision must be the revision get_contribution_policy returned");
+  }
+  const sleep = context.sleep ?? ((ms) => new Promise((r2) => setTimeout(r2, ms)));
+  const result = await runPush({
+    build: async () => {
+      const built = await quietly(context, (inner) => build(inner, {}));
+      await writeBuildReport(workdir, built, revision === undefined ? undefined : Number(revision));
+    },
+    pack: () => quietly(context, (inner) => pack(inner)),
+    check: async () => {
+      await quietly(context, (inner) => check4(inner));
+    },
+    upload: async (urls) => {
+      await quietly(context, (inner) => uploadOutputs(inner, { urls: JSON.stringify(urls) }));
+    },
+    pull: () => quietly(context, (inner) => pull(inner, {})),
+    openEditor: async (url3) => {
+      if (!config3.editor_url)
+        return false;
+      try {
+        return await context.openUrl(assertEditorUrl(url3, config3.editor_url));
+      } catch (error51) {
+        if (error51 instanceof EditorUrlError)
+          return false;
+        throw error51;
+      }
+    },
+    mcp: mcpFor(context, config3.mcp_url),
+    sleep,
+    newRequestKey: randomUUID2
+  }, {
+    message: flags.message,
+    ...revision === undefined ? {} : { policyRevision: Number(revision) },
+    ...flags["request-key"] ? { requestKey: flags["request-key"] } : {},
+    open: flags.open === "true"
+  });
+  const update = await kitUpdate(context);
+  print(context, { ...result, ...update.status === "outdated" ? { kit_update: update } : {} });
+}
+async function writeBuildReport(workdir, built, policyRevision) {
+  const path = join34(workdir, WORKDIR_DIRS.outputs, "build-report.json");
+  const pending = join34(sourceOf(workdir), "packages", "db-schema", "pending");
+  const report2 = completeBuildReport({
+    existing: existsSync23(path) ? JSON.parse(await readFile20(path, "utf8")) : null,
+    projectYaml: await readFile20(join34(sourceOf(workdir), "infra", "project.yaml"), "utf8"),
+    apps: built.apps,
+    schemaVersion: built.schema_version,
+    pendingFiles: existsSync23(pending) ? (await readdir11(pending)).filter((name3) => name3.endsWith(".sql")).sort() : [],
+    ...policyRevision === undefined ? {} : { policyRevision }
+  });
+  await mkdir13(dirname12(path), { recursive: true });
+  await writeFile14(path, `${JSON.stringify(report2, null, 2)}
+`);
+}
+async function doctor(context) {
+  const workdir = locateWorkdir(context.cwd);
+  const config3 = workdir ? await readConfig(workdir) : null;
+  const report2 = await runDoctor({
+    nodeVersion: process.versions.node,
+    exec: execCommand,
+    workdir: config3 ? {
+      gatewayUrl: config3.gateway_url,
+      loggedIn: await accessToken(config3.mcp_url, context) !== null
+    } : null,
+    kitUpdate: () => kitUpdate(context)
+  });
+  print(context, report2);
+  if (!report2.ok)
+    throw new CommandError('some checks failed; follow each "fix" above');
+}
+async function kitUpdate(context) {
+  const manifest2 = JSON.parse(await readFile20(join34(context.kitRoot, ".claude-plugin", "plugin.json"), "utf8"));
+  const current = typeof manifest2.version === "string" ? manifest2.version : "unknown";
+  if (process.env.KIT_TOOL_ROOT)
+    return { status: "unknown", current };
+  return checkKitUpdate({
+    current,
+    repository: typeof manifest2.repository === "string" ? manifest2.repository : undefined,
+    fetch: context.fetch
   });
 }
 async function fetchReview(context, flags) {

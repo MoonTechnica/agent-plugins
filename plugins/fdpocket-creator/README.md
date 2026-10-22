@@ -41,6 +41,9 @@ Things to know up front:
 - A registered account (an anonymous guest account is not enough). You sign in through the browser the first time.
 - Network access to the npm registry (the project's dependencies are installed with `bun install`).
 
+`node <kit>/scripts/kit.mjs doctor` checks all of these at once, shows how to fix anything missing, and tells you
+when a newer Kit is available.
+
 ## Quick start (Claude Code)
 
 ### 1. Install
@@ -96,7 +99,11 @@ asks you to confirm each one every time (allow rules cannot skip this).
 
 ```text
 /plugin marketplace update moon-technica
+/plugin update fdpocket-creator@moon-technica
+/reload-plugins
 ```
+
+Then ask the agent to run `kit.mjs link` in each working directory. `kit push` and `kit doctor` tell you when a newer Kit is out.
 
 ## Quick start (Claude app)
 
@@ -217,17 +224,19 @@ node <kit>/scripts/kit.mjs <command> [--flag value]
 
 | Command | What it does |
 |---|---|
-| `clone` | Create a working directory for an app: `source/` becomes a git repository of its history. |
+| `doctor` | Check Node, git, Git LFS, Bun, your login and the Kit version, and show how to fix what is missing. |
+| `clone` | Create a working directory for an app (`--project-id` / `--session-id`): `source/` becomes a git repository of its history. |
 | `pull` | Fetch the Platform's new commits and rebase your branch onto them. |
+| `push` | Build, check, send, and wait for the Platform's validation in one step (`--message`; `--open` opens the editor when it is ready). |
 | `new` | Place the template project into an empty `source/`. |
 | `generate` | Check `infra/project.yaml`, place the base data model, and generate the typed client from the ZModel. |
 | `db diff` | Regenerate the branch's pending migration (`pending/generated.sql`) and report destructive changes. |
 | `dev` | Run every app locally with the Platform's Gateway, a local database and file store, and the development host page. |
 | `check` | Run the pre-push checks locally (exit code 2 when something fails). |
 | `build` | Install with the lockfile and build every app into `source/dist/`. The only way to build. |
-| `pack` | Bundle your new commits as `outputs/source.bundle`, pack `outputs/dist.tar.gz`, and print the push arguments. |
-| `upload` | Upload the LFS files, then the packed files to the signed URLs from `begin_build`. |
-| `login` | Sign in for Git LFS. Opens the browser once; the token stays in `~/.config/tokoyo/`. |
+| `pack` | Bundle your new commits as `outputs/source.bundle`, pack `outputs/dist.tar.gz`, and print the push arguments (used by `push`). |
+| `upload` | Upload the LFS files, then the packed files to the signed URLs from `begin_build` (used by `push`). |
+| `login` | Sign the Kit in (for `clone`, `pull`, `push`, Git LFS and the real AI in `kit dev`). `clone` / `pull` / `push` start it for you when needed; the token stays in `~/.config/tokoyo/`. |
 | `assets add` | Put an image from the asset library under `source/`. |
 | `open` | Open the editor URL in your browser. |
 | `link` | Re-point the working directory at a newer Kit (after updating). |
@@ -239,9 +248,10 @@ node <kit>/scripts/kit.mjs <command> [--flag value]
 |---|---|
 | "Kit is outdated" / `SDK_VERSION_DEPRECATED` when pushing | Update the Kit (see the Update sections above), then ask the agent to run `kit.mjs link` and `kit.mjs generate`. |
 | The push fails validation | Ask the agent to read the validation report and fix the problem. Running `check` locally reproduces most failures. |
+| A Kit command stops with an environment error (`bun` not found, `mise ERROR …`) | Run `node <kit>/scripts/kit.mjs doctor` and follow each `fix`. |
 | `kit dev` does not start | It needs Node 22.12 or later. If `seed.ts` failed, the error is printed; ask the agent to fix it. |
 | "Someone changed the app first" / `STALE_BASE` | The app moved on. The agent pulls, rebases your commits, and pushes again. |
-| LFS asks for credentials / `LFS_OBJECT_MISSING` | Run `node <kit>/scripts/kit.mjs login` once, then push again. |
+| LFS asks for credentials / `LFS_OBJECT_MISSING` | Run `node <kit>/scripts/kit.mjs login` once, then push again. The Kit's login is separate from the MCP login in `/mcp`. |
 | `author_mismatch` | A commit is not in your name. Do not change `user.name` / `user.email` in `source/`; the agent resets the author and pushes again. |
 | Rate or quota limit | Wait a bit and try again. Do not resend repeatedly. |
 | Permission error on an app | You can only edit apps owned by your account or a team you belong to. |

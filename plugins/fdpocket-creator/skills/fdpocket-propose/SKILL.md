@@ -1,6 +1,7 @@
 ---
 name: fdpocket-propose
 description: 自分のブランチの変更を同じミニアプリの main へ提案する。提案への返事・直し・取り下げも行う。Platform MCP の get_project / open_proposal / get_proposal / comment_proposal / update_proposal / close_proposal を使う。
+user-invocable: false
 ---
 
 # main へ提案する

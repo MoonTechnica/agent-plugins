@@ -1,6 +1,7 @@
 ---
 name: fdpocket-pull
 description: Platform にあるミニアプリを手元に取り込む（続きを作る・制作画面で進んだ版を取り込む）。Platform MCP（fdpocket）の get_project / get_git_bundles と Kit の CLI（clone / pull。手元は git のリポジトリ）を使う。project_id や制作画面の URL を渡されたとき、「続きを作って」「最新にして」のときに使う。pull, sync, continue.
+user-invocable: false
 ---
 
 # 手元に取り込む
@@ -9,12 +10,13 @@ description: Platform にあるミニアプリを手元に取り込む（続き�
 ディレクトリの 2 つ上（分からなければ利用者に Kit の場所を聞く）。git と Git LFS が要る。
 
 1. **Project を決める**: ID またはリポジトリの URL を `resolve_project({ reference })` へ渡し、返る `project_id` を使う。制作画面の URL は ID を含むとは限らないので解析せず、分からなければ `list_projects()` の `items` から利用者に選んでもらう。`next_cursor` があれば `list_projects({ cursor })` で続きを取得する。
-2. `.tokoyo.json` の `app_id` は MCP の `project_id` と同じ値。自分の session_id は既存の `.tokoyo.json`、`get_project({ project_id })` の `session_id`、または `resolve_project` の `my_branches` から選ぶ。`get_git_bundles({ project_id, session_id })` を呼ぶ（署名 URL は短命なので、すぐ次へ渡す）。
-   `requires_proposal: true` なら返る `contribution_policy` を読む。以後の各編集依頼の前にも
+2. `.tokoyo.json` の `app_id` は MCP の `project_id` と同じ値。自分の session_id は既存の `.tokoyo.json`、`get_project({ project_id })` の `session_id`、または `resolve_project` の `my_branches` から選ぶ。貢献のブランチ（`resolve_project` / `get_project` が `requires_proposal: true`）なら
+   `get_contribution_policy({ project_id })` で規約を読む。以後の各編集依頼の前にも
    `get_contribution_policy({ project_id })` で最新を確認する。禁止事項・ガイドラインに抵触する依頼は
    該当の規約と理由を説明して編集を拒否し、素材生成・commit・push は行わない。取得失敗時も作業を止める。
-3. **取り込む**: その App の `.tokoyo.json` があるディレクトリなら `node <kit>/scripts/kit.mjs pull --bundles '<JSON>'`。
-   無ければ新しいディレクトリを作って移り、`node <kit>/scripts/kit.mjs clone --bundles '<同じ JSON>'`。
+3. **取り込む**: その App の `.tokoyo.json` があるディレクトリなら `node <kit>/scripts/kit.mjs pull`。
+   無ければ新しいディレクトリを作って移り、`node <kit>/scripts/kit.mjs clone --project-id <project_id> --session-id <session_id>`。
+   どちらも Kit が `get_git_bundles` を呼ぶ（初回だけブラウザでログインの許可を求められる）。
    `pull` は commit していない変更があると断るので、先に `git commit` する（`<kit>/profile/instructions.md` §8.3 / §8.4）。
 4. 結果の `status` が `conflict` なら、示されたファイルの衝突を解き `git add` → `git rebase --continue`（§8.4）。
    `packages/db-schema/pending/generated.sql` は解かずに `kit.mjs db diff` で作り直す。
