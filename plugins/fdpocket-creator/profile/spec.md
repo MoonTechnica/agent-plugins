@@ -386,6 +386,7 @@ notifications:
 - api（サーバー）からは、利用者のリクエストを受けたときだけ、`asUser(request)` の戻り値の `ai`（同じ `chat` / `reset`）で
   その利用者として呼ぶ（`servicePermissions: [ai.chat]`。その利用者のクレジットから引く）。jobs からは呼べない。
 - 自分の API キーで外部の AI を呼ぶこともできる（`$fdpocket-app-integrations`。費用は作者持ち）。利用者に払ってもらうならこの `client.ai`。
+- 作り方（宣言・指示文と Schema・画面で必ずすること・`kit dev` の模擬の応答）は `$fdpocket-app-ai`。
 
 ## 4. エラー（`SdkError`）
 

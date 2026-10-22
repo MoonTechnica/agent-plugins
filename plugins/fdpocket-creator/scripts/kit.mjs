@@ -68474,10 +68474,10 @@ ${untracked.code === 0 ? untracked.stdout : ""}`.split(`
 
 // frontend/packages/miniapp-kit/src/commands.ts
 import { createHash as createHash8 } from "node:crypto";
-import { existsSync as existsSync22 } from "node:fs";
-import { mkdir as mkdir13, readdir as readdir11, readFile as readFile19, writeFile as writeFile14 } from "node:fs/promises";
+import { existsSync as existsSync23 } from "node:fs";
+import { mkdir as mkdir13, readdir as readdir11, readFile as readFile20, writeFile as writeFile14 } from "node:fs/promises";
 import { homedir } from "node:os";
-import { dirname as dirname12, join as join33, resolve as resolve3 } from "node:path";
+import { dirname as dirname12, join as join34, resolve as resolve3 } from "node:path";
 
 // frontend/packages/miniapp-kit/src/approval.ts
 var ASK_A_PERSON_TOOLS = [
@@ -76158,9 +76158,9 @@ ${data}
 
 // frontend/packages/miniapp-kit/src/dev/runtime.ts
 import { createHash as createHash6, randomBytes } from "node:crypto";
-import { existsSync as existsSync15 } from "node:fs";
-import { mkdir as mkdir7, readFile as readFile13, rm as rm8, writeFile as writeFile8 } from "node:fs/promises";
-import { dirname as dirname9, join as join21 } from "node:path";
+import { existsSync as existsSync16 } from "node:fs";
+import { mkdir as mkdir7, readFile as readFile14, rm as rm8, writeFile as writeFile8 } from "node:fs/promises";
+import { dirname as dirname9, join as join22 } from "node:path";
 
 // frontend/node_modules/@hono/node-server/dist/index.mjs
 import { Http2ServerRequest, constants } from "node:http2";
@@ -77378,6 +77378,124 @@ async function createTestEs256Key(kid) {
   };
 }
 
+// frontend/packages/miniapp-kit/src/dev/ai.ts
+import { existsSync as existsSync15 } from "node:fs";
+import { readFile as readFile13 } from "node:fs/promises";
+import { join as join21 } from "node:path";
+var JEV_ROUTER = "typesafe/jev-router";
+var ALL_MODALITIES = ["text", "image", "file", "audio", "video"];
+function createDevAi(options2) {
+  const conversations = new Map;
+  const pending = new Map;
+  const keyOf4 = (userId, conversation) => `${userId}\x00${conversation}`;
+  async function prompt(kind, key) {
+    if (key === null)
+      return null;
+    const declared = kind === "instructions" ? options2.manifest.ai?.instructions : options2.manifest.ai?.schemas;
+    const path = kind === "instructions" ? join21(options2.root, "ai", `${key}.md`) : join21(options2.root, "ai", "schemas", `${key}.json`);
+    if (!declared?.includes(key) || !existsSync15(path)) {
+      throw new GatewayError("VALIDATION_FAILED", `${kind} "${key}" is not declared in project.yaml`);
+    }
+    const content = await readFile13(path, "utf8");
+    return kind === "schema" ? JSON.parse(content) : content;
+  }
+  return {
+    platform: {
+      async begin(input) {
+        const key = keyOf4(input.userId, input.conversation);
+        pending.set(input.turnId, key);
+        const model = input.model ?? options2.manifest.ai?.model ?? "auto";
+        return {
+          turnId: input.turnId,
+          model: {
+            id: model === "auto" ? JEV_ROUTER : model,
+            kind: model === "auto" ? "router" : "model",
+            providerSlug: null,
+            inputModalities: ALL_MODALITIES,
+            supportsJsonSchema: true
+          },
+          maxOutputTokens: options2.manifest.ai?.maxOutputTokens ?? AI_MAX_OUTPUT_TOKENS_DEFAULT,
+          instructions: await prompt("instructions", input.instructions),
+          schema: await prompt("schema", input.schema),
+          history: [...conversations.get(key) ?? []]
+        };
+      },
+      async finish(input) {
+        const key = pending.get(input.turnId);
+        pending.delete(input.turnId);
+        if (key) {
+          conversations.set(key, [
+            ...conversations.get(key) ?? [],
+            { role: "user", content: input.userContent },
+            { role: "assistant", content: input.assistant }
+          ]);
+        }
+        return { credits: 0 };
+      },
+      async fail(turnId) {
+        pending.delete(turnId);
+      },
+      async reset(input) {
+        conversations.delete(keyOf4(input.userId, input.conversation));
+      }
+    },
+    openRouter: {
+      async chat(body) {
+        const request = body;
+        const schema2 = request.response_format?.json_schema?.schema;
+        const text = schema2 === undefined ? `（kit dev の模擬の応答。本番では AI が答えます）${lastUserText(request.messages)}` : JSON.stringify(sampleOf(schema2));
+        const id = `gen-kit-dev-${crypto.randomUUID()}`;
+        const events = [
+          { id, model: "kit-dev/mock", choices: [{ delta: { content: text } }] },
+          {
+            id,
+            model: "kit-dev/mock",
+            choices: [{ delta: { content: "" }, finish_reason: "stop" }],
+            usage: { prompt_tokens: 0, completion_tokens: 0, cost: 0 }
+          }
+        ];
+        const sse = `${events.map((e2) => `data: ${JSON.stringify(e2)}
+
+`).join("")}data: [DONE]
+
+`;
+        return new Response(sse, { headers: { "content-type": "text/event-stream" } });
+      }
+    }
+  };
+}
+function lastUserText(messages) {
+  const content = messages?.filter((m3) => m3.role === "user").at(-1)?.content;
+  if (typeof content === "string")
+    return content;
+  if (!Array.isArray(content))
+    return "";
+  return content.map((part) => part.type === "text" ? part.text : "").join("");
+}
+function sampleOf(schema2) {
+  const s3 = schema2 ?? {};
+  if (s3.const !== undefined)
+    return s3.const;
+  if (s3.enum?.length)
+    return s3.enum[0];
+  const type = Array.isArray(s3.type) ? s3.type.find((t2) => t2 !== "null") : s3.type;
+  switch (type) {
+    case "object":
+      return Object.fromEntries((s3.required ?? []).map((name3) => [name3, sampleOf(s3.properties?.[name3])]));
+    case "array":
+      return [];
+    case "string":
+      return "kit dev";
+    case "integer":
+    case "number":
+      return 0;
+    case "boolean":
+      return false;
+    default:
+      return null;
+  }
+}
+
 // frontend/packages/miniapp-kit/src/dev/jobs.ts
 function createDevJobs(input) {
   const rows = new Map;
@@ -77581,11 +77699,11 @@ function versionIdOf(hash3) {
   return `${hash3.slice(0, 8)}-${hash3.slice(8, 12)}-4${hash3.slice(13, 16)}-8${hash3.slice(17, 20)}-${hash3.slice(20, 32)}`;
 }
 async function readGenerated(root, file2) {
-  const path = join21(root, PROJECT_PATHS.generated, file2);
-  if (!existsSync15(path)) {
+  const path = join22(root, PROJECT_PATHS.generated, file2);
+  if (!existsSync16(path)) {
     throw new DevError(`${PROJECT_PATHS.generated}/${file2} is missing; run kit.mjs generate first`);
   }
-  return readFile13(path, "utf8");
+  return readFile14(path, "utf8");
 }
 async function createDevRuntime(options2) {
   const { root, projectId } = options2;
@@ -77606,7 +77724,7 @@ async function createDevRuntime(options2) {
         schema: schema2,
         importModule: options2.importModule ?? defaultImporter(root, manifest2)
       });
-      await writeFile8(join21(root, DEV_DB_STAMP), `${stamp}
+      await writeFile8(join22(root, DEV_DB_STAMP), `${stamp}
 `);
     }
   } catch (error51) {
@@ -77617,7 +77735,7 @@ async function createDevRuntime(options2) {
   }
   const key = await createTestEs256Key("kit-dev");
   const objects = createLocalObjectStore({
-    root: join21(root, DEV_OBJECTS_DIR),
+    root: join22(root, DEV_OBJECTS_DIR),
     baseUrl: options2.objectsBaseUrl,
     secret: crypto.randomUUID()
   });
@@ -77682,6 +77800,7 @@ async function createDevRuntime(options2) {
     },
     services,
     jobs: jobs2.port,
+    ai: createDevAi({ root, manifest: manifest2 }),
     jwks: {
       async verifySupabaseToken(token2) {
         const identity2 = identities.get(token2);
@@ -77738,13 +77857,13 @@ async function openDevDatabase(options2) {
   const hash3 = createHash6("sha256");
   for (const part of sql3)
     hash3.update(`${part.what}\x00${part.sql}\x00`);
-  const seedPath = join21(root, PROJECT_PATHS.seed);
-  hash3.update(`seed\x00${existsSync15(seedPath) ? await readFile13(seedPath, "utf8") : ""}`);
+  const seedPath = join22(root, PROJECT_PATHS.seed);
+  hash3.update(`seed\x00${existsSync16(seedPath) ? await readFile14(seedPath, "utf8") : ""}`);
   const stamp = hash3.digest("hex");
-  const path = join21(root, DEV_DB_PATH);
-  const stampPath = join21(root, DEV_DB_STAMP);
-  const current = existsSync15(stampPath) ? (await readFile13(stampPath, "utf8")).trim() : null;
-  const recreated = current !== stamp || !existsSync15(path);
+  const path = join22(root, DEV_DB_PATH);
+  const stampPath = join22(root, DEV_DB_STAMP);
+  const current = existsSync16(stampPath) ? (await readFile14(stampPath, "utf8")).trim() : null;
+  const recreated = current !== stamp || !existsSync16(path);
   if (recreated) {
     for (const file2 of [stampPath, path, `${path}-wal`, `${path}-shm`, `${path}-journal`])
       await rm8(file2, { force: true });
@@ -77772,15 +77891,15 @@ async function devDatabaseSql(root) {
       throw new DevError(error51.message);
     throw error51;
   }
-  const pending = join21(root, PENDING_SQL_PATH);
-  if (!existsSync15(pending)) {
+  const pending = join22(root, PENDING_SQL_PATH);
+  if (!existsSync16(pending)) {
     throw new DevError(`${PENDING_SQL_PATH} is missing; run kit.mjs db diff first`);
   }
-  const data = join21(root, PENDING_DATA_PATH);
+  const data = join22(root, PENDING_DATA_PATH);
   return [
     ...migrations.map((m3) => ({ what: `${PROJECT_PATHS.migrations}/${m3.name}`, sql: m3.sql })),
-    { what: PENDING_SQL_PATH, sql: await readFile13(pending, "utf8") },
-    ...existsSync15(data) ? [{ what: PENDING_DATA_PATH, sql: await readFile13(data, "utf8") }] : []
+    { what: PENDING_SQL_PATH, sql: await readFile14(pending, "utf8") },
+    ...existsSync16(data) ? [{ what: PENDING_DATA_PATH, sql: await readFile14(data, "utf8") }] : []
   ];
 }
 function defaultImporter(root, manifest2) {
@@ -77790,7 +77909,7 @@ function defaultImporter(root, manifest2) {
     for (const slug of slugs) {
       let entry;
       try {
-        entry = resolveViteEntry(join21(root, "apps", slug));
+        entry = resolveViteEntry(join22(root, "apps", slug));
       } catch (error51) {
         reasons.push(`apps/${slug}: ${error51 instanceof Error ? error51.message : String(error51)}`);
         continue;
@@ -78061,7 +78180,7 @@ async function errorCode(response) {
 import { spawn as spawn5 } from "node:child_process";
 import { readFileSync as readFileSync4 } from "node:fs";
 import { createServer } from "node:http";
-import { join as join24 } from "node:path";
+import { join as join25 } from "node:path";
 
 // frontend/packages/miniapp-kit/src/verify/dist-server.ts
 function createDistHandler(options2) {
@@ -78477,9 +78596,9 @@ void open()
 }
 
 // frontend/packages/miniapp-kit/src/dev/realtime.ts
-import { readFile as readFile14 } from "node:fs/promises";
+import { readFile as readFile15 } from "node:fs/promises";
 import { createRequire as createRequire9 } from "node:module";
-import { join as join22 } from "node:path";
+import { join as join23 } from "node:path";
 
 // infra/workers/gateway/src/realtime.ts
 var MAX_CONNECTIONS = REALTIME_LIMITS.connections;
@@ -78524,9 +78643,9 @@ async function wakeRealtime(scope, env) {
 
 // frontend/packages/miniapp-kit/src/dev/realtime.ts
 async function startRealtimeGateway(options2) {
-  const fromToolRoot = createRequire9(join22(process.env.KIT_TOOL_ROOT ?? process.cwd(), "package.json"));
+  const fromToolRoot = createRequire9(join23(process.env.KIT_TOOL_ROOT ?? process.cwd(), "package.json"));
   const { Miniflare, Response: WorkerResponse } = fromToolRoot("miniflare");
-  const source = await readFile14(join22(options2.kitRoot, "platform", "realtime-local.js"), "utf8");
+  const source = await readFile15(join23(options2.kitRoot, "platform", "realtime-local.js"), "utf8");
   const runtime = new Miniflare({
     modules: true,
     script: source,
@@ -78617,8 +78736,8 @@ async function startRealtimeGateway(options2) {
 }
 
 // frontend/packages/miniapp-kit/src/dev/vars.ts
-import { readFile as readFile15 } from "node:fs/promises";
-import { join as join23 } from "node:path";
+import { readFile as readFile16 } from "node:fs/promises";
+import { join as join24 } from "node:path";
 import { parseEnv } from "node:util";
 
 // frontend/packages/miniapp-kit/src/git.ts
@@ -78670,7 +78789,7 @@ async function readDevVars(root, hosted) {
   if (hosted)
     return {};
   try {
-    const values = parseEnv(await readFile15(join23(root, ".kit/dev.vars"), "utf8"));
+    const values = parseEnv(await readFile16(join24(root, ".kit/dev.vars"), "utf8"));
     const result = {};
     for (const [name3, value] of Object.entries(values)) {
       if (value !== undefined && name3 !== "GATEWAY_URL" && !name3.startsWith("PLATFORM_"))
@@ -78707,7 +78826,7 @@ async function startDev(options2) {
   });
   const createLibsqlClient = options2.createLibsqlClient ?? await loadProjectLibsql(root, (m3) => new DevError(m3));
   await diffDatabase({ root, kitRoot, createLibsqlClient });
-  const projectName = String(JSON.parse(readFileSync4(join24(root, "package.json"), "utf8")).name ?? "");
+  const projectName = String(JSON.parse(readFileSync4(join25(root, "package.json"), "utf8")).name ?? "");
   const ports = options2.ports ?? DEV_PORTS;
   const webApps = Object.values(manifest2.apps).filter((app) => app.kind === "web").map((app) => app.slug).sort();
   const appPorts = allocateAppPorts(webApps);
@@ -78839,11 +78958,11 @@ async function startDev(options2) {
         if (!dist)
           await buildWorkerBundle({
             root,
-            appDir: join24(root, "apps", app.slug),
+            appDir: join25(root, "apps", app.slug),
             slug: app.slug,
             kind: app.kind
           });
-        const bytes = dist ? dist.files.get(`${app.slug}/index.js`) : readFileSync4(join24(root, "dist", app.slug, "index.js"));
+        const bytes = dist ? dist.files.get(`${app.slug}/index.js`) : readFileSync4(join25(root, "dist", app.slug, "index.js"));
         if (!bytes)
           throw new DevError(`missing Worker bundle: ${app.slug}/index.js`);
         return {
@@ -78907,7 +79026,7 @@ async function startDev(options2) {
     for (const slug of dist ? [] : webApps) {
       const vite = await (options2.startVite ?? viteDev)({
         slug,
-        appDir: join24(root, "apps", slug),
+        appDir: join25(root, "apps", slug),
         port: appPorts[slug],
         env: live ? {
           ...env,
@@ -79088,10 +79207,10 @@ var decoder2 = new TextDecoder;
 
 // frontend/packages/miniapp-kit/src/login.ts
 import { createHash as createHash7, randomBytes as randomBytes2 } from "node:crypto";
-import { existsSync as existsSync16 } from "node:fs";
-import { chmod, mkdir as mkdir8, readFile as readFile16, rename, writeFile as writeFile9 } from "node:fs/promises";
+import { existsSync as existsSync17 } from "node:fs";
+import { chmod, mkdir as mkdir8, readFile as readFile17, rename, writeFile as writeFile9 } from "node:fs/promises";
 import { createServer as createServer2 } from "node:http";
-import { join as join25 } from "node:path";
+import { join as join26 } from "node:path";
 var DEFAULT_MCP_URL = "https://fdpocket.dev/mcp/creator";
 var REDIRECT_URI = "http://127.0.0.1:43126/callback";
 var REFRESH_MARGIN_MS = 60000;
@@ -79102,10 +79221,10 @@ class LoginError extends Error {
   name = "LoginError";
 }
 async function readLogins(configDir) {
-  const path = join25(configDir, CREDENTIALS_FILE);
-  if (!existsSync16(path))
+  const path = join26(configDir, CREDENTIALS_FILE);
+  if (!existsSync17(path))
     return {};
-  const parsed = JSON.parse(await readFile16(path, "utf8"));
+  const parsed = JSON.parse(await readFile17(path, "utf8"));
   return parsed.logins ?? {};
 }
 async function writeLogin(configDir, mcpUrl, login) {
@@ -79115,7 +79234,7 @@ async function writeLogin(configDir, mcpUrl, login) {
   else
     logins[mcpUrl] = login;
   await mkdir8(configDir, { recursive: true, mode: 448 });
-  const path = join25(configDir, CREDENTIALS_FILE);
+  const path = join26(configDir, CREDENTIALS_FILE);
   const temporary = `${path}.${process.pid}.tmp`;
   await writeFile9(temporary, `${JSON.stringify({ logins }, null, 2)}
 `, { mode: 384 });
@@ -79303,9 +79422,9 @@ function loopbackAuthorize(openUrl) {
 }
 
 // frontend/packages/miniapp-kit/src/new.ts
-import { existsSync as existsSync17 } from "node:fs";
-import { mkdir as mkdir9, readdir as readdir10, readFile as readFile17, writeFile as writeFile10 } from "node:fs/promises";
-import { dirname as dirname10, join as join26, relative } from "node:path";
+import { existsSync as existsSync18 } from "node:fs";
+import { mkdir as mkdir9, readdir as readdir10, readFile as readFile18, writeFile as writeFile10 } from "node:fs/promises";
+import { dirname as dirname10, join as join27, relative } from "node:path";
 var TEMPLATE_DIR = "templates/project";
 var DEFAULT_APP_SPECS = ["web", "admin"];
 var NAME_PATTERN = /^[a-z][a-z0-9-]{0,63}$/;
@@ -79336,22 +79455,22 @@ async function newProject(options2) {
   });
   if (!declarations.length || declarations.length > PROJECT_APPS_MAX || new Set(declarations.map((a2) => a2.slug)).size !== declarations.length)
     throw new NewProjectError(`declare 1–${PROJECT_APPS_MAX} unique Apps`);
-  if (existsSync17(root) && (await readdir10(root)).some((entry) => entry !== ".git")) {
+  if (existsSync18(root) && (await readdir10(root)).some((entry) => entry !== ".git")) {
     throw new NewProjectError(`${root} is not empty; kit new only fills an empty Project`);
   }
-  const template = join26(options2.kitRoot, TEMPLATE_DIR);
+  const template = join27(options2.kitRoot, TEMPLATE_DIR);
   const files = [];
   const sources = await listFiles(template);
   const put = async (target, text) => {
-    await mkdir9(dirname10(join26(root, target)), { recursive: true });
-    await writeFile10(join26(root, target), text);
+    await mkdir9(dirname10(join27(root, target)), { recursive: true });
+    await writeFile10(join27(root, target), text);
     files.push(target);
   };
   for (const source of sources) {
     if (source.startsWith("apps/"))
       continue;
     const target = targetPath(source);
-    let text = fill(await readFile17(join26(template, source), "utf8"), { name: name3, title });
+    let text = fill(await readFile18(join27(template, source), "utf8"), { name: name3, title });
     if (target === PROJECT_PATHS.manifest) {
       const document2 = $parseDocument(text);
       const original = document2.toJS().apps;
@@ -79391,7 +79510,7 @@ async function newProject(options2) {
     const prefix2 = `apps/${templateSlug}/`;
     for (const source of sources.filter((path) => path.startsWith(prefix2))) {
       const target = `apps/${slug}/${source.slice(prefix2.length)}`;
-      let text = fill(await readFile17(join26(template, source), "utf8"), { name: name3, title });
+      let text = fill(await readFile18(join27(template, source), "utf8"), { name: name3, title });
       if (target.endsWith("/vite.config.ts"))
         text = text.replace(`createAppConfig("${templateSlug}"`, `createAppConfig("${slug}"`);
       if (target.endsWith("/package.json")) {
@@ -79418,7 +79537,7 @@ async function listFiles(root) {
   const files = [];
   const walk = async (dir) => {
     for (const entry of await readdir10(dir, { withFileTypes: true })) {
-      const path = join26(dir, entry.name);
+      const path = join27(dir, entry.name);
       if (entry.isDirectory())
         await walk(path);
       else if (entry.isFile())
@@ -79550,16 +79669,16 @@ function trackingRef(threadRef) {
 var REMOTE_REFS = "refs/remotes/tokoyo";
 
 // frontend/packages/miniapp-kit/src/repo.ts
-import { existsSync as existsSync18 } from "node:fs";
-import { appendFile, mkdir as mkdir10, readFile as readFile18, rm as rm9, writeFile as writeFile11 } from "node:fs/promises";
-import { join as join27 } from "node:path";
+import { existsSync as existsSync19 } from "node:fs";
+import { appendFile, mkdir as mkdir10, readFile as readFile19, rm as rm9, writeFile as writeFile11 } from "node:fs/promises";
+import { join as join28 } from "node:path";
 class RepoError extends Error {
   name = "RepoError";
 }
 function kitCommand(kitRoot, ...args) {
   return [
     shellQuote(process.execPath),
-    shellQuote(join27(kitRoot, "scripts", "kit.mjs")),
+    shellQuote(join28(kitRoot, "scripts", "kit.mjs")),
     ...args
   ].join(" ");
 }
@@ -79595,10 +79714,10 @@ async function configureRepo(git, source, config3, author) {
   await set2(git, source, `branch.${branch}.remote`, ".");
   await set2(git, source, `branch.${branch}.merge`, trackingRef(config3.thread_ref));
   await set2(git, source, `branch.${branch}.rebase`, "true");
-  const info = join27(source, ".git", "info");
+  const info = join28(source, ".git", "info");
   await mkdir10(info, { recursive: true });
-  const excludePath = join27(info, "exclude");
-  const excluded = existsSync18(excludePath) ? (await readFile18(excludePath, "utf8")).split(`
+  const excludePath = join28(info, "exclude");
+  const excluded = existsSync19(excludePath) ? (await readFile19(excludePath, "utf8")).split(`
 `) : [];
   const missing = EXCLUDES.filter((line) => !excluded.includes(line));
   if (missing.length > 0)
@@ -79612,12 +79731,12 @@ async function requireGitLfs(git, cwd) {
   }
 }
 function requireRepo(source) {
-  if (!existsSync18(join27(source, ".git"))) {
+  if (!existsSync19(join28(source, ".git"))) {
     throw new RepoError(`${source} is not a git repository; run kit.mjs clone in a new directory`);
   }
 }
 async function requireClean(git, source, what) {
-  if (existsSync18(join27(source, ".git", "rebase-merge")) || existsSync18(join27(source, ".git", "rebase-apply"))) {
+  if (existsSync19(join28(source, ".git", "rebase-merge")) || existsSync19(join28(source, ".git", "rebase-apply"))) {
     throw new RepoError("a git rebase is in progress in source/; finish it (git rebase --continue) first");
   }
   if (await gitOk(git, source, ["status", "--porcelain"]) !== "") {
@@ -79627,13 +79746,13 @@ async function requireClean(git, source, what) {
 async function fetchBundles(git, source, pulled, already, download2) {
   const listed = new Set(pulled.bundles.map((bundle2) => bundle2.sha256));
   const fetched = already.filter((sha) => listed.has(sha));
-  const dir = join27(source, ".git", "tokoyo-bundles");
+  const dir = join28(source, ".git", "tokoyo-bundles");
   await mkdir10(dir, { recursive: true });
   for (const bundle2 of fetchOrder(pulled.bundles)) {
     if (fetched.includes(bundle2.sha256))
       continue;
     const bytes = await download2(`bundle ${bundle2.seq}`, bundle2.url, bundle2.sha256);
-    const file2 = join27(dir, `${bundle2.sha256}.bundle`);
+    const file2 = join28(dir, `${bundle2.sha256}.bundle`);
     await writeFile11(file2, bytes);
     try {
       await gitOk(git, source, [
@@ -79737,16 +79856,16 @@ class ValidationFailed extends Error {
 
 // frontend/packages/miniapp-kit/src/verify/validate.ts
 import { mkdir as mkdir12, writeFile as writeFile13 } from "node:fs/promises";
-import { join as join31 } from "node:path";
+import { join as join32 } from "node:path";
 
 // frontend/packages/miniapp-kit/src/verify/dynamic.ts
 import { mkdir as mkdir11, writeFile as writeFile12 } from "node:fs/promises";
-import { join as join30 } from "node:path";
+import { join as join31 } from "node:path";
 
 // frontend/packages/miniapp-kit/src/verify/browser.ts
-import { existsSync as existsSync19 } from "node:fs";
+import { existsSync as existsSync20 } from "node:fs";
 import { createRequire as createRequire10 } from "node:module";
-import { join as join28 } from "node:path";
+import { join as join29 } from "node:path";
 import { pathToFileURL as pathToFileURL8 } from "node:url";
 
 class BrowserUnavailableError extends Error {
@@ -79756,7 +79875,7 @@ function resolvePlaywright() {
   const bases = [process.env.KIT_PLAYWRIGHT_DIR, process.cwd()].filter((base) => Boolean(base));
   for (const base of bases) {
     try {
-      return createRequire10(join28(base, "noop.js")).resolve("playwright-core");
+      return createRequire10(join29(base, "noop.js")).resolve("playwright-core");
     } catch {}
   }
   try {
@@ -79769,7 +79888,7 @@ var launchChromium = async () => {
   const loaded = await import(pathToFileURL8(resolvePlaywright()).href);
   const module = loaded.default ?? loaded;
   const executablePath = process.env.KIT_CHROMIUM_PATH;
-  if (executablePath && !existsSync19(executablePath)) {
+  if (executablePath && !existsSync20(executablePath)) {
     throw new BrowserUnavailableError(`KIT_CHROMIUM_PATH does not exist: ${executablePath}`);
   }
   return module.chromium.launch({
@@ -79779,10 +79898,10 @@ var launchChromium = async () => {
 };
 
 // frontend/packages/miniapp-kit/src/verify/erase.ts
-import { existsSync as existsSync20 } from "node:fs";
+import { existsSync as existsSync21 } from "node:fs";
 import { mkdtemp as mkdtemp2, rm as rm10 } from "node:fs/promises";
 import { tmpdir as tmpdir2 } from "node:os";
-import { join as join29 } from "node:path";
+import { join as join30 } from "node:path";
 var failed = (message2) => ({
   code: "ERASE_TEST_FAILED",
   path: PROJECT_PATHS.eraseTest,
@@ -79791,7 +79910,7 @@ var failed = (message2) => ({
 var describe4 = (error51) => error51 instanceof Error ? error51.message : String(error51);
 async function runEraseTest(options2) {
   const { root } = options2;
-  if (!existsSync20(join29(root, PROJECT_PATHS.eraseTest))) {
+  if (!existsSync21(join30(root, PROJECT_PATHS.eraseTest))) {
     return {
       errors: [],
       warnings: [
@@ -79806,8 +79925,8 @@ async function runEraseTest(options2) {
   const manifest2 = JSON.parse(await readGenerated(root, "project.json"));
   const schema2 = JSON.parse(await readGenerated(root, "schema.json"));
   const importModule = options2.importModule ?? defaultImporter(root, manifest2);
-  const dir = await mkdtemp2(join29(tmpdir2(), "kit-erase-"));
-  const db = options2.createLibsqlClient({ url: `file:${join29(dir, "erase.db")}` });
+  const dir = await mkdtemp2(join30(tmpdir2(), "kit-erase-"));
+  const db = options2.createLibsqlClient({ url: `file:${join30(dir, "erase.db")}` });
   try {
     for (const part of await devDatabaseSql(root))
       await applySql(db, part.sql);
@@ -79815,7 +79934,7 @@ async function runEraseTest(options2) {
     await runSeed({ root, db, schema: schema2, importModule });
     let test;
     try {
-      test = (await importModule(join29(root, PROJECT_PATHS.eraseTest))).default;
+      test = (await importModule(join30(root, PROJECT_PATHS.eraseTest))).default;
     } catch (error51) {
       return { errors: [failed(`could not be loaded: ${describe4(error51)}`)], warnings: [] };
     }
@@ -80043,7 +80162,7 @@ async function runDynamicChecks(options2) {
   });
   const browser = await (options2.launch ?? launchChromium)();
   try {
-    await mkdir11(join30(options2.outDir, "screenshots"), { recursive: true });
+    await mkdir11(join31(options2.outDir, "screenshots"), { recursive: true });
     const observations = [];
     const at = (app) => ({
       hostUrl: dev.hostUrl,
@@ -80079,7 +80198,7 @@ async function runDynamicChecks(options2) {
       gatewayUrl: dev.gatewayUrl,
       appsOrigin: dev.appsOrigin
     });
-    await writeFile12(join30(options2.outDir, "permission-matrix.json"), `${JSON.stringify(matrix, null, 1)}
+    await writeFile12(join31(options2.outDir, "permission-matrix.json"), `${JSON.stringify(matrix, null, 1)}
 `);
     const erase = await runEraseTest({
       root: options2.root,
@@ -80087,7 +80206,7 @@ async function runDynamicChecks(options2) {
     });
     const judged = judgeDynamic(options2.manifest, observations);
     const workerResults = await dev.checkWorkers();
-    await writeFile12(join30(options2.outDir, "worker-mocks.json"), `${JSON.stringify({ results: workerResults, events: dev.workerEvents() }, null, 1)}
+    await writeFile12(join31(options2.outDir, "worker-mocks.json"), `${JSON.stringify({ results: workerResults, events: dev.workerEvents() }, null, 1)}
 `);
     const workerErrors = workerResults.filter((result) => result.status >= (result.kind === "jobs" ? 400 : 500)).map((result) => ({
       code: "WORKER_RUNTIME_FAILED",
@@ -80165,7 +80284,7 @@ async function observe(context, visit2, at, shot) {
     if (shot)
       await page.waitForTimeout(shot.settleMs);
     const name3 = shot?.name ?? `screenshots/${visit2.app}-${visit2.principal}.png`;
-    await writeFile12(join30(at.outDir, name3), await page.locator("#frame").screenshot());
+    await writeFile12(join31(at.outDir, name3), await page.locator("#frame").screenshot());
     observation.screenshot = name3;
     return observation;
   } finally {
@@ -80240,17 +80359,17 @@ async function validateVersion(options2) {
   });
   const report2 = reportSchema.parse(result.report);
   await mkdir12(options2.outDir, { recursive: true });
-  await writeFile13(join31(options2.outDir, "report.json"), `${JSON.stringify(report2, null, 2)}
+  await writeFile13(join32(options2.outDir, "report.json"), `${JSON.stringify(report2, null, 2)}
 `);
   if (result.schemaJson !== undefined) {
-    await writeFile13(join31(options2.outDir, "schema.json"), result.schemaJson);
+    await writeFile13(join32(options2.outDir, "schema.json"), result.schemaJson);
   }
   return report2;
 }
 
 // frontend/packages/miniapp-kit/src/workdir.ts
-import { existsSync as existsSync21 } from "node:fs";
-import { dirname as dirname11, join as join32 } from "node:path";
+import { existsSync as existsSync22 } from "node:fs";
+import { dirname as dirname11, join as join33 } from "node:path";
 var CONFIG_FILE = ".tokoyo.json";
 var WORKDIR_DIRS = {
   source: "source",
@@ -80319,7 +80438,7 @@ function serializeConfig(config3) {
 }
 function locateWorkdir(start) {
   for (let current = start;; current = dirname11(current)) {
-    if (existsSync21(join32(current, CONFIG_FILE)))
+    if (existsSync22(join33(current, CONFIG_FILE)))
       return current;
     if (dirname11(current) === current)
       return null;
@@ -80379,7 +80498,7 @@ class CommandError extends Error {
 }
 function defaultConfigDir() {
   const xdg = process.env.XDG_CONFIG_HOME;
-  return join33(xdg && xdg !== "" ? xdg : join33(homedir(), ".config"), "tokoyo");
+  return join34(xdg && xdg !== "" ? xdg : join34(homedir(), ".config"), "tokoyo");
 }
 async function readStdin() {
   const chunks = [];
@@ -80458,30 +80577,30 @@ async function runCommand(args, context) {
 var print = (context, value) => context.stdout(JSON.stringify(value, null, 2));
 var mcpUrlOf = (flag) => flag ?? process.env.CREATOR_MCP_URL ?? DEFAULT_MCP_URL;
 async function kitVersion(kitRoot) {
-  const manifest2 = join33(kitRoot, ".claude-plugin", "plugin.json");
-  if (!existsSync22(manifest2))
+  const manifest2 = join34(kitRoot, ".claude-plugin", "plugin.json");
+  if (!existsSync23(manifest2))
     throw new CommandError(`${manifest2} is missing; reinstall the Kit`);
-  const version3 = JSON.parse(await readFile19(manifest2, "utf8")).version;
+  const version3 = JSON.parse(await readFile20(manifest2, "utf8")).version;
   if (typeof version3 !== "string")
     throw new CommandError(`${manifest2} has no version`);
   return version3;
 }
 async function readConfig(workdir) {
-  return parseConfig(await readFile19(join33(workdir, CONFIG_FILE), "utf8"));
+  return parseConfig(await readFile20(join34(workdir, CONFIG_FILE), "utf8"));
 }
 async function saveConfig(workdir, config3) {
-  await writeFile14(join33(workdir, CONFIG_FILE), serializeConfig(config3));
+  await writeFile14(join34(workdir, CONFIG_FILE), serializeConfig(config3));
 }
-var sourceOf = (workdir) => join33(workdir, WORKDIR_DIRS.source);
+var sourceOf = (workdir) => join34(workdir, WORKDIR_DIRS.source);
 var AGENTS_TITLE = agentsMd("").split(`
 `)[0];
 async function writeAgentFiles(workdir, kitRoot) {
-  const agents = join33(workdir, "AGENTS.md");
-  if (!existsSync22(agents) || (await readFile19(agents, "utf8")).startsWith(AGENTS_TITLE)) {
+  const agents = join34(workdir, "AGENTS.md");
+  if (!existsSync23(agents) || (await readFile20(agents, "utf8")).startsWith(AGENTS_TITLE)) {
     await writeFile14(agents, agentsMd(kitRoot));
   }
-  const claude = join33(workdir, "CLAUDE.md");
-  if (!existsSync22(claude))
+  const claude = join34(workdir, "CLAUDE.md");
+  if (!existsSync23(claude))
     await writeFile14(claude, CLAUDE_MD);
 }
 async function fetchVerified(context, name3, url3, sha2562) {
@@ -80497,8 +80616,8 @@ var NEXT_EDIT = "change source/, git commit, then kit.mjs pack";
 async function clone4(context, flags) {
   const pulled = parsePulled(flags.bundles);
   const workdir = context.cwd;
-  const path = join33(workdir, CONFIG_FILE);
-  if (existsSync22(path)) {
+  const path = join34(workdir, CONFIG_FILE);
+  if (existsSync23(path)) {
     const existing = await readConfig(workdir);
     if (existing.app_id !== pulled.project_id) {
       throw new CommandError(`${path} belongs to App ${existing.app_id}; use another directory for App ${pulled.project_id}`);
@@ -80506,12 +80625,12 @@ async function clone4(context, flags) {
     throw new CommandError(`${workdir} already has App ${pulled.project_id}; run kit.mjs pull instead`);
   }
   const source = sourceOf(workdir);
-  if (existsSync22(source) && (await readdir11(source)).length > 0) {
+  if (existsSync23(source) && (await readdir11(source)).length > 0) {
     throw new CommandError(`${source} is not empty; clone into a new directory`);
   }
   await requireGitLfs(context.git, workdir);
   for (const dir of Object.values(WORKDIR_DIRS))
-    await mkdir13(join33(workdir, dir), { recursive: true });
+    await mkdir13(join34(workdir, dir), { recursive: true });
   const branch = threadBranch(pulled.thread_ref);
   await gitOk(context.git, workdir, ["init", "-q", "-b", branch, source]);
   await gitOk(context.git, source, ["lfs", "install", "--local"]);
@@ -80662,7 +80781,7 @@ async function publishedFlags(flags) {
   }
   if (flags["published-schema"] !== undefined) {
     try {
-      out.publishedSchema = JSON.parse(await readFile19(flags["published-schema"], "utf8"));
+      out.publishedSchema = JSON.parse(await readFile20(flags["published-schema"], "utf8"));
     } catch (error51) {
       throw new CommandError(`--published-schema must be a readable JSON file: ${error51 instanceof Error ? error51.message : String(error51)}`);
     }
@@ -80717,13 +80836,13 @@ async function validate(context, flags) {
     root,
     kitRoot: context.kitRoot,
     git: context.git,
-    archive: new Uint8Array(await readFile19(resolve3(context.cwd, flags.archive))),
+    archive: new Uint8Array(await readFile20(resolve3(context.cwd, flags.archive))),
     outDir: resolve3(context.cwd, flags.out),
     projectId: flags["project-id"],
     gatewayUrl: flags["gateway-url"],
     base: flags.base === undefined ? undefined : flags.base === "none" ? null : flags.base,
     sdkUpdate: flags["sdk-update"] === "true",
-    ...flags.captures ? { captures: parseCaptures(await readFile19(resolve3(context.cwd, flags.captures), "utf8")) } : {}
+    ...flags.captures ? { captures: parseCaptures(await readFile20(resolve3(context.cwd, flags.captures), "utf8")) } : {}
   });
   print(context, {
     passed: report2.passed,
@@ -80799,16 +80918,16 @@ async function pack(context) {
   if (tip === base) {
     throw new CommandError("no new commits since the head kit.mjs pull took (base_commit_oid); git commit first");
   }
-  const outputs = join33(workdir, WORKDIR_DIRS.outputs);
-  const reportPath = join33(outputs, "build-report.json");
-  if (!existsSync22(reportPath)) {
+  const outputs = join34(workdir, WORKDIR_DIRS.outputs);
+  const reportPath = join34(outputs, "build-report.json");
+  if (!existsSync23(reportPath)) {
     throw new CommandError("outputs/build-report.json is missing; write it first (instructions.md §2)");
   }
-  const dist = join33(source, "dist");
-  if (!existsSync22(dist))
+  const dist = join34(source, "dist");
+  if (!existsSync23(dist))
     throw new CommandError("source/dist is missing; kit.mjs build first");
   await mkdir13(outputs, { recursive: true });
-  const bundlePath = join33(outputs, "source.bundle");
+  const bundlePath = join34(outputs, "source.bundle");
   await gitOk(context.git, source, [
     "bundle",
     "create",
@@ -80818,12 +80937,12 @@ async function pack(context) {
     ...base === null ? [] : [`^${base}`]
   ]);
   const distArchive = buildDistArchive(await collectFiles(dist));
-  await writeFile14(join33(outputs, "dist.tar.gz"), distArchive);
+  await writeFile14(join34(outputs, "dist.tar.gz"), distArchive);
   print(context, {
     files: {
-      "source.bundle": describeFile(new Uint8Array(await readFile19(bundlePath))),
+      "source.bundle": describeFile(new Uint8Array(await readFile20(bundlePath))),
       "dist.tar.gz": describeFile(distArchive),
-      "build-report.json": describeFile(new Uint8Array(await readFile19(reportPath)))
+      "build-report.json": describeFile(new Uint8Array(await readFile20(reportPath)))
     },
     project_id: config3.app_id,
     session_id: config3.session_id,
@@ -80853,7 +80972,7 @@ async function uploadOutputs(context, flags) {
     throw new CommandError(`uploading the LFS files failed: ${lfs.stderr.trim()} (not logged in? run kit.mjs login)`);
   }
   for (const [name3, contentType2] of Object.entries(OUTPUT_FILES)) {
-    const bytes = new Uint8Array(await readFile19(join33(workdir, WORKDIR_DIRS.outputs, name3)));
+    const bytes = new Uint8Array(await readFile20(join34(workdir, WORKDIR_DIRS.outputs, name3)));
     await upload(name3, urls[name3], bytes, contentType2, context.fetch);
   }
   print(context, { uploaded: Object.keys(OUTPUT_FILES) });
@@ -80913,7 +81032,7 @@ async function addAsset(context, flags) {
   }
   const workdir = await findWorkdir(context.cwd);
   const bytes = await fetchVerified(context, path, flags.url, flags.sha256);
-  const target = join33(sourceOf(workdir), ...segments);
+  const target = join34(sourceOf(workdir), ...segments);
   await mkdir13(dirname12(target), { recursive: true });
   await writeFile14(target, bytes);
   print(context, {
