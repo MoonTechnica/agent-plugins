@@ -84,7 +84,7 @@
 ## 7. 記録例
 
 ```markdown
-定義: levels/forest.ts / 生成版2 / 今回のcommit
+定義: godot/levels/forest.tscn / 生成版2 / 今回のcommit
 操作: 歩行3m/s、幅0.6m。鍵は消費しない。
 必須: 鍵→扉→目的地、失敗後の復帰。品質: 選択と移動負担。
 枠: 2候補、修正2巡。固定seed 4 / 別seed 4。

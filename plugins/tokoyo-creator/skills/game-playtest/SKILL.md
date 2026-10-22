@@ -1,6 +1,6 @@
 ---
 name: game-playtest
-description: 作ったゲームを自分で遊んで確かめ、直す。核が遊べる形になったときと、仕上げの前に使う。design/playtest.md の確かめる項目（rubric）の作り方、ルールを node で回す検査（assets/playtest-rules.mjs をコピーして使う）、利用者が頼んだときだけ Platform にしっかりした試遊を頼むこと、前の版の試遊結果（input/playtest-report.json）の読み方、直す順序を扱う。playtest, rubric, self-test, headless, simulation, autoplay, bug triage.
+description: 作ったゲームを自分で遊んで確かめ、直す。核が遊べる形になったときと、仕上げの前に使う。design/playtest.md の確かめる項目（rubric）の作り方、ルールを Godot の headless で回す検査（assets/playtest_rules.gd をコピーして使う）、利用者が頼んだときだけ Platform にしっかりした試遊を頼むこと、前の版の試遊結果（input/playtest-report.json）の読み方、直す順序を扱う。playtest, rubric, self-test, headless, simulation, autoplay, bug triage.
 ---
 
 制作中のケース起動、Test Level、本編処理の再利用、開発用コマンドと分離ビルドは `references/development-preview.md` を読む。カタログ検査と実際の描画・操作の結果は分けて報告する。
@@ -52,26 +52,27 @@ Platformの毎版検証やthoroughを自動で増やす指示ではない。描�
 書き出し・最適化後のGLBを本編で再生し、輪郭/関節変形/接地/ループ/切替を確認する。
 静止プレビューや骨/クリップの存在だけでは動作品質を合格にせず、未再生・未確認の動作を残す。
 
-## 2. ルール検査（`rules.ts` があるターンは毎回・このターンの中で）
+## 2. ルール検査（`rules.gd` があるターンは毎回・このターンの中で）
 
-`src/rules.ts` の遊びのルールを、描画なしで `node` から回す（`$game-design` §3 の形が前提。`rules.ts` の無い前の版を続けるときは
-省いて `notes` に 1 行書く。`$game-design` §1）。
+`godot/rules.gd` の遊びのルールを、描画なしで Godot の headless から回す（`$game-design` §3 の形が前提。`rules.gd` の無い前の版を
+続けるときは省いて `notes` に 1 行書く。`$game-design` §1）。
 
-1. `<kit>/skills/game-playtest/assets/playtest-rules.mjs` を `scripts/playtest-rules.mjs` にコピーする（初回だけ。以後はそのファイルを直す）。
-2. 下の方の `CHECKS` を、このゲームの rubric に合わせて書き換える。`idle`（何もしない）と `play`（うまく遊ぶ人の入力）を rules.ts の `Input` の形にする。
-   RPG等の進行型は`PROGRESSION = true`にし、終了/得点のCHECKSを保存再開・進行条件・報酬重複防止へ置換する。
-   この場合`loadRules(path, { progression: true })`は`init`/`step`だけ要求し、未定義のscoreはnull、isOverはfalseとして扱う。
-   `world.ts`等を直接検査する独立したテストも可。使わないscore/isOverをダミーで追加しない。
-   `simulate(rules, { seed, seconds, input })` が `over` / `endedAt` / `score` / `samples` / `brokenNumber` を返す。
-   **雛形の `CHECKS` はアクション向け**（放置しても 10 秒は終わらない・放置すればいつか終わる）。放置で負ける遊び（ワンボタン）、
+1. `<kit>/skills/game-playtest/assets/playtest_rules.gd` を `scripts/playtest_rules.gd` にコピーする（初回だけ。以後はそのファイルを直す）。
+   **`godot/` の外に置く**（本番の pack に入れない）。
+2. `_checks()` を、このゲームの rubric に合わせて書き換える。`_idle`（何もしない）と `_play`（うまく遊ぶ人の入力）を rules.gd の input の形にする。
+   RPG等の進行型は`PROGRESSION = true`にし、終了/得点のchecksを保存再開・進行条件・報酬重複防止へ置換する。
+   この場合は`init`/`step`だけを要求し、`is_over`は見ない。使わない`score`/`is_over`をダミーで追加しない。
+   `simulate(seed, seconds, input)` が `over` / `ended_at` / `score` / `samples` / `broken` を返す。
+   **雛形の checks はアクション向け**（放置しても 10 秒は終わらない・放置すればいつか終わる）。放置で負ける遊び（ワンボタン）、
    入力が無いと進まない遊び（パズル・ターン制・クリッカー）では、その項目を遊びに合う形（「最初の手で状態が変わる」「解ける」など）に置き換える。
-   「再挑戦で最初に戻る」は `init` が同じ seed で同じ状態を返すことだけを見る。リザルトから戻る操作は画面側なので、`main.ts` を読んで確かめる。
-3. `node scripts/playtest-rules.mjs` を実行する。✗ が出たら直して、全部 ✓ になるまで回す。
+   「再挑戦で最初に戻る」は `init` が同じ seed で同じ状態を返すことだけを見る。リザルトから戻る操作は画面側なので、シーンのスクリプトを読んで確かめる。
+3. `godot --headless --path godot --script ../scripts/playtest_rules.gd` を実行する（別のルールファイルは末尾に `-- res://<path>.gd`）。
+   ✗ が出たら直して、全部 ✓ になるまで回す。**✓ も ✗ も 1 行も出ないのは失敗**（スクリプトを読めないときも Godot は終了コード 0 を返す）。
 4. 結果を `design/playtest.md` の「結果」に写す。
 
 - 世界生成・保存往復・クエスト遷移など独立した重要性質の検査は必要なら追加する。実装をなぞるだけのテストは書かない。
-- 対戦のルールも `src/rules.ts` に書き、`server/main.ts` の `defineSpace` がそれを呼ぶ（`$game-design` §3）。検査はその `rules.ts` を回す。
-- 数値を直すときは `src/tuning.ts` だけを変えて回し直す。
+- 対戦の勝敗・手番は `server/main.ts` の `defineSpace` が持つ（`$game-multiplayer`）。画面側の `rules.gd` で勝敗を決めない。
+- 数値を直すときは `godot/tuning.gd` だけを変えて回し直す。
 
 ## 3. Platform の試遊（検証のついで）
 

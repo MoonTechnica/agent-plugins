@@ -1,11 +1,14 @@
 ---
 name: game-documents
-description: 相手と同時にいなくても進むゲーム（非同期対戦）と、時間をまたいで複数の人が持つ場を作る（app.documents）。documentSchema の決め方（members・write・read・join・maxBytes・ttlDays）、手番制、REVISION_CONFLICT の読み直し、onChange、招待とマッチング、決着（finish）、秘密を場に置かないこと、匿名の人の扱いを扱う。遊びの説明に「通信対局」「1 日 1 手」「交代で」「攻め合い」「友達の記録に挑戦」「みんなで育てる世界」などがあるときに使う。async multiplayer, turn-based, correspondence, shared world.
+description: 相手と同時にいなくても進むゲーム（非同期対戦）と、時間をまたいで複数の人が持つ場を作る（TokoyoApp.documents。契約は app.documents）。documentSchema の決め方（members・write・read・join・maxBytes・ttlDays）、手番制、REVISION_CONFLICT の読み直し、subscribe と changed シグナル、招待とマッチング、決着（finish）、秘密を場に置かないこと、匿名の人の扱いを扱う。遊びの説明に「通信対局」「1 日 1 手」「交代で」「攻め合い」「友達の記録に挑戦」「みんなで育てる世界」などがあるときに使う。async multiplayer, turn-based, correspondence, shared world.
 ---
 
-# 非同期対戦と共有の場（`app.documents`）
+# 非同期対戦と共有の場（`TokoyoApp.documents`）
 
-**API の正本は `<kit>/sdk/app-sdk/spec.md` §8.2**。先に読む。
+**API の正本は `<kit>/sdk/app-sdk/spec.md` §8.2**。先に読む。GDScript からは `TokoyoApp.documents` の facade を使う
+（`create` / `join_open` / `fetch` / `list` / `update(record_id, patch, expected_revision)` / `finish` / `leave` / `subscribe` / `unsubscribe` /
+`launch_record_id`。最後の引数の `Callable` に `(ok, result_or_code)` が返る。`$game-godot`）。下の文中の `joinOpen` / `get` / `onChange` /
+`launchRecordId` は契約の名前で、facade ではそれぞれ `join_open` / `fetch` / `subscribe` + `changed` シグナル / `launch_record_id`。
 
 場（Document）は App の中で閉じた 1 レコードで、**メンバー**（席に座った人）が時間をまたいで読み書きする。
 Platform が守るのは「誰が読めるか・書けるか」「形（Schema）」「大きさ」「版（`revision`）」「手番」だけ。
@@ -13,9 +16,9 @@ Platform が守るのは「誰が読めるか・書けるか」「形（Schema�
 
 | 置き場 | 何を置くか |
 |---|---|
-| `app.store` | その人だけのもの（設定・所持品・**相手に見せない手札**） |
-| `app.space` | 同時にいる人の状態（リアルタイム対戦。`$game-multiplayer`） |
-| `app.documents` | **時間をまたいで複数人が持つもの**（通信対局の盤・攻め合いの拠点・挑戦の記録・協力して育てる世界） |
+| Store（`TokoyoApp.save`） | その人だけのもの（設定・所持品・**相手に見せない手札**） |
+| `TokoyoSpace` | 同時にいる人の状態（リアルタイム対戦。`$game-multiplayer`） |
+| `TokoyoApp.documents` | **時間をまたいで複数人が持つもの**（通信対局の盤・攻め合いの拠点・挑戦の記録・協力して育てる世界） |
 
 ## 1. 形を選ぶ（`manifest.json` の `documentSchema`）
 
@@ -23,10 +26,10 @@ Platform が守るのは「誰が読めるか・書けるか」「形（Schema�
 
 | 形 | 例 | Schema の要点 | 流れ |
 |---|---|---|---|
-| **1 対 1 のターン制** | チェス・将棋・オセロ・五目並べ | `members: { min: 2, max: 2 }`、`write: "turn"`、`join: "open"`（知らない人と）か `"invite"`（友達と） | `joinOpen` → 無ければ `create` → 相手が入ると `active` → 自分の番に `update({ board, turn: 相手の席 })` → 決着で `update` のあと `finish` |
+| **1 対 1 のターン制** | チェス・将棋・オセロ・五目並べ | `members: { min: 2, max: 2 }`、`write: "turn"`、`join: "open"`（知らない人と）か `"invite"`（友達と） | `joinOpen` → 無ければ `create` → 相手が入ると `active` → 自分の番に `update(record_id, {"board": ..., "turn": 相手の席}, expected_revision)` → 決着で `update` のあと `finish` |
 | **非同期の攻め合い** | 放置して拠点を攻め合う・塔の防衛と襲撃 | `members: { min: 2, max: 8 }`、`write: "member"` | 各自が好きなときに `update`。**自分の領域のキーだけ書く**（`{ players: { "2": {...} } }`）。衝突は `REVISION_CONFLICT` → 読み直し |
-| **記録に挑戦** | 友達のスコア・ゴーストに挑む | `members: { min: 1, max: 8 }`、`read: "app"`、`write: "owner"` | 作った人が `create` してリプレイを置く。他の人は `list(collection, { open: true })` で探して読むだけ。挑んだ結果は各自の `app.leaderboard.submit()`（`$game-leaderboard`） |
-| **協力して育てる世界** | みんなで建てる村・共有の畑 | `members: { min: 1, max: 8 }`、`write: "member"`、`maxBytes: 1048576`、`ttlDays: 365` | 世界の**差分**（seed + 変えたところ）だけを置く。一緒に遊ぶ間はリアルタイム対戦（`app.space`）で同期し、終わるときに場へ書き戻す |
+| **記録に挑戦** | 友達のスコア・ゴーストに挑む | `members: { min: 1, max: 8 }`、`read: "app"`、`write: "owner"` | 作った人が `create` してリプレイを置く。他の人は `list(collection, { open: true })` で探して読むだけ。挑んだ結果は各自の `TokoyoApp.leaderboard.submit()`（`$game-leaderboard`） |
+| **協力して育てる世界** | みんなで建てる村・共有の畑 | `members: { min: 1, max: 8 }`、`write: "member"`、`maxBytes: 1048576`、`ttlDays: 365` | 世界の**差分**（seed + 変えたところ）だけを置く。一緒に遊ぶ間はリアルタイム対戦（`TokoyoSpace`）で同期し、終わるときに場へ書き戻す |
 
 | 項目 | 決め方 |
 |---|---|
@@ -51,8 +54,8 @@ Platform が守るのは「誰が読めるか・書けるか」「形（Schema�
 - 定員がそろう（`status: 'active'`）まで最初の手は打てない。`open` の間は「相手を待っています」と出す。
 - 手を打つ前に**画面で合法手かを確かめる**（ルールの関数は純粋関数にしてファイルを分ける）。改造した画面からの
   書き込みは Platform では止まらないので、**読むときも形と中身を確かめ**、壊れていたら「この対局は続けられません」と出す。
-- 決着の手は `update({ board, turn: 相手, winner })` で盤を書いてから、返ってきた `revision` を使って
-  `finish({ expectedRevision, result: { winner } })` する。
+- 決着の手は `update(record_id, {"board": ..., "turn": 相手, "winner": ...}, expected_revision)` で盤を書いてから、返ってきた `revision` を使って
+  `finish(record_id, revision, {"winner": ...})` する。
 
 ## 3. 書き込みと衝突（`REVISION_CONFLICT`）
 
@@ -65,30 +68,30 @@ Platform が守るのは「誰が読めるか・書けるか」「形（Schema�
 - 場を作るのは**毎時 30 回まで**（超えると `RATE_LIMITED`。少し待って作り直す）、**参加中の場は同時に 20 件まで**（超えると `QUOTA_EXCEEDED`）。
   `QUOTA_EXCEEDED` なら「終わった対局を片付けてください」と自分の一覧を出す（`leave` で抜けられる）。
 
-## 4. 変化を知る（`onChange`）と起動
+## 4. 変化を知る（`subscribe` と `changed`）と起動
 
-- 起動したら**最初に `app.documents.launchRecordId()`** を見る。招待リンク・「続きから」から来たときはその場の id が入っている。
+- 起動したら**最初に `TokoyoApp.documents.launch_record_id()`** を見る。招待リンク・「続きから」から来たときはその場の id が入っている。
   あればその場を開き、無ければタイトル（自分の場の一覧 `list(collection)` と「相手を探す」「友達を誘う」）を出す。
-- 場を開いている間は `onChange(recordId, listener)` を登録し、呼ばれたら `get` で読み直して描き直す（通知に中身は載らない）。
-  画面を離れるときは返り値で外す。通知は届かないことがあるが、SDK が 60 秒ごとに `revision` を確かめて知らせるので、
+- 場を開いている間は `subscribe(record_id)` して `changed(record_id, revision, kind)` シグナルを受け、届いたら `fetch` で読み直して描き直す（通知に中身は載らない）。
+  画面を離れるときは `unsubscribe(record_id)` する。通知は届かないことがあるが、SDK が 60 秒ごとに `revision` を確かめて知らせるので、
   **自前のポーリングは書かない**。
 - `kind` が `left` なら相手が抜けた。どう扱うか（勝ちにする・待つ）は遊びで決め、終わらせるなら `finish` する。
 - ページを開いていない相手には Platform がベルで「あなたの番です」を知らせる（App が通知を送る API は無い）。
 
 ## 5. 招待とマッチング
 
-- 知らない人と: `joinOpen(collection)` で空き席に入る。**`null` なら `create(collection, 初期データ)`** で新しく立てて待つ。
-- 友達と: `create` のあと `app.ui.openInvite({ kind: 'document', recordId })` で Platform の招待画面を出す
+- 知らない人と: `join_open(collection)` で空き席に入る。**`null` なら `create(collection, 初期データ)`** で新しく立てて待つ。
+- 友達と: `create` のあと `TokoyoApp.ui.open_invite(record_id)` で Platform の招待画面を出す
   （招待の URL を App が作ったり表示したりしない）。
-- **匿名の人は場を作れず `joinOpen` もできない**（`FORBIDDEN`）。招待リンクから来た場には入れる。
+- **匿名の人は場を作れず `join_open` もできない**（`FORBIDDEN`）。招待リンクから来た場には入れる。
   `FORBIDDEN` を受けたら「ログインすると相手を探せます。友達の招待からなら今すぐ遊べます」と案内する（責めない書き方で）。
 
 ## 6. 置いてはいけないもの・Platform がしないこと
 
 - **秘密の情報を場に置かない**。メンバーは全員 `data` を読める。相手に見せない手札・伏せたカード・隠した配置は本人の
-  `app.store` に置き、**見せる時点で場へ写す**。
-- 名前・メールなどの個人情報を `data` に入れない（表示名は `get` の `members[].displayName` を使う）。
-- **勝ち負けは Platform の対戦成績に入らない**（画面の判定なので）。順位を残すなら各自が `app.leaderboard.submit()` する。
+  Store（`TokoyoApp.save`）に置き、**見せる時点で場へ写す**。
+- 名前・メールなどの個人情報を `data` に入れない（表示名は `fetch` の `members[].displayName` を使う）。
+- **勝ち負けは Platform の対戦成績に入らない**（画面の判定なので）。順位を残すなら各自が `TokoyoApp.leaderboard.submit()` する。
 - `finish` した場には書けない（`INVALID_ACTION`）。結果の画面を出し、「もう一局」は新しい場で始める。
   最後に書いてから `ttlDays` 日たった場は `finished`（`result` は `{ reason: 'timeout' }`）になるので、その表示も用意する。
 
@@ -112,7 +115,7 @@ Platform が守るのは「誰が読めるか・書けるか」「形（Schema�
 - [ ] 手番制なら `fields.turn` があり、1 回の `update` で `turn` を相手の席に変えている
 - [ ] `create` / `update` で書くキー（`winner` など）が全部 `fields` に宣言してある
 - [ ] 書くたびに `expectedRevision` を渡し、`REVISION_CONFLICT` で読み直している
-- [ ] 起動時に `launchRecordId()` を見ている。`onChange` で読み直し、自前のポーリングが無い
-- [ ] `joinOpen` が `null` のとき `create` している。匿名の `FORBIDDEN` を案内している
+- [ ] 起動時に `launch_record_id()` を見ている。`subscribe` / `changed` で読み直し、自前のポーリングが無い
+- [ ] `join_open` が `null` のとき `create` している。匿名の `FORBIDDEN` を案内している
 - [ ] 秘密の情報・個人情報を場に置いていない。読んだ `data` の形を確かめている
 - [ ] 決着は `update` → `finish`。`finished`（時間切れを含む）の表示がある

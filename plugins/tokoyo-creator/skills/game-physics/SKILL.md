@@ -26,8 +26,8 @@ APIの正本は`<kit>/sdk/app-server-sdk/spec.md`と同梱型。
 - 全入力の型・有限値・範囲・手番・終了済みをサーバーで検証する。時間はctx.dt、乱数はseed付き状態から作る。
 
 `TokoyoSpace`が送るサーバー状態からGodotで描画し、表示だけを補間する。
-GodotとHavok/Rapierは同じ物理結果になるとは限らない。JSのreconciler/rollbackやnative練習シミュレーションは提供しない。
-Web/native共通対戦は`practice:false`。予測位置から被弾・勝敗・成績を確定しない。
+GodotとHavok/Rapierは同じ物理結果になるとは限らない。クライアント予測・reconciler/rollback・練習モードは提供しない。
+補間した表示位置から被弾・勝敗・成績を確定しない。
 teleport/respawnでは補間履歴を捨てる。履歴には上限を置く。
 
 ## 検証

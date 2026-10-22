@@ -3,7 +3,7 @@ name: game-leaderboard
 description: ゲームにランキング（順位表）を付ける。manifest の leaderboards の決め方（並び・自己ベストか最新か・単位・season と自動リセット・range）、スコアを送る瞬間、自己申告と対戦で確定した記録（verified）の違い、順位表の表示と 5 つの状態、匿名の記録が一覧に出ないこと、10,000 位以下の見せ方を扱う。遊びの説明に「ランキング」「順位」「ハイスコア」「スコアアタック」「タイムアタック」「世界で何位」などがあるときに使う。leaderboard, ranking, high score, time attack, season.
 ---
 
-# ランキング（`app.leaderboard`）
+# ランキング（`TokoyoApp.leaderboard`）
 
 **API の正本は `<kit>/sdk/app-sdk/spec.md` §8.1**。先に読む。対戦で確定したスコアを載せるなら
 `<kit>/sdk/app-server-sdk/spec.md` の `ctx.finish` の `scores` も読む。
@@ -29,7 +29,7 @@ Capability が無い、または逆は静的検証が落とす。`sdkVersion` �
 
 ## 2. スコアを送る瞬間
 
-- **1 回の遊びが終わったとき（リザルト画面に入るとき）に 1 回だけ** `app.leaderboard.submit(board, score)` を呼ぶ。
+- **1 回の遊びが終わったとき（リザルト画面に入るとき）に 1 回だけ** `TokoyoApp.leaderboard.submit(board, score)` を呼ぶ（契約は `app.leaderboard.submit`。結果は最後の `Callable` に `(ok, result_or_code)` で返る）。
   プレイ中に毎フレーム・毎得点で送らない（**毎分 12 回まで**。超えると `RATE_LIMITED`）。
 - `requestId` は省いてよい（SDK が振り、届かなければ同じ id で送り直す）。自分で送り直すなら、同じ遊びの
   結果には**同じ `requestId`** を使う。
@@ -57,7 +57,7 @@ Capability が無い、または逆は静的検証が落とす。`sdkVersion` �
 - 自分の位置は `me(board)`（無ければ `null` = まだ記録が無い）と `aroundMe(board, 3)`（自分の前後）。
   `rank` が `null` なら `rankOver`（10000）を使って「10,000 位以下」と出す。
 - 各行は `rank`・`displayName`（空なら「名無し」など）・`score`（`unit` に合わせて整える）・アバター。
-  `avatarUrl` はそのまま `<img src>` に使え、`null` なら頭文字の丸などで代わりに描く。自分の行（`self`）は色を変える。
+  facade（`TokoyoApp.leaderboard`）経由では `avatarUrl` は常に `null` なので、`displayName` の頭文字の丸などで描く。自分の行（`self`）は色を変える。
 - **5 つの状態を全部作る**:
 
 | 状態 | 見せ方 |

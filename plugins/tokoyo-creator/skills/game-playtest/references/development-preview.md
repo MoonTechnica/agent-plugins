@@ -22,11 +22,11 @@ Godotでは`$game-godot`と`$game-3d-and-bundles`の開発シーン・資源寿�
 
 ## 核が遊べるとき
 
-`debug/entry.ts`と`debug/catalog.json`を作る。新規ゲームは通常開始ケースを含める。
+`debug/catalog.json`・`debug/definitions.json`・`debug/presets/`を作る。新規ゲームは通常開始ケースを含める。
 本編の安定したstage/entry/subject IDと進行restoreを使い、所持品、能力、扉、イベント、敵の状態とseedを
 `debug/presets/`へ置く。配列indexや実ユーザーのセーブ、Document ID、tokenをfixtureへ入れない。
-初期保存のACKと必要bundle、衝突、カメラの準備後にSDKの`app.debug.ready`を呼ぶ。失敗は`app.debug.fail`で報告する。
-APIの正確な型は`<kit>/sdk/app-sdk/types/`と`spec.md`を読む。未実装の遠隔操作APIを呼ばない。
+ケースの読み取り・command登録・`ready`/`fail`はGDScriptの`TokoyoApp.debug`で行う（`$game-godot`の「Development preview from GDScript」）。
+初期保存のACKと必要bundle、衝突、カメラの準備後に`TokoyoApp.debug.ready()`を呼ぶ。未実装の遠隔操作APIを呼ばない。
 
 キャラ・機能アイテム・敵・仕掛けの試験場は本編factory/controller、animation、inventory/item effect、AI、
 衝突と保存をそのまま使う。選んだ対象と必要な相手だけを配置する。図形や既存素材で十分な試験に有料素材を生成しない。

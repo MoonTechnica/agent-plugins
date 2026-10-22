@@ -1,9 +1,9 @@
 ---
 name: game-ai
-description: ゲームの中で AI と会話させる（NPC との会話・案内役・物語や選択肢・クエストの生成）。manifest の ai（model・maxOutputTokens・instructionsKey・schema）と ai/*.md の指示文の書き方、Structured Outputs、会話の key の切り方、ストリーミング表示、失敗しても遊べる作り（決まった台詞に戻す）、エラーの見せ方（残高不足は app.ui.openCredits）、1 ターンの費用の目安、匿名と年齢確認の案内がゲームの外で出ること、カメラ・マイクと併用できないことを扱う。遊びの説明に「AI と話す」「NPC と会話」「しゃべるキャラ」「AI が物語を作る」「AI が問題を出す」などがあるときに使う。ai, npc, chat, dialogue, llm, gpt.
+description: ゲームの中で AI と会話させる（NPC との会話・案内役・物語や選択肢・クエストの生成）。manifest の ai（model・maxOutputTokens・instructionsKey・schema）と ai/*.md の指示文の書き方、Structured Outputs、会話の key の切り方、ストリーミング表示、失敗しても遊べる作り（決まった台詞に戻す）、エラーの見せ方（残高不足は TokoyoApp.ui.open_credits）、1 ターンの費用の目安、匿名と年齢確認の案内がゲームの外で出ること、カメラ・マイクと併用できないことを扱う。遊びの説明に「AI と話す」「NPC と会話」「しゃべるキャラ」「AI が物語を作る」「AI が問題を出す」などがあるときに使う。ai, npc, chat, dialogue, llm, gpt.
 ---
 
-# ゲーム内 AI（`app.ai`）
+# ゲーム内 AI（`TokoyoApp.ai`。契約は `app.ai`）
 
 **API の正本は `<kit>/sdk/app-sdk/spec.md` §8.3**。先に読む。
 
@@ -29,11 +29,11 @@ AI は**遊びの味付け**に使う。返事が来なくても・遅くても�
 
 ## 2. 指示文を書く（`ai/<key>.md`）
 
-- Artifact の `ai/` に置く（`src/` ではない。ソースの `ai/` を `build.mjs` で `dist/ai/` へそのまま写す。`kit build` の既定の手順は `ai/` を写さない。`instructions.md` §4.1）。**1 ファイル 8 KiB・8 個まで**、名前は英小文字・数字・`_` `-`（`npc.md` / `merchant.md`）。
+- ゲームのソースの `ai/` に置く（`godot/` の中ではない）。`kit build` が `dist/ai/` へそのまま写す（`build.mjs` は書かない）。**1 ファイル 8 KiB・8 個まで**、名前は英小文字・数字・`_` `-`（`npc.md` / `merchant.md`）。
 - 公開前の検証が DB に写し、**実行時は写しだけ**が使われる。ゲームの中から指示文を渡したり書き換えたりはできない（渡せるのは key だけ）。
 - 書くこと: 役（誰として話すか）・口調・**返事の長さ**（「2 文以内」など。短いほど速くて安い）・知っていること（世界の設定・ゲームのルール）・**知らないことには知らないと答える**・話を逸らされたらゲームの話に戻す。
 - 書かないこと: 秘密（指示文は遊ぶ人から見えない前提にしない）、ゲームの判定そのもの（§5）。
-- 複数の役を出すなら役ごとにファイルを分け、`app.ai.chat({ instructions: 'merchant', ... })` で選ぶ。
+- 複数の役を出すなら役ごとにファイルを分け、`TokoyoApp.ai.chat({"conversation": ..., "message": ..., "instructions": "merchant"})` で選ぶ。
 
 ## 3. Structured Outputs（選択肢・クエスト・問題を JSON で受け取る）
 
@@ -51,20 +51,20 @@ AI は**遊びの味付け**に使う。返事が来なくても・遅くても�
   本登録の 2,000 クレジットで数万ターン。それでも遊ぶ人のお金なので、**無駄に呼ばない**。
 - `maxOutputTokens` の決め方: 台詞なら 150〜300、選択肢や短いクエストの JSON なら 300〜600、物語の 1 場面でも 1000 以下。上限に当たると `incomplete: true`（**その分も課金される**）。
 - 呼ぶのは**遊ぶ人の操作があったときだけ**。毎フレーム・タイマーで勝手に呼ばない。同時に 1 本・毎分 20 回まで（超えると `RATE_LIMITED`）。
-- 同じ遊びの中では同じ `conversation` を使う（Platform が履歴を持つ。App は履歴を送らない）。場面が変わったら別の key にするか `app.ai.reset(key)`。
+- 同じ遊びの中では同じ `conversation` を使う（Platform が履歴を持つ。App は履歴を送らない）。場面が変わったら別の key にするか `TokoyoApp.ai.reset(key)`。
 
 ## 5. 進行を AI に依存させない（必須）
 
 - 勝ち負け・正解・所持品・次のステージへ進めるかは**ゲームのコードが決める**。AI の返事で判定しない（言いくるめられる・毎回違う）。
 - AI を呼ぶ場面には**必ず決まった台詞（フォールバック）を用意**し、失敗・拒否・途中切れのときはそれを出して先へ進める。
 - 返事を待つ間もゲームは止めない（「考え中…」を出す。ストリーミングなら届いた分から表示）。
-- 返事は表示する前に長さを切る（画面からあふれない。`stream: true` の `onToken` の差分をつないで吹き出しに出す）。
+- 返事は表示する前に長さを切る（画面からあふれない。`stream: true` なら `token(request_id, text)` シグナルの差分をつないで吹き出しに出す）。
 
 ## 6. エラーの見せ方（必ず表示する）
 
 | コード | 起きること | 見せ方 |
 |---|---|---|
-| `QUOTA_EXCEEDED` | クレジットが足りない | 「クレジットが足りません」+「クレジットを買う」ボタン → **`app.ui.openCredits()`**（Host の購入画面。開いている間ゲームは `lifecycle` の pause を受ける）。**ゲームの中に購入画面を作らない** |
+| `QUOTA_EXCEEDED` | クレジットが足りない | 「クレジットが足りません」+「クレジットを買う」ボタン → **`TokoyoApp.ui.open_credits()`**（Host の購入画面。開いている間ゲームは `TokoyoApp.lifecycle_changed` で pause を受ける）。**ゲームの中に購入画面を作らない** |
 | `RATE_LIMITED` | 同時・毎分の上限 | 「少し待ってからもう一度」。自動で連打しない |
 | `INVALID_ACTION` | 発話の形が不正、または内容が安全性の検査で止められた（理由は返らない） | 「その言葉には答えられません」+ フォールバックの台詞 |
 | `FORBIDDEN` | 本登録でない・年齢確認がまだ | 普通は起きない（§7）。フォールバックの台詞 |
@@ -83,7 +83,7 @@ AI は**遊びの味付け**に使う。返事が来なくても・遅くても�
 - [ ] `capabilities` に `ai.chat`、`ai` の 4 項目、`ai/<instructionsKey>.md` が Artifact に入っている（ビルドで `dist/ai/` へ写す）
 - [ ] 指示文に役・口調・返事の長さ・知らないときの答え方がある。8 KiB 以内
 - [ ] AI を呼ぶ全部の場面にフォールバックの台詞がある。AI の返事で勝敗・正解を決めていない
-- [ ] 5 つのエラーコードを全部画面に出す。`QUOTA_EXCEEDED` で `app.ui.openCredits()` を呼べる
+- [ ] 5 つのエラーコードを全部画面に出す。`QUOTA_EXCEEDED` で `TokoyoApp.ui.open_credits()` を呼べる
 - [ ] 呼ぶのは操作があったときだけ。`maxOutputTokens` は用途に合った小さい値
 - [ ] `stream: true` なら届いた分から表示し、失敗したら出した差分を消してフォールバックに差し替える
 - [ ] `device.camera` / `device.microphone` を宣言していない

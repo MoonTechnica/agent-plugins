@@ -9,7 +9,8 @@ description: 広い世界を局所的に読み込み、解放して長く遊べ�
 最初から設計し、その上で実描画を測って必要な追加最適化を行う。世界を広げてから基本対策を後付けしない。
 RPGの進行は `$game-design` references/rpg.md。SDK APIの正本は `<kit>/sdk/app-sdk/spec.md`。
 地域の役割・接続・配置・生成候補の選定は `$game-level-design`。このSkillは採用した世界の読み込み・活動範囲・保存を扱う。
-エンジンAPIは固定版Godotの公式マニュアル/API定義で確認する。JSのbundle契約をnativeのPCKへ自動適用しない。
+エンジンAPIは固定版Godotの公式マニュアル/API定義で確認する。世界の素材はすべて1つのPCK（64 MiB以内）に入り、後から取り寄せる配信は無い。
+減らすのはダウンロード量ではなく、同時にメモリへ載せる地域・活動させる処理の量。
 世界規模・活動NPC・生成・描画方式を決める段階で `$game-design` references/performance-risk.md を読み、
 懸念を先に伝え、代表的な地域の最小試作を実描画して比較する。広げてから負荷を調べない。
 
@@ -17,12 +18,12 @@ RPGの進行は `$game-design` references/rpg.md。SDK APIの正本は `<kit>/sd
 
 作者設計の地域データ/tilemap/GLB、seed生成、両者の組み合わせを使える。総面積ではなく現在の負荷を限定する。
 部屋/場所を切り替える世界も使える。切替方式と実世界/マップメニューの対応は `$game-level-design`
-references/transitions-and-map.md。地域/部屋・bundle・chunkを同じ単位と決めつけず、小さい場所切替へ半径式の管理を強制しない。
+references/transitions-and-map.md。地域/部屋・シーン・chunkを同じ単位と決めつけず、小さい場所切替へ半径式の管理を強制しない。
 
 - 地形はチャンクへ分割する。32mや32–64tileは初期候補であり保証値ではない。
 - 読み込み半径r、保持半径r+1、描画、physics、AI、骨格animationの範囲を別に決める。
   r=2なら読み込み25に対し保持集合の保守的上限49。r=3なら49に対し81。
-- pointer:coarseは操作方式の判定だけ。スマホ/PCやWebGPU対応だけで性能を判断しない。
+- タッチの有無は操作方式の判定だけ。スマホ/PCの別や描画方式だけで性能を判断しない。
 - 中心チャンク/進行方向が変わった時にqueueを更新する。全候補を毎frame配列化/sortしない。
 - 近傍NPCの感知/経路探索だけ更新し、時間分散と要求上限を持つ。不可視meshにも計算が残り得る。
 - 表示と衝突が準備できるまで未ロード地域へ進めない。teleportはロード画面と進捗を用意する。
@@ -31,51 +32,58 @@ references/transitions-and-map.md。地域/部屋・bundle・chunkを同じ単�
 
 ## 2. 時間予算と取消
 
-「1フレーム1チャンク」は停止時間を保証しない。生成/組立/decode/GPU登録/解放を小さな工程に分ける。
+「1フレーム1チャンク」は停止時間を保証しない。生成/組立/load/instantiate/解放を小さな工程に分け、
+`_process` の中で時間予算を見ながら少しずつ進める。Web は single-threaded、iOS の組み込み runtime では
+スクリプトが作るスレッドと `WorkerThreadPool` が使えないので、重い処理をスレッドへ逃がす設計にしない。
 
-```ts
-import { createWorkQueue, createFrameStats } from '@workspace/app-sdk/runtime'
-const work = createWorkQueue({ maxPending: 128, maxSteps: 32 })
-const frames = createFrameStats()
-function frame() {
-  frames.record(performance.now()) // 平滑化されたsimulation deltaを実frame時間の計測に使わない
-  work.tick(2)                    // 調整用初期値。同期step自体は中断できない
-  // 既存engineのupdate/renderを続ける。第二のRAFを作らない
-}
-function* buildRegion() {
-  // 小さな単位でCPU生成しyield。最後にengineへ登録する
-  // 取消時はfinallyで未登録の地域専用資源を解放する
-}
-work.add('region-id', buildRegion())
+```gdscript
+const BUDGET_USEC := 2000          # 調整用の初期値。1つの工程そのものは途中で止められない
+var _jobs: Array[Dictionary] = []  # {id, steps: Array[Callable], next: int}
+
+func _process(_delta: float) -> void:
+	var start := Time.get_ticks_usec()
+	while not _jobs.is_empty() and Time.get_ticks_usec() - start < BUDGET_USEC:
+		var job: Dictionary = _jobs[0]
+		job.steps[job.next].call()   # 地形 1 行・配置 1 塊・instantiate 1 つ、のように小さく
+		job.next += 1
+		if job.next >= job.steps.size():
+			_jobs.pop_front()
+
+func cancel(region_id: String) -> void:
+	# 取り消した地域で作りかけの Node は queue_free() し、登録前の Resource 参照を手放す
+	_jobs = _jobs.filter(func(j): return j.id != region_id)
 ```
 
-- 地域離脱でwork.cancel(id)。通信の後着は世代/所有を照合し、不要meshを登録せず解放する。
-- 大きな同期decode/uploadをasync関数で包むだけでは分割にならない。素材分割と段階別測定が先。
+- 地域離脱でその地域のjobを取り消す。後から完了したものは世代/所有を照合し、不要なNodeを木に入れず解放する。
+- 大きな同期load/instantiateを別の関数に包むだけでは分割にならない。地域シーンの分割と段階別測定が先。
 - pauseで時計の基準をresetしsimulationを止める。通常の低FPSを一律33ms capで遅くしない。
-- frame p50/p95/p99と最大停止、各jobの時間を記録。CPU描画時間はGPU完了時間ではない。
+- 実frame時間（`Time.get_ticks_usec()` の差）を有限の履歴に残してp50/p95/p99と最大停止、各jobの時間を出し、`TokoyoApp.report()` で記録する。
+  `Performance` の `TIME_PROCESS` などはCPU側の時間で、GPU完了時間ではない。
 
 ## 3. 資源の所有と地域素材
 
-bundles/<地域>/へ素材/定義を置きmanifestへ宣言。使う前にapp.bundles.load(name)を待つ。
-隣地域はapp.bundles.hint(neighbors)（最大8名）で先読みできる。
-Cacheありの先読みは永続cacheへ、なしの場合はHost保持32MiB予算。decode/GPUメモリとは別。
+地域ごとの素材と定義は `godot/` の地域ごとのフォルダ（地域のシーン `.tscn` と、その地域だけが使う素材）に置く。
+すべて同じPCKに入り、`manifest.json` の `bundles` は `godot_native` だけ（地域の宣言は無い）。
+地域のシーンは近づいたときに `load()`（または `ResourceLoader.load()`）して工程を分けて instantiate し、隣地域は
+保持半径に入った時点で読み始める。PCKのファイルを読むことと、decode/GPUに載ったメモリは別に数える。
 
 - 地域専用資源と常駐/共有資源を分け、最後の利用者が共有資源を解放する。
 - Godotの地域Nodeはqueue_free()し、autoload・signal・キャッシュがResource参照を保持していないか調べる。
   共有material/textureは最後の利用者が解放する。MultiMeshは地域×モデル単位にし、活動範囲を制限する。
-- engine資源を片付けてからapp.bundles.unload(name)。URL revokeだけではGPU/audioは解放されない。
-- loading中unloadは旧loadを拒否し、不要な後着をURL化しない。再loadは未完了の同じ不変bundleに合流する。
-  複数地域が同じbundleを借りるなら利用者数を管理し、最後の利用者だけunloadする。
+- 地域を離れたらその地域のNodeを`queue_free()`し、地域専用のResourceへの参照（変数・辞書・キャッシュ）を消す。参照が残る限りGPU/audioは解放されない。
+- 読み込み中に離れたら、後から届いた結果を木に入れず捨てる。同じ地域を読み直すときは進行中の読み込みに合流する。
+  複数地域が同じ素材を借りるなら利用者数を管理し、最後の利用者だけが参照を手放す。
 
 ## 4. 決定的生成と保存
 
 - 生成worldはseed＋生成方式version＋安定ID＋差分＋位置/進行を保存。作者設計worldは定義版＋安定ID＋進行。
-- 生成は描画から分離し整数hash/seed付き乱数を使う。Math.randomや実装依存sin noiseを使わない。
+- 生成は描画から分離し整数hashと`seed`を固定した`RandomNumberGenerator`を使う。グローバルの`randf()`/`randomize()`や実装依存のsin noiseを使わない。
   同seed/version/座標の再現と境界一致を検査。camera方向のsin/cosは生成ではない。
-- 改変はblobへ。上限1MiBはgzip+base64後の最終JSON UTF-8。圧縮だけで無限改変を保証しない。
+- 改変はStoreの`blob`フィールドへ。上限1MiBはgzip+base64後の最終JSON UTF-8。圧縮だけで無限改変を保証しない。
 - 活動中の定期/重要進行時にdirtyをまとめ、毎分12write以内で保存する。
-  createCheckpointで単一flight/固定snapshot/同requestId再送/ACKした変更だけ確認できる。
-- onPauseでstore APIを呼ばない（paused中は拒否）。入力/simulationを止め、resume後に未保存分を再試行する。
+  `TokoyoApp.save()` は保存中の次の保存を1つにまとめ、revisionとrequest IDを付ける。`save_status()` / `store_saved` で確定を確かめ、`failed` なら同じ内容を再試行する。
+  保存する値は保存時点の小さな写し（`duplicate(true)`）にし、巨大なworldやNodeを渡さない。
+- `TokoyoApp.is_paused()` の間はsaveしない（paused中は拒否）。入力/simulationを止め、resume後に未保存分を再試行する。
   OS終了前の非同期完了は保証しない。未保存/最後の確定/競合/容量超過を画面で知らせる。
 - 毎保存で最新revisionだけreadして古いローカルworldを上書きしない。起動revision→ACK revisionを使う。
 - 生成版変更/rollbackで旧IDが別物を指さないようにする。読めない旧セーブを消して新worldにしない。
@@ -93,7 +101,7 @@ groupは同時保持の宣言であり実行時の保持数を強制しない。
 
 ルール/敵/改変は `$game-multiplayer` のサーバー権威。次回のworldは `$game-documents`、個人持ち物はstore。
 共有documentのサイズ/件数/失効/書込権を守る。1卓は最長30分でソロの総プレイ時間制限ではない。
-**上限前から定期チェックポイント。timeoutのonFinishで初めて保存しない。** 切断/所有者交代/競合を定義し、
+**上限前から定期チェックポイント。timeoutの`finished`で初めて保存しない。** 切断/所有者交代/競合を定義し、
 終了前に知らせ次の卓から続ける導線を作る。永久共有世界や無期限卓を既存SDKが保証すると説明しない。
 
 ## 7. チェック

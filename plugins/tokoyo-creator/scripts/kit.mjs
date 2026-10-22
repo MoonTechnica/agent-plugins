@@ -23689,15 +23689,12 @@ var ARTIFACT_MAX_BYTES = 4 * 1024 * 1024 * 1024;
 var ARTIFACT_ARCHIVE_UNPACKED_MAX_BYTES = 1024 * 1024 * 1024;
 var ARTIFACT_FILE_MAX_BYTES = 64 * 1024 * 1024;
 var ARTIFACT_MAX_FILES = 20000;
-var ARTIFACT_LEDGER_FILE_MAX_BYTES = 256 * 1024 * 1024;
 var ARTIFACT_INITIAL_MAX_BYTES = 64 * 1024 * 1024;
 var ARTIFACT_INITIAL_WARN_BYTES = 10 * 1024 * 1024;
 var ARTIFACT_MEMORY_WARN_BYTES = 512 * 1024 * 1024;
 var ARTIFACT_MEMORY_STRONG_WARN_BYTES = 768 * 1024 * 1024;
-var ARTIFACT_MAX_BUNDLES = 512;
 var ARTIFACT_BUNDLE_MAX_BYTES = 256 * 1024 * 1024;
 var ARTIFACT_WIFI_NOTICE_BYTES = 200 * 1024 * 1024;
-var BUNDLE_HINT_MAX_NAMES = 8;
 var STORE_MAX_BYTES = 1024 * 1024;
 var SPACE_MESSAGE_MAX_BYTES = 4 * 1024;
 var SPACE_MIN_DURATION_SEC = 30;
@@ -23748,8 +23745,6 @@ var ORIENTATIONS = ["portrait", "landscape", "any"];
 var orientationSchema = exports_external.enum(ORIENTATIONS);
 var GAMEPAD_SUPPORTS = ["full", "partial", "none"];
 var gamepadSupportSchema = exports_external.enum(GAMEPAD_SUPPORTS);
-var SAFE_AREA_MODES = ["host", "app"];
-var safeAreaModeSchema = exports_external.enum(SAFE_AREA_MODES);
 var artifactPathSchema = exports_external.string().min(1).max(255).regex(/^[A-Za-z0-9._-]+(?:\/[A-Za-z0-9._-]+)*$/, "must be a relative path inside the artifact").refine((path) => path.split("/").every((segment) => segment !== "." && segment !== ".."), 'must not contain "." or ".." segments');
 var spaceRoleIdSchema = exports_external.string().regex(/^[A-Za-z_][A-Za-z0-9_]{0,31}$/, "must be an identifier");
 var spaceRoleSchema = exports_external.strictObject({
@@ -23777,8 +23772,7 @@ var spaceParticipantsSchema = exports_external.strictObject({
 var spaceManifestSchema = exports_external.strictObject({
   server: artifactPathSchema,
   participants: spaceParticipantsSchema,
-  maxDurationSec: exports_external.int().min(SPACE_MIN_DURATION_SEC).max(SPACE_MAX_DURATION_SEC).default(SPACE_DEFAULT_DURATION_SEC),
-  practice: exports_external.boolean().default(false)
+  maxDurationSec: exports_external.int().min(SPACE_MIN_DURATION_SEC).max(SPACE_MAX_DURATION_SEC).default(SPACE_DEFAULT_DURATION_SEC)
 });
 var STORE_FIELD_TYPES = ["string", "number", "boolean", "object", "array", "blob"];
 var storeFieldTypeSchema = exports_external.enum(STORE_FIELD_TYPES);
@@ -23791,12 +23785,10 @@ var storeSchemaSchema = exports_external.strictObject({
   fields: exports_external.record(storeFieldNameSchema, storeFieldSchema)
 });
 var bundleNameSchema = exports_external.string().regex(/^[a-z0-9][a-z0-9_-]{0,31}$/, "invalid bundle name");
-var BUNDLE_LOADS = ["background", "demand"];
-var bundleManifestSchema = exports_external.strictObject({
-  load: exports_external.enum(BUNDLE_LOADS).default("demand"),
-  group: bundleNameSchema.optional()
+var GODOT_NATIVE_BUNDLE = "godot_native";
+var bundlesManifestSchema = exports_external.strictObject({
+  [GODOT_NATIVE_BUNDLE]: exports_external.strictObject({ load: exports_external.literal("demand") })
 });
-var bundlesManifestSchema = exports_external.record(bundleNameSchema, bundleManifestSchema).refine((bundles) => Object.keys(bundles).length <= ARTIFACT_MAX_BUNDLES, `at most ${ARTIFACT_MAX_BUNDLES} bundles`);
 var lowerIdentifierSchema = exports_external.string().regex(/^[a-z][a-z0-9_]{0,31}$/, "must be a lowercase identifier");
 var LEADERBOARD_ORDERS = ["desc", "asc"];
 var LEADERBOARD_KEEPS = ["best", "latest"];
@@ -23860,8 +23852,6 @@ var aiManifestSchema = exports_external.strictObject({
   instructionsKey: exports_external.string().regex(/^[a-z0-9][a-z0-9_-]{0,31}$/, "must be a file name in ai/"),
   schema: exports_external.string().regex(/^ai\/schemas\/[A-Za-z0-9_-]{1,64}\.json$/, "must be a file in ai/schemas/").nullable().default(null)
 });
-var RENDERERS = ["webgpu", "webgl2", "webgl", "canvas2d"];
-var rendererSchema = exports_external.enum(RENDERERS);
 var deviceFeatureSchema = exports_external.strictObject({
   purpose: exports_external.string().min(1).max(80).optional(),
   required: exports_external.boolean().default(false)
@@ -23873,6 +23863,7 @@ var deviceManifestSchema = exports_external.strictObject({
   pointerLock: deviceFeatureSchema.optional()
 });
 var GODOT_VERSION = "4.5.1";
+var GODOT_ENTRYPOINT = "app.bundle.js";
 var godotManifestSchema = exports_external.strictObject({
   version: exports_external.literal(GODOT_VERSION),
   web: exports_external.strictObject({
@@ -23890,7 +23881,7 @@ var manifestSchema = exports_external.strictObject({
   contentRating: exports_external.union([exports_external.literal("all"), exports_external.literal(13), exports_external.literal(16), exports_external.literal(18)]).optional(),
   runtimeVersion: exports_external.int().min(1),
   sdkVersion: exports_external.literal(SDK_VERSION),
-  entrypoint: artifactPathSchema,
+  entrypoint: exports_external.literal(GODOT_ENTRYPOINT),
   space: spaceManifestSchema.nullable().default(null),
   orientation: orientationSchema.default("any"),
   gamepad: gamepadSupportSchema.default("none"),
@@ -23898,30 +23889,13 @@ var manifestSchema = exports_external.strictObject({
   storeSchema: storeSchemaSchema.nullable().default(null),
   capabilities: exports_external.array(capabilitySchema).default([]),
   externalNetwork: exports_external.boolean().default(false),
-  bundles: bundlesManifestSchema.default({}),
+  bundles: bundlesManifestSchema,
   leaderboards: leaderboardsManifestSchema.default({}),
   documentSchemaVersion: exports_external.int().min(1).default(1),
   documentSchema: documentSchemaSchema.nullable().default(null),
   ai: aiManifestSchema.nullable().default(null),
-  renderer: rendererSchema.default("webgpu"),
   device: deviceManifestSchema.default({}),
-  safeArea: safeAreaModeSchema.optional(),
-  godot: godotManifestSchema.optional()
-}).superRefine((manifest, ctx) => {
-  if (!manifest.godot)
-    return;
-  if (manifest.renderer !== "webgl2")
-    ctx.addIssue({
-      code: "custom",
-      path: ["renderer"],
-      message: "Godot Web requires Compatibility/WebGL2"
-    });
-  if (manifest.bundles.godot_native?.load !== "demand")
-    ctx.addIssue({
-      code: "custom",
-      path: ["bundles", "godot_native"],
-      message: "native packs require a demand-only bundle"
-    });
+  godot: godotManifestSchema
 });
 function sortKeysDeep(value) {
   if (Array.isArray(value)) {
@@ -23988,11 +23962,7 @@ var artifactIndexSchema = exports_external.strictObject({
     path: artifactPathSchema,
     sha256: exports_external.string().regex(SHA256_HEX),
     size: exports_external.int().min(0),
-    mime: exports_external.string().regex(/^[\w.+-]+\/[\w.+-]+$/, "must be a MIME type"),
-    source: exports_external.literal("ledger").optional(),
-    assetId: exports_external.uuid().optional()
-  }).refine((file2) => file2.source === undefined === (file2.assetId === undefined), {
-    message: "source and assetId go together"
+    mime: exports_external.string().regex(/^[\w.+-]+\/[\w.+-]+$/, "must be a MIME type")
   })).min(1)
 });
 // frontend/packages/app-protocol/src/bundles.ts
@@ -24047,24 +24017,16 @@ function planBundles(manifest, files) {
       findings.push({
         code: "BUNDLE_TOO_LARGE",
         severity: "error",
-        message: `bundle "${name}" totals ${bundle.size} bytes (max ${ARTIFACT_BUNDLE_MAX_BYTES}); split it into smaller bundles`,
+        message: `bundle "${name}" totals ${bundle.size} bytes (max ${ARTIFACT_BUNDLE_MAX_BYTES})`,
         path: `${BUNDLES_DIR}/${name}/`
       });
     }
-  }
-  if (manifest.entrypoint.split("/")[0] === BUNDLES_DIR) {
-    findings.push({
-      code: "ENTRYPOINT_IN_BUNDLE",
-      severity: "error",
-      message: "the entrypoint must be outside bundles/ so it can load before launch",
-      path: manifest.entrypoint
-    });
   }
   if (initial.size > ARTIFACT_INITIAL_MAX_BYTES) {
     findings.push({
       code: "INITIAL_BUNDLE_TOO_LARGE",
       severity: "error",
-      message: `the files outside bundles/ total ${initial.size} bytes (max ${ARTIFACT_INITIAL_MAX_BYTES}); move assets into bundles/<name>/`
+      message: `the files outside bundles/ total ${initial.size} bytes (max ${ARTIFACT_INITIAL_MAX_BYTES}); make the Godot pack smaller`
     });
   } else if (initial.size > ARTIFACT_INITIAL_WARN_BYTES) {
     findings.push({
@@ -24075,17 +24037,6 @@ function planBundles(manifest, files) {
   }
   return { plan: { initial, bundles }, findings };
 }
-
-// frontend/packages/app-protocol/src/bundle-refs.ts
-var BUNDLE_REFS_PATH = "bundle-refs.json";
-var BUNDLE_REFS_SOURCE_PATH = "bundles.refs.json";
-var bundledPathSchema = artifactPathSchema.refine((path) => {
-  const segments = path.split("/");
-  return segments.length >= 3 && segments[0] === BUNDLES_DIR;
-}, { message: `a referenced file must be under ${BUNDLES_DIR}/<name>/` });
-var bundleRefsSchema = exports_external.strictObject({
-  refs: exports_external.record(bundledPathSchema, exports_external.uuid())
-});
 // frontend/packages/app-protocol/src/commerce.ts
 var coins = exports_external.string().regex(/^[0-9]{1,14}(\.[0-9]{1,6})?$/);
 var commercePurchasePayloadSchema = exports_external.strictObject({
@@ -24391,9 +24342,6 @@ var spaceConnectionSchema = exports_external.strictObject({
   url: exports_external.url(),
   token: exports_external.string().min(1)
 });
-var spacePracticeSchema = exports_external.strictObject({
-  role: exports_external.string().min(1)
-});
 var safeAreaInsetsSchema = exports_external.strictObject({
   top: exports_external.number().min(0),
   right: exports_external.number().min(0),
@@ -24405,19 +24353,16 @@ var contextPayloadSchema = exports_external.strictObject({
   capabilities: exports_external.array(capabilitySchema),
   api: apiContextSchema,
   space: spaceConnectionSchema.optional(),
-  practice: spacePracticeSchema.optional(),
   paused: exports_external.boolean().optional(),
-  safeArea: safeAreaInsetsSchema.optional(),
   documentId: exports_external.uuid().optional()
 });
-var notBothSpaceAndPractice = (value) => value.space === undefined || value.practice === undefined;
 var contextMessageSchema = contextPayloadSchema.extend({
   type: exports_external.literal("context"),
   executionMode: exports_external.enum(["production", "playtest", "debug"]),
   launchId: exports_external.uuid(),
   debug: debugLaunchSchema.optional()
-}).refine(notBothSpaceAndPractice, "space and practice are exclusive").refine((v) => v.executionMode === "debug" ? !!v.debug && !!v.launchId && !v.space && !v.documentId : v.debug === undefined, "invalid development context");
-var contextUpdateMessageSchema = contextPayloadSchema.partial().extend({ type: exports_external.literal("context_update") }).refine(notBothSpaceAndPractice, "space and practice are exclusive");
+}).refine((v) => v.executionMode === "debug" ? !!v.debug && !!v.launchId && !v.space && !v.documentId : v.debug === undefined, "invalid development context");
+var contextUpdateMessageSchema = contextPayloadSchema.partial().extend({ type: exports_external.literal("context_update") });
 function isArrayBuffer(value) {
   return Object.prototype.toString.call(value) === "[object ArrayBuffer]";
 }
@@ -24427,45 +24372,14 @@ var artifactFileSchema = exports_external.strictObject({
   size: exports_external.int().min(0),
   bytes: exports_external.custom(isArrayBuffer, "must be an ArrayBuffer")
 });
-var bundleSummarySchema = exports_external.strictObject({
-  load: exports_external.enum(BUNDLE_LOADS),
-  size: exports_external.int().min(0),
-  files: exports_external.int().min(0)
-});
 var artifactMessageSchema = exports_external.strictObject({
   type: exports_external.literal("artifact"),
   entrypoint: artifactPathSchema,
-  files: exports_external.array(artifactFileSchema),
-  bundles: exports_external.record(bundleNameSchema, bundleSummarySchema).default({})
+  files: exports_external.array(artifactFileSchema)
 });
 var bootMessageSchema = exports_external.strictObject({
   type: exports_external.literal("boot"),
   ok: exports_external.boolean()
-});
-var bundleRequestMessageSchema = exports_external.strictObject({
-  type: exports_external.literal("bundle_request"),
-  name: bundleNameSchema
-});
-var bundleHintMessageSchema = exports_external.strictObject({
-  type: exports_external.literal("bundle_hint"),
-  names: exports_external.array(bundleNameSchema).max(BUNDLE_HINT_MAX_NAMES)
-});
-var bundleMessageSchema = exports_external.strictObject({
-  type: exports_external.literal("bundle"),
-  name: bundleNameSchema,
-  files: exports_external.array(artifactFileSchema)
-});
-var bundleErrorMessageSchema = exports_external.strictObject({
-  type: exports_external.literal("bundle_error"),
-  name: bundleNameSchema,
-  code: errorCodeSchema,
-  retryable: exports_external.boolean()
-});
-var bundleProgressMessageSchema = exports_external.strictObject({
-  type: exports_external.literal("bundle_progress"),
-  name: bundleNameSchema,
-  loaded: exports_external.int().min(0),
-  total: exports_external.int().min(0)
 });
 var avatarKeySchema = exports_external.string().min(1).max(512).regex(/^(?!\/)(?!.*(?:^|\/)\.\.(?:\/|$))[A-Za-z0-9._\-/]+$/, "must be a storage key");
 var avatarRequestMessageSchema = exports_external.strictObject({
@@ -24628,9 +24542,6 @@ var hostToShellMessageSchema = exports_external.union([
   artifactMessageSchema,
   replyMessageSchema,
   lifecycleMessageSchema,
-  bundleMessageSchema,
-  bundleErrorMessageSchema,
-  bundleProgressMessageSchema,
   avatarMessageSchema,
   documentsChangedMessageSchema,
   deviceStreamMessageSchema,
@@ -24648,8 +24559,6 @@ var shellToHostMessageSchema = exports_external.union([
   debugResumedMessageSchema,
   helloMessageSchema,
   opMessageSchema,
-  bundleRequestMessageSchema,
-  bundleHintMessageSchema,
   avatarRequestMessageSchema,
   spaceEndedMessageSchema
 ]);
@@ -24991,7 +24900,7 @@ var CODE_RULES = [
   },
   {
     code: "EVAL",
-    pattern: /\beval\s*\(|new\s+Function\s*\((?!\s*(['"])return this\1\s*\))/,
+    pattern: /\beval\s*\(|\bnew\s+Function\s*\(/,
     severity: "error",
     why: "eval / new Function build code at runtime (the Shell's CSP forbids it too)"
   },
@@ -25116,17 +25025,10 @@ function validateStatic(files, options = {}) {
     });
   }
   errors3.push(...checkStoreSchema(options.previousStoreSchema ?? null, manifest.storeSchema, manifest.storeSchemaVersion));
-  const entrypoint = byPath.get(manifest.entrypoint);
-  if (!entrypoint) {
+  if (!byPath.has(manifest.entrypoint)) {
     errors3.push({
       code: "MISSING_ENTRYPOINT",
       message: `the manifest points at "${manifest.entrypoint}", which is not in the artifact`,
-      path: manifest.entrypoint
-    });
-  } else if (!trustedGodot && manifest.gamepad !== "none" && !decode3(entrypoint).includes("getGamepads")) {
-    errors3.push({
-      code: "GAMEPAD_DECLARED_BUT_UNUSED",
-      message: `the manifest declares gamepad "${manifest.gamepad}" but "${manifest.entrypoint}" never calls getGamepads()`,
       path: manifest.entrypoint
     });
   }
@@ -25176,7 +25078,7 @@ function validateStatic(files, options = {}) {
       continue;
     if (manifest.space && file2.path === manifest.space.server)
       continue;
-    if (trustedGodot && file2.path === manifest.godot?.web.glue)
+    if (trustedGodot && file2.path === manifest.godot.web.glue)
       continue;
     const source = decode3(file2);
     for (const rule of CODE_RULES) {
@@ -25200,8 +25102,6 @@ function validateStatic(files, options = {}) {
   return { manifest, errors: errors3, warnings, aiPrompts };
 }
 function validateGodotReferences(manifest, byPath, errors3) {
-  if (!manifest.godot)
-    return false;
   const resources = [
     [manifest.godot.web.glue, ".js"],
     [manifest.godot.web.wasm, ".wasm"],
@@ -25238,17 +25138,15 @@ function validateGodotReferences(manifest, byPath, errors3) {
   return trusted;
 }
 function clientSources(manifest, files) {
-  return files.filter((file2) => [".js", ".mjs", ".html"].includes(extensionOf(file2.path))).filter((file2) => !(manifest.space && file2.path === manifest.space.server)).filter((file2) => file2.path !== manifest.godot?.web.glue).map(decode3);
+  return files.filter((file2) => [".js", ".mjs", ".html"].includes(extensionOf(file2.path))).filter((file2) => !(manifest.space && file2.path === manifest.space.server)).filter((file2) => file2.path !== manifest.godot.web.glue).map(decode3);
 }
 var DEVICE_FEATURES = ["camera", "microphone", "motion", "pointerLock"];
 var DEVICE_USAGE = {
   camera: /\bdevice\s*\.\s*camera\b/,
   microphone: /\bdevice\s*\.\s*microphone\b/,
   motion: /\bdevice\s*\.\s*motion\b/,
-  pointerLock: /(?<!\.webkitRequestPointerLock,[\w$]+\.)\brequestPointerLock\s*\(/
+  pointerLock: /\brequestPointerLock\s*\(/
 };
-var USES_WEBGPU = /\bWebGPUEngine\b|\bWebGPURenderer\b|['"]three\/webgpu['"]|\bnavigator\s*\.\s*gpu\b/;
-var USES_WEBGL = /\bThinEngine\b|\bWebGLRenderer\b|getContext\s*\(\s*['"](?:webgl2?|experimental-webgl)['"]/;
 function validateFeatures(manifest, files, options, errors3, warnings) {
   const declares = (capability) => manifest.capabilities.includes(capability);
   const sources = clientSources(manifest, files);
@@ -25362,16 +25260,6 @@ function validateFeatures(manifest, files, options, errors3, warnings) {
     warnings.push({
       code: "CAPTURE_SELF_FULLSCREEN",
       message: "a game that uses device.camera / device.microphone cannot go fullscreen by itself (requestFullscreen() is refused); leave it to the fullscreen button of the player"
-    });
-  }
-  const webgpu = uses(USES_WEBGPU);
-  const webgl = uses(USES_WEBGL);
-  const mismatch = manifest.renderer === "webgpu" && !webgpu || manifest.renderer === "webgl2" && webgpu || manifest.renderer === "webgl" && (webgpu || !webgl) || manifest.renderer === "canvas2d" && (webgpu || webgl);
-  if (mismatch) {
-    const found = webgpu ? "uses a WebGPU engine" : webgl ? "uses WebGLRenderer" : "does not create a declared GPU context";
-    warnings.push({
-      code: "RENDERER_MISMATCH",
-      message: `the manifest declares renderer "${manifest.renderer}" but the code ${found}`
     });
   }
   if (ai === null)
@@ -25720,7 +25608,7 @@ function assertSafePath(path) {
     throw new ImportError("EMPTY_SEGMENT", `empty path segment: ${path}`);
   }
 }
-async function importArtifact(archive, ledger = []) {
+async function importArtifact(archive) {
   if (archive.byteLength > ARTIFACT_ARCHIVE_MAX_BYTES) {
     throw new ImportError("ARCHIVE_TOO_LARGE", `the archive is ${archive.byteLength} bytes (max ${ARTIFACT_ARCHIVE_MAX_BYTES})`);
   }
@@ -25764,7 +25652,7 @@ async function importArtifact(archive, ledger = []) {
     }
     totalBytes += bytes.byteLength;
     if (totalBytes > ARTIFACT_ARCHIVE_UNPACKED_MAX_BYTES) {
-      throw new ImportError("ARTIFACT_TOO_LARGE", `the archive exceeds ${ARTIFACT_ARCHIVE_UNPACKED_MAX_BYTES} bytes once unpacked; reference large assets from the ledger`);
+      throw new ImportError("ARTIFACT_TOO_LARGE", `the archive exceeds ${ARTIFACT_ARCHIVE_UNPACKED_MAX_BYTES} bytes once unpacked`);
     }
     if (files.length >= ARTIFACT_MAX_FILES) {
       throw new ImportError("TOO_MANY_FILES", `the artifact has more than ${ARTIFACT_MAX_FILES} files`);
@@ -25774,73 +25662,9 @@ async function importArtifact(archive, ledger = []) {
   if (files.length === 0) {
     throw new ImportError("EMPTY_ARTIFACT", "the archive contains no files");
   }
-  totalBytes += await admitLedger(files, ledger === "unresolved" ? await placeholdersFor(files) : ledger, totalBytes);
   files.sort((a, b) => a.path < b.path ? -1 : a.path > b.path ? 1 : 0);
   const artifactHash = await computeArtifactHash(files);
   return { files, artifactHash, totalBytes };
-}
-async function placeholdersFor(files) {
-  const refsFile = files.find((file2) => file2.path === BUNDLE_REFS_PATH);
-  if (!refsFile)
-    return [];
-  const parsed = bundleRefsSchema.safeParse((() => {
-    try {
-      return JSON.parse(new TextDecoder().decode(refsFile.bytes));
-    } catch {
-      return null;
-    }
-  })());
-  if (!parsed.success)
-    return [];
-  const empty = new Uint8Array(0);
-  const sha256 = await hashArtifactFile(empty);
-  return Object.keys(parsed.data.refs).map((path) => ({ path, sha256, size: 0, bytes: empty }));
-}
-async function admitLedger(files, ledger, totalBefore) {
-  const refsFile = files.find((file2) => file2.path === BUNDLE_REFS_PATH);
-  let referenced = [];
-  if (refsFile) {
-    let parsed;
-    try {
-      parsed = JSON.parse(new TextDecoder().decode(refsFile.bytes));
-    } catch (cause) {
-      throw new ImportError("BUNDLE_REFS_INVALID", `${BUNDLE_REFS_PATH} is not JSON: ${cause}`);
-    }
-    const refs = bundleRefsSchema.safeParse(parsed);
-    if (!refs.success) {
-      throw new ImportError("BUNDLE_REFS_INVALID", `${BUNDLE_REFS_PATH}: ${refs.error.message}`);
-    }
-    referenced = Object.keys(refs.data.refs).sort();
-  }
-  const given = ledger.map((file2) => file2.path).sort();
-  if (referenced.join(`
-`) !== given.join(`
-`)) {
-    throw new ImportError("LEDGER_MISMATCH", `the archive references ${referenced.length} ledger files but ${given.length} were given`);
-  }
-  let added = 0;
-  const seen = new Set(files.map((file2) => file2.path));
-  for (const file2 of ledger) {
-    if (seen.has(file2.path)) {
-      throw new ImportError("DUPLICATE_ENTRY", `${file2.path} is both in the archive and referenced`);
-    }
-    if (file2.bytes.byteLength > ARTIFACT_LEDGER_FILE_MAX_BYTES) {
-      throw new ImportError("FILE_TOO_LARGE", `${file2.path} is ${file2.bytes.byteLength} bytes (max ${ARTIFACT_LEDGER_FILE_MAX_BYTES})`);
-    }
-    if (await hashArtifactFile(file2.bytes) !== file2.sha256) {
-      throw new ImportError("HASH_MISMATCH", `${file2.path} does not match the ledger's sha256`);
-    }
-    added += file2.bytes.byteLength;
-    if (totalBefore + added > ARTIFACT_MAX_BYTES) {
-      throw new ImportError("ARTIFACT_TOO_LARGE", `the artifact exceeds ${ARTIFACT_MAX_BYTES} bytes with its referenced assets`);
-    }
-    files.push({ ...file2, size: file2.bytes.byteLength });
-  }
-  if (files.length > ARTIFACT_MAX_FILES) {
-    throw new ImportError("TOO_MANY_FILES", `the artifact has more than ${ARTIFACT_MAX_FILES} files`);
-  }
-  files.sort((a, b) => a.path < b.path ? -1 : a.path > b.path ? 1 : 0);
-  return added;
 }
 // frontend/node_modules/property-graph/dist/index.mjs
 var EventDispatcher = class {
@@ -39712,38 +39536,20 @@ async function estimateMemory(manifest, files) {
     bundles[name] = size.size;
     fallbackBundles[name] = size.fallback;
   }
-  const groups = {};
-  const singles = [];
-  for (const [name, size] of Object.entries(bundles)) {
-    const group = manifest.bundles[name]?.group;
-    if (group === undefined)
-      singles.push(size);
-    else
-      groups[group] = (groups[group] ?? 0) + size;
-  }
-  const peak = initial + Math.max(0, ...singles, ...Object.values(groups));
-  const fallbackGroups = {};
-  const fallbackSingles = [];
-  for (const [name, size] of Object.entries(fallbackBundles)) {
-    const group = manifest.bundles[name]?.group;
-    if (group === undefined)
-      fallbackSingles.push(size);
-    else
-      fallbackGroups[group] = (fallbackGroups[group] ?? 0) + size;
-  }
-  const fallbackPeak = initialSize.fallback + Math.max(0, ...fallbackSingles, ...Object.values(fallbackGroups));
-  const advice = "Prefer KTX2 textures (8 bpp instead of 32), shrink textures, group the bundles that are held together " + "and unload the ones not in use. For 2-3 GB phones, 256 MiB is an asset guideline, not an OS memory guarantee. " + "Include retained chunks, transition overlap, decode/upload buffers, generated meshes and render targets separately.";
+  const peak = initial + Math.max(0, ...Object.values(bundles));
+  const fallbackPeak = initialSize.fallback + Math.max(0, ...Object.values(fallbackBundles));
+  const advice = "Prefer KTX2 textures (8 bpp instead of 32), shrink textures and unload resources not in use. For 2-3 GB phones, 256 MiB is an asset guideline, not an OS memory guarantee. " + "Include retained chunks, transition overlap, decode/upload buffers, generated meshes and render targets separately.";
   if (peak > ARTIFACT_MEMORY_STRONG_WARN_BYTES) {
     findings.push({
       code: "MEMORY_ESTIMATE_VERY_LARGE",
       severity: "warning",
-      message: `the decoded size of the start-up files plus the largest set of bundles held together is about ${mib(peak)}, ` + `over ${mib(ARTIFACT_MEMORY_STRONG_WARN_BYTES)}; even 4 GB phones are likely to close the page. ${advice}`
+      message: `the decoded size of the start-up files plus the largest bundle is about ${mib(peak)}, ` + `over ${mib(ARTIFACT_MEMORY_STRONG_WARN_BYTES)}; even 4 GB phones are likely to close the page. ${advice}`
     });
   } else if (peak > ARTIFACT_MEMORY_WARN_BYTES) {
     findings.push({
       code: "MEMORY_ESTIMATE_LARGE",
       severity: "warning",
-      message: `the decoded size of the start-up files plus the largest set of bundles held together is about ${mib(peak)}, ` + `over the ${mib(ARTIFACT_MEMORY_WARN_BYTES)} guideline; phones may close the page. ${advice}`
+      message: `the decoded size of the start-up files plus the largest bundle is about ${mib(peak)}, ` + `over the ${mib(ARTIFACT_MEMORY_WARN_BYTES)} guideline; phones may close the page. ${advice}`
     });
   }
   if (fallbackPeak > peak && fallbackPeak > ARTIFACT_MEMORY_WARN_BYTES && peak <= ARTIFACT_MEMORY_WARN_BYTES) {
@@ -39757,12 +39563,10 @@ async function estimateMemory(manifest, files) {
     estimate: {
       initial,
       bundles,
-      groups,
       peak,
       rgbaFallback: {
         initial: initialSize.fallback,
         bundles: fallbackBundles,
-        groups: fallbackGroups,
         peak: fallbackPeak
       }
     },
@@ -39770,13 +39574,13 @@ async function estimateMemory(manifest, files) {
   };
 }
 // frontend/packages/app-validator/src/validate.ts
-async function validateArchive(archive, options = {}, ledger = []) {
+async function validateArchive(archive, options = {}) {
   const stages = [];
   const importStage = startStage("import");
   let files;
   let artifactHash;
   try {
-    const imported = await importArtifact(archive, ledger);
+    const imported = await importArtifact(archive);
     files = imported.files;
     artifactHash = imported.artifactHash;
   } catch (error51) {
@@ -39784,13 +39588,7 @@ async function validateArchive(archive, options = {}, ledger = []) {
     stages.push(importStage.finish("failed", { errors: [finding] }));
     return { report: buildReport({ artifactHash: null, files: [], stages }) };
   }
-  const notChecked = ledger === "unresolved" && files.some((file2) => file2.path === BUNDLE_REFS_PATH) ? [
-    {
-      code: "LEDGER_NOT_CHECKED",
-      message: "referenced assets (bundle-refs.json) are checked by the Platform after the push, not here"
-    }
-  ] : [];
-  stages.push(importStage.finish("passed", { warnings: notChecked }));
+  stages.push(importStage.finish("passed"));
   const reportFiles = files.map((file2) => ({
     path: file2.path,
     sha256: file2.sha256,
@@ -39919,28 +39717,26 @@ async function validateGameAssetCatalog(source) {
 class KitBuildError extends Error {
   name = "KitBuildError";
 }
-var GAME_BUILD_SCRIPT = "build.mjs";
-var DEFAULT_BUILD_SCRIPT = "default-build.mjs";
+var GODOT_BUILD_SCRIPT = "godot-build.mjs";
+var DEBUG_BUILD_SCRIPT = "debug-build.mjs";
+var GODOT_PROJECT = "godot/project.godot";
 var MANIFEST_PATH2 = "manifest.json";
 async function kitBuild(source) {
   await rm(join3(source, "debug-dist"), { recursive: true, force: true });
   const sourceManifest = manifestSchema.parse(JSON.parse(await readFile3(join3(source, MANIFEST_PATH2), "utf8")));
+  if (!existsSync(join3(source, GODOT_PROJECT)))
+    throw new KitBuildError(`kit build only builds Godot games (${GODOT_PROJECT} is missing)`);
   const hasDebug = requiresDevelopmentArtifact(sourceManifest);
-  if (hasDebug) {
-    if (!existsSync(join3(source, "debug/entry.ts")) && !existsSync(join3(source, "godot/project.godot")))
-      throw new KitBuildError("game builds require development source and normal_start");
+  if (hasDebug)
     await validateDebugCatalog(source);
-  }
   await validateGameAssetCatalog(source);
   const dist = join3(source, "dist");
   await rm(dist, { recursive: true, force: true });
-  const gameScript = join3(source, GAME_BUILD_SCRIPT);
-  await runNode(existsSync(gameScript) ? gameScript : defaultBuildScript(source), source);
+  await runNode(buildConfigScript(source, GODOT_BUILD_SCRIPT), source);
   const manifestPath = join3(dist, MANIFEST_PATH2);
   if (!existsSync(manifestPath)) {
     throw new KitBuildError(`the build left no ${MANIFEST_PATH2} at the root of dist/`);
   }
-  await copyBundleRefs(source, dist);
   const manifest = JSON.parse(await readFile3(manifestPath, "utf8"));
   if (typeof manifest.entrypoint !== "string") {
     throw new KitBuildError(`dist/${MANIFEST_PATH2} has no entrypoint`);
@@ -39959,7 +39755,7 @@ async function kitBuild(source) {
   await cp(join3(source, "debug/catalog.json"), join3(debugDist, "debug/catalog.json"));
   if (existsSync(join3(source, "debug/assets")))
     await cp(join3(source, "debug/assets"), join3(debugDist, "debug/assets"), { recursive: true });
-  await runNode(join3(dirname(defaultBuildScript(source)), "debug-build.mjs"), source);
+  await runNode(buildConfigScript(source, DEBUG_BUILD_SCRIPT), source);
   const debugIndex = await buildDistIndex(await readDist(debugDist), {
     entrypoint: manifest.entrypoint
   });
@@ -39971,9 +39767,9 @@ async function kitBuild(source) {
     debug: { dist: debugDist, artifactHash: debugIndex.artifactHash }
   };
 }
-function defaultBuildScript(source) {
+function buildConfigScript(source, name) {
   const config2 = createRequire2(join3(source, "package.json")).resolve("@workspace/app-sdk/build-config");
-  return join3(dirname(config2), DEFAULT_BUILD_SCRIPT);
+  return join3(dirname(config2), name);
 }
 function runNode(script, cwd) {
   return new Promise((resolve, reject) => {
@@ -39986,23 +39782,6 @@ function runNode(script, cwd) {
         reject(new KitBuildError(`node ${relative2(cwd, script) || script} failed (${signal ?? `exit ${code}`})`));
     });
   });
-}
-async function copyBundleRefs(source, dist) {
-  const path = join3(source, BUNDLE_REFS_SOURCE_PATH);
-  if (!existsSync(path))
-    return;
-  let document2;
-  try {
-    document2 = JSON.parse(await readFile3(path, "utf8"));
-  } catch (error51) {
-    throw new KitBuildError(`${BUNDLE_REFS_SOURCE_PATH} is not JSON: ${String(error51)}`);
-  }
-  const parsed = bundleRefsSchema.safeParse(document2);
-  if (!parsed.success) {
-    throw new KitBuildError(`${BUNDLE_REFS_SOURCE_PATH} must be {"refs": {"bundles/<name>/<file>": "<asset id>"}}`);
-  }
-  await writeFile(join3(dist, BUNDLE_REFS_PATH), `${JSON.stringify(parsed.data, null, 2)}
-`);
 }
 async function readDist(dist) {
   const entries = await readdir(dist, { withFileTypes: true, recursive: true });
@@ -40091,7 +39870,7 @@ function openInBrowser(url2) {
 
 // frontend/packages/creator-kit/src/check.ts
 async function checkDist(archive, artifactFlavor = "production") {
-  const { report } = await validateArchive(archive, { artifactFlavor }, "unresolved");
+  const { report } = await validateArchive(archive, { artifactFlavor });
   return { passed: report.passed, summary: summarize(report), report };
 }
 function summarize(report) {

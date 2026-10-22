@@ -24,7 +24,7 @@
 GPU particles/GPU layer/動的解像度/積極的freeze/追加passは対応と適用条件を確認し、同条件で比較して採用する。
 全objectの最大数まで事前確保、全meshのmerge、全FX禁止を一律の最適化にしない。
 画質段階を用意する場合は内部解像度・影・装飾・粒子・LODを調整し、入力座標/移動速度/衝突/ルールを変えない。
-WebGPU対応やpointer:coarseだけで品質段階を決めず、WebGL2でも遊びと必要な視認性を保つ。
+タッチの有無や端末の種類だけで品質段階を決めず、Web/native共通のCompatibility renderer（WebGL2相当）で遊びと必要な視認性を保つ。
 
 該当原則・選んだ方式・例外と理由を`design/performance.md`へ短く残す。詳細な新規設計書を毎回要求しない。
 基本実装の実描画を確認し、予算超過/停止/資源増加など改善すべき箇所があれば原因を分けて追加最適化する。
@@ -44,7 +44,7 @@ CPU負荷へ解像度だけを下げるなど原因と異なる対策を繰り�
 | 広い世界・NPC | 全世界更新、全組合せ衝突、全NPCの毎frame経路探索、一括生成 | 地域分割、近傍だけ更新、時間分散 |
 | 長時間プレイ | 地域往復ごとにtexture/body/listener等が増え続ける | 所有と解放、保持上限、再訪時の資源数を測る |
 
-雲が画像一枚ならray marchingの警告を出さない。WebGPU対応やdraw callの少なさだけで安全と判断しない。
+雲が画像一枚ならray marchingの警告を出さない。draw callの少なさだけで安全と判断しない。
 画素数×覆う割合×反復×pass数は比較の目安であり、GPU時間やFPSへの換算ではない。
 
 懸念を見つけた時点で、利用者へ「方式・理由・代案・まだ推定」を短く伝える。
@@ -60,9 +60,9 @@ CPU負荷へ解像度だけを下げるなど原因と異なる対策を繰り�
    比較用スイッチは制作時だけ。依頼にない製品設定画面を増やさない。
 2. 起動/初回shader compilation/地域読込と定常描画を分ける。数秒warm-up後、各条件を30–60秒程度測る。
    条件の順を替えて2–3回比較する。描画後の画面も確認し、演出やゲームが実際に動いていることを確かめる。
-3. **既存エンジンの実際のframeループ**へSDKの`createFrameStats`を一時的に入れ、
-   `performance.now()`を`record`する。平滑化/制限後のdeltaやsimulationのdtは計測値に使わない。
-   60秒程度の比較は`createFrameStats(10000)`を各条件で新しく作る。`snapshot()`のcount/p50/p95/p99/maxを保存する。
+3. Godotの`_process`へ一時的な計測Nodeを入れ、毎frame`Time.get_ticks_usec()`の差（実frame間隔）を有限の配列に記録する。
+   平滑化/制限後のdeltaやsimulationのdtは計測値に使わない。60秒程度の比較は各条件で配列を新しくし（上限10000件）、
+   count/p50/p95/p99/maxを`TokoyoApp.report()`で記録する。
    pause/非表示区間は除外して時計をresetする。サンプルが足りない条件は測定不足とする。
 4. Godotの固定版APIで、取得できる描画回数・活動object・texture/body等を併記する。
    CPU側処理時間、frame間隔、GPU時間、素材メモリ推定は別々に書く。
@@ -94,5 +94,5 @@ PC/headless/software rendererでの測定は比較/退行検出として扱い�
 - `build-report.json`の`notes`にも残る懸念・測定環境・未確認を記録する。
   詳細記録はソース内の`design/performance.md`。新しい成果物/APIフィールドを作らない。
 
-測定の解釈: [MDN requestAnimationFrame](https://developer.mozilla.org/en-US/docs/Web/API/Window/requestAnimationFrame)
-（表示周期に沿うcallbackで、GPU実行時間ではない）。SDKの`runtime/index.js`と同梱engine型を正本にする。
+測定の解釈: Godotの`_process`の間隔と[`Performance`](https://docs.godotengine.org/en/4.5/classes/class_performance.html)のmonitor（`TIME_PROCESS`・draw call・static memory）は
+CPU側の値で、GPU実行時間ではない。測った値は`TokoyoApp.report()`で記録する。固定版Godotの公式API定義を正本にする。

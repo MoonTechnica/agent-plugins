@@ -42,7 +42,7 @@
 5. **`./input/` を見る**（§4.0）。前の版があれば、それを土台にして続きを作る。
 | Skill | 使うとき |
 |---|---|
-| `$game-design` | 新しく作るとき・遊びの核（ルール・操作・目的）を変えるとき。作り方の工程（企画 → 見た目の合意 → 素材の設計 → 核を遊べる形に → 素材 → 遊んで直す → 数値 → 磨く → 掲載）と各段階の完了条件、企画（`design/brief.md`）、ジャンルの下限、ルール（`src/rules.ts`）と調整値（`src/tuning.ts`）の分け方 |
+| `$game-design` | 新しく作るとき・遊びの核（ルール・操作・目的）を変えるとき。作り方の工程（企画 → 見た目の合意 → 素材の設計 → 核を遊べる形に → 素材 → 遊んで直す → 数値 → 磨く → 掲載）と各段階の完了条件、企画（`design/brief.md`）、ジャンルの下限、ルール（`godot/rules.gd`）と調整値（`godot/tuning.gd`）の分け方 |
 | `$game-art-direction` | 新しく作るとき・見た目の方向（絵柄・主役・世界観）を変えるとき・素材を選ぶとき。コンセプトの合意、スタイルガイド、素材の採否、2D / 3D の画風・材質・光・影・露出の統一、実画面と世界観の比較（`references/visual-direction.md`） |
 | `$game-level-design` | **ステージ・マップ・コース・盤面・敵/報酬の配置・マップメニューを作る/変えるとき**。体験/進行と空間の候補を検査・選定する。RPGの地域切替、メトロイドバニアの部屋/能力/再探索、実ステージと地図の対応は `references/transitions-and-map.md`。仕上げ後は影響する経路と実画面を再確認する |
 | `$game-playtest` | 遊びの核を作った/変えたとき・前の版の試遊結果（`input/playtest-report.json`）があるとき・利用者が確認を頼んだとき。自分で遊んで確かめる（ルールの検査・前の版の試遊結果。しっかりした試遊は利用者が頼んだときだけ） |
@@ -55,10 +55,10 @@
 | `$game-3d-and-bundles` | 3D で描くとき・ステージが複数あるとき・素材が大きいとき |
 | `$game-3d-studio` | 3Dモデルを調達/生成/加工するときは references/model-quality.md（入力・用途別修復・リトポロジー/ベイク・変形と完成GLBの実再生）。Blenderでのモデリング・リグ・モーション・3Dから2Dも扱う |
 | `$game-multiplayer` | オンライン対戦（2〜8 人）のとき（§1） |
-| `$game-leaderboard` | ランキング・順位・ハイスコア・タイムアタックが遊びにあるとき（`app.leaderboard`） |
-| `$game-documents` | 非同期対戦（交代で 1 手ずつ・相手が同時にいない）・攻め合い・記録への挑戦・みんなで育てる世界のとき（`app.documents`。§1） |
+| `$game-leaderboard` | ランキング・順位・ハイスコア・タイムアタックが遊びにあるとき（`TokoyoApp.leaderboard`） |
+| `$game-documents` | 非同期対戦（交代で 1 手ずつ・相手が同時にいない）・攻め合い・記録への挑戦・みんなで育てる世界のとき（`TokoyoApp.documents`。§1） |
 | `$game-open-world` | 広い世界を歩き回るとき（探索・冒険・サンドボックス。チャンクの読み込み・seed から作る世界・seed + 差分のセーブ・協力プレイの世界） |
-| `$game-ai` | ゲームの中で AI と話すとき（NPC との会話・案内役・物語や選択肢・クエストの生成。`app.ai`）。AI は遊びの味付けで、返事が来なくても遊べる作りにする |
+| `$game-ai` | ゲームの中で AI と話すとき（NPC との会話・案内役・物語や選択肢・クエストの生成。`TokoyoApp.ai`）。AI は遊びの味付けで、返事が来なくても遊べる作りにする |
 | `$game-physics` | 物理で動くとき（落下・衝突・転がる・積む・跳ねる。Godotの物理と、対戦サーバーの権威ある物理を分離する） |
 | `$game-merge` | **`./input/merge-report.json` があるとき・リポジトリが `git merge` の途中（`MERGE_HEAD` がある）のとき**（2 つの版を合わせるターン。「合流する」も。新しく作らない。§4.0） |
 
@@ -90,7 +90,7 @@ source-dirは`./source`。SDKのCLIと作業ディレクトリ側の`scripts/kit
 - Skill の規則に従ったせいで説明の要求を削った・変えたときは、`build-report.json` の `notes` に
   Skill 名・該当の規則・理由を 1 行で書く。
 - **開発中の利用者は速い反復を望んでいる。** 確認は変更の大きさに合わせ、同じ確認を繰り返さない。
-  毎ターン確かめるのは「ビルドが通る」「`node` で読み込める」「`manifest.json` が仕様どおり」、ルールを変えたなら「ルールの検査が通る（`$game-playtest` §2）」。
+  毎ターン確かめるのは「ビルド（Godot の import・export）が通る」「GDScript の構文エラーが無い」「`manifest.json` が仕様どおり」、ルールを変えたなら「ルールの検査が通る（`$game-playtest` §2）」。
   使った Skill のチェックは、その Skill が扱う部分を変えたときだけ。世界生成・保存往復・クエスト遷移など重要な性質の検査は必要な範囲で追加する。実装をなぞるだけのテストは書かない。
   成果物は `outputs/` へ出す。hosted の作業計画と返信は既存のチャット中継で利用者へ届くが、
   会話を成果物の代わりにしない。性能の懸念と測定結果はソース内の `design/performance.md` にも残す。
@@ -102,7 +102,7 @@ source-dirは`./source`。SDKのCLIと作業ディレクトリ側の`scripts/kit
 | 形 | 内容 | `manifest.json` の `space` |
 |---|---|---|
 | **ソロ** | 1 人で遊ぶ。ブラウザの中だけで完結する | `null` |
-| **オンライン対戦** | 2〜8 人が同じ対戦（Match）に入る。ルールと勝敗は `server/main.ts` の `defineSpace` が決める | `{ "server": "server.bundle.js", "participants": { "min": 2, "max": 4 }, "maxDurationSec": ..., "practice": false }`（人数は遊びに合わせる。役割があれば `participants.roles`） |
+| **オンライン対戦** | 2〜8 人が同じ対戦（Match）に入る。ルールと勝敗は `server/main.ts` の `defineSpace` が決める | `{ "server": "server.bundle.js", "participants": { "min": 2, "max": 4 }, "maxDurationSec": ... }`（人数は遊びに合わせる。役割があれば `participants.roles`） |
 | **非同期対戦** | 相手と同時にいなくても、交代で 1 手ずつ進める（通信対局・攻め合い・記録への挑戦）。場は Platform の共有レコード、ルールと勝敗は画面が決める | `null`（代わりに `documentSchema`。下の「非同期対戦」） |
 
 
@@ -110,7 +110,7 @@ source-dirは`./source`。SDKのCLIと作業ディレクトリ側の`scripts/kit
 
 相手と同時にいなくても、手番ごとに交代で遊ぶ（将棋の通信対局・1 日 1 手・放置して攻め合う・友達の記録に挑む）。
 **`$game-documents` に従う**。`space` は `null` のまま、`manifest.json` に `documentSchema`（場の形・人数・誰が書けるか）と
-`documents.read` / `documents.write` を書き、`app.documents`（`<kit>/sdk/app-sdk/spec.md` §8.2）で場を作る・入る・書く。
+`documents.read` / `documents.write` を書き、`TokoyoApp.documents`（契約は `app.documents`。`<kit>/sdk/app-sdk/spec.md` §8.2）で場を作る・入る・書く。
 
 - 「通信対局」「1 日 1 手」「交代で」「相手が同時にいなくても」「相手の番が来たら」のように、**時間をまたいで遊ぶことが明示されているとき**に選ぶ。
   同時に操作する・すぐに決着する対戦は上のオンライン対戦にする。
@@ -122,10 +122,10 @@ source-dirは`./source`。SDKのCLIと作業ディレクトリ側の`scripts/kit
 
 広い世界を少しずつ読み込みながら歩き回り、変えたところだけを保存する（探索・冒険・サンドボックス）。
 **`$game-open-world` に従う**。1 人なら `space` は `null`（ソロ）、一緒に歩くならオンライン対戦の形に
-`app.documents` の `worlds`（世界の保存）を足す。3D なら `$game-3d-and-bundles` も使う。
+`TokoyoApp.documents` の `worlds`（世界の保存）を足す。3D なら `$game-3d-and-bundles` も使う。
 
 - 地形と配置は作者設計の地域データ、seedからの生成、または両者を組み合わせる。生成方式の版と安定IDを持ち、セーブは進行と必要な差分だけ（`storeSchema` の `blob` 型）。
-- 地域ごとの素材は `bundles/<地域>/` に置き、`group` で組にする。
+- 地域ごとの素材は `godot/` の地域ごとのフォルダに置き、Godot の PCK（64 MiB まで）に収める。地域のシーンは `ResourceLoader` で必要になったときに読み、離れたら解放する。
 - 協力プレイの 1 回の卓は最長 30 分。長く遊ぶなら保存して卓を立て直す。
 
 **入力にどちらとも読めることが書いてあるときはソロにする。** 対戦はルールの定義と複数人の接続が揃って初めて成立し、
@@ -133,7 +133,7 @@ source-dirは`./source`。SDKのCLIと作業ディレクトリ側の`scripts/kit
 「対戦」「〜人で」「相手」「勝負」のように**対戦だと明示されているときだけ**対戦にし、`$game-multiplayer` に従う。
 
 対戦は**ターン制でも同時操作でもよい**。どちらにするかは遊びの内容から決める。人数（2〜8）と役割（「鬼 1 人と逃げる人 4 人」など）も
-遊びの説明から決める。練習モード（`"practice": true`。一人で遊べる、成績に残らない）は**説明で求められたときだけ**付ける。
+遊びの説明から決める。Platform の練習モードは無い（一人で練習させたいなら、その遊びを Godot の中で作る）。
 
 ## 2. 出力（`./outputs/` に置くもの）
 
@@ -156,19 +156,16 @@ source-dirは`./source`。SDKのCLIと作業ディレクトリ側の`scripts/kit
 app.bundle.js        # Platform との橋渡し（kit build が作る。Godot の pack は assets/godot/ と bundles/godot_native/）
 server.bundle.js     # 対戦があるときだけ（server/main.ts の defineSpace）
 manifest.json        # 書庫の根に置く。入れ子にすると取り込みに落とされる
-assets/              # 最初の画面から要る画像・音声・フォント（起動前に全部届く）
-bundles/<名前>/       # 後から取り寄せる素材（ステージ・BGM・3D モデル。`$game-3d-and-bundles`）
-bundle-refs.json     # 台帳から参照する素材の一覧（ビルドが source/bundles.refs.json から作る。手で置かない）
+assets/godot/        # Web 用の game.js・game.wasm・game.pck（kit build が作る）
+bundles/godot_native/ # 組み込み native 用の game.pck（kit build が作る。ブラウザは取らない）
 ai/<key>.md          # ゲーム内 AI の指示文（`ai.chat` のときだけ。`ai/schemas/*.json` も。`$game-ai`）
 ```
 
-- 合計 **4 GiB**・**20,000 ファイル**・**バンドル 1 つ 256 MiB** まで。そのうち書庫（`dist.tar.gz`）は**圧縮後 200 MiB・展開後 1 GiB・1 ファイル 64 MiB** まで。
-- **大きい素材（1 ファイル数 MiB 以上の音・3D・動画）は書庫に入れず、素材台帳から参照する。** 素材を `upload_asset` / 生成ツールで台帳に載せ、
-  `source/bundles.refs.json` に `{"refs": {"bundles/<名前>/<ファイル>": "<asset_id>"}}` と書く（そのパスのファイルは `dist/` に置かない）。
-  ビルドが `dist/bundle-refs.json` に写し、Platform が台帳の中身を `bundles/` のそのパスで配る。ゲームのコードは書庫のファイルと同じく
-  `app.assets.url('bundles/<名前>/<ファイル>')` で読む。1 つ 256 MiB まで（`$game-3d-and-bundles` §1）。
-- **`bundles/` の外（起動前に全部届く分）は 64 MiB まで**。10 MiB を超えると警告になる
-  （スマートフォンの回線で起動を待たせる）。大きい素材は `bundles/` へ。
+- 書庫（`dist.tar.gz`）は**圧縮後 200 MiB・1 ファイル 64 MiB** まで。
+- **素材はすべて `godot/` に置き、Godot の import と export で PCK に入れる。** ゲームのコードは `preload()` / `load()` / `ResourceLoader` で
+  `res://` から読む。PCK の外から素材を取り寄せる経路（URL・後から取り寄せるバンドル・台帳から参照する素材）は無い。
+- **PCK は 1 つ 64 MiB まで**（iOS の組み込み runtime の上限）。Web では起動前に全部届くので、10 MiB を超えると警告になる
+  （スマートフォンの回線で起動を待たせる）。テクスチャの圧縮 import・音の圧縮・解像度で収める（`$game-3d-and-bundles`）。
 - 絶対パス・`..`・シンボリックリンク・同じパスの重複は取り込みで落とされる。
 - ファイル名は英数字と `.` `_` `-` と `/` だけを使う。
 
@@ -193,7 +190,7 @@ ai/<key>.md          # ゲーム内 AI の指示文（`ai.chat` のときだけ�
 | `manifest.json` に宣言していない Capability の API | 使うものを `capabilities` に宣言する |
 
 `externalNetwork` は常に `false`。広告・解析・外部ログインは入れられない。生成 AI は外部の API を直接呼べず、
-**Platform 経由の `app.ai`（`ai.chat`。`$game-ai`）だけ**を使える。
+**Platform 経由の `TokoyoApp.ai`（契約は `app.ai`、capability は `ai.chat`。`$game-ai`）だけ**を使える。
 
 ## 4. 作り方
 
@@ -212,8 +209,7 @@ ai/<key>.md          # ゲーム内 AI の指示文（`ai.chat` のときだけ�
 | `playtest-report.json`（と `playtest/*.png`） | 前の版を Platform が試遊した結果 | 依頼の作業より先に読む（`$game-playtest` §3） |
 | `branch.json` | 同じゲームの外部参加者のfeatで作業している | 下の「派生で作るとき」に従う |
 
-- 前の版の `bundles/` の素材もリポジトリに入っている（commit されたファイル）。`bundles.refs.json` で参照している素材だけは
-  リポジトリに無く、素材台帳にある（`$game-3d-and-bundles` §1）。
+- 前の版の素材は `godot/` の下にリポジトリごと入っている（commit されたファイル。画像・音・3D は Git LFS）。
 - `package.json` の SDK の参照（`file:/workspace/sdk/...`）はそのまま使える（手元では git のフィルタが `<kit>/sdk/...` の絶対パスにして取り出し、commit には `/workspace` の形で入る。§8）。`node_modules` は入っていないので入れ直す。
 - 取得に失敗したら作り直さずにターンを終える（`build-report.json` の `notes` に理由を書き、`outputs/` には何も置かない）。
   前の版を失ったまま別物を作ると、利用者の作品が置き換わってしまう。
@@ -255,18 +251,18 @@ ai/<key>.md          # ゲーム内 AI の指示文（`ai.chat` のときだけ�
 
    `kit build` は `dist/` を消してから、`godot/project.godot` を見つけて Godot を取り込み、Web と native の pack・
    固定の `app.bundle.js`（Platform との橋渡し）を出す。`server/main.ts` があれば `server.bundle.js` も作り、
-   続けて `bundles.refs.json` → `dist/bundle-refs.json` とハッシュ一覧（`dist/.artifact-index.json`）を書く。
-   Godot のゲームに `build.mjs` は書かない（ビルドの手順や生成済みの橋渡しのコードを変えない。`$game-godot`）。
-   続けて**実際に動かして確かめる**（`node` で読み込める、構文エラーが無い、
-   `manifest.json` が仕様どおり、ルールの検査が通る。`$game-playtest`）。
+   続けてハッシュ一覧（`dist/.artifact-index.json`）を書く。ゲームの `build.mjs` は実行されないので書かない
+   （ビルドの手順や生成済みの橋渡しのコードを変えない。`$game-godot`）。
+   続けて**実際に動かして確かめる**（Godot の import・export が通る、GDScript の構文エラーが無い、
+   `manifest.json` が仕様どおり、`godot/rules.gd` のルールの検査が headless の Godot で通る。`$game-playtest`）。
 5. 掲載情報を `listing/` に作る（`$game-listing`。ゲームが出来てから書くと、名前・説明・遊び方・画像が中身と合う）。
 6. `./outputs/` に 3 つのファイルを置く。
 ### 4.2 制作エンジンとサーバー物理
 
 新規・継続制作はGodot 4.5.1に統一する。`$game-godot`を読み、2D/3Dの描画・ローカル物理・入力をGDScriptへ実装する。
-旧Phaser/Babylon作品はソースをGodotへ移行し、移行点と未対応機能を`build-report.json`へ記録する。
-JS描画エンジン・`@workspace/app-sdk/3d`・クライアントRapierは提供しない。
-manifestは`renderer: "webgl2"`とGodot宣言を維持し、Web/nativeを同じソースからexportする。
+JS/TSで書くゲーム（canvas・Phaser・three.js・Babylon.jsのクライアント）は作れず、ビルドもできない。前の版がJSのゲームなら、
+ルール・素材をGodotへ移し、移行点と未対応機能を`build-report.json`へ記録する。
+manifestは`godot`宣言を必須とし（`renderer`項目は無い）、Web/nativeを同じソースからexportする。
 
 対戦の認可・マッチング・権威あるルール・結果処理は既存Spaceを維持する。`server/main.ts`はTypeScriptの`defineSpace`、
 画面は`TokoyoSpace`。3Dサーバー物理に限りBabylon NullEngine/Havok、2Dサーバー物理に固定Rapierを使える。
@@ -304,7 +300,7 @@ IDは変更後も維持し、削除後も他の対象に再利用しない。leg
 
 | 発話の指示 | すること |
 |---|---|
-| ゲームの中で使う・表示する・流す | `get_asset(asset_id)` で取得して同梱する。動画は `bundles/<名前>/` に置いて `<video>` で流す |
+| ゲームの中で使う・表示する・流す | `get_asset(asset_id)` で取得して `godot/` に同梱する。動画は Godot が再生できる Ogg Theora（`.ogv`）にして `VideoStreamPlayer` で流す（変換できなければ `notes` に書く） |
 | 参考・雰囲気・「こういう動きで」 | 見た内容（絵柄・色・動き・間）を真似て作る。**ファイルは同梱しない** |
 | 何も言っていない | 画像・音・3D はゲームで使う。動画は参考として扱う。モーション（FBX）はキャラにリターゲットして使う（`$game-3d-studio` §4.3.1） |
 
@@ -357,7 +353,7 @@ MCP のツールが返す URL は署名付きで短命なので、受け取っ�
 | `.tokoyo.json` | `app_id`・`session_id`・`thread_ref`（push する branch）・`base_commit_oid`（取り込んだスレッドの head）・`kit_root`（`<kit>`）ほか。手で書き換えない |
 | `source/` | 作るプロジェクト = **git のリポジトリ**（branch は手元のスレッド `thread/<session>`）。`package.json` の SDK の参照は手元では `file:<kit>/sdk/<pkg>` の絶対パスで、commit には git のフィルタが正規形（`file:/workspace/sdk/<pkg>`）で入れる。Skill や §4 に `file:/workspace/sdk/<pkg>` とあれば `<kit>` の実パスに読み替える。画像・音・3D などは `.gitattributes` の規則で Git LFS に入る |
 | `input/` | 前の版の試遊の結果（`playtest-report.json` と `playtest/`。`$game-playtest` §3） |
-| `assets-cache/` | 素材ツールの `download_url` から取った素材。台帳の素材を使うなら `kit.mjs assets add --url <download_url> --sha256 <sha256> --path <source/ からの相対パス>` で `source/` の下に置いて commit する（実体は台帳にあるので送り直されない）。大きいものは置かず `source/bundles.refs.json` で参照する（§2） |
+| `assets-cache/` | 素材ツールの `download_url` から取った素材。台帳の素材を使うなら `kit.mjs assets add --url <download_url> --sha256 <sha256> --path <source/ からの相対パス>` で `source/godot/` の下に置いて commit する（実体は台帳にあるので送り直されない）。PCK の 64 MiB に収まる大きさにする（§2） |
 | `outputs/` | 送る 3 つ（`source.bundle`・`dist.tar.gz`・`build-report.json`） |
 
 git と Git LFS（`git lfs version`）が要る。commit の作者は `clone` が Platform の決めた本人（`get_git_bundles` の `author`）にしてある。
@@ -376,7 +372,7 @@ LFS の実体を上げ下ろしするので、最初に一度 `node <kit>/script
    `pull` は commit していない変更があると断るので、先に `git commit` する。結果の `status` が `conflict` なら §8.4。
    head の試遊の結果があれば `input/` に置かれる。
 2. **作る**: `source/` で `npm install`（または `bun install`）してから、`kit.mjs build` でビルドする
-   （§4.1 の 4. の `kit build` と同じもの。`build.mjs` を直接実行しない）。依存は足さない（§3）。区切りごとに `git commit` する。
+   （§4.1 の 4. の `kit build` と同じもの。ゲームの `build.mjs` は使われない）。依存は足さない（§3）。区切りごとに `git commit` する。
 3. **出力**: 変更を `git commit` し、`kit.mjs build` で `source/dist/` を作り、`source/listing/` の掲載情報を用意し（`$game-listing`。今の値は `get_app` の `listing`）、
    `outputs/build-report.json` を書き（§2）、`kit.mjs pack` を実行する。
    `pack` は `outputs/source.bundle`（取り込んだ head からの新しい commit だけ）と `outputs/dist.tar.gz` を作り、`begin_build` に渡す引数

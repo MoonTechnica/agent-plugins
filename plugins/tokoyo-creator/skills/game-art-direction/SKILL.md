@@ -113,9 +113,9 @@ description: 2D / 3D の画風・質感・光・影・色調・カメラを揃�
 
 | 役割 | 既定 | 次の候補 |
 |---|---|---|
-| 効果音（押す・良い・悪い・行為ごと） | **素材**（Impact / Interface / UI / RPG の効果音） | 生成（素材に無い音）/ Web Audio の合成 |
+| 効果音（押す・良い・悪い・行為ごと） | **素材**（Impact / Interface / UI / RPG の効果音） | 生成（素材に無い音）/ Godot の `AudioStreamGenerator` での合成 |
 | 勝ち・負けの短い曲 | **素材**（Music Jingles） | 生成 |
-| BGM（ループ） | **素材**（雰囲気・テンポ・ループが合う曲をMCPで調査） | 合う曲が無ければ生成 / Web Audioの合成。Blenderは対象外 |
+| BGM（ループ） | **素材**（雰囲気・テンポ・ループが合う曲をMCPで調査） | 合う曲が無ければ生成 / Godot での合成。Blenderは対象外 |
 
 ## 4. 素材の設計書（`design/asset-manifest.md`）
 

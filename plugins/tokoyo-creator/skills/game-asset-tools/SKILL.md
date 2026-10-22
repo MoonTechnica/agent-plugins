@@ -1,6 +1,6 @@
 ---
 name: game-asset-tools
-description: ゲームの絵と音を用意する。CC0 のフリー素材の探し方と取り込み方、画像の作り方（内蔵の画像生成、無い環境では generate_image）、素材ツール（MCP）の使い方と予算、透過キャラクター・連番アニメ・アニメ付き 3D・効果音・BGM・動画の手順、自分で作った素材の登録（upload_asset。大きい物は台帳から参照）、失敗したときの対処を扱う。画像・キャラクター・背景・モーション・効果音・BGM・3D モデルを用意するとき、素材ツールが使えるときに使う。assets, sprites, stock assets, CC0, sound effects, music, budget.
+description: ゲームの絵と音を用意する。CC0 のフリー素材の探し方と取り込み方、画像の作り方（内蔵の画像生成、無い環境では generate_image）、素材ツール（MCP）の使い方と予算、透過キャラクター・連番アニメ・アニメ付き 3D・効果音・BGM・動画の手順、自分で作った素材の登録（upload_asset）とGodotプロジェクトへの同梱、失敗したときの対処を扱う。画像・キャラクター・背景・モーション・効果音・BGM・3D モデルを用意するとき、素材ツールが使えるときに使う。assets, sprites, stock assets, CC0, sound effects, music, budget.
 ---
 
 キャラ・機能アイテム・敵・仕掛けを変更したら `$game-playtest` の `references/development-preview.md` に従い、本編factoryを使う試験ケースを更新する。試験場のためだけの新規有料素材を作らず、共通の素材hashを両Artifactで再利用する。
@@ -47,8 +47,8 @@ CLIは参照検索と決定的なローカル加工だけで、有料生成・�
    | 3D モデル | クレジット（モデル・品質・リグ・アニメ指定で単価が変わる。**ツール一覧に `generate_model_3d` があるときだけ**） | 主役 1〜2 体 |
    | 人型のモーション | クレジット（1 回 $0.08） | 主役の動作 3〜6 種（待機・歩き・走り・跳び・攻撃・やられ） |
 
-4. **図形・通常のUI文字・ボタン・パーティクル・弾・床のタイルは生成しない。** Canvas で描く方が速く、軽く、きれいで、
-   画面の大きさにも追従できる。操作部とボタンは入力キット（`$game-controls`）が描く。
+4. **図形・通常のUI文字・ボタン・パーティクル・弾・床のタイルは生成しない。** Godot の Node2D の描画・Control・`GPUParticles2D` / `CPUParticles2D` で作る方が速く、軽く、きれいで、
+   画面の大きさにも追従できる。操作部とボタンはスターターの移動スティックと `TouchScreenButton`（`$game-controls`）。
 
 タイトルロゴはこの通常UI文字の除外対象ではなく、独立した透過画像として生成・管理する。
 `$game-listing` references/title-logo.md に従い、アイコン・カバー・スタート画面で同じ素材を再利用する。
@@ -67,8 +67,8 @@ CLIは参照検索と決定的なローカル加工だけで、有料生成・�
 
 ```json
 {"version":1,"items":[
-  {"id":"player-plane","name":"自機","description":"プレイヤーが操縦する飛行機","kind":"model_3d","sources":[{"path":"src/view.ts","symbol":"jet"}]},
-  {"id":"launch-sound","name":"ミサイルの発射音","description":"発射時に鳴る音","kind":"audio","sources":[{"path":"src/sound.ts"}]},
+  {"id":"player-plane","name":"自機","description":"プレイヤーが操縦する飛行機","kind":"model_3d","sources":[{"path":"godot/player/jet.gd","symbol":"build_mesh"}]},
+  {"id":"launch-sound","name":"ミサイルの発射音","description":"発射時に鳴る音","kind":"audio","sources":[{"path":"godot/audio/launch_sound.gd"}]},
   {"id":"concept-key-art","name":"完成イメージ","description":"画風と構図の制作基準","kind":"image","purposes":["reference"],"sources":[{"path":"design/concept/key-art.png"}],"thumbnail_path":"design/concept/key-art.png"}
 ]}
 ```
@@ -91,19 +91,19 @@ CLIは参照検索と決定的なローカル加工だけで、有料生成・�
 
 | 作りたいもの | 手順 | 置き方 |
 |---|---|---|
-| 背景・タイトル画面 | 画像を作る（冒頭の表）→ `convert <PNG> -resize 1024x1024 -quality 85 assets/bg.jpg` | JPEG。長辺 1024px 以下 |
+| 背景・タイトル画面 | 画像を作る（冒頭の表）→ `convert <PNG> -resize 1024x1024 -quality 85 godot/assets/bg.jpg` | JPEG。長辺 1024px 以下 |
 | キャラクター・アイテム（透過） | 内蔵の画像生成なら §3 の手順。`generate_image` なら `transparent=true` で作って取得する（§4） | 透過 PNG。長辺 512px 以下 |
 | 効果音 | `generate_sound_effect(name, prompt, duration_sec)`。短く具体的に（「軽いジャンプ音、上がる音程、0.3 秒」） | MP3。0.5〜2 秒 |
 | BGM | `generate_music(name, prompt, duration_sec=30)`。雰囲気・テンポ・楽器を書き「ループしやすい」と添える | MP3。ループ再生 |
-| 3D モデル | 透過した元画像の `asset_id`（§3 の結果、または `generate_image(transparent=true)` の結果）で `generate_model_3d(name, asset_id, polycount="low")`。**数分かかる** | GLB を `bundles/` に置く（`$game-3d-and-bundles`） |
+| 3D モデル | 透過した元画像の `asset_id`（§3 の結果、または `generate_image(transparent=true)` の結果）で `generate_model_3d(name, asset_id, polycount="low")`。**数分かかる** | GLB を `godot/` の下に置いて import する（`$game-3d-and-bundles`） |
 | 人型のモーション | フリー素材のアニメ付きキャラ（§3.5）に無い動きだけ `generate_motion(name, prompt, duration_sec)`。prompt は英語で 1 人の動きを具体的に（「A person swings a sword overhead, then steps back.」）。ループする動き（待機・歩き）は 1 周期の長さにする | **FBX のままゲームに入れない。** `$game-3d-studio` §4.3.1 でキャラの骨格にリターゲットし、キャラの GLB にクリップとして入れる |
-| 自分で作った音（Web Audio の書き出し）・GLB | ほかのファイルと同じく commit する（Git LFS に入り、次のターンにも残る）。数 MiB を超えるものは `upload_asset(name, kind)` で台帳に載せて参照する（§4） | `assets/` か `bundles/` |
+| 自分で作った音・GLB | ほかのファイルと同じく commit する（Git LFS に入り、次のターンにも残る）。他のターン・リミックスで使い回すなら `upload_asset(name, kind)` でも台帳に載せる（§4） | `godot/` の下 |
 
-- 生成したままの PNG（1 枚 1〜2 MB）を `assets/` に入れない。必ず縮小する。
+- 生成したままの PNG（1 枚 1〜2 MB）を `godot/` に入れない。必ず縮小する（PCK は 64 MiB まで）。
 - 同じキャラクターの色・表情・装備違いは、承認済み原型/基準画像を入力して編集・派生する。
   同じ指示文だけで同一キャラになると扱わない。色や寸法だけなら決定的な加工を先に評価する。
 - 絵柄はゲーム全体でそろえる（最初に「ドット絵 / フラットなイラスト / 水彩」などを決め、毎回の指示に入れる）。
-- **画像に文字を入れない**（指示に「文字・ロゴ・数字を描かない」と書く）。看板やボタンの文字は canvas / DOM で描く（`$game-ux` §3）。
+- **画像に文字を入れない**（指示に「文字・ロゴ・数字を描かない」と書く）。看板やボタンの文字は Godot の `Label` / `RichTextLabel` で描く（`$game-ux` §3）。
 - 効果音は最低限「押す / 良い / 悪い」の 3 種類をそろえる（`$game-ux` references/feedback.md §6）。
 
 ### 2.1 画像からの3Dとモーション
@@ -137,7 +137,7 @@ Smart Topologyや複数視点等を公式サイトで見つけても、現行ツ
    （先に呼ぶと `ASSET_NOT_READY`）。
 4. 結果の `download_url` を取得する: `curl -fsSL -o /tmp/hero.png '<download_url>'`
    （URL は 10 分で失効する。切れたら `get_asset(asset_id)` で取り直す）。
-5. 縮小して置く: `convert /tmp/hero.png -resize 512x512 assets/hero.png`
+5. 縮小して置く: `convert /tmp/hero.png -resize 512x512 godot/assets/hero.png`
 
 ## 3.5 フリー素材（CC0）を探して取り込む
 
@@ -155,12 +155,9 @@ Smart Topologyや複数視点等を公式サイトで見つけても、現行ツ
 - 供給元は Kenney、既存固定版 Quaternius UAL、Superpowers、KayKit Prototype Bits、Poly Haven、ambientCG。検索は索引だけを読み、素材原本は取り込み時に取得する。HDRI・字体・SVG・CC BY の素材はこの経路にはまだ含まれない。
 - 結果は良く合う順。`pack`（パック名）が同じものは絵柄がそろっている。続きは `next_cursor` を渡す。
 - **連番フレーム**（`playerBlue_walk1` … `playerBlue_walk5`）は `name` の末尾の数字順に 1 枚ずつ取り込む
-  （1 枚で `stock` 枠を 1 回）。`name` は `hero-walk-1` のように付け、コードで 8〜12 fps で切り替える:
-
-  ```js
-  const walk = [1, 2, 3, 4, 5].map((n) => loadImage(app.assets.url(`assets/hero-walk-${n}.png`)))
-  // 毎フレーム: frame = walk[Math.floor(time * 10) % walk.length]
-  ```
+  （1 枚で `stock` 枠を 1 回）。`name` は `hero-walk-1` のように付け、`godot/assets/` に置いて `SpriteFrames` の
+  アニメーション（8〜12 fps）に並べ、`AnimatedSprite2D` で再生する（エディタで作った `.tres` か、`load()` した `Texture2D` を
+  `SpriteFrames.add_frame()` で足す）。
 
 - **3Dは結果の`animations`**をGodotのAnimationPlayer/AnimationTreeで再生する。
   GLBをimportしてシーンへ配置し、実際のクリップ名を確認する。終了時はシーンと保持したResource参照を解放する。
@@ -174,15 +171,16 @@ Smart Topologyや複数視点等を公式サイトで見つけても、現行ツ
 
 ## 4. 取得と登録
 
-- 結果の `download_url` は `curl -fsSL -o <suggested_path> '<download_url>'` で取得する（`suggested_path` は `assets/…`）。
-- コードからは **`app.assets.url('assets/hero.png')`** が返す URL で読む
-  （`<img src="assets/…">` のような相対 URL は解決されない）。
+- 結果の `download_url` は `curl -fsSL -o godot/<suggested_path> '<download_url>'` で取得する（`suggested_path` は `assets/…`。
+  Godot プロジェクトの `godot/` の下に置く）。
+- コードからは **`preload("res://assets/hero.png")`**（または `load()` / `ResourceLoader`）で読む。Godot の import と export で PCK に入る。
+  URL で素材を読む経路は無い。
 - 自分で作った音（MP3）・3D（GLB）・動画（MP4）は **`upload_asset(name, kind)`**（`kind` は `audio` / `model_3d` / `video`）で登録する。
   返った `upload_url` に `curl -fsS -X PUT -F 'file=@<パス>;type=audio/mpeg' '<upload_url>'`
   （GLB は `type=model/gltf-binary`、動画は `type=video/mp4`）でアップロードし、`get_asset` を呼ぶと確定する。
   **1 つ 256 MiB まで**。持ち込みの枠（`upload`）を 1 回使い、生成の枠は減らない。
-- **大きい素材（1 ファイル数 MiB 以上の音・3D・動画）はゲームに同梱しない。** 台帳に載せた `asset_id` を
-  `source/bundles.refs.json` で参照する（書庫の 1 ファイルは 64 MiB まで。書き方は `$game-3d-and-bundles` §1）。
+- **ゲームに入る素材はすべて PCK に入る**（1 つ 64 MiB まで。台帳から後で取り寄せる経路は無い）。大きい音・3D・動画は
+  圧縮・短縮・解像度で収めてから `godot/` に置く（`$game-3d-and-bundles`）。
 - 素材の保存量はアカウントで 20 GiB まで（超えると `STORAGE_QUOTA_EXCEEDED`）。同じ物を何度も上げない。
 
 ## 5. 待ち時間
@@ -214,10 +212,12 @@ Smart Topologyや複数視点等を公式サイトで見つけても、現行ツ
 
 ## 7. 音の鳴らし方（素材の使い方）
 
-- `AudioContext` は 1 つ。最初の操作で `resume()` する（`$game-controls` §3）。
-- 効果音は起動時に全部 `decodeAudioData` して `AudioBuffer` を使い回す（鳴らすたびに読み込まない）。
-- BGM は `AudioBufferSourceNode` を `loop = true` で鳴らす。音量は効果音より小さく（0.3〜0.5）。
-- 効果音と BGM は**別の `GainNode`** に通す。ミュートの持ち方（まとめて / 個別）と `app.store` への保存は `$game-ux` §7。
+- 音は `godot/` に置いて `preload()` した `AudioStream` を `AudioStreamPlayer`（2D/3D なら `AudioStreamPlayer2D` / `3D`）で鳴らす。
+  Web では最初の操作まで音が出ない（`$game-controls`）。
+- 効果音のプレイヤーは使い回す（鳴らすたびにノードやストリームを作らない）。同時に重なる音は `max_polyphony` で受ける。
+- BGM はループを有効にして import する（MP3 / Ogg の import 設定の `loop`）。音量は効果音より小さく（-6〜-10 dB）。
+- 効果音と BGM は**別の Audio バス**に通す。ミュートの持ち方（まとめて / 個別）と Store（`TokoyoApp.save`）への保存は `$game-ux` §7。
+  実装の決まりは `$game-godot` references/best-practices.md の「Audio」。
 - Artifact の上限（`<kit>/profile/instructions.md` §2）とメモリ（`$game-3d-and-bundles` §3）に素材も入る。
 
 ## 8. 3D のテクスチャ（KTX2）
@@ -231,7 +231,7 @@ Smart Topologyや複数視点等を公式サイトで見つけても、現行ツ
 3. 結果の `download_url` を `suggested_path`（`assets/<name>.ktx2`）に取得し、Godot固定版のimportで読み込む。未対応の圧縮形式を仮定せず、必要なら元画像を使う。
 
 - 画像の枠を 1 回使う（費用はかからない）。WebP の素材は変換できない。
-- 2D のスプライト・UI の画像は PNG / WebP のままでよい（`<img>` や Canvas で描くもの）。
+- 2D のスプライト・UI の画像は PNG / WebP のままでよい（`Sprite2D` / `TextureRect` で描くもの）。
 
 ## 9. 利用者の素材（`source: user`）と「添付された素材」
 
@@ -246,29 +246,15 @@ Smart Topologyや複数視点等を公式サイトで見つけても、現行ツ
 
   | 発話の指示 | すること |
   |---|---|
-  | ゲームの中で使う・表示する・流す（「この画像を主人公に」「この動画をオープニングで流して」） | 画像は `get_asset` で取得し、§2 のとおり縮小して `assets/` に同梱する。音・3D は小さければ同梱、数 MiB を超えるもの・動画は取得せず `bundles.refs.json` で参照する（§4） |
+  | ゲームの中で使う・表示する・流す（「この画像を主人公に」「この動画をオープニングで流して」） | 画像は `get_asset` で取得し、§2 のとおり縮小して `godot/assets/` に同梱する。音・3D も `godot/` に同梱する（PCK の 64 MiB に収まるよう縮める。§4） |
   | 参考・雰囲気・「こういう動きで」「この感じの絵柄で」 | 添えられた画像（動画はコマ割り）を見て、絵柄・色・動き・間を真似て作る。**ファイルは同梱しない** |
   | 何も言っていない | 画像・音・3D はゲームで使う。**動画は参考として扱う**（同梱しない） |
 
-- **動画をゲームで流すとき**: ファイルは取得せず、`source/bundles.refs.json` に
-  `{"refs": {"bundles/intro/opening.mp4": "<asset_id>"}}` と書いて台帳から参照し、`manifest.json` の `bundles` に `intro` を宣言する
-  （書庫にも初期ダウンロードの 64 MiB にも入らない。`$game-3d-and-bundles` §1）。
-  `app.bundles.load('intro')` の後、`app.assets.url()` が返す URL（Host が渡す blob URL）を `<video>` に渡す:
-
-  ```js
-  async function playOpening() {
-    await app.bundles.load('intro')
-    const video = document.createElement('video')
-    video.src = app.assets.url('bundles/intro/opening.mp4')
-    video.playsInline = true
-    video.muted = true // 自動で流すなら muted が要る。音を出すのは最初の操作の後（`$game-controls` §3）
-    await video.play()
-    // これはWeb専用SDK動画要素。Godot nativeへ直接渡せる契約ではないため、共通対応済みと説明しない。
-    // 終わったら video.pause(); video.removeAttribute('src'); app.bundles.unload('intro')
-    return video
-  }
-  ```
-
+- **動画をゲームで流すとき**: Godot が再生できるのは Ogg Theora（`.ogv`）。`get_asset` で MP4 を取得し、
+  `ffmpeg -i opening.mp4 -c:v libtheora -q:v 6 -c:a libvorbis godot/assets/opening.ogv` のように変換・縮小してから同梱し、
+  `VideoStreamPlayer` で再生する（PCK の 64 MiB に収める。短く・解像度を下げる）。Web と組み込み native の両方で
+  再生できたことを実際に確かめるまで「対応済み」と書かない。変換できない・収まらないときは、コマ割りを参考にした
+  静止画の演出に替え、`notes` に書く。
   結果の `duration_ms` と `width` / `height` で長さと縦横比が分かる（読み込み前に枠を決められる）。
 - 利用者が上げられる形式: 画像 PNG / JPEG / WebP（4 MiB）、音 MP3・3D GLB（256 MiB）、動画 MP4（H.264・3 分・256 MiB）。
 - 利用者の素材は予算を使わない（`get_asset` は何度呼んでもよい）。

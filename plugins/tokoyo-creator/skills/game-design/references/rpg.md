@@ -7,20 +7,19 @@
 
 - アイテム/NPC/クエスト/地域の定義とruntime stateを分け、安定したIDで参照する。配列の現在のindexを保存IDにしない。
 - クエストは未開始/進行中/達成/報酬受取などの遷移を明示。二重入力・再開・再訪で報酬が重複しない。
-- 定義データは地域bundleで遅延ロードする。作者設計のtilemap/GLBも利用できる。
+- 定義データは地域ごとのシーン/Resourceに分け、近づいたときに`load()`する（すべて同じPCKの中。`$game-open-world`）。作者設計のtilemap/GLBも利用できる。
 - 保存はschemaVersion、生成方式version、seed（生成worldの場合）、進行、必要な差分、必要なRNG状態。
   旧セーブや公開版rollbackで参照できない版を勝手に新規worldへ置き換えず、理由を表示する。
 - 無限に改変できるworldの差分は圧縮だけでは有界にならない。有限範囲、同一IDの最新変更へのcompact、容量予算を決める。
 
 ## 保存
 
-- 起動時のstore.getが失敗したら空データで上書きしない。最初のrevisionとACK済みrevisionを使う。
-- `@workspace/app-sdk/runtime`のcreateCheckpointで固定snapshot・単一flight・同じ要求の再送を扱える。
-  captureは保存対象の小さなJSONデータだけを返す。Mesh/Scene/Input/音は含めない。
+- 起動時の読み込み（`TokoyoApp.store_loaded` / `save_status()`）が失敗したら空データで上書きしない。`TokoyoApp.save()`はrevisionとrequest IDを付け、保存中の次の保存を1つにまとめる。
+  渡す値は保存時点の小さなJSONにできるデータの写し（`duplicate(true)`）だけ。Node/Scene/Mesh/入力/音は含めない。
 - 活動中の定期/重要進行時にdirtyをまとめてflushする。毎分12writeを守り、移動毎frameや拾うたびに直接writeしない。
-- onPauseは入力/simulation/timerを止める。paused中はSDK APIを使えない。未保存分はresume後の活動中に再試行する。
+- `TokoyoApp.lifecycle_changed(paused)`で入力/simulation/timerを止める。paused中はSDK APIを使えない。未保存分はresume後の活動中に再試行する。
   OS終了時の非同期完了は保証しない。最後の確定時刻、未保存、再試行、容量不足、競合を表示する。
-- 失敗した要求は同一payload/requestId/revisionで再送する。REVISION_CONFLICTで最新revisionだけ取得して古い世界を上書きしない。
+- 失敗した保存（`save_status()`が`failed`）は同じ内容で再送する。REVISION_CONFLICTで最新revisionだけ取得して古い世界を上書きしない。
   競合はプレイヤーに選択/再読込を示すか、ゲーム固有の安全なmergeを行う。
 - 1MiBはgzip単体ではなくbase64を含む最終JSON UTF-8の長さ。所持品/設定/クエストを別保存処理が互いに上書きしない。
 
@@ -37,9 +36,9 @@
 場所/入口の接続と切替、部屋単位/連続の読み込み、実ステージと地図の対応は
 `$game-level-design` references/transitions-and-map.md を読む。移動先の準備が済む前に到着/訪問を確定しない。
 
-- 会話/メニュー中は移動/攻撃を止め、決定・戻る・相互作用の割当を入力キットで管理する。閉じた入力が戦闘へ漏れない。
+- 会話/メニュー中は移動/攻撃を止め、決定・戻る・相互作用の割当をInputMapのactionで管理する（`$game-controls`）。閉じた入力が戦闘へ漏れない。
 - 復帰地点、失うもの、続きからを明示。地域の表示と衝突が準備できるまで境界で待機する。
-- pause/resumeは冪等にし、timer/render loop/listenerを二重登録しない。
+- pause/resumeは冪等にし、Timer/signal接続を二重登録しない。
 
 ## 検査
 

@@ -37,7 +37,7 @@ Platform の規則（別のゲームとのマージでは `listing/` は ours・
 行単位の合わせ方は文法を見ないので、両側が同じ場所にキーを足すと壊れることがある。
 
 最後に `build-report.json` の `notes` に、**衝突ごとにどう解いたか**を 1 行ずつ書く
-（例: `"src/game.ts: speed の変更は両方を掛け合わせず theirs の 9 を採った（説明に『速くする』とあるため）"`）。
+（例: `"godot/tuning.gd: SPEED の変更は両方を掛け合わせず theirs の 9 を採った（説明に『速くする』とあるため）"`）。
 提案のページやチャットに表示され、合わせた人が確かめる手掛かりになる。
 
 ## 2. 衝突の解き方
@@ -60,13 +60,11 @@ Platform の規則（別のゲームとのマージでは `listing/` は ours・
 - ours と theirs が**同じ変更**をしているなら 1 つにする（重複させない）。
 - 印の中に書かれていない部分（既に合わさった部分）は変えない。
 
-## 3. 素材（`bundles/` と `bundles.refs.json`）
+## 3. 素材（`godot/` の下の素材）
 
 両側は同じゲームのリポジトリです。素材は既存の台帳とcommitに紐づいており、Platformは別ゲームへのコピーを行いません。入力に渡された許可済みの素材だけを使います。
 
-- **台帳から参照している素材**（`source/bundles.refs.json`）は、git がほかのソースと同じく合わせている。衝突したら
-  **両側の参照を両方残す**（同じパスが別の `asset_id` を指すときだけ theirs を採り、`notes` に書く）。参照の素材は取り直さない。
-- **commit してある素材**（`bundles/` などに置いたファイル）は、ほかのファイルと同じく git が合わせている（LFS のポインタ）。
+- **commit してある素材**（`godot/` の下の画像・音・3D・フォント）は、ほかのファイルと同じく git が合わせている（LFS のポインタ）。
   取り直さない。衝突したら §2 の LFS の項のとおり ours のポインタに戻す。
 - **素材を消さない**（ours の素材も theirs の素材も残す）。
 
@@ -83,11 +81,10 @@ Platform の規則（別のゲームとのマージでは `listing/` は ours・
 
 ## 4. 出力前のチェック
 
-- [ ] `grep -rnE '^(<<<<<<<|>>>>>>>) ' src server assets design listing manifest.json package.json bundles.refs.json` が何も返さない
+- [ ] `grep -rnE '^(<<<<<<<|>>>>>>>) ' godot server debug ai design listing manifest.json package.json` が何も返さない
       （`git diff --check` と `git status` に `Unmerged paths` が無いことも）
-- [ ] `manifest.json` と `package.json`（と `bundles.refs.json`）が JSON として読める。`manifest.json` の `bundles` の名前ごとに、
-  `bundles/<名前>/` のディレクトリか `bundles.refs.json` の参照がある（`$game-3d-and-bundles` §1）
-- [ ] ビルドが通り、`node` で読み込める
-- [ ] 対戦のあるゲームなら `server/main.ts` の `defineSpace` と画面が同じ定義を使っている（`$game-multiplayer`）
+- [ ] `manifest.json` と `package.json` が JSON として読める。`manifest.json` の `bundles` は `{ "godot_native": { "load": "demand" } }` のまま
+- [ ] `kit build` が通る（Godot の import・export と GDScript の構文）。`godot/rules.gd` があればルールの検査が通る（`$game-playtest`）
+- [ ] 対戦のあるゲームなら `server/main.ts` の `defineSpace` と画面（`TokoyoSpace` の状態・message 名・入力）が食い違っていない（`$game-multiplayer`）
 - [ ] `notes` に衝突ごとの解き方を書いた（衝突 0 件なら「衝突なし」と、ビルドや検証で直したこと）
 - [ ] 新しい機能・見た目の変更を足していない

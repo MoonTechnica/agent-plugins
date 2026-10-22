@@ -26,15 +26,14 @@ GodotのRPC/ENet・独自WebSocket・直接HTTP・独自認証でPlatformを迂�
 "space": {
   "server": "server.bundle.js",
   "participants": { "min": 2, "max": 2 },
-  "maxDurationSec": 120,
-  "practice": false
+  "maxDurationSec": 120
 },
 "capabilities": ["identity.read", "space.connect"]
 ```
 
 人数は2〜8。依頼からmin/maxを決め、全人数で成立させる。非対称・チーム戦は`participants.roles`と`player.role`を使う。
-slotは1起点（0は空）。ネイティブの練習シミュレーションは未対応なので、Web/native共通ゲームは`practice:false`にする。
-CPU練習を実装済みと説明しない。招待・マッチング・待機室は既存Platformが用意する。
+slotは1起点（0は空）。Platformの練習モード（`space.practice`）は無い。一人で練習させたいなら、その遊びをGodotの中で作る
+（サーバーのルールを複製せず、練習の結果を成績に残さない）。CPU練習を実装済みと説明しない。招待・マッチング・待機室は既存Platformが用意する。
 
 ## GodotのAPI
 

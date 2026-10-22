@@ -1,6 +1,6 @@
 ---
 name: game-design
-description: ゲームを作る工程の正本。依頼を受けたら最初に使う。企画（design/brief.md）の書き方、面白さの設計（核の動詞・看板の仕掛け・山と休み）と「AI が作った感じ」の点検、名作の手本、工程の順序と各段階の完了条件、ジャンルごとに「完成している」と感じる下限、遊びのルールを rules.ts / 調整値を tuning.ts に分ける形、仕上げ（polish）と出荷前のチェックを扱う。game design, brief, core loop, scope, genre minimum, tuning, polish, ship checklist.
+description: ゲームを作る工程の正本。依頼を受けたら最初に使う。企画（design/brief.md）の書き方、面白さの設計（核の動詞・看板の仕掛け・山と休み）と「AI が作った感じ」の点検、名作の手本、工程の順序と各段階の完了条件、ジャンルごとに「完成している」と感じる下限、遊びのルールを rules.gd / 調整値を tuning.gd に分ける形、仕上げ（polish）と出荷前のチェックを扱う。game design, brief, core loop, scope, genre minimum, tuning, polish, ship checklist.
 ---
 
 遊べる核ができたら `$game-playtest` の `references/development-preview.md` を読み、通常開始ケースと本編factoryを使う代表試験場を用意する。メニューUIは作品に合わせてゲームリポジトリ内の`debug/`へ作り、SDKの型付き操作でHostの認可・専用Scopeに接続する。本番成果物へ含めない。Document read/write要求は今回の対象外。
@@ -19,7 +19,7 @@ description: ゲームを作る工程の正本。依頼を受けたら最初に�
 | 1 | 企画 | `design/brief.md` の全見出しが埋まり、ジャンルの下限（[references/genres-minimum.md](references/genres-minimum.md)）が列挙されている。核の動詞・看板の仕掛け・テーマの規則・山と休みを [references/fun.md](references/fun.md) §1 で決め、該当ジャンルの [references/exemplars.md](references/exemplars.md) を読んだ | この Skill §2 |
 | 2 | 絵で合意 | コンセプト画像（`key-art` / `hero`）とスタイルガイドがある。**新しいゲームの最初のターンと、見た目・遊びの核を変えるときは企画のターンとして見せて終える**（`$game-art-direction` §2） | `$game-art-direction` |
 | 3 | 素材の設計 | `design/asset-manifest.md` の全行に経路・理由・枠があり、合計が予算内 | `$game-art-direction` |
-| 4 | 核を遊べる形に | 開始 → 核の行為 → 結果/進行 → 次の区切りが回る。進行型は保存 → 再開も核として検査する（`rules.ts` の無い前の版を続けるときは下の「2 回目以降」） | この Skill §3、`$game-playtest` |
+| 4 | 核を遊べる形に | 開始 → 核の行為 → 結果/進行 → 次の区切りが回る。進行型は保存 → 再開も核として検査する（`rules.gd` の無い前の版を続けるときは下の「2 回目以降」） | この Skill §3、`$game-playtest` |
 | 5 | 素材の差し替え | manifest の全行が済み、`design/game-assets.json`の名前と実装参照が一致する（コードで作るモデル/音も含む） | `$game-asset-tools` |
 | 6 | 遊んで直す | 確認済みと未確認が明確。確認できた重大な失敗は修正済み。新規制作と核の変更では [references/fun.md](references/fun.md) §4 の点検表を当て、効くものから直した。公開前検証/作者プレビュー待ちへ ✓ を付けない | `$game-playtest` |
 | 7 | 数値で整える | 導入は安全で、区切りの長さと難易度がbriefに合う。全作品に短時間終了を課さない | この Skill §3 |
@@ -34,9 +34,9 @@ description: ゲームを作る工程の正本。依頼を受けたら最初に�
   - 見た目の方向が変わる（絵柄・主役・世界観）→ 2 から
 - 前の版に `design/` が無い（この工程より前に作られた）ときは、今の中身から `brief.md` と `style-guide.md` を起こしてから続ける。
   ただし**外部参加のfeat（`./input/branch.json`。手元では `get_app` の `branch` の `requires_proposal` が `true`）では起こさない**（本流への提案に関係の無い差分を増やさない）。
-- 前の版に `src/rules.ts` が無いときは、**依頼の変更のために作り直さない**（`instructions.md` §4.0 の「変更だけ」が優先）。
-  ルール検査（`$game-playtest` §2）はその版では省き、`notes` に「rules.ts が無いのでルール検査を省いた」と 1 行書く。
-  `rules.ts` / `tuning.ts` に分けるのは、遊びの核から作り直すとき（段階 1 から）だけ。派生では分けない。
+- 前の版に `godot/rules.gd` が無いときは、**依頼の変更のために作り直さない**（`instructions.md` §4.0 の「変更だけ」が優先）。
+  ルール検査（`$game-playtest` §2）はその版では省き、`notes` に「rules.gd が無いのでルール検査を省いた」と 1 行書く。
+  `rules.gd` / `tuning.gd` に分けるのは、遊びの核から作り直すとき（段階 1 から）だけ。派生では分けない。
 - 自己試遊の結果（`./input/playtest-report.json`）があれば、段階 6 の前に読んで直す（`$game-playtest`）。
 - **ベストプラクティスに沿って実装し、その上で追加最適化する。** 新規制作/変更部分の実装前に
   [references/performance-risk.md](references/performance-risk.md) §0と使用エンジンの指針を読み、該当する基本対策を適用する。
@@ -96,21 +96,22 @@ Godot 2D（動く物が少ない）
 ## 3. ルールと調整値を分ける
 
 ```text
-src/
-├── tuning.ts   # 調整値だけ（速度・重力・間隔・体力・得点・判定の猶予）
-├── rules.ts    # 遊びのルールだけ（状態・入力・時間 → 次の状態）。描画・DOM・音・SDK に触れない
-└── main.ts     # 入力を集め、rules を進め、描く・鳴らす
+godot/
+├── tuning.gd   # 調整値だけ（速度・重力・間隔・体力・得点・判定の猶予）。const だけ
+├── rules.gd    # 遊びのルールだけ（状態・入力・時間 → 次の状態）。ノード・描画・音・TokoyoApp に触れない
+└── main.gd     # 入力を集め、rules を進め、描く・鳴らす（シーンのスクリプト）
 ```
 
-- `tuning.ts` は `export const tuning = { ... } as const` 1 つ。数値をコードに散らさない。
-- `rules.ts` は純粋な関数で書く: `init(seed)` / `step(state, input, dt)` / `isOver(state)` / `score(state)` の形。
-  乱数は seed から（`Math.random` を直接使わない）。これで `node` からルールだけを回せる（`$game-playtest` §2）。
+- `tuning.gd` は `const` だけ（`const FALL_SPEED := 120.0`）。数値をコードに散らさない。
+- `rules.gd` は static 関数で書く: `init(seed) -> Dictionary` / `step(state, input, dt) -> Dictionary` / `is_over(state)` / `score(state)` の形。
+  乱数は state に持たせた seed から `RandomNumberGenerator` で引く（`randf()` を直接使わない）。これで headless の Godot から
+  ルールだけを回せる（`$game-playtest` §2）。物理（`CharacterBody2D` 等）で動く部分は rules に入れず、勝敗・得点・進行の判定だけを置く。
   RPGで不要なscore/ゲーム全体のisOverを強制しない。定義データとruntime進行を分け、局所更新を検査可能にする。
   毎frameの全世界deep cloneは行わず、保存時の固定snapshotとsimulationを分離する。
 - RPG/長期探索は [references/rpg.md](references/rpg.md) を先に読む。会話・クエスト・所持品は依頼の核に必要なものだけ作る。
-- 対戦は `rules.ts` の関数（手番・勝敗の判定・1 tick の計算）を `server/main.ts` の `defineSpace` から呼ぶ。ルールを書くのは `rules.ts` の
-  1 か所だけで、`defineSpace` はそれを Platform につなぐ（`$game-multiplayer` §2）。`tuning.ts` は画面とサーバーが同じものを import する。
-- **プレイヤーに有利に「ごまかす」**のは既定で入れる（`tuning.ts` に値を置く）:
+- 対戦は手番・勝敗の判定・1 tick の計算を `server/main.ts` の `defineSpace` だけが持つ（サーバーが権威。`$game-multiplayer` §2）。
+  画面側の GDScript は手を送って同期された状態を描くだけで、勝敗を計算しない。
+- **プレイヤーに有利に「ごまかす」**のは既定で入れる（`tuning.gd` に値を置く）:
   足場の端から離れても少しの間は跳べる（coyote 80〜120ms）、着地の少し前の入力を覚える（buffer 100ms）、
   当たり判定は見た目より少し小さく、取る判定は少し大きく。
 
