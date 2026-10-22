@@ -153,17 +153,19 @@ source-dirは`./source`。SDKのCLIと作業ディレクトリ側の`scripts/kit
 `dist.tar.gz` の中身（`tar -C dist -czf ../outputs/dist.tar.gz .` 相当。**`dist/` を入れ子にしない**）:
 
 ```text
-app.bundle.js        # Platform との橋渡し（kit build が作る。Godot の pack は assets/godot/ と bundles/godot_native/）
+app.bundle.js        # Platform との橋渡し（kit build が作る。Godot の pack は assets/godot/・bundles/godot_native/・bundles/<地域>/）
 server.bundle.js     # 対戦があるときだけ（server/main.ts の defineSpace）
 manifest.json        # 書庫の根に置く。入れ子にすると取り込みに落とされる
 assets/godot/        # Web 用の game.js・game.wasm・game.pck（kit build が作る）
 bundles/godot_native/ # 組み込み native 用の game.pck（kit build が作る。ブラウザは取らない）
+bundles/<地域>/       # 地域ごとの追加 pack（web.pck・native.pck。godot.regions に宣言した地域だけ。kit build が作る）
 ai/<key>.md          # ゲーム内 AI の指示文（`ai.chat` のときだけ。`ai/schemas/*.json` も。`$game-ai`）
 ```
 
 - 書庫（`dist.tar.gz`）は**圧縮後 200 MiB・1 ファイル 64 MiB** まで。
 - **素材はすべて `godot/` に置き、Godot の import と export で PCK に入れる。** ゲームのコードは `preload()` / `load()` / `ResourceLoader` で
-  `res://` から読む。PCK の外から素材を取り寄せる経路（URL・後から取り寄せるバンドル・台帳から参照する素材）は無い。
+  `res://` から読む。URL・台帳から参照する素材の経路は無い。広い世界は `godot/regions/<地域>/` に分けて地域ごとの
+  追加 pack にし、近づいたら `TokoyoApp.regions.load(name)` で重ねる（`$game-open-world`、`spec.md` §8.6）。
 - **PCK は 1 つ 64 MiB まで**（iOS の組み込み runtime の上限）。Web では起動前に全部届くので、10 MiB を超えると警告になる
   （スマートフォンの回線で起動を待たせる）。テクスチャの圧縮 import・音の圧縮・解像度で収める（`$game-3d-and-bundles`）。
 - 絶対パス・`..`・シンボリックリンク・同じパスの重複は取り込みで落とされる。

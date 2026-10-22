@@ -14311,6 +14311,7 @@ var ARTIFACT_INITIAL_MAX_BYTES = 64 * 1024 * 1024;
 var ARTIFACT_INITIAL_WARN_BYTES = 10 * 1024 * 1024;
 var ARTIFACT_MEMORY_WARN_BYTES = 512 * 1024 * 1024;
 var ARTIFACT_MEMORY_STRONG_WARN_BYTES = 768 * 1024 * 1024;
+var ARTIFACT_MAX_REGIONS = 256;
 var ARTIFACT_BUNDLE_MAX_BYTES = 256 * 1024 * 1024;
 var ARTIFACT_WIFI_NOTICE_BYTES = 200 * 1024 * 1024;
 var STORE_MAX_BYTES = 1024 * 1024;
@@ -14404,9 +14405,13 @@ var storeSchemaSchema = strictObject({
 });
 var bundleNameSchema = string2().regex(/^[a-z0-9][a-z0-9_-]{0,31}$/, "invalid bundle name");
 var GODOT_NATIVE_BUNDLE = "godot_native";
-var bundlesManifestSchema = strictObject({
-  [GODOT_NATIVE_BUNDLE]: strictObject({ load: literal("demand") })
+var bundlesManifestSchema = record(bundleNameSchema, strictObject({ load: literal("demand") })).refine((bundles) => (GODOT_NATIVE_BUNDLE in bundles), {
+  message: `bundles must declare ${GODOT_NATIVE_BUNDLE}`
 });
+var regionNameSchema = string2().regex(/^[a-z][a-z0-9_]{0,31}$/, "invalid region name").refine((name) => name !== GODOT_NATIVE_BUNDLE, `${GODOT_NATIVE_BUNDLE} is reserved`).refine((name) => !name.startsWith("debug_"), "debug_ is reserved for development files");
+function regionPackPath(name, target) {
+  return `bundles/${name}/${target}.pck`;
+}
 var lowerIdentifierSchema = string2().regex(/^[a-z][a-z0-9_]{0,31}$/, "must be a lowercase identifier");
 var LEADERBOARD_ORDERS = ["desc", "asc"];
 var LEADERBOARD_KEEPS = ["best", "latest"];
@@ -14491,7 +14496,8 @@ var godotManifestSchema = strictObject({
   }),
   native: strictObject({
     pack: artifactPathSchema.refine((path) => /^bundles\/godot_native\/.+\.pck$/.test(path))
-  })
+  }),
+  regions: array(regionNameSchema).max(ARTIFACT_MAX_REGIONS).refine((names) => new Set(names).size === names.length, "duplicate region").default([])
 });
 var manifestSchema = strictObject({
   manifestVersion: literal(MANIFEST_VERSION).default(MANIFEST_VERSION),
@@ -14514,6 +14520,16 @@ var manifestSchema = strictObject({
   ai: aiManifestSchema.nullable().default(null),
   device: deviceManifestSchema.default({}),
   godot: godotManifestSchema
+}).superRefine((manifest, ctx) => {
+  const declared = new Set([GODOT_NATIVE_BUNDLE, ...manifest.godot.regions]);
+  const bundles = Object.keys(manifest.bundles);
+  if (bundles.length !== declared.size || bundles.some((name) => !declared.has(name))) {
+    ctx.addIssue({
+      code: "custom",
+      path: ["bundles"],
+      message: `bundles must be exactly ${GODOT_NATIVE_BUNDLE} and godot.regions`
+    });
+  }
 });
 function sortKeysDeep(value) {
   if (Array.isArray(value)) {
@@ -15012,6 +15028,30 @@ var avatarMessageSchema = strictObject({
     bytes: custom(isArrayBuffer, "must be an ArrayBuffer")
   }).nullable()
 });
+var regionRequestMessageSchema = strictObject({
+  type: literal("region_request"),
+  name: regionNameSchema
+});
+var REGION_FAILURE_CODES = [
+  "REGION_UNKNOWN",
+  "REGION_FETCH_FAILED",
+  "REGION_INTEGRITY",
+  "RUNTIME_UNSUPPORTED"
+];
+var regionMessageSchema = union([
+  strictObject({
+    type: literal("region"),
+    name: regionNameSchema,
+    bytes: custom(isArrayBuffer, "must be an ArrayBuffer"),
+    code: _null3()
+  }),
+  strictObject({
+    type: literal("region"),
+    name: regionNameSchema,
+    bytes: _null3(),
+    code: _enum(REGION_FAILURE_CODES)
+  })
+]);
 var DOCUMENT_EVENT_KINDS = [
   "created",
   "joined",
@@ -15161,6 +15201,7 @@ var hostToShellMessageSchema = union([
   replyMessageSchema,
   lifecycleMessageSchema,
   avatarMessageSchema,
+  regionMessageSchema,
   documentsChangedMessageSchema,
   deviceStreamMessageSchema,
   deviceStoppedMessageSchema
@@ -15178,6 +15219,7 @@ var shellToHostMessageSchema = union([
   helloMessageSchema,
   opMessageSchema,
   avatarRequestMessageSchema,
+  regionRequestMessageSchema,
   spaceEndedMessageSchema
 ]);
 var OUTCOMES = ["win", "lose", "draw"];
@@ -15736,6 +15778,23 @@ function validateGodotReferences(manifest, byPath, errors) {
         message: `Godot resource must use ${extension}`,
         path
       });
+    }
+  }
+  for (const region of manifest.godot.regions) {
+    const expected = new Set(["web", "native"].map((target) => regionPackPath(region, target)));
+    for (const path of expected) {
+      if (!byPath.has(path)) {
+        errors.push({ code: "GODOT_FILE_MISSING", message: "Godot region pack is missing", path });
+      }
+    }
+    for (const path of byPath.keys()) {
+      if (path.startsWith(`bundles/${region}/`) && !expected.has(path)) {
+        errors.push({
+          code: "REGION_FILE_UNEXPECTED",
+          message: `bundles/${region}/ may only hold web.pck and native.pck`,
+          path
+        });
+      }
     }
   }
   let trusted = true;

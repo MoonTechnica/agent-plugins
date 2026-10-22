@@ -14,10 +14,12 @@ Godot 4.5.1のCompatibility rendererでWeb/native共通の描画を作る。JS/T
 - 不要なシーンは`queue_free()`し、autoload・signal・配列・辞書がResourceを保持していないか確認する。
 - 再入場が必要な近隣だけを上限付きで保持する。全ステージのpreload・無制限キャッシュを使わない。
 - 大きい音・画像・GLBは素材台帳（`list_assets` / `get_asset`）で再利用し、再生成しない。ゲームに入れるものは`godot/`に置く。
-- **素材はすべて1つのPCKに入る。PCKは64 MiBまで**（iOSの組み込みruntimeの上限。書庫の単一ファイル上限も64 MiB）。
-  後から取り寄せるバンドル・台帳から参照する素材・追加PCKの読み込みは無い。`manifest.json`の`bundles`は`godot_native`だけ。
-  標準Web WASMだけでも約38 MiBある。テクスチャの圧縮import・解像度・音のビットレートで収め、PCKの容量を実測して超過を隠さない。
-- GodotのWeb exportはPCKを起動時に全部取得する。初期ダウンロードを減らしたいなら素材そのものを削る（分割配信は無い）。
+- **主PCKは64 MiBまで**（起動前に全部届く。書庫の単一ファイル上限も64 MiB）。標準Web WASMだけでも約38 MiBある。
+  テクスチャの圧縮import・解像度・音のビットレートで収め、PCKの容量を実測して超過を隠さない。
+- 広い世界・ステージの多い作品は、場所ごとの素材を`godot/regions/<地域>/`に分けて**地域ごとの追加pack**にする
+  （`manifest.json`の`godot.regions`と`bundles`に同じ名前を書く。近づいたら`TokoyoApp.regions.load(name)`。`spec.md` §8.6）。
+  地域packも1つ64 MiBまで。スクリプトと複数の地域が使う素材は主PCKに置く。Godotはpackを外せないので、読む地域は利用者が近づく所だけにする。
+- 台帳から参照する素材・URLで読む経路は無い。ゲームに入れるものはすべて`godot/`に置く。
 
 影・透明描画・全画面shader・粒子・テクスチャ寸法・解像度・活動中のNode数に予算を置く。
 見た目を一律に下げず、実frame時間・メモリ・操作感から原因別に調整する。

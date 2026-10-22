@@ -1,6 +1,6 @@
 ---
 name: game-open-world
-description: 広い世界を局所的に読み込み、解放して長く遊べるようにする。作者設計map/seed生成、時間予算、活動NPC、地域資源の所有、進行保存/再開、協力卓のチェックポイントを扱う。探索・RPG・サンドボックスを作るときに使う。open world, RPG, chunks, streaming, save, memory.
+description: 広い世界（8 km四方級まで）を局所的に読み込み、解放して長く遊べるようにする。地域ごとの追加pack、GDScriptのクリップマップ地形、作者設計map/seed生成、時間予算、活動NPC、地域資源の所有、進行保存/再開、協力卓のチェックポイントを扱う。探索・RPG・サンドボックスを作るときに使う。open world, RPG, chunks, streaming, save, memory.
 ---
 
 # オープンワールド・長時間探索
@@ -9,8 +9,10 @@ description: 広い世界を局所的に読み込み、解放して長く遊べ�
 最初から設計し、その上で実描画を測って必要な追加最適化を行う。世界を広げてから基本対策を後付けしない。
 RPGの進行は `$game-design` references/rpg.md。SDK APIの正本は `<kit>/sdk/app-sdk/spec.md`。
 地域の役割・接続・配置・生成候補の選定は `$game-level-design`。このSkillは採用した世界の読み込み・活動範囲・保存を扱う。
-エンジンAPIは固定版Godotの公式マニュアル/API定義で確認する。世界の素材はすべて1つのPCK（64 MiB以内）に入り、後から取り寄せる配信は無い。
-減らすのはダウンロード量ではなく、同時にメモリへ載せる地域・活動させる処理の量。
+エンジンAPIは固定版Godotの公式マニュアル/API定義で確認する。8 km四方級（原点中心で±4 km）までの世界を作れる。
+起動前に届く主PCKは64 MiBまでで、地域ごとの素材は**地域ごとの追加pack**（`spec.md` §8.6）で近づいたときに取り寄せる。
+減らすのは同時にメモリへ載せる地域・活動させる処理の量と、1回のプレイで読む地域packの総量。
+雰囲気と「次に行きたい場所」の作り方は `$game-level-design` references/genre-spaces.md §5。広さそのものを面白さにしない。
 世界規模・活動NPC・生成・描画方式を決める段階で `$game-design` references/performance-risk.md を読み、
 懸念を先に伝え、代表的な地域の最小試作を実描画して比較する。広げてから負荷を調べない。
 
@@ -29,6 +31,28 @@ references/transitions-and-map.md。地域/部屋・シーン・chunkを同じ�
 - 表示と衝突が準備できるまで未ロード地域へ進めない。teleportはロード画面と進捗を用意する。
 - 徒歩だけでなく、その作品で可能な最大移動速度/急な方向転換/境界往復を先読み設計に含める。
   霧で隠しただけでmesh/physics/AIの処理が減ったとは扱わず、活動範囲とLODを別に管理する。
+
+## 1.5 広い地形（8 km級）
+
+GDExtensionの地形（Terrain3D等）は使えない（WebとiOSの実行環境が拒否する）。GDScriptとシェーダで作る。
+そのまま動く実装例（リング・シェーダ・周辺の当たり判定・植生）は [references/large-terrain.md](references/large-terrain.md)。ゼロから書かずにこれを作品に合わせて直す。
+
+- **座標**: 世界の中心を原点に置き、端まで±4096 m以内にする。単精度のまま、原点の移動もしない
+  （Godot公式の推奨範囲。対戦サーバーとの座標も揃えやすい）。
+- **描画**: 地形はクリップマップ。中心ほど細かい同心のグリッドメッシュを数枚、起動時に`ArrayMesh`で作り、カメラに合わせて
+  グリッド単位でずらす。高さは`ShaderMaterial`の頂点シェーダで高さテクスチャから`VERTEX.y`を変える。
+  シェーダで動かした頂点はAABBと合わないので、`custom_aabb`（または`extra_cull_margin`）を設定して誤ったカリングを防ぐ。
+- **高さデータ**: 粗い世界全体の高さ（例: 2048²の16 bit）は主PCK、細かい高さタイルは地域packに入れる。8 bitの高さは段差になるので使わない。
+- **当たり判定**: 利用者（と対戦相手）の周囲の数チャンクだけ`HeightMapShape3D`を作り、離れたら外す。生成もフレームの時間予算に含める。
+- **植生・小物**: `MultiMeshInstance3D`を地域×区画ごとに分ける（1つのMultiMeshは全体で同じLODになる）。配置表は地域packに置く。
+  半透明を避け、不透明かアルファテストにする。
+- **遠景**: 霧で遠景を消し、`Camera3D.far`を縮める（既定4000。1.5〜2 kmから実測で決める）。さらに遠くは最も粗いリングで描く。
+  影の距離は延ばさない。Web・モバイルのCompatibility rendererでは可視範囲（`visibility_range_*`）のフェードが効かず即座に切り替わるので、
+  切り替わる距離を見通しの悪い場所に置く。遮蔽カリングはWebの標準テンプレートに無いので頼らない。
+- **読み込み**: スレッドが無い環境では`ResourceLoader.load_threaded_request`も同期で最後まで走る。地域のシーンを小さく分け、§2の予算で
+  1件ずつ`load`→`instantiate`→`add_child`を進める。地域packの取得（`TokoyoApp.regions.load`）は境界の手前で先に始める。
+- **地域pack**: `godot/regions/<地域>/`に地域の素材を置く（1 km²前後を目安に作品で決める）。packは外せないので、
+  近づいた地域だけを読み、1回のプレイで読む総量を設計で抑える。Webでは読んだpackがタブのメモリに残る。
 
 ## 2. 時間予算と取消
 
@@ -62,10 +86,10 @@ func cancel(region_id: String) -> void:
 
 ## 3. 資源の所有と地域素材
 
-地域ごとの素材と定義は `godot/` の地域ごとのフォルダ（地域のシーン `.tscn` と、その地域だけが使う素材）に置く。
-すべて同じPCKに入り、`manifest.json` の `bundles` は `godot_native` だけ（地域の宣言は無い）。
-地域のシーンは近づいたときに `load()`（または `ResourceLoader.load()`）して工程を分けて instantiate し、隣地域は
-保持半径に入った時点で読み始める。PCKのファイルを読むことと、decode/GPUに載ったメモリは別に数える。
+地域ごとの素材と定義は `godot/regions/<地域>/`（地域のシーン `.tscn` と、その地域だけが使う素材）に置き、
+`manifest.json` の `godot.regions` と `bundles` に同じ名前で宣言する（`spec.md` §8.6）。地域のフォルダは主PCKから外れ、
+地域ごとのpackになる。隣の地域が保持半径に入ったら `TokoyoApp.regions.load(name)` で取り寄せ、重ねてから
+`load()` して工程を分けて instantiate する。packのファイルを読むことと、decode/GPUに載ったメモリは別に数える。
 
 - 地域専用資源と常駐/共有資源を分け、最後の利用者が共有資源を解放する。
 - Godotの地域Nodeはqueue_free()し、autoload・signal・キャッシュがResource参照を保持していないか調べる。

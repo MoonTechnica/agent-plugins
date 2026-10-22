@@ -5,10 +5,10 @@
   },
   "plugins": [
     {
-      "name": "tokoyo-creator",
+      "name": "fdpocket-creator",
       "source": {
         "source": "local",
-        "path": "./plugins/tokoyo-creator"
+        "path": "./plugins/fdpocket-creator"
       },
       "policy": {
         "installation": "AVAILABLE",
@@ -17,10 +17,10 @@
       "category": "Productivity"
     },
     {
-      "name": "fdpocket-creator",
+      "name": "tokoyo-creator",
       "source": {
         "source": "local",
-        "path": "./plugins/fdpocket-creator"
+        "path": "./plugins/tokoyo-creator"
       },
       "policy": {
         "installation": "AVAILABLE",
