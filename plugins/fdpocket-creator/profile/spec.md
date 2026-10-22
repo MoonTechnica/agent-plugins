@@ -371,7 +371,7 @@ notifications:
 |---|---|
 | `client.ai.chat(input)` | 1 ターン送って結果を待つ。`input`（`AiChatInput`）: `conversation`（会話の名前。`[A-Za-z0-9_.:-]` で 64 字まで。同じ名前の履歴を Platform が持つ）・`message`・`attachments`（`[{ fileId }]`。Storage のファイル、4 個まで）・`instructions`（宣言した指示文の名前）・`schema`（宣言した Schema の名前。JSON で返させる）・`model`・`onToken`（渡すと届いた分から順に呼ぶ）・`signal`（待つのをやめる） |
 | `client.ai.reset(conversation)` | 会話を切る（次のターンから履歴を送らない） |
-| `client.ai.openai()` | OpenAI 互換の接続先（`OpenAiCompatible`: `baseURL`・`apiKey`・`fetch`）。LangChain・Mastra・Vercel AI SDK・OpenAI SDK にそのまま渡し、エージェント（ツール呼び出しのループ）・構造化出力・ストリーミングを作る。会話の履歴はフレームワークが持つ |
+| `client.ai.openai()` | OpenAI 互換の接続先（`OpenAiCompatible`: `baseURL`・`apiKey`・`fetch`）。LangChain・Vercel AI SDK・OpenAI SDK にそのまま渡し、エージェント（ツール呼び出しのループ）・構造化出力・ストリーミングを作る。会話の履歴はフレームワークが持つ |
 
 結果（`AiTurnResult`）: `text`・`json`（`schema` を指定し、正常に終わったときだけ）・`finishReason`（`AiFinishReason`。
 `stop` は正常、`length` は出力の上限で切れた、`content_filter` は提供元が止めた、`other` はそれ以外）・
@@ -395,7 +395,7 @@ notifications:
 `openai()` の要点（`model` は `auto`＝Jev Router か、project.yaml の `ai.model` / 許可一覧の ID）:
 
 ```ts
-import { createOpenAI } from '@ai-sdk/openai'               // Mastra も同じ provider を使う
+import { createOpenAI } from '@ai-sdk/openai'
 const fdpocket = createOpenAI(client.ai.openai())
 const model = fdpocket.chat('auto')                          // Chat Completions（/responses ではない）
 

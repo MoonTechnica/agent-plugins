@@ -42,14 +42,15 @@ export function createServerClient(options) {
         });
         return pending;
     }
-    function transportFor(userToken) {
+    /** サービストークンで送る。`extra` は利用者（X-Act-As）・実行中のジョブ（x-fdpocket-run） */
+    function serviceTransport(extra = {}) {
         return createTransport({
             gateway: base,
             token: serviceToken,
             fetch: (input, init) => {
                 const headers = new Headers(init?.headers);
-                if (userToken)
-                    headers.set(ACT_AS_HEADER, userToken);
+                for (const [name, value] of Object.entries(extra))
+                    headers.set(name, value);
                 return fetchImpl(input, { ...init, headers });
             },
             onUnauthenticated: () => {
@@ -57,6 +58,7 @@ export function createServerClient(options) {
             },
         });
     }
+    const transportFor = (userToken) => serviceTransport(userToken ? { [ACT_AS_HEADER]: userToken } : {});
     function dataClient(userToken) {
         const transport = transportFor(userToken);
         return {
@@ -69,29 +71,14 @@ export function createServerClient(options) {
     }
     return {
         ...dataClient(),
-        jobs: createJobs((path, body) => createTransport({
-            gateway: base,
-            token: serviceToken,
-            fetch: fetchImpl,
-            onUnauthenticated: () => {
-                held = null;
-            },
-        }).send(path, { method: 'POST', body })),
+        jobs: createJobs((path, body) => serviceTransport().send(path, { method: 'POST', body })),
         notifications: {
             async send(input) {
                 const parsed = notificationSendRequestSchema.safeParse(input);
                 if (!parsed.success)
                     throw new SdkError('VALIDATION_FAILED', 'invalid notification request');
                 const body = parsed.data;
-                const transport = createTransport({
-                    gateway: base,
-                    fetch: fetchImpl,
-                    token: serviceToken,
-                    onUnauthenticated: () => {
-                        held = null;
-                    },
-                });
-                const result = notificationSendResponseSchema.safeParse(await transport.send('/v1/notifications/send', { method: 'POST', body }));
+                const result = notificationSendResponseSchema.safeParse(await serviceTransport().send('/v1/notifications/send', { method: 'POST', body }));
                 if (!result.success)
                     throw new SdkError('GATEWAY_UNAVAILABLE', 'invalid notification response', {
                         retryable: true,
@@ -114,18 +101,7 @@ export function createServerClient(options) {
         },
         forJob(event) {
             const run = `${event.cron === undefined ? 'queue' : 'schedule'}:${event.id}`;
-            const transport = createTransport({
-                gateway: base,
-                token: serviceToken,
-                fetch: (input, init) => {
-                    const headers = new Headers(init?.headers);
-                    headers.set(AI_RUN_HEADER, run);
-                    return fetchImpl(input, { ...init, headers });
-                },
-                onUnauthenticated: () => {
-                    held = null;
-                },
-            });
+            const transport = serviceTransport({ [AI_RUN_HEADER]: run });
             return { ai: { openai: () => createAi(transport, base).openai() } };
         },
     };

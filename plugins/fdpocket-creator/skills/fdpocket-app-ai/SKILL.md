@@ -1,6 +1,6 @@
 ---
 name: fdpocket-app-ai
-description: ミニアプリに AI の機能（要約・下書き・分類・チャット・画像や PDF の読み取り・ツールを使うエージェント）を入れるときに使う。LangChain・Mastra・Vercel AI SDK・OpenAI SDK もそのまま使える。費用は使った利用者のクレジット。
+description: ミニアプリに AI の機能（要約・下書き・分類・チャット・画像や PDF の読み取り・ツールを使うエージェント）を入れるときに使う。LangChain・Vercel AI SDK・OpenAI SDK もそのまま使える。費用は使った利用者のクレジット。
 ---
 
 # ミニアプリ内 AI（`client.ai`）
@@ -13,7 +13,7 @@ Platform が用意する AI を `client.ai.chat` か、OpenAI 互換の `client.
 | 頼まれたこと | 作り方 |
 |---|---|
 | 利用者の入力を要約・分類・下書き・翻訳する、画像や PDF を読ませる、相談相手のチャット | `client.ai.chat`（§3） |
-| AI に道具（DB の検索・計算・外部 API）を使わせて何手か進めるエージェント、ストリーミングの UI、構造化出力をフレームワークで扱う | `client.ai.openai()` ＋ Vercel AI SDK / Mastra / LangChain.js（§3a） |
+| AI に道具（DB の検索・計算・外部 API）を使わせて何手か進めるエージェント、ストリーミングの UI、構造化出力をフレームワークで扱う | `client.ai.openai()` ＋ Vercel AI SDK / LangChain.js（§3a） |
 | 作者が契約している特定の AI（自社のモデル・独自の API）を使う、費用を作者が持つ | 自分の API キーで api から呼ぶ（`$fdpocket-app-integrations`。`network.egress` と `secrets`） |
 | AI が無くても成り立つ処理（並べ替え・集計・決まった文面） | AI を使わない（費用と待ち時間を利用者に負わせない） |
 
@@ -66,7 +66,7 @@ const summary = result.json                          // schema を指定し、�
 `model` は `auto`（Jev Router）か project.yaml の `ai.model`・許可一覧の ID。依存は普通の npm の追加（`$fdpocket-app-dependencies`）。
 
 ```ts
-// Vercel AI SDK（Mastra も同じ provider を渡す）。Chat Completions を使う（.chat）
+// Vercel AI SDK。Chat Completions を使う（.chat）
 import { createOpenAI } from '@ai-sdk/openai'
 import { generateText, stepCountIs, tool } from 'ai'
 import { z } from 'zod'

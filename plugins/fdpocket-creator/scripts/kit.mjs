@@ -61127,7 +61127,7 @@ var import_ts_japi, import_url_pattern, loggerSchema, fieldSlicingSchema, modelS
       match2.type = this.reverseModelNameMapping[match2.type];
     return match2;
   }
-  async handleRequest({ client, method, path, query, requestBody: requestBody2 }) {
+  async handleRequest({ client, method, path, query, requestBody }) {
     method = method.toUpperCase();
     if (!path.startsWith("/"))
       path = "/" + path;
@@ -61139,7 +61139,7 @@ var import_ts_japi, import_url_pattern, loggerSchema, fieldSlicingSchema, modelS
           method,
           proc,
           query,
-          requestBody: requestBody2
+          requestBody
         });
       }
       switch (method) {
@@ -61162,46 +61162,46 @@ var import_ts_japi, import_url_pattern, loggerSchema, fieldSlicingSchema, modelS
           return this.makeError("invalidPath");
         }
         case "POST": {
-          if (!requestBody2)
+          if (!requestBody)
             return this.makeError("invalidPayload");
           const nestedMatch = this.matchUrlPattern(path, UrlPatterns.FETCH_RELATIONSHIP);
           if (nestedMatch && this.nestedRoutes && this.resolveNestedRelation(nestedMatch.type, nestedMatch.relationship)?.isCollection)
-            return await this.processNestedCreate(client, nestedMatch.type, nestedMatch.id, nestedMatch.relationship, query, requestBody2);
+            return await this.processNestedCreate(client, nestedMatch.type, nestedMatch.id, nestedMatch.relationship, query, requestBody);
           let match2 = this.matchUrlPattern(path, UrlPatterns.COLLECTION);
           if (match2) {
-            const body = requestBody2;
+            const body = requestBody;
             if (this.upsertMetaSchema.safeParse(body).success)
-              return await this.processUpsert(client, match2.type, query, requestBody2);
+              return await this.processUpsert(client, match2.type, query, requestBody);
             else
-              return await this.processCreate(client, match2.type, query, requestBody2);
+              return await this.processCreate(client, match2.type, query, requestBody);
           }
           match2 = this.matchUrlPattern(path, UrlPatterns.RELATIONSHIP);
           if (match2)
-            return await this.processRelationshipCRUD(client, "create", match2.type, match2.id, match2.relationship, query, requestBody2);
+            return await this.processRelationshipCRUD(client, "create", match2.type, match2.id, match2.relationship, query, requestBody);
           return this.makeError("invalidPath");
         }
         case "PUT":
         case "PATCH": {
-          if (!requestBody2)
+          if (!requestBody)
             return this.makeError("invalidPayload");
           let match2 = this.matchUrlPattern(path, UrlPatterns.RELATIONSHIP);
           if (match2)
-            return await this.processRelationshipCRUD(client, "update", match2.type, match2.id, match2.relationship, query, requestBody2);
+            return await this.processRelationshipCRUD(client, "update", match2.type, match2.id, match2.relationship, query, requestBody);
           const nestedToOnePatchMatch = this.matchUrlPattern(path, UrlPatterns.FETCH_RELATIONSHIP);
           if (nestedToOnePatchMatch && this.nestedRoutes && this.resolveNestedRelation(nestedToOnePatchMatch.type, nestedToOnePatchMatch.relationship) && !this.resolveNestedRelation(nestedToOnePatchMatch.type, nestedToOnePatchMatch.relationship)?.isCollection)
-            return await this.processNestedUpdate(client, nestedToOnePatchMatch.type, nestedToOnePatchMatch.id, nestedToOnePatchMatch.relationship, undefined, query, requestBody2);
+            return await this.processNestedUpdate(client, nestedToOnePatchMatch.type, nestedToOnePatchMatch.id, nestedToOnePatchMatch.relationship, undefined, query, requestBody);
           const nestedPatchMatch = this.matchUrlPattern(path, UrlPatterns.NESTED_SINGLE);
           if (nestedPatchMatch && this.nestedRoutes && this.resolveNestedRelation(nestedPatchMatch.type, nestedPatchMatch.relationship)?.isCollection)
-            return await this.processNestedUpdate(client, nestedPatchMatch.type, nestedPatchMatch.id, nestedPatchMatch.relationship, nestedPatchMatch.childId, query, requestBody2);
+            return await this.processNestedUpdate(client, nestedPatchMatch.type, nestedPatchMatch.id, nestedPatchMatch.relationship, nestedPatchMatch.childId, query, requestBody);
           match2 = this.matchUrlPattern(path, UrlPatterns.SINGLE);
           if (match2)
-            return await this.processUpdate(client, match2.type, match2.id, query, requestBody2);
+            return await this.processUpdate(client, match2.type, match2.id, query, requestBody);
           return this.makeError("invalidPath");
         }
         case "DELETE": {
           let match2 = this.matchUrlPattern(path, UrlPatterns.RELATIONSHIP);
           if (match2)
-            return await this.processRelationshipCRUD(client, "delete", match2.type, match2.id, match2.relationship, query, requestBody2);
+            return await this.processRelationshipCRUD(client, "delete", match2.type, match2.id, match2.relationship, query, requestBody);
           const nestedDeleteMatch = this.matchUrlPattern(path, UrlPatterns.NESTED_SINGLE);
           if (nestedDeleteMatch && this.nestedRoutes && this.resolveNestedRelation(nestedDeleteMatch.type, nestedDeleteMatch.relationship)?.isCollection)
             return await this.processNestedDelete(client, nestedDeleteMatch.type, nestedDeleteMatch.id, nestedDeleteMatch.relationship, nestedDeleteMatch.childId);
@@ -61228,7 +61228,7 @@ var import_ts_japi, import_url_pattern, loggerSchema, fieldSlicingSchema, modelS
 ` + err.stack : ""}`);
     return resp;
   }
-  async processProcedureRequest({ client, method, proc, query, requestBody: requestBody2 }) {
+  async processProcedureRequest({ client, method, proc, query, requestBody }) {
     if (!proc)
       return this.makeProcBadInputErrorResponse("missing procedure name");
     const procDef = getProcedureDef(this.schema, proc);
@@ -61239,7 +61239,7 @@ var import_ts_japi, import_url_pattern, loggerSchema, fieldSlicingSchema, modelS
         return this.makeProcBadInputErrorResponse("invalid request method, only POST is supported");
     } else if (method !== "GET")
       return this.makeProcBadInputErrorResponse("invalid request method, only GET is supported");
-    const { result: processedArgsPayload, error: error51 } = await processSuperJsonRequestPayload(method === "POST" ? requestBody2 : query);
+    const { result: processedArgsPayload, error: error51 } = await processSuperJsonRequestPayload(method === "POST" ? requestBody : query);
     if (error51)
       return this.makeProcBadInputErrorResponse(error51);
     let procInput;
@@ -61550,14 +61550,14 @@ var import_ts_japi, import_url_pattern, loggerSchema, fieldSlicingSchema, modelS
       })
     };
   }
-  async processNestedCreate(client, parentType, parentId, parentRelation, _query, requestBody2) {
+  async processNestedCreate(client, parentType, parentId, parentRelation, _query, requestBody) {
     const resolved = this.resolveNestedRelation(parentType, parentRelation);
     if (!resolved)
       return this.makeError("invalidPath");
     const parentInfo = this.getModelInfo(parentType);
     const childType = resolved.childType;
     const childInfo = this.getModelInfo(childType);
-    const { attributes, relationships, error: error51 } = this.processRequestBody(requestBody2);
+    const { attributes, relationships, error: error51 } = this.processRequestBody(requestBody);
     if (error51)
       return error51;
     const createData = { ...attributes };
@@ -61604,8 +61604,8 @@ var import_ts_japi, import_url_pattern, loggerSchema, fieldSlicingSchema, modelS
       } })
     };
   }
-  buildNestedUpdatePayload(childType, typeInfo, rev, requestBody2) {
-    const { attributes, relationships, error: error51 } = this.processRequestBody(requestBody2);
+  buildNestedUpdatePayload(childType, typeInfo, rev, requestBody) {
+    const { attributes, relationships, error: error51 } = this.processRequestBody(requestBody);
     if (error51)
       return { error: error51 };
     const updateData = { ...attributes };
@@ -61630,14 +61630,14 @@ var import_ts_japi, import_url_pattern, loggerSchema, fieldSlicingSchema, modelS
       }
     return { updateData };
   }
-  async processNestedUpdate(client, parentType, parentId, parentRelation, childId, _query, requestBody2) {
+  async processNestedUpdate(client, parentType, parentId, parentRelation, childId, _query, requestBody) {
     const resolved = this.resolveNestedRelation(parentType, parentRelation);
     if (!resolved)
       return this.makeError("invalidPath");
     const parentInfo = this.getModelInfo(parentType);
     const childType = resolved.childType;
     const typeInfo = this.getModelInfo(childType);
-    const { updateData, error: error51 } = this.buildNestedUpdatePayload(childType, typeInfo, resolved.reverseRelation, requestBody2);
+    const { updateData, error: error51 } = this.buildNestedUpdatePayload(childType, typeInfo, resolved.reverseRelation, requestBody);
     if (error51)
       return error51;
     if (childId) {
@@ -61749,8 +61749,8 @@ var import_ts_japi, import_url_pattern, loggerSchema, fieldSlicingSchema, modelS
       }) : null
     }));
   }
-  processRequestBody(requestBody2) {
-    let body = requestBody2;
+  processRequestBody(requestBody) {
+    let body = requestBody;
     if (body.meta?.serialization)
       body = dist_default.deserialize({
         json: body,
@@ -61769,11 +61769,11 @@ var import_ts_japi, import_url_pattern, loggerSchema, fieldSlicingSchema, modelS
       error: undefined
     };
   }
-  async processCreate(client, type, _query, requestBody2) {
+  async processCreate(client, type, _query, requestBody) {
     const typeInfo = this.getModelInfo(type);
     if (!typeInfo)
       return this.makeUnsupportedModelError(type);
-    const { attributes, relationships, error: error51 } = this.processRequestBody(requestBody2);
+    const { attributes, relationships, error: error51 } = this.processRequestBody(requestBody);
     if (error51)
       return error51;
     const createPayload = { data: { ...attributes } };
@@ -61803,15 +61803,15 @@ var import_ts_japi, import_url_pattern, loggerSchema, fieldSlicingSchema, modelS
       body: await this.serializeItems(type, entity)
     };
   }
-  async processUpsert(client, type, _query, requestBody2) {
+  async processUpsert(client, type, _query, requestBody) {
     const typeInfo = this.getModelInfo(type);
     if (!typeInfo)
       return this.makeUnsupportedModelError(type);
     const modelName = typeInfo.name;
-    const { attributes, relationships, error: error51 } = this.processRequestBody(requestBody2);
+    const { attributes, relationships, error: error51 } = this.processRequestBody(requestBody);
     if (error51)
       return error51;
-    const parseResult = this.upsertMetaSchema.safeParse(requestBody2);
+    const parseResult = this.upsertMetaSchema.safeParse(requestBody);
     if (parseResult.error)
       return this.makeError("invalidPayload", getZodErrorMessage(parseResult.error));
     const matchFields = parseResult.data.meta.matchFields;
@@ -61850,7 +61850,7 @@ var import_ts_japi, import_url_pattern, loggerSchema, fieldSlicingSchema, modelS
     const modelDef = this.requireModel(type);
     return Object.entries(modelDef.uniqueFields).map(([k3, v3]) => typeof v3.type === "string" ? [k3] : Object.keys(v3));
   }
-  async processRelationshipCRUD(client, mode, type, resourceId, relationship, _query, requestBody2) {
+  async processRelationshipCRUD(client, mode, type, resourceId, relationship, _query, requestBody) {
     const typeInfo = this.getModelInfo(type);
     if (!typeInfo)
       return this.makeUnsupportedModelError(type);
@@ -61870,7 +61870,7 @@ var import_ts_japi, import_url_pattern, loggerSchema, fieldSlicingSchema, modelS
       }
     };
     if (!relationInfo.isCollection) {
-      const parsed = this.updateSingleRelationSchema.safeParse(requestBody2);
+      const parsed = this.updateSingleRelationSchema.safeParse(requestBody);
       if (!parsed.success)
         return this.makeError("invalidPayload", getZodErrorMessage(parsed.error));
       if (parsed.data.data === null) {
@@ -61880,7 +61880,7 @@ var import_ts_japi, import_url_pattern, loggerSchema, fieldSlicingSchema, modelS
       } else
         updateArgs.data = { [relationship]: { connect: this.makeIdConnect(relationInfo.idFields, parsed.data.data.id) } };
     } else {
-      const parsed = this.updateCollectionRelationSchema.safeParse(requestBody2);
+      const parsed = this.updateCollectionRelationSchema.safeParse(requestBody);
       if (!parsed.success)
         return this.makeError("invalidPayload", getZodErrorMessage(parsed.error));
       const relationVerb = mode === "create" ? "connect" : mode === "delete" ? "disconnect" : "set";
@@ -61896,11 +61896,11 @@ var import_ts_japi, import_url_pattern, loggerSchema, fieldSlicingSchema, modelS
       })
     };
   }
-  async processUpdate(client, type, resourceId, _query, requestBody2) {
+  async processUpdate(client, type, resourceId, _query, requestBody) {
     const typeInfo = this.getModelInfo(type);
     if (!typeInfo)
       return this.makeUnsupportedModelError(type);
-    const { attributes, relationships, error: error51 } = this.processRequestBody(requestBody2);
+    const { attributes, relationships, error: error51 } = this.processRequestBody(requestBody);
     if (error51)
       return error51;
     const updatePayload = {
@@ -62606,7 +62606,7 @@ var import_ts_japi, import_url_pattern, loggerSchema, fieldSlicingSchema, modelS
   get log() {
     return this.options.log;
   }
-  async handleRequest({ client, method, path, query, requestBody: requestBody2 }) {
+  async handleRequest({ client, method, path, query, requestBody }) {
     const parts = path.split("/").filter((p3) => !!p3);
     const op = parts.pop();
     let model = parts.pop();
@@ -62618,14 +62618,14 @@ var import_ts_japi, import_url_pattern, loggerSchema, fieldSlicingSchema, modelS
         method: method.toUpperCase(),
         proc: op,
         query,
-        requestBody: requestBody2
+        requestBody
       });
     if (model === TRANSACTION_ROUTE_PREFIX)
       return this.handleTransaction({
         client,
         method: method.toUpperCase(),
         type: op,
-        requestBody: requestBody2
+        requestBody
       });
     model = lowerCaseFirst(model);
     method = method.toUpperCase();
@@ -62638,9 +62638,9 @@ var import_ts_japi, import_url_pattern, loggerSchema, fieldSlicingSchema, modelS
       case "upsert":
         if (method !== "POST")
           return this.makeBadInputErrorResponse("invalid request method, only POST is supported");
-        if (!requestBody2)
+        if (!requestBody)
           return this.makeBadInputErrorResponse("missing request body");
-        args = requestBody2;
+        args = requestBody;
         resCode = 201;
         break;
       case "findFirst":
@@ -62663,9 +62663,9 @@ var import_ts_japi, import_url_pattern, loggerSchema, fieldSlicingSchema, modelS
       case "updateManyAndReturn":
         if (method !== "PUT" && method !== "PATCH")
           return this.makeBadInputErrorResponse("invalid request method, only PUT or PATCH are supported");
-        if (!requestBody2)
+        if (!requestBody)
           return this.makeBadInputErrorResponse("missing request body");
-        args = requestBody2;
+        args = requestBody;
         break;
       case "delete":
       case "deleteMany":
@@ -62709,16 +62709,16 @@ var import_ts_japi, import_url_pattern, loggerSchema, fieldSlicingSchema, modelS
         return this.makeGenericErrorResponse(err);
     }
   }
-  async handleTransaction({ client, method, type, requestBody: requestBody2 }) {
+  async handleTransaction({ client, method, type, requestBody }) {
     if (method !== "POST")
       return this.makeBadInputErrorResponse("invalid request method, only POST is supported");
     if (type !== "sequential")
       return this.makeBadInputErrorResponse(`unsupported transaction type: ${type}`);
-    if (!requestBody2 || !Array.isArray(requestBody2) || requestBody2.length === 0)
+    if (!requestBody || !Array.isArray(requestBody) || requestBody.length === 0)
       return this.makeBadInputErrorResponse("request body must be a non-empty array of operations");
     const processedOps = [];
-    for (let i2 = 0;i2 < requestBody2.length; i2++) {
-      const item = requestBody2[i2];
+    for (let i2 = 0;i2 < requestBody.length; i2++) {
+      const item = requestBody[i2];
       if (!item || typeof item !== "object")
         return this.makeBadInputErrorResponse(`operation at index ${i2} must be an object`);
       const { model: itemModel, op: itemOp, args: itemArgs } = item;
@@ -62764,7 +62764,7 @@ var import_ts_japi, import_url_pattern, loggerSchema, fieldSlicingSchema, modelS
       return this.makeGenericErrorResponse(err);
     }
   }
-  async handleProcedureRequest({ client, method, proc, query, requestBody: requestBody2 }) {
+  async handleProcedureRequest({ client, method, proc, query, requestBody }) {
     if (!proc)
       return this.makeBadInputErrorResponse("missing procedure name");
     const procDef = getProcedureDef(this.options.schema, proc);
@@ -62775,7 +62775,7 @@ var import_ts_japi, import_url_pattern, loggerSchema, fieldSlicingSchema, modelS
         return this.makeBadInputErrorResponse("invalid request method, only POST is supported");
     } else if (method !== "GET")
       return this.makeBadInputErrorResponse("invalid request method, only GET is supported");
-    let argsPayload = method === "POST" ? requestBody2 : undefined;
+    let argsPayload = method === "POST" ? requestBody : undefined;
     if (method === "GET")
       try {
         argsPayload = query?.["q"] ? unmarshalQ(query["q"], query["meta"]) : undefined;
@@ -71114,6 +71114,262 @@ async function jsonBody(c) {
   }
 }
 
+// frontend/packages/project-gateway/src/ai/completion.ts
+async function startCompletion(ai2, plan, fields) {
+  const { maxTokens, ...rest } = fields;
+  const body = {
+    ...rest,
+    model: plan.model.id,
+    stream: true,
+    max_tokens: Math.min(maxTokens ?? plan.maxOutputTokens, plan.maxOutputTokens),
+    user: await sha256Hex2(new TextEncoder().encode(plan.userId)),
+    provider: plan.model.kind === "router" ? { data_collection: "deny", zdr: true } : { only: [plan.model.providerSlug], allow_fallbacks: false, data_collection: "deny" }
+  };
+  let upstream;
+  try {
+    upstream = await ai2.openRouter.chat(body);
+  } catch (cause) {
+    await ai2.platform.fail(plan.turnId, null, "provider_unreachable");
+    if (cause instanceof GatewayError)
+      throw cause;
+    throw new GatewayError("GATEWAY_UNAVAILABLE", "ai provider is unreachable", { cause });
+  }
+  if (!upstream.ok || !upstream.body) {
+    await upstream.body?.cancel();
+    await ai2.platform.fail(plan.turnId, null, `provider_${upstream.status}`);
+    throw providerError(upstream.status);
+  }
+  return upstream.body;
+}
+async function measureCompletion(platform, turnId, stream, onDelta = () => {}) {
+  const completion = {
+    id: null,
+    model: null,
+    created: null,
+    content: "",
+    toolCalls: [],
+    finishReason: null,
+    usage: null,
+    refused: null
+  };
+  try {
+    for await (const data of sseData(stream)) {
+      if (data === "[DONE]")
+        break;
+      const chunk = JSON.parse(data);
+      if (chunk.id)
+        completion.id = chunk.id;
+      if (chunk.model)
+        completion.model = chunk.model;
+      if (chunk.created)
+        completion.created = chunk.created;
+      if (chunk.usage)
+        completion.usage = chunk.usage;
+      if (chunk.error)
+        completion.refused = chunk.error.message ?? "provider error";
+      for (const choice of chunk.choices ?? []) {
+        if (choice.finish_reason)
+          completion.finishReason = choice.finish_reason;
+        if (choice.delta?.content) {
+          completion.content += choice.delta.content;
+          onDelta(choice.delta.content);
+        }
+        for (const call of choice.delta?.tool_calls ?? []) {
+          const index2 = call.index ?? 0;
+          const current = completion.toolCalls[index2] ?? {
+            id: "",
+            type: "function",
+            function: { name: "", arguments: "" }
+          };
+          completion.toolCalls[index2] = current;
+          if (call.id)
+            current.id = call.id;
+          if (call.function?.name)
+            current.function.name += call.function.name;
+          if (call.function?.arguments)
+            current.function.arguments += call.function.arguments;
+        }
+      }
+    }
+  } catch (cause) {
+    await platform.fail(turnId, completion.id, "stream_lost");
+    throw new GatewayError("GATEWAY_UNAVAILABLE", "ai stream was interrupted", { cause });
+  }
+  const cost = Number(completion.usage?.cost);
+  if (!completion.id || !completion.usage || !Number.isFinite(cost) || cost < 0) {
+    await platform.fail(turnId, completion.id, completion.refused ? "provider_refused" : "usage_missing");
+    return { completion, cost: null };
+  }
+  return { completion, cost };
+}
+async function settleCompletion(platform, turnId, stream) {
+  const { completion, cost } = await measureCompletion(platform, turnId, stream);
+  if (cost !== null && completion.id && completion.usage) {
+    await platform.settle({
+      turnId,
+      generationId: completion.id,
+      modelUsed: completion.model ?? "",
+      usage: completion.usage,
+      costUsd: cost
+    });
+  }
+  return completion;
+}
+async function respondCompletion(c, ai2, plan, upstream, stream, logger) {
+  if (stream) {
+    const [forClient, forSettlement] = upstream.tee();
+    const settlement = settleCompletion(ai2.platform, plan.turnId, forSettlement).catch((error51) => {
+      logger.log("error", "ai settlement failed", { turn_id: plan.turnId, error: String(error51) });
+    });
+    waitUntilOf(c)?.(settlement);
+    return new Response(forClient, {
+      headers: { "content-type": "text/event-stream", "cache-control": "no-store" }
+    });
+  }
+  return c.json(chatCompletionOf(await settleCompletion(ai2.platform, plan.turnId, upstream), plan));
+}
+function chatCompletionOf(completion, plan) {
+  const toolCalls = completion.toolCalls.filter(Boolean);
+  return {
+    id: completion.id ?? `chatcmpl-${plan.turnId}`,
+    object: "chat.completion",
+    created: completion.created ?? Math.floor(Date.now() / 1000),
+    model: completion.model ?? plan.model.id,
+    choices: [
+      {
+        index: 0,
+        message: {
+          role: "assistant",
+          content: completion.content === "" && toolCalls.length > 0 ? null : completion.content,
+          ...toolCalls.length > 0 ? { tool_calls: toolCalls } : {}
+        },
+        finish_reason: completion.finishReason ?? "stop"
+      }
+    ],
+    ...completion.usage ? { usage: completion.usage } : {}
+  };
+}
+function contentPartOf(file2) {
+  const data = `data:${file2.contentType};base64,${file2.base64}`;
+  switch (file2.kind) {
+    case "image":
+      return { type: "image_url", image_url: { url: data } };
+    case "file":
+      return { type: "file", file: { filename: file2.name, file_data: data } };
+    case "audio":
+      return {
+        type: "input_audio",
+        input_audio: {
+          data: file2.base64,
+          format: file2.contentType.includes("wav") ? "wav" : "mp3"
+        }
+      };
+    default:
+      return { type: "video_url", video_url: { url: data } };
+  }
+}
+async function* sseData(stream) {
+  const reader = stream.getReader();
+  const decoder2 = new TextDecoder;
+  let buffer = "";
+  for (;; ) {
+    const { value, done } = await reader.read();
+    if (done)
+      break;
+    buffer += decoder2.decode(value, { stream: true });
+    let index2 = buffer.indexOf(`
+`);
+    while (index2 >= 0) {
+      const line = buffer.slice(0, index2).trim();
+      buffer = buffer.slice(index2 + 1);
+      if (line.startsWith("data:"))
+        yield line.slice(5).trim();
+      index2 = buffer.indexOf(`
+`);
+    }
+  }
+  if (buffer.trim().startsWith("data:"))
+    yield buffer.trim().slice(5).trim();
+}
+function providerError(status) {
+  if (status === 429)
+    return new GatewayError("RATE_LIMITED", "ai provider is busy");
+  if (status === 400 || status === 403)
+    return new GatewayError("VALIDATION_FAILED", "provider_refused");
+  return new GatewayError("GATEWAY_UNAVAILABLE", `ai provider failed (${status})`);
+}
+function waitUntilOf(c) {
+  try {
+    const ctx = c.executionCtx;
+    return (task) => ctx.waitUntil(task);
+  } catch (error51) {
+    if (error51 instanceof Error)
+      return null;
+    throw error51;
+  }
+}
+
+// frontend/packages/project-gateway/src/ai/dev-routes.ts
+var KIT_AI_KEY_HEADER = "x-kit-ai-key";
+var contentPartSchema = exports_external.looseObject({ type: exports_external.string().min(1).max(32) });
+var devChatSchema = exports_external.strictObject({
+  sessionId: exports_external.uuid(),
+  app: appSlugSchema,
+  model: exports_external.string().min(1).max(160).optional(),
+  messages: exports_external.array(exports_external.looseObject({
+    role: exports_external.enum(["system", "developer", "user", "assistant", "tool"]),
+    content: exports_external.union([exports_external.string(), exports_external.array(contentPartSchema).max(64), exports_external.null()]).optional()
+  })).min(1).max(1000),
+  maxTokens: exports_external.int().min(1).optional(),
+  responseFormat: exports_external.looseObject({ type: exports_external.enum(["json_schema", "json_object", "text"]) }).optional(),
+  tools: exports_external.array(exports_external.looseObject({ type: exports_external.string().min(1).max(32) })).max(128).optional(),
+  toolChoice: exports_external.unknown().optional(),
+  parallelToolCalls: exports_external.boolean().optional()
+});
+function registerAiDevRoutes(app, adapters, logger) {
+  app.post("/v1/ai/dev/chat", async (c) => {
+    const ai2 = adapters.ai;
+    const dev = ai2?.dev;
+    if (!ai2 || !dev)
+      throw new GatewayError("GATEWAY_UNAVAILABLE", "ai is not configured");
+    const liveKey = c.req.header(KIT_AI_KEY_HEADER);
+    let userId = null;
+    if (!liveKey) {
+      const token2 = bearerOf(c);
+      const identity2 = await adapters.jwks.verifySupabaseToken(token2);
+      if (identity2.isAnonymous)
+        throw new GatewayError("FORBIDDEN", "anonymous users cannot use ai");
+      userId = identity2.userId;
+    }
+    const parsed = devChatSchema.safeParse(await jsonBody(c));
+    if (!parsed.success)
+      throw new GatewayError("VALIDATION_FAILED", "invalid dev ai request");
+    const request = parsed.data;
+    const turnId = crypto.randomUUID();
+    const plan = await dev.begin({
+      turnId,
+      sessionId: request.sessionId,
+      userId,
+      liveKeyHash: liveKey ? await sha256Hex2(new TextEncoder().encode(liveKey)) : null,
+      app: request.app,
+      model: request.model ?? null
+    });
+    const completion = { ...plan, maxOutputTokens: AI_MAX_OUTPUT_TOKENS_LIMIT };
+    const upstream = await startCompletion(ai2, completion, {
+      messages: request.messages,
+      maxTokens: request.maxTokens,
+      ...request.responseFormat && (request.responseFormat.type !== "json_schema" || plan.model.supportsJsonSchema) ? { response_format: request.responseFormat } : {},
+      ...request.tools ? { tools: request.tools } : {},
+      ...request.toolChoice !== undefined ? { tool_choice: request.toolChoice } : {},
+      ...request.parallelToolCalls !== undefined ? { parallel_tool_calls: request.parallelToolCalls } : {}
+    });
+    return respondCompletion(c, ai2, completion, upstream, true, logger);
+  });
+}
+
+// frontend/packages/project-gateway/src/ai/openai-routes.ts
+init_zod();
+
 // frontend/packages/project-gateway/src/internal/role-grants.ts
 var NO_BOOTSTRAP = { eligible: false, roles: [], legacyRoles: [] };
 var definitions = [
@@ -71597,24 +71853,26 @@ function registerAiRoutes(app, adapters, config2, runtime, logger) {
       await ai2.platform.fail(turnId, null, "unsupported_attachment");
       throw new GatewayError("VALIDATION_FAILED", "unsupported_attachment");
     }
-    let upstream;
-    try {
-      upstream = await ai2.openRouter.chat(await requestBody(plan, request.message, request.schema, attachments, claims));
-    } catch (cause) {
-      await ai2.platform.fail(turnId, null, "provider_unreachable");
-      if (cause instanceof GatewayError)
-        throw cause;
-      throw new GatewayError("GATEWAY_UNAVAILABLE", "ai provider is unreachable", { cause });
-    }
-    if (!upstream.ok || !upstream.body) {
-      await upstream.body?.cancel();
-      await ai2.platform.fail(turnId, null, `provider_${upstream.status}`);
-      throw providerError(upstream.status);
-    }
+    const upstream = await startCompletion(ai2, { ...plan, userId: platformUserIdOf(claims.gid) }, {
+      messages: [
+        ...plan.instructions ? [{ role: "system", content: plan.instructions }] : [],
+        ...plan.history,
+        {
+          role: "user",
+          content: [{ type: "text", text: request.message }, ...attachments.map(contentPartOf)]
+        }
+      ],
+      ...request.schema && plan.schema ? {
+        response_format: {
+          type: "json_schema",
+          json_schema: { name: request.schema, strict: true, schema: plan.schema }
+        }
+      } : {}
+    });
     const turn = createTurn(ai2.platform, {
       turnId,
       plan,
-      upstream: upstream.body,
+      upstream,
       message: request.message,
       attachments,
       schema: request.schema
@@ -71728,90 +71986,21 @@ function createAiAccess(adapters, config2, runtime) {
   }
   return { open, loadAttachments };
 }
-async function requestBody(plan, message2, schemaKey, attachments, claims) {
-  const content = [
-    { type: "text", text: message2 },
-    ...attachments.map((a) => {
-      const data = `data:${a.contentType};base64,${a.base64}`;
-      switch (a.kind) {
-        case "image":
-          return { type: "image_url", image_url: { url: data } };
-        case "file":
-          return { type: "file", file: { filename: a.name, file_data: data } };
-        case "audio":
-          return {
-            type: "input_audio",
-            input_audio: { data: a.base64, format: a.contentType.includes("wav") ? "wav" : "mp3" }
-          };
-        default:
-          return { type: "video_url", video_url: { url: data } };
-      }
-    })
-  ];
-  return {
-    model: plan.model.id,
-    stream: true,
-    max_tokens: plan.maxOutputTokens,
-    messages: [
-      ...plan.instructions ? [{ role: "system", content: plan.instructions }] : [],
-      ...plan.history,
-      { role: "user", content }
-    ],
-    ...schemaKey && plan.schema ? {
-      response_format: {
-        type: "json_schema",
-        json_schema: { name: schemaKey, strict: true, schema: plan.schema }
-      }
-    } : {},
-    user: await sha256Hex3(platformUserIdOf(claims.gid)),
-    provider: plan.model.kind === "router" ? { data_collection: "deny", zdr: true } : { only: [plan.model.providerSlug], allow_fallbacks: false, data_collection: "deny" }
-  };
-}
 function createTurn(platform, input) {
   let listener = () => {};
   const done = (async () => {
-    let text = "";
-    let generationId = null;
-    let model = input.plan.model.id;
-    let usage = null;
-    let refused = null;
-    let finishReason = "other";
-    try {
-      for await (const chunk of sseData(input.upstream)) {
-        if (chunk === "[DONE]")
-          break;
-        const event = JSON.parse(chunk);
-        if (event.id)
-          generationId = event.id;
-        if (event.model)
-          model = event.model;
-        if (event.error)
-          refused = event.error.message ?? "provider error";
-        const reason = event.choices?.[0]?.finish_reason;
-        if (reason)
-          finishReason = finishReasonOf(reason);
-        const delta = event.choices?.[0]?.delta?.content;
-        if (delta) {
-          text += delta;
-          listener(delta);
-        }
-        if (event.usage)
-          usage = event.usage;
-      }
-    } catch (cause) {
-      await platform.fail(input.turnId, generationId, "stream_lost");
-      throw new GatewayError("GATEWAY_UNAVAILABLE", "ai stream was interrupted", { cause });
+    const { completion, cost } = await measureCompletion(platform, input.turnId, input.upstream, (text2) => listener(text2));
+    if (cost === null || !completion.id || !completion.usage) {
+      throw completion.refused ? new GatewayError("VALIDATION_FAILED", "provider_refused") : new GatewayError("GATEWAY_UNAVAILABLE", "ai usage was not reported");
     }
-    const cost = Number(usage?.cost);
-    if (!generationId || !usage || !Number.isFinite(cost) || cost < 0) {
-      await platform.fail(input.turnId, generationId, refused ? "provider_refused" : "usage_missing");
-      throw refused ? new GatewayError("VALIDATION_FAILED", "provider_refused") : new GatewayError("GATEWAY_UNAVAILABLE", "ai usage was not reported");
-    }
+    const text = completion.content;
+    const model = completion.model ?? input.plan.model.id;
+    const finishReason = finishReasonOf(completion.finishReason ?? "other");
     const { credits } = await platform.finish({
       turnId: input.turnId,
-      generationId,
+      generationId: completion.id,
       modelUsed: model,
-      usage,
+      usage: completion.usage,
       costUsd: cost,
       userContent: input.message,
       userAttachments: input.attachments.map(({ fileId, kind }) => ({ fileId, kind })),
@@ -71822,7 +72011,7 @@ function createTurn(platform, input) {
       finishReason,
       ...input.schema && finishReason === "stop" ? jsonOf(text) : {},
       credits,
-      responseId: generationId,
+      responseId: completion.id,
       model
     };
   })();
@@ -71832,29 +72021,6 @@ function createTurn(platform, input) {
       listener = next;
     }
   };
-}
-async function* sseData(stream) {
-  const reader = stream.getReader();
-  const decoder2 = new TextDecoder;
-  let buffer = "";
-  for (;; ) {
-    const { value, done } = await reader.read();
-    if (done)
-      break;
-    buffer += decoder2.decode(value, { stream: true });
-    let index2 = buffer.indexOf(`
-`);
-    while (index2 >= 0) {
-      const line = buffer.slice(0, index2).trim();
-      buffer = buffer.slice(index2 + 1);
-      if (line.startsWith("data:"))
-        yield line.slice(5).trim();
-      index2 = buffer.indexOf(`
-`);
-    }
-  }
-  if (buffer.trim().startsWith("data:"))
-    yield buffer.trim().slice(5).trim();
 }
 function finishReasonOf(reason) {
   return AI_FINISH_REASONS.includes(reason) ? reason : "other";
@@ -71868,27 +72034,6 @@ function jsonOf(text) {
     throw error51;
   }
 }
-function providerError(status) {
-  if (status === 429)
-    return new GatewayError("RATE_LIMITED", "ai provider is busy");
-  if (status === 400 || status === 403)
-    return new GatewayError("VALIDATION_FAILED", "provider_refused");
-  return new GatewayError("GATEWAY_UNAVAILABLE", `ai provider failed (${status})`);
-}
-function waitUntilOf(c) {
-  try {
-    const ctx = c.executionCtx;
-    return (task) => ctx.waitUntil(task);
-  } catch (error51) {
-    if (error51 instanceof Error)
-      return null;
-    throw error51;
-  }
-}
-async function sha256Hex3(text) {
-  const digest2 = await crypto.subtle.digest("SHA-256", new TextEncoder().encode(text));
-  return [...new Uint8Array(digest2)].map((b2) => b2.toString(16).padStart(2, "0")).join("");
-}
 function toBase64(bytes) {
   let binary = "";
   for (let i = 0;i < bytes.length; i += 32768) {
@@ -71897,158 +72042,7 @@ function toBase64(bytes) {
   return btoa(binary);
 }
 
-// frontend/packages/project-gateway/src/ai/completion.ts
-var emptyCompletion = () => ({
-  id: null,
-  model: null,
-  created: null,
-  content: "",
-  toolCalls: [],
-  finishReason: null,
-  usage: null
-});
-async function readCompletion(stream, into = emptyCompletion()) {
-  const result = into;
-  for await (const data of sseData(stream)) {
-    if (data === "[DONE]")
-      break;
-    const chunk = JSON.parse(data);
-    if (chunk.id)
-      result.id = chunk.id;
-    if (chunk.model)
-      result.model = chunk.model;
-    if (chunk.created)
-      result.created = chunk.created;
-    if (chunk.usage)
-      result.usage = chunk.usage;
-    for (const choice of chunk.choices ?? []) {
-      if (choice.finish_reason)
-        result.finishReason = choice.finish_reason;
-      if (choice.delta?.content)
-        result.content += choice.delta.content;
-      for (const call of choice.delta?.tool_calls ?? []) {
-        const index2 = call.index ?? 0;
-        const current = result.toolCalls[index2] ?? {
-          id: "",
-          type: "function",
-          function: { name: "", arguments: "" }
-        };
-        result.toolCalls[index2] = current;
-        if (call.id)
-          current.id = call.id;
-        if (call.function?.name)
-          current.function.name += call.function.name;
-        if (call.function?.arguments)
-          current.function.arguments += call.function.arguments;
-      }
-    }
-  }
-  return result;
-}
-async function settleCompletion(platform, turnId, stream) {
-  const completion = emptyCompletion();
-  try {
-    await readCompletion(stream, completion);
-  } catch (cause) {
-    await platform.fail(turnId, completion.id, "stream_lost");
-    throw cause;
-  }
-  const cost = Number(completion.usage?.cost);
-  if (!completion.id || !completion.usage || !Number.isFinite(cost) || cost < 0) {
-    await platform.fail(turnId, completion.id, "usage_missing");
-    return completion;
-  }
-  await platform.settle({
-    turnId,
-    generationId: completion.id,
-    modelUsed: completion.model ?? "",
-    usage: completion.usage,
-    costUsd: cost
-  });
-  return completion;
-}
-
-// frontend/packages/project-gateway/src/ai/dev-routes.ts
-var KIT_AI_KEY_HEADER = "x-kit-ai-key";
-var contentPartSchema = exports_external.looseObject({ type: exports_external.string().min(1).max(32) });
-var devChatSchema = exports_external.strictObject({
-  sessionId: exports_external.uuid(),
-  app: appSlugSchema,
-  model: exports_external.string().min(1).max(160).optional(),
-  messages: exports_external.array(exports_external.looseObject({
-    role: exports_external.enum(["system", "developer", "user", "assistant", "tool"]),
-    content: exports_external.union([exports_external.string(), exports_external.array(contentPartSchema).max(64), exports_external.null()]).optional()
-  })).min(1).max(1000),
-  maxTokens: exports_external.int().min(1).optional(),
-  responseFormat: exports_external.looseObject({ type: exports_external.enum(["json_schema", "json_object", "text"]) }).optional(),
-  tools: exports_external.array(exports_external.looseObject({ type: exports_external.string().min(1).max(32) })).max(128).optional(),
-  toolChoice: exports_external.unknown().optional(),
-  parallelToolCalls: exports_external.boolean().optional()
-});
-function registerAiDevRoutes(app, adapters, logger) {
-  app.post("/v1/ai/dev/chat", async (c) => {
-    const ai2 = adapters.ai;
-    const dev = ai2?.dev;
-    if (!ai2 || !dev)
-      throw new GatewayError("GATEWAY_UNAVAILABLE", "ai is not configured");
-    const liveKey = c.req.header(KIT_AI_KEY_HEADER);
-    let userId = null;
-    if (!liveKey) {
-      const token2 = bearerOf(c);
-      const identity2 = await adapters.jwks.verifySupabaseToken(token2);
-      if (identity2.isAnonymous)
-        throw new GatewayError("FORBIDDEN", "anonymous users cannot use ai");
-      userId = identity2.userId;
-    }
-    const parsed = devChatSchema.safeParse(await jsonBody(c));
-    if (!parsed.success)
-      throw new GatewayError("VALIDATION_FAILED", "invalid dev ai request");
-    const request = parsed.data;
-    const turnId = crypto.randomUUID();
-    const plan = await dev.begin({
-      turnId,
-      sessionId: request.sessionId,
-      userId,
-      liveKeyHash: liveKey ? await sha256Hex3(liveKey) : null,
-      app: request.app,
-      model: request.model ?? null
-    });
-    const body = {
-      model: plan.model.id,
-      stream: true,
-      max_tokens: Math.min(request.maxTokens ?? AI_MAX_OUTPUT_TOKENS_LIMIT, AI_MAX_OUTPUT_TOKENS_LIMIT),
-      messages: request.messages,
-      ...request.responseFormat && (request.responseFormat.type !== "json_schema" || plan.model.supportsJsonSchema) ? { response_format: request.responseFormat } : {},
-      ...request.tools ? { tools: request.tools } : {},
-      ...request.toolChoice !== undefined ? { tool_choice: request.toolChoice } : {},
-      ...request.parallelToolCalls !== undefined ? { parallel_tool_calls: request.parallelToolCalls } : {},
-      user: await sha256Hex3(plan.userId),
-      provider: plan.model.kind === "router" ? { data_collection: "deny", zdr: true } : { only: [plan.model.providerSlug], allow_fallbacks: false, data_collection: "deny" }
-    };
-    let upstream;
-    try {
-      upstream = await ai2.openRouter.chat(body);
-    } catch (cause) {
-      await ai2.platform.fail(turnId, null, "provider_unreachable");
-      throw new GatewayError("GATEWAY_UNAVAILABLE", "ai provider is unreachable", { cause });
-    }
-    if (!upstream.ok || !upstream.body) {
-      await ai2.platform.fail(turnId, null, `provider_${upstream.status}`);
-      throw providerError(upstream.status);
-    }
-    const [forClient, forSettlement] = upstream.body.tee();
-    const settlement = settleCompletion(ai2.platform, turnId, forSettlement).catch((error51) => {
-      logger.log("error", "dev ai settlement failed", { turn_id: turnId, error: String(error51) });
-    });
-    waitUntilOf(c)?.(settlement);
-    return new Response(forClient, {
-      headers: { "content-type": "text/event-stream", "cache-control": "no-store" }
-    });
-  });
-}
-
 // frontend/packages/project-gateway/src/ai/openai-routes.ts
-init_zod();
 var FILE_REF = /^fdpocket-file:([0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12})$/i;
 var PASS_THROUGH = [
   "tools",
@@ -72151,42 +72145,12 @@ function registerAiOpenAiRoutes(app, adapters, config2, runtime, logger) {
       await ai2.platform.fail(turnId, null, "unsupported_attachment");
       throw new GatewayError("VALIDATION_FAILED", "unsupported_attachment");
     }
-    const requested = request.max_completion_tokens ?? request.max_tokens ?? plan.maxOutputTokens;
-    const body = {
+    const upstream = await startCompletion(ai2, plan, {
       ...Object.fromEntries(PASS_THROUGH.filter((key) => request[key] !== undefined).map((key) => [key, request[key]])),
-      model: plan.model.id,
       messages,
-      stream: true,
-      max_tokens: Math.min(requested, plan.maxOutputTokens),
-      user: await sha256Hex3(plan.userId),
-      provider: plan.model.kind === "router" ? { data_collection: "deny", zdr: true } : { only: [plan.model.providerSlug], allow_fallbacks: false, data_collection: "deny" }
-    };
-    let upstream;
-    try {
-      upstream = await ai2.openRouter.chat(body);
-    } catch (cause) {
-      await ai2.platform.fail(turnId, null, "provider_unreachable");
-      if (cause instanceof GatewayError)
-        throw cause;
-      throw new GatewayError("GATEWAY_UNAVAILABLE", "ai provider is unreachable", { cause });
-    }
-    if (!upstream.ok || !upstream.body) {
-      await upstream.body?.cancel();
-      await ai2.platform.fail(turnId, null, `provider_${upstream.status}`);
-      throw providerError(upstream.status);
-    }
-    if (request.stream) {
-      const [forClient, forSettlement] = upstream.body.tee();
-      const settlement = settleCompletion(ai2.platform, turnId, forSettlement).catch((error51) => {
-        logger.log("error", "ai settlement failed", { turn_id: turnId, error: String(error51) });
-      });
-      waitUntilOf(c)?.(settlement);
-      return new Response(forClient, {
-        headers: { "content-type": "text/event-stream", "cache-control": "no-store" }
-      });
-    }
-    const completion = await settleCompletion(ai2.platform, turnId, upstream.body);
-    return c.json(chatCompletionOf(completion, plan.model.id));
+      maxTokens: request.max_completion_tokens ?? request.max_tokens
+    });
+    return respondCompletion(c, ai2, plan, upstream, request.stream === true, logger);
   }
 }
 function fileRefsOf(message2) {
@@ -72224,47 +72188,16 @@ function inlineFiles(message2, files) {
       const file2 = match2?.[1] ? files.get(match2[1].toLowerCase()) : undefined;
       if (!file2)
         return part;
-      const data = `data:${file2.contentType};base64,${file2.base64}`;
-      switch (part.type) {
-        case "image_url":
-          return { ...part, image_url: { ...part.image_url, url: data } };
-        case "video_url":
-          return { ...part, video_url: { ...part.video_url, url: data } };
-        case "file":
-          return { ...part, file: { filename: file2.name, file_data: data } };
-        case "input_audio":
-          return {
-            ...part,
-            input_audio: {
-              data: file2.base64,
-              format: file2.contentType.includes("wav") ? "wav" : "mp3"
-            }
-          };
-        default:
-          return part;
-      }
+      const replaced = contentPartOf(file2);
+      const type = replaced.type;
+      return part.type === type ? {
+        ...part,
+        [type]: {
+          ...part[type],
+          ...replaced[type]
+        }
+      } : replaced;
     })
-  };
-}
-function chatCompletionOf(completion, requestedModel) {
-  const toolCalls = completion.toolCalls.filter(Boolean);
-  return {
-    id: completion.id ?? `chatcmpl-${crypto.randomUUID()}`,
-    object: "chat.completion",
-    created: completion.created ?? Math.floor(Date.now() / 1000),
-    model: completion.model ?? requestedModel,
-    choices: [
-      {
-        index: 0,
-        message: {
-          role: "assistant",
-          content: completion.content === "" && toolCalls.length > 0 ? null : completion.content,
-          ...toolCalls.length > 0 ? { tool_calls: toolCalls } : {}
-        },
-        finish_reason: completion.finishReason ?? "stop"
-      }
-    ],
-    ...completion.usage ? { usage: completion.usage } : {}
   };
 }
 

@@ -12,7 +12,9 @@ description: ミニアプリの掲載情報（名前・キャッチコピー・�
 listing/
 ├── listing.json   # 文字の項目と、スクリーンショットに撮るページ
 ├── icon.png       # アイコン（正方形。.webp も可）
-└── cover.png      # カバー画像（横長。.webp も可）
+├── cover.png      # カバー画像（横長。.webp も可）
+└── apps/
+    └── <slug>/icon.png  # App ごとのアイコン（画面の App が 2 つ以上のとき。§4.2）
 ```
 
 ## 1. まず今の掲載情報を読む
@@ -24,6 +26,7 @@ listing/
 |---|---|
 | `title` `tagline` `description` `category` `tags` | 今の値（空なら未作成） |
 | `hasIcon` / `hasCover` | 今の版にアイコン / カバーがあるか |
+| `appIcons` | 今の版でアイコンがある App の slug（§4.2） |
 | `screenshots` | 今のギャラリー（§4.1）。`origin` が `requested`（利用者の指定）・`upload`（作者のアップロード）の枠は消さない |
 | `userEdited` | **利用者が手で直した項目** |
 | `missing` | **公開に足りない項目**（`icon` `cover` を含む）。このターンで必ず埋める |
@@ -38,6 +41,8 @@ listing/
 | 初回・`missing` がある | 足りない項目を作る（§3・§4） |
 | 目的・主な画面・対象の利用者が変わった | `description` を直す。分類が変わるほどなら `category` も |
 | 見た目が大きく変わった | `icon` と `cover` を作り直す |
+| 画面の App が 2 つ以上あり、`appIcons` に無い App がある・App を足した | その App のアイコンを作る（§4.2） |
+| App の用途が変わった | その App のアイコンを作り直す |
 | 名前を変えた | `cover` のタイトルも新しい名前で作り直す |
 | 利用者が名前・説明などの変更を頼んだ | 頼まれた項目を直す（`userEdited` にあっても。§5） |
 | 主な画面が増えた・変わった | `screenshots` を見直す（§4.1） |
@@ -96,7 +101,7 @@ listing/
 - タイトルは `listing.json` の最終的な `title` を引用し、「この文字列を正確に描く」と指定する。勝手に英訳しない。
 
 **`generate_image` で作る**。アイコンは `size="square"`、カバーは `size="landscape"` で作り、`download_url` から取って
-`source/listing/` に置く（届いた形式に合わせて拡張子を `.webp` にする）。
+`source/listing/`（App ごとのものは `source/listing/apps/<slug>/`）に置く（届いた形式に合わせて拡張子を `.webp` にする）。
 
 ### 4.1 スクリーンショット（`screenshots`）
 
@@ -128,7 +133,19 @@ listing/
 - `input/listing.json` の `requested` / `upload` の枠は宣言から消しても Platform が残す。消さずにそのまま書く。
 - `userEdited` に `screenshots` があるときは、利用者が頼んだときだけ変え、`listingRequested` に `screenshots` を挙げる（§5）。
 
-**生成後は最終画像を開いて確かめる**: カバーのタイトルの誤字・欠け・不要な文字・読みにくさ、アイコンを 48px / 96px と丸角で見ても判別できるか。
+### 4.2 App ごとのアイコン（`apps/<slug>/icon.png`）
+
+`project.yaml` の画面の App（`kind: web`。`admin` も含む）が **2 つ以上**あるときは、App ごとにアイコンを作る。
+利用者のホームでは App が 1 つずつアイコンで並び、フォルダーの中でもこのアイコンで見分ける。無い App は
+リポジトリの `icon.png` で表示されるので、全部が同じ絵になる。App が 1 つだけなら作らない（`icon.png` が使われる）。
+
+- 形と上限は `icon.png` と同じ（正方形・512〜2048px・PNG か WebP・4 MiB まで）。`<slug>` は `project.yaml` の App の slug。
+- **画風・配色・背景の塗り方は `icon.png` とそろえ、モチーフで App の用途を描き分ける**（例: 勤怠は時計、経費はレシート、
+  管理画面は歯車と盾）。同じ絵の色違いにしない。文字は入れない。
+- 書かなかった App のアイコンは前の版から引き継がれる。作り直すときだけ置く。
+- api / jobs の App には作らない（ホームに並ばない）。
+
+**生成後は最終画像を開いて確かめる**: カバーのタイトルの誤字・欠け・不要な文字・読みにくさ、アイコン（App ごとのものも）を 48px / 96px と丸角で見ても判別できるか、App ごとのアイコンを並べて見分けられるか。
 整わなければ作り直し、それでも駄目なら完成扱いにせず `notes` に理由を書く。
 
 ## 5. `listingRequested`
@@ -141,6 +158,7 @@ listing/
 - [ ] `input/listing.json` の値から始め、`missing` をすべて埋めた
 - [ ] 文字数の上限を守り、`category` は一覧の id、`tags` は 5 個まで
 - [ ] `icon` は正方形、`cover` は横長（比 1.4〜1.9）。最終画像を開いて確かめた
+- [ ] 画面の App が 2 つ以上なら、各 App の `apps/<slug>/icon.png` があり、並べて見分けられる
 - [ ] `screenshots` は主要な画面を各 5 枚まで。利用者の指定は `requested: true`、`requested` / `upload` の枠は残した
 - [ ] `userEdited` は頼まれたときだけ変え、変えたなら `listingRequested` に挙げた
 - [ ] `releaseNotes` の先頭に短い見出しを付け、このターンの変更だけを書いた
