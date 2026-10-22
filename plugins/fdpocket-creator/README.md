@@ -105,6 +105,9 @@ asks you to confirm each one every time (allow rules cannot skip this).
 
 Then ask the agent to run `kit.mjs link` in each working directory. `kit push` and `kit doctor` tell you when a newer Kit is out.
 
+To update automatically, run `/plugin`, open the **Marketplaces** tab, select `moon-technica`, and choose **Enable auto-update**
+(auto-update is off by default for this marketplace).
+
 ## Quick start (Claude app)
 
 You can install the Kit from the Claude desktop app without typing any commands.
@@ -146,7 +149,8 @@ In Codex, call the Skills with `$`:
 
 Opening, withdrawing, commenting on, and merging a proposal reach other people, so make them approval-only.
 Codex plugins cannot ship this setting, so add the following to `~/.codex/config.toml`
-(`node <kit>/scripts/kit.mjs codex-config` prints the same text):
+(`node <kit>/scripts/kit.mjs codex-config` prints the same text, and `codex-config --write` writes it there for you,
+replacing an earlier copy and keeping the rest of the file):
 
 ```toml
 [plugins."fdpocket-creator@moon-technica".mcp_servers.fdpocket]
@@ -240,7 +244,7 @@ node <kit>/scripts/kit.mjs <command> [--flag value]
 | `assets add` | Put an image from the asset library under `source/`. |
 | `open` | Open the editor URL in your browser. |
 | `link` | Re-point the working directory at a newer Kit (after updating). |
-| `codex-config` | Print the recommended Codex approval settings. |
+| `codex-config` | Print the recommended Codex approval settings (`--write` adds them to `$CODEX_HOME/config.toml`, by default `~/.codex/config.toml`). |
 
 ## Troubleshooting
 

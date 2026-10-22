@@ -63017,7 +63017,7 @@ var COMMANDS = {
   credential: { actions: ["get", "store", "erase"], required: [], optional: [] },
   assets: { actions: ["add"], required: ["url", "sha256", "path"], optional: [] },
   open: { required: ["url"], optional: [] },
-  "codex-config": { required: [], optional: [] }
+  "codex-config": { required: [], optional: [], switches: ["write"] }
 };
 var USAGE = `usage: node <kit>/scripts/kit.mjs <command> [--flag value]…
 commands: ${Object.keys(COMMANDS).join(", ")}`;
@@ -68500,6 +68500,49 @@ function codexApprovalToml(pluginId, server) {
     ])
   ].join(`
 `);
+}
+
+class CodexConfigConflict extends Error {
+  name = "CodexConfigConflict";
+}
+function mergeCodexApproval(existing, pluginId, server) {
+  const table = `plugins."${pluginId}".mcp_servers.${server}`;
+  const kept = [];
+  let current = "";
+  let dropping = false;
+  for (const line of existing.split(`
+`)) {
+    const header = tableHeader(line);
+    if (header !== null) {
+      current = header;
+      dropping = header === table || header.startsWith(`${table}.`);
+    }
+    if (dropping)
+      continue;
+    if (header === null && mentionsServer(current, line, pluginId, server))
+      throw new CodexConfigConflict(`${table} is already set in another form (${line.trim()})`);
+    kept.push(line);
+  }
+  const rest = kept.join(`
+`).replace(/\s+$/, "");
+  const block = codexApprovalToml(pluginId, server);
+  return rest === "" ? `${block}
+` : `${rest}
+
+${block}
+`;
+}
+function tableHeader(line) {
+  const match = /^\s*\[([^[\]]+)\]\s*(#.*)?$/.exec(line);
+  return match ? match[1].trim() : null;
+}
+function mentionsServer(table, line, pluginId, server) {
+  const key = line.split("#")[0]?.split("=")[0]?.trim() ?? "";
+  if (key === "")
+    return false;
+  const path = table === "" ? key : `${table}.${key}`;
+  const prefix = `plugins."${pluginId}".mcp_servers`;
+  return path === `${prefix}.${server}` || path.startsWith(`${prefix}.${server}.`);
 }
 
 // frontend/packages/miniapp-kit/src/browser.ts
@@ -81089,6 +81132,10 @@ function defaultConfigDir() {
   const xdg = process.env.XDG_CONFIG_HOME;
   return join34(xdg && xdg !== "" ? xdg : join34(homedir(), ".config"), "fdpocket");
 }
+function defaultCodexHome() {
+  const home = process.env.CODEX_HOME;
+  return home && home !== "" ? home : join34(homedir(), ".codex");
+}
 async function readStdin() {
   const chunks = [];
   for await (const chunk of process.stdin)
@@ -81107,6 +81154,7 @@ function defaultContext(cwd, kitRoot) {
     git: runGit,
     stdin: readStdin,
     configDir: defaultConfigDir(),
+    codexHome: defaultCodexHome(),
     now: Date.now,
     authorize: loopbackAuthorize(openInBrowser),
     untilStopped: () => new Promise((resolve4) => {
@@ -81158,7 +81206,7 @@ async function runCommand(args, context) {
       case "open":
         return await openEditor(context, flags);
       case "codex-config":
-        return codexConfig(context);
+        return await codexConfig(context, flags);
     }
   } catch (error51) {
     if (error51 instanceof RepoError || error51 instanceof PulledError || error51 instanceof GenerateError || error51 instanceof NewProjectError || error51 instanceof BuildError || error51 instanceof DevError || error51 instanceof DbError || error51 instanceof VendorError || error51 instanceof PushError || error51 instanceof McpToolError) {
@@ -81805,8 +81853,32 @@ async function openEditor(context, flags) {
   });
 }
 var MCP_SERVER_NAME = "fdpocket";
-function codexConfig(context) {
-  context.stdout(codexApprovalToml(`${KIT_PLUGIN_NAME}@${KIT_MARKETPLACE_NAME}`, MCP_SERVER_NAME));
+async function codexConfig(context, flags) {
+  const pluginId = `${KIT_PLUGIN_NAME}@${KIT_MARKETPLACE_NAME}`;
+  if (flags.write !== "true") {
+    context.stdout(codexApprovalToml(pluginId, MCP_SERVER_NAME));
+    return;
+  }
+  const path = join34(context.codexHome, "config.toml");
+  const existing = existsSync23(path) ? await readFile21(path, "utf8") : "";
+  let merged;
+  try {
+    merged = mergeCodexApproval(existing, pluginId, MCP_SERVER_NAME);
+  } catch (error51) {
+    if (error51 instanceof CodexConfigConflict)
+      throw new CommandError(`${error51.message}; edit ${path} by hand (kit.mjs codex-config prints the settings)`);
+    throw error51;
+  }
+  const changed = merged !== existing;
+  if (changed) {
+    await mkdir13(context.codexHome, { recursive: true });
+    await writeFile15(path, merged);
+  }
+  print(context, {
+    written: path,
+    changed,
+    next: "start a new Codex session so it reads the approval settings"
+  });
 }
 
 // frontend/packages/miniapp-kit/src/cli.ts
