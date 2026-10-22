@@ -62996,7 +62996,7 @@ var COMMANDS = {
   new: { required: ["name"], optional: ["title", "apps"] },
   generate: { required: [], optional: [] },
   build: { required: [], optional: ["project-id", "gateway-url"] },
-  dev: { required: [], optional: ["as", "project-id", "trigger"], switches: ["live"] },
+  dev: { required: [], optional: ["as", "project-id", "trigger", "ai"], switches: ["live"] },
   db: {
     actions: ["diff", "finalize"],
     required: [],
