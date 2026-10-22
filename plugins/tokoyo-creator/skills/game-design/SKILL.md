@@ -1,6 +1,6 @@
 ---
 name: game-design
-description: ゲームを作る工程の正本。依頼を受けたら最初に使う。企画（design/brief.md）の書き方、工程の順序と各段階の完了条件、ジャンルごとに「完成している」と感じる下限、遊びのルールを rules.ts / 調整値を tuning.ts に分ける形、仕上げ（polish）と出荷前のチェックを扱う。game design, brief, core loop, scope, genre minimum, tuning, polish, ship checklist.
+description: ゲームを作る工程の正本。依頼を受けたら最初に使う。企画（design/brief.md）の書き方、面白さの設計（核の動詞・看板の仕掛け・山と休み）と「AI が作った感じ」の点検、名作の手本、工程の順序と各段階の完了条件、ジャンルごとに「完成している」と感じる下限、遊びのルールを rules.ts / 調整値を tuning.ts に分ける形、仕上げ（polish）と出荷前のチェックを扱う。game design, brief, core loop, scope, genre minimum, tuning, polish, ship checklist.
 ---
 
 遊べる核ができたら `$game-playtest` の `references/development-preview.md` を読み、通常開始ケースと本編factoryを使う代表試験場を用意する。メニューUIは作品に合わせてゲームリポジトリ内の`debug/`へ作り、SDKの型付き操作でHostの認可・専用Scopeに接続する。本番成果物へ含めない。Document read/write要求は今回の対象外。
@@ -16,12 +16,12 @@ description: ゲームを作る工程の正本。依頼を受けたら最初に�
 
 | # | 段階 | 次へ行ける条件 | 使う Skill |
 |---|---|---|---|
-| 1 | 企画 | `design/brief.md` の全見出しが埋まり、ジャンルの下限（[references/genres-minimum.md](references/genres-minimum.md)）が列挙されている | この Skill §2 |
-| 2 | 絵で合意 | コンセプト画像とスタイルガイドがある。利用者に見せるべきなら見せて終える | `$game-art-direction` |
+| 1 | 企画 | `design/brief.md` の全見出しが埋まり、ジャンルの下限（[references/genres-minimum.md](references/genres-minimum.md)）が列挙されている。核の動詞・看板の仕掛け・テーマの規則・山と休みを [references/fun.md](references/fun.md) §1 で決め、該当ジャンルの [references/exemplars.md](references/exemplars.md) を読んだ | この Skill §2 |
+| 2 | 絵で合意 | コンセプト画像（`key-art` / `hero`）とスタイルガイドがある。**新しいゲームの最初のターンと、見た目・遊びの核を変えるときは企画のターンとして見せて終える**（`$game-art-direction` §2） | `$game-art-direction` |
 | 3 | 素材の設計 | `design/asset-manifest.md` の全行に経路・理由・枠があり、合計が予算内 | `$game-art-direction` |
 | 4 | 核を遊べる形に | 開始 → 核の行為 → 結果/進行 → 次の区切りが回る。進行型は保存 → 再開も核として検査する（`rules.ts` の無い前の版を続けるときは下の「2 回目以降」） | この Skill §3、`$game-playtest` |
 | 5 | 素材の差し替え | manifest の全行が済み、`design/game-assets.json`の名前と実装参照が一致する（コードで作るモデル/音も含む） | `$game-asset-tools` |
-| 6 | 遊んで直す | 確認済みと未確認が明確。確認できた重大な失敗は修正済み。公開前検証/作者プレビュー待ちへ ✓ を付けない | `$game-playtest` |
+| 6 | 遊んで直す | 確認済みと未確認が明確。確認できた重大な失敗は修正済み。新規制作と核の変更では [references/fun.md](references/fun.md) §4 の点検表を当て、効くものから直した。公開前検証/作者プレビュー待ちへ ✓ を付けない | `$game-playtest` |
 | 7 | 数値で整える | 導入は安全で、区切りの長さと難易度がbriefに合う。全作品に短時間終了を課さない | この Skill §3 |
 | 8 | 磨く | §4 のチェックが埋まる。**この段階で機能を足さない** | `$game-ux` |
 | 9 | 掲載 | `$game-listing` のチェック | `$game-listing` |
@@ -60,26 +60,33 @@ description: ゲームを作る工程の正本。依頼を受けたら最初に�
 跳ぶ（1 つだけ。「と」でつながない）
 ## 狙う感じ
 挑戦（Challenge）+ 爽快感（Sensation）
+## 看板の仕掛け
+星を取るたびに自分が少し重くなり、跳べる高さが下がる（取りすぎると針に近づく）
+## テーマの規則
+星は流れ星なので斜めに落ちる / 夜が深まるほど暗くなり、光る星しか見えない
 ## 勝ち・負け・終わり
 30 秒で終わる。点数を競う。地面の針に触れたら即終了。
 ## 1 回の長さ
 30〜60 秒
 ## 進み方
-10 秒ごとに星が速くなり、針が 1 本増える。
+10 秒の波を 3 つ。波ごとに新しい星（分裂する / 逃げる）を足し、波の間に 3 秒の休み。
 ## 作らないもの
 ステージ選択・ショップ・ストーリー・オンライン対戦
 ## ジャンルと下限
 ワンボタン / エンドレス: 加速する難しさ・ベストの記録・ニアミス報酬・1 秒以内の再開
 ## 道具
-Canvas 2D（動く物が少ない）
+Godot 2D（動く物が少ない）
 ```
 
 | 見出し | 決め方 |
 |---|---|
 | 動詞 | 遊ぶ人が何度も繰り返す操作を 1 つ。依頼に複数あれば、いちばん触る回数が多いものを核にし、残りは補助にする |
 | 狙う感じ | 挑戦 / 爽快感 / 見立て（Fantasy）/ 物語 / 仲間 / 発見 / 表現 / 暇つぶし（Submission）から 1〜2 個。手応えと絵の選択がこれに揃う |
+| 看板の仕掛け | このゲームでしかできないこと 1 つ（[references/fun.md](references/fun.md) §1）。ジャンルの下限は看板にならない |
+| テーマの規則 | テーマを動詞と規則に変えたもの 2 つ以上。絵を替えても同じなら書き直す |
 | 勝ち・負け・終わり | 必ず決める。終わりの無い遊び（育成・放置）でも「1 回の区切り」を決める |
 | 1 回の長さ | 操作/戦闘/クエストの区切り、1回のプレイ、作品全体を区別する。短時間ゲームは30秒〜3分が目安、協力卓は現行上限内 |
+| 進み方 | 直線で難しくしない。区切り（波・面）ごとの新しい要素と、山の後の休み（[references/fun.md](references/fun.md) §1「山と休み」「起承転結」） |
 | 作らないもの | 依頼に無く、核の完成に要らないもの。**ここに書いたものは作らない** |
 | ジャンルと下限 | [references/genres-minimum.md](references/genres-minimum.md) の該当行を写す。**下限は依頼に無くても作る**。下限を超える機能は依頼にあるときだけ |
 | 道具 | `instructions.md` §4.2 の選び方 |
@@ -114,6 +121,7 @@ src/
 
 - [ ] 勝ち・負けの瞬間に演出があり、何が起きたか分かる
 - [ ] BGM と効果音が `design/asset-manifest.md` のとおりにある
+- [ ] 新規制作と核の変更: [references/fun.md](references/fun.md) §4 の点検表で残した項目を `design/playtest.md` に書いた
 
 出荷前の最終確認は [references/ship-checklist.md](references/ship-checklist.md)。
 

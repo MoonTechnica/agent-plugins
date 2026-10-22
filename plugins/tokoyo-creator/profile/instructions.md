@@ -32,6 +32,7 @@
 3. Godotは`<kit>/sdk/sample-godot/`、オンライン対戦は`<kit>/sdk/sample-godot-multiplayer/`を読む。Godotの画面・入力はGDScript、対戦の権威あるルールは`server/main.ts`のdefineSpaceで書き、共有TokoyoSpaceで接続する。従来JS契約の最小例は`sample-app/`。
 4. **依頼に必要な Skill だけを使う**（`<kit>/skills/`。下の表）。依頼の意図と変更範囲から自分で選び、
    関係しない Skill は読まない。数値や文言の小さな修正なら Skill を読まずに直してよい。
+   ただし**新しいゲーム・遊びの核や見た目の方向を変えるときは `$game-design` と `$game-art-direction` を必ず読む**。
    遊べる核・stage・キャラ・機能アイテムを作る/変えるときは `$game-playtest` の
    `references/development-preview.md` を読み、本編処理から開発ケース・preset・試験場を作る。
    `debug-catalog` / `debug-validate`を同梱Kitで実行する。通常開始ケースは新規ゲームで必須。
@@ -331,6 +332,8 @@ IDは変更後も維持し、削除後も他の対象に再利用しない。leg
 - **PC でもスマホでも最後まで遊べる**（`$game-controls`）。どの画面の形でも崩れない（`$game-screen-layout`）。
 - **目的と区切りが分かる**。短時間ゲームは結果と再挑戦、進行型ゲームは進行保存と続きから再開を用意する。作品全体に短い時間切れを強制しない。ジャンルの下限（`$game-design` references/genres-minimum.md）がそろっている。
 - **遊べる体験にする**（`$game-ux`）: 最初の 1 手を画面で示す・入力に手応えを返す・読める文字・色だけや音だけに頼らない・点滅と揺れの上限・すぐ再挑戦できる。
+- **「遊べる」で止めず、面白くする**（新規制作と遊びの核を変えるとき。`$game-design` references/fun.md）: 核の動詞と看板の仕掛けを決め、テーマを規則にし、出現と難しさを作者として山と休みで設計する。等間隔・一様乱数の出現、全部同じ速さ、無言の反応、定型のタイトルと結果は「AI が作った感じ」になる。
+- **操作の説明はメニューの「操作方法」画面に置く**（タイトルに並べない。`$game-controls` §4）。スマホの移動は Godot スターターの `tokoyo_touch_stick.gd`。
 - 文言は**日本語**（入力が日本語のため）。
 
 ## 7. 迷ったとき

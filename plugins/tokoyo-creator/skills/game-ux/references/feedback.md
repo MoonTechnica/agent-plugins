@@ -88,11 +88,21 @@ function burst(x: number, y: number, color: string) {
 
 ## 4. Godotの2D/3D
 
-固定版GodotのAPI定義を確認する。揺れはカメラの表示offsetへ上限付きで加え、HUDは別CanvasLayerへ置く。
-伸び縮みと点滅は対象NodeのTweenで実装し、Node破棄時に停止する。全画面flashを使わない。
-粒子はGPUParticles2D/3D等を上限付きで再利用し、不要なエフェクトと音をシーン終了時に解放する。
-ヒットストップはローカルの演出に限定し、オンラインの権威あるサーバーtickや入力送信を止めない。
-reduced-motionとeffects=0では揺れを止め、視覚だけ・音だけで必須情報を伝えない。
+固定版GodotのAPI定義を確認する。実装の決まりは `$game-godot` references/best-practices.md の「Juice」「Audio」。
+§1 の量と §2 の作りを Godot へ写すと:
+
+| 手応え | Godot での書き方 |
+|---|---|
+| ヒットストップ | `Engine.time_scale = 0.05` → `get_tree().create_timer(秒, true, false, true).timeout` で 1.0 に戻す（最後の true で実時間）。UI の Tween は `set_ignore_time_scale(true)`。乱戦は当たった 2 体だけ止める。オンラインの権威 tick と入力送信は止めない |
+| 揺れ | `trauma`（0〜1）を足し 0.1〜0.3 秒で減衰、`Camera2D.offset`（3D はカメラの子の位置）へ `trauma² ×` 数〜15px（720 基準）。向きのある出来事はその向きに揺らす。`position` は揺らさない |
+| 伸び縮み | `scale` を Tween で（ジャンプ (0.6, 1.4)・着地は落下の速さに比例して最大 (1.6, 0.4) → 0.2〜0.35 秒で 1 に戻す）。同じプロパティの前の Tween は `kill()` |
+| 白い点滅 | `modulate` を明るくして 0.1 秒で戻す（CanvasItem）。3D は `material_overlay` の発光を短く |
+| 粒子 | 動く発生源は `CPUParticles2D`（物理補間時）。`one_shot` は `restart()` か複数を使い回す。上限を決める |
+| 効果音 | `max_polyphony` 4〜8、`play()` の前に `pitch_scale = randf_range(0.92, 1.08)`。連鎖は回数で音程を上げる。Web ではバスのエフェクトが鳴らない |
+| 押した反応 | 押したフレームで画面のボタン・主役の見た目を変える（入力を待つアニメの後で動かさない） |
+
+HUDは別CanvasLayerへ置く。全画面flashを使わない。不要なエフェクトと音はシーン終了時に解放する。
+`effects=0`と端末の動き軽減の設定では揺れ・点滅・粒子を止め、ヒットストップと音は残す。視覚だけ・音だけで必須情報を伝えない。
 
 ## 6. 効果音の 3 種類
 

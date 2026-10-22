@@ -1,6 +1,6 @@
 ---
 name: game-controls
-description: ゲームの操作を PC（キーボード・マウス）とスマートフォン（画面のスティック・ボタン・タップ・スワイプ・ドラッグ）の両方で遊べるように作り、市販のゲームパッド（PS5 / Xbox / Switch Pro）でも遊べるようにする。新しく作るときと操作を作る/変えるときに使う。ジャンルごとの操作割り当て、入力キット assets/input.ts（コピーして使う）、操作説明の出し分け、音の開始、manifest の gamepad、マウス固定（Pointer Lock）・傾き・カメラ / マイクの入力を扱う。input, controls, touch, virtual joystick, gamepad, pointer lock, FPS, tilt, microphone.
+description: ゲームの操作を PC（キーボード・マウス）とスマートフォン（画面のスティック・ボタン・タップ・スワイプ・ドラッグ）の両方で遊べるように作り、市販のゲームパッド（PS5 / Xbox / Switch Pro）でも遊べるようにする。新しく作るときと操作を作る/変えるときに使う。Godot の移動スティック（スターターの tokoyo_touch_stick.gd）・画面ボタン・InputMap、ジャンルごとの操作割り当て、旧 JS 作品の入力キット assets/input.ts、メニューの「操作方法」画面と入力方法ごとの出し分け、音の開始、manifest の gamepad、マウス固定（Pointer Lock）・傾き・カメラ / マイクの入力を扱う。input, controls, touch, virtual joystick, gamepad, pointer lock, FPS, tilt, microphone.
 ---
 
 # ゲームの操作（PC とスマホの両対応 + ゲームパッド）
@@ -13,6 +13,11 @@ description: ゲームの操作を PC（キーボード・マウス）とスマ�
 
 ## 1. 手順
 
+**Godot で作るとき（新規・継続制作の既定）は [references/godot-input.md](references/godot-input.md) を先に読む。**
+移動はスターターの `tokoyo_touch_stick.gd`、画面のアクションボタンは `TouchScreenButton`、キーとパッドは InputMap。
+下の手順 3 の入力キット（`input.ts`）と §3 / §4 のコード例は旧 JS 作品のためのもので、考え方（アクション・
+最初の操作・説明の出し分け）だけを Godot に写す。
+
 1. **ジャンルを決め、[references/genres.md](references/genres.md) の該当する節を読む**。
    PC の割り当て・スマホの操作部・入力キットの設定がジャンルごとに書いてある。
    遊びの説明に操作の指定があればそれに従い、無い部分だけ表で埋める。
@@ -23,7 +28,7 @@ description: ゲームの操作を PC（キーボード・マウス）とスマ�
    `createInput({ root: document.body, move, buttons })` で設定する（使い方はファイル冒頭のコメント）。
    キットで足りない操作（ドラッグで照準・ピンチ等）は、キットの `pointer` / `onTap` / `onSwipe` / `look` の上に書く。
 4. **開始画面**を作る（§3）。
-5. **操作説明を入力方法ごとに出し分ける**（§4）。
+5. **メニューに「操作方法」画面を作り、入力方法ごとに出し分ける**（§4）。
 6. **`manifest.json` の `gamepad` を §7 の基準で決める**。
 7. **§6 のチェック**を全部満たしてから出力する。
 
@@ -180,9 +185,14 @@ input.setControlsVisible(false)                 // タイトル中は操作部�
 
 リザルト画面も同じ: 操作部を隠し、「タップ / クリック / Space でもう一度」。
 
-## 4. 操作説明の出し分け
+## 4. 操作方法の画面と出し分け
 
-操作説明は**その端末で使う入力で書く**。キーボードの説明をスマホに出さない。
+**操作の説明はタイトル画面に並べない。** タイトルメニューとポーズメニューに「操作方法」項目を置き、専用の画面で
+入力方法ごと（タッチ / キーボード・マウス / コントローラー）に丁寧に説明する。プレイ中は、その操作が初めて要る
+瞬間に一言だけ示す（`$game-ux` §1）。画面の中身は [references/godot-input.md](references/godot-input.md) §4。
+
+説明は**その端末で使う入力で書く**。キーボードの説明をスマホに出さない（操作方法の画面は今の入力のタブを開いて出し、
+ほかの入力のタブも見られるようにする）。旧 JS 作品での書き方:
 
 ```ts
 function controlsHelp(mode: InputMode): string {
@@ -193,14 +203,15 @@ function controlsHelp(mode: InputMode): string {
 input.onModeChange(() => drawHelp())            // 入力方法が変わったら描き直す
 ```
 
-- 説明は開始画面と、ポーズ画面に出す。プレイ中はスマホの操作部のボタンの文字が説明の代わりになる。
+- 説明はタイトルとポーズから開く「操作方法」画面に出す。プレイ中はスマホの操作部のボタンの文字と、初めての瞬間の一言が説明の代わりになる。
 - ボタンの文字は日本語 2〜4 文字か記号（`ジャンプ` / `攻撃` / `▲`）。キーの名前はボタンに書かない。
 - ゲームパッドのボタン名は **`input.padLabel(action)`** で機種に合わせる（PS: `×` / Xbox: `A` / Switch: `B`。
   分からなければ「下のボタン」）。「×で決定」のように機種を決めつけて書かない。
 
 ### Godotで作るとき
 
-`$game-godot`のInputMapと同梱API定義を使う。キーボード・マウス・タッチ・gamepadを同じactionへまとめる。
+[references/godot-input.md](references/godot-input.md) が正本。InputMapでキーボード・マウス・タッチ・gamepadを同じactionへまとめ、
+移動は`tokoyo_touch_stick.gd`の`get_move()`、画面のボタンは`TouchScreenButton`で読む。
 Webとnativeで同じGDScriptの入力を使い、pause/背景移行/切断時に押下状態をリセットする。
 画面のタッチ標的はsafe area内に配置し、指で隠れる領域を避ける。
 
@@ -225,7 +236,8 @@ Webとnativeで同じGDScriptの入力を使い、pause/背景移行/切断時�
 
 - [ ] すべてのアクションが **キーボードでも、タッチでも**実行できる（キットの `buttons` の `keys` と `label`、または直接タッチ）
 - [ ] 開始・ポーズ・再挑戦が、タップ / クリック / キー（Space か Enter）のどれでもできる
-- [ ] 操作説明が入力方法ごとに出し分けられ、`onModeChange` で描き直される
+- [ ] タイトルとポーズから「操作方法」画面を開け、入力方法ごとに説明し、今の入力のタブで開く。タイトル画面に説明文を並べていない
+- [ ] **Godot**: 移動は `tokoyo_touch_stick.gd`、画面のアクションボタンは `TouchScreenButton`。references/godot-input.md §5 を確かめた
 - [ ] スマホの操作部とゲームの重要な表示が重ならない
 - [ ] `pointercancel` と画面から離れたとき（`input.reset()` / キットが自動で呼ぶ）に操作が残らない
 - [ ] 音は `onFirstInteraction` の中で `resume()` し、ミュートのボタンがある
