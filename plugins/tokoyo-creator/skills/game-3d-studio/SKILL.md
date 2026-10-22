@@ -13,7 +13,9 @@ GodotのNode/meshで組める形（箱・球・床・パーティクル）は、
 手元の Blender（4.5 LTS 以上。無ければ blender.org から無料で入る）を
 `blender -b --factory-startup -Y --python-exit-code 1 -P art/3d/<name>.py` で動かす。
 書き出した GLB は `upload_asset`（`model_3d`。持ち込みの枠なので 3D 生成が閉じていても登録できる）、PNG は `upload_image` で素材に登録する。
+ゲームが使う GLB は `source/godot/` の下に置く。手元の Godot Editor（`kit.mjs editor`）を開いていれば書き出すたびに読み込み直されるので、利用者にその場で見てもらえる。
 Blender が無く、利用者が入れない場合は 3D スタジオを使わずに作る（コードのジオメトリ。ツール一覧にあれば 3D のフリー素材・`generate_model_3d`）。
+画面の Blender で見せる・利用者が手直しするときは §6。
 
 ## 1. スクリプトはソースに置く
 
@@ -25,6 +27,8 @@ Blender が無く、利用者が入れない場合は 3D スタジオを使わ�
   同じ実行内で再利用するときも入力/設定/Blender版と出力の一致を確認する。
 - スクリプトは **`art/3d/<name>.py`** に置く（ソースの commit に入り、配信物には入らない）。
   「剣を長くして」のような直しは、このスクリプトの数値を変えて**もう一度実行**する。
+  先頭に `# tokoyo: hand-finished <path>` の印があるスクリプトは実行しない（利用者が画面で仕上げた GLB がある）。
+- `.blend` はソースに入れない（正本はスクリプトと書き出した GLB。Godot は `.blend` を Blender で読み込もうとし、Blender の無いビルドで止まる）。
 - 同じ結果が出るようにする: 最初に `bpy.ops.wm.read_factory_settings(use_empty=True)` で空のシーンにし、
   乱数は `random.seed(<固定値>)`。時刻やファイルの一覧順に依存しない。
 - 書き出し先は環境変数 `OUT` の下（`os.environ["OUT"]`）。入力の素材は `INPUTS` の下。
@@ -121,5 +125,24 @@ AO やライトを Cycles でテクスチャに焼き込むと、Godot側でラ�
 UV を展開（`smart_project`）→ 画像テクスチャのノードを作って選択 → `bpy.ops.object.bake(type="AO")` → PNG で保存。
 1024 px・32 サンプルで数秒〜十数秒。
 
+## 6. 画面の Blender（手元）
+
+**見せる**（「Blender で開いて」）: `node <kit>/scripts/kit.mjs blender --script art/3d/<name>.py` でスクリプトの結果のシーンを、
+`--model source/godot/<path>.glb` で GLB を、利用者の Blender の画面に開く。スクリプトの書き出しは一時ディレクトリに向くので、ゲームのファイルは変わらない。
+画面での変更はそのままではゲームに残らないこと、`.blend` を `source/` に保存しないこと（Kit は git に入れず、`pack` が断る。§1）を伝える。
+
+**手直しを残す**: 利用者に、手直しした結果を glTF Binary で `art/3d/out/<name>.edited.glb` に書き出してもらい、スクリプトの GLB と比べる。
+
+```
+blender -b --factory-startup -Y --python-exit-code 1 -P <kit>/skills/game-3d-studio/assets/glb_compare.py -- <スクリプトの GLB> art/3d/out/<name>.edited.glb
+```
+
+1. `writable_back: true`（どのオブジェクトも位置・大きさ・回転の違いだけ）なら、**スクリプトに書き戻す**:
+   `size_ratio`（軸ごとの倍率）・`edited.center`・`edited.rotation` をスクリプトの数値に反映して実行し直し、同じ比較で全部が `changed: false` になるまで直す。終わったら `edited.glb` を消す。
+2. `writable_back: false`（頂点を動かした・オブジェクトを足した/消した・回転を適用した）なら、利用者に確かめてから**手で仕上げた GLB として残す**:
+   書き出した GLB をゲームが参照している同じパスに置き、スクリプトの 1 行目に `# tokoyo: hand-finished <source/ からの GLB のパス>` を書いて両方を commit する。
+   以後このスクリプトは実行しない（仕上げる前の形に戻る。`kit.mjs blender --script` は代わりに仕上げた GLB を開く）。数値での直しを頼まれたら、
+   画面の Blender で直してもらうか、利用者が手直しを捨ててよいと言ったときだけ印を外してスクリプトから作り直す。
+3. どちらも §2 の上限と §3 の形式に合わせる（仕上げた GLB も検証器が確かめる）。
 
 専用AI優先: 非人型は形の生成後に`rig_model_3d`→`animate_model_3d`を使い、未対応の体型・動作のみBlenderで補う。対応presetとキー未設定時の経路はgame-3d-studio/references/non-humanoid.mdを参照。

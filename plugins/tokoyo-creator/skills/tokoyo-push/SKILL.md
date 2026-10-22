@@ -22,5 +22,5 @@ description: 手元で作った TOKOYO.games のゲームを Platform に送る�
    → `submit_build` → `get_build` を 3 秒ごとに終わるまで。
 6. `ready` なら **`node <kit>/scripts/kit.mjs open --url <editor_url>` で制作画面をブラウザに開く**（この会話で最初の `ready` のときだけ。
    開けない環境では `opened: false` になるだけ。`open` がエラーで終わっても止まらない）。開けたかどうかに関わらず、**`editor_url` を返事の最後に目立つ形で毎回示す**
-   （手元で遊ぶ仕組みは無い。試遊は制作画面）。そのあと `$tokoyo-pull` で取り込み直す（次の push の base になる）。
+   （正式な試遊は制作画面。手元の Godot Editor の実行は確認用で、Platform の機能は動かない。instructions §8.7）。そのあと `$tokoyo-pull` で取り込み直す（次の push の base になる）。
    `STALE_BASE` は `kit.mjs pull`（= `git pull --rebase`）してから 2. から（§8.4）、ほかのエラーは §8.5。公開・投稿は制作画面で利用者が行う。

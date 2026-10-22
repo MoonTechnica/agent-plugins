@@ -1,0 +1,9 @@
+{
+  "gdscript": {
+    "command": "node",
+    "args": ["${CLAUDE_PLUGIN_ROOT}/scripts/kit.mjs", "lsp"],
+    "extensionToLanguage": { ".gd": "gdscript" },
+    "startupTimeout": 120000,
+    "maxRestarts": 2
+  }
+}

@@ -413,7 +413,7 @@ LFS の実体を上げ下ろしするので、最初に一度 `node <kit>/script
 | `FORBIDDEN` | この App を編集できない（別のアカウントの App）。利用者に確認する |
 | `INVALID_ACTION` | マージ中・生成中など、今は送れない状態。`get_app` の `running_job` / `merge_in_progress` を見て待つ |
 
-**手元で遊ぶ仕組み（dev サーバ）は無い。** 送った版は下書きになり、`editor_url`（制作画面）で試遊する（§8.3 の 6. のとおり開く・示す）。
+送った版は下書きになり、`editor_url`（制作画面）で試遊する（§8.3 の 6. のとおり開く・示す）。手元の Godot Editor でも動かせるが確認用（§8.7）。
 **公開・非公開・投稿は制作画面で利用者が行う**（MCP には無い。リミックス許可や提案の受付の設定も同じ）。
 
 ### 8.6 リミックスと提案（`$tokoyo-remix` / `$tokoyo-propose` / `$tokoyo-proposals`）
@@ -433,6 +433,22 @@ LFS の実体を上げ下ろしするので、最初に一度 `node <kit>/script
 | `INVALID_ACTION`（`proposal_already_open`） | 同じfeatから開いている提案がある。`update_proposal` で版を差し替える |
 | `QUOTA_EXCEEDED`（`insufficient_credits`） | マージの支払い元の残高が無い。利用者に伝える |
 | `RATE_LIMITED` | 提案は 1 日 20 件、コメントは 1 日 200 件まで。待つ |
+
+### 8.7 手元で動かす（Godot Editor）
+
+`source/godot` は固定版（Godot 4.5.1 stable）の Editor でそのまま開ける。**正式な確認は制作画面（`editor_url`）**で、手元の実行は配置・操作感・ルールをすぐ確かめるための補助。
+
+- **「Godot で開いて」「Blender で開いて」と頼まれたら**、Kit の CLI で開く（作業ディレクトリのゲームだけを開き、版を確かめる）:
+  - Godot Editor: `node <kit>/scripts/kit.mjs editor`（特定のシーンは `--scene res://<path>.tscn`）。`GODOT_BIN` で実行ファイルを指定できる。利用者は F5 で遊べる。
+  - Blender: `node <kit>/scripts/kit.mjs blender --script art/3d/<name>.py`（スクリプトの結果）/ `--model source/godot/<path>.glb`（GLB）。`BLENDER_BIN` で指定できる（4.5 LTS 以上）。画面の手直しの残し方は `$game-3d-studio` §6。
+  - どのシーン・モデルか分からなければ、`design/game-assets.json`・`art/3d/`・シーンの一覧から候補を示して確かめる（推測で別のものを開かない）。開いた結果（`opened`・開いたパス）を利用者に伝える。
+  Agent が自分で動かすときは `"$GODOT_BIN" --path source/godot -- --tokoyo-local`（手元のセーブを消して始めるなら `--tokoyo-local-reset` も付ける）。
+- **手元で動くもの**: スターターの autoload `TokoyoLocal`（`res://tokoyo_local.gd`。`$game-godot`）が Host の代わりに応える。本人は固定の `local-player`、Capability は `manifest.json` の宣言、Store はパソコンの `user://tokoyo_local/` に保存される。
+- **手元で動かないもの**: 対戦・ランキング・Document・ゲーム内 AI・購入・共有・端末の傾き/カメラ/マイク・開発メニューのケースは `RUNTIME_UNSUPPORTED` で失敗する（成功を装わない）。これらは push して制作画面で確かめる。手元で動いたことを、アプリで動いた・実機で確かめたと言わない。
+- **同時に編集しない**: Agent が `source/` を書き換えている間、利用者に Editor で保存しないよう伝える（開いているシーンを保存すると Agent の変更を上書きする）。Editor は外の変更を検知すると読み込み直しを尋ねるので、読み込み直してもらう。
+- **書き換えないもの**: Editor が作る `.godot/`（git に入れない）。`*.uid` は git に入れる。別の版の Editor で開かない（`project.godot` と import の結果が書き換わる）。
+- **診断**: Claude Code ではプラグインの LSP（`kit.mjs lsp`）が `.gd` を編集するたびに Godot の診断を返す。エラーは直してから進む。Codex にはこの自動の診断が無い（Editor のスクリプトエディターの表示か、手元実行・push 後の検証で確かめる）。
+- `TokoyoLocal` が無い既存のゲームで手元実行するときは、`<kit>/sdk/sample-godot/godot/tokoyo_local.gd` を `source/godot/` に写し、`project.godot` の `[autoload]` の最後に `TokoyoLocal="*res://tokoyo_local.gd"` を足して commit する。
 
 一般参加者には公開版とその作業に必要なコード・素材だけを取得する。未公開 main の共有は作者・チームまたは明示的に許可された招待者だけ。公開版からの提案も最新 main に取り込むが、合流候補のコード・競合解決・検証・プレビューは作者側で確認する。
 
