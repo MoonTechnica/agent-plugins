@@ -6,9 +6,9 @@ user-invocable: false
 
 # main へ提案する
 
-作業ディレクトリ（`.tokoyo.json` のあるところ）で行う。手順・エラーの正本は **`<kit>/profile/instructions.md` §8.6**。要点:
+作業ディレクトリ（`.fdpocket.json` のあるところ）で行う。手順・エラーの正本は **`<kit>/profile/instructions.md` §8.6**。要点:
 
-1. `get_project({ project_id })` と `.tokoyo.json` で自分の session_id を確認する。`proposals.from_me` に開いている提案があれば、新しく開かずに 4. へ。
+1. `get_project({ project_id })` と `.fdpocket.json` で自分の session_id を確認する。`proposals.from_me` に開いている提案があれば、新しく開かずに 4. へ。
 2. **提案できるのは自分のブランチの検証済みの head**（公開しなくてよい。編集者はその版を試せる）。
    `latest_proposable_version_id` が null か、送った変更がまだ `ready` になっていなければ、`$fdpocket-push` して `get_build` が `ready` になるのを待つ。
 3. `open_proposal({ project_id, session_id, title, body, discussion_id? })`（題名 100 文字・説明 2000 文字まで。何を変えたか・なぜか・データモデルの変更を書く）。

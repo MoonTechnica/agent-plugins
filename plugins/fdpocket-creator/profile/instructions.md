@@ -6,8 +6,8 @@ Project は利用者向けの `web` と、必要なら管理用の `admin` の A
 
 `listing/listing.json` の `releaseNotes` は対象版の差分と実際の検証結果を記録する。実行した検証のコマンド・結果を区別し、未実施・失敗・確認不能も明記する。推測や予定を確認済みとせず、ビルド成功だけで動作確認済みと記載しない。作者の意図・背景・利用者へのメッセージはPlatformの別の編集欄で扱い、この固定記録へ流用しない。
 
-> **手元で作るとき**: この文書と Skill の `<kit>` は Creator Kit の置き場で、作業ディレクトリの `.tokoyo.json` の
-> `kit_root` に絶対パスで書いてある。`./` は作業ディレクトリ（`.tokoyo.json` のあるところ）。
+> **手元で作るとき**: この文書と Skill の `<kit>` は Creator Kit の置き場で、作業ディレクトリの `.fdpocket.json` の
+> `kit_root` に絶対パスで書いてある。`./` は作業ディレクトリ（`.fdpocket.json` のあるところ）。
 > 手元での進め方（取得・ビルド・検査・送信）は **§8** が正本。§0〜§7 の約束はそのまま守る。
 
 ## 0. 最初にやること
@@ -158,14 +158,14 @@ Node は 22.12 以上が要る。起動時に `kit db diff` を回し、DB を�
 ## 8. 手元で作るとき（Creator Kit）
 
 手元の Coding Agent は Platform MCP **`fdpocket`** とこの Kit の CLI（`node <kit>/scripts/kit.mjs <command>`）で
-Platform とやり取りする。**CLI は作業ディレクトリ（`.tokoyo.json` のあるところ）で実行する。**
+Platform とやり取りする。**CLI は作業ディレクトリ（`.fdpocket.json` のあるところ）で実行する。**
 MCP のツールが返す URL は署名付きで短命なので、受け取ったらすぐ CLI に渡す（保存しない・会話に貼らない）。
 
 ### 8.1 作業ディレクトリ
 
 | パス | 中身 |
 |---|---|
-| `.tokoyo.json` | `app_id`（MCP の `project_id` と同じ値）・`session_id`・`thread_ref`（push する branch）・`base_commit_oid`（取り込んだスレッドの head）・`kit_root`（`<kit>`）ほか。手で書き換えない |
+| `.fdpocket.json` | `project_id`（MCP の `project_id`）・`session_id`・`thread_ref`（push する branch）・`base_commit_oid`（取り込んだスレッドの head）・`kit_root`（`<kit>`）ほか。手で書き換えない |
 | `source/` | 作る Project = **git のリポジトリ**（branch は手元のスレッド `thread/<session>`）。画像・音・動画・フォントは `.gitattributes` の規則で Git LFS に入る |
 | `assets-cache/` | 素材ツールの `download_url` から取った画像。`kit.mjs assets add --url <download_url> --sha256 <sha256> --path <source/ からの相対パス>` で `source/` に置いて commit する |
 | `outputs/` | 送る 3 つ（`source.bundle`・`dist.tar.gz`・`build-report.json`） |
@@ -176,17 +176,17 @@ git と Git LFS（`git lfs version`）・Bun・Node 22.12 以上が要る。`nod
 
 ### 8.2 素材ツール
 
-画像のツール（`generate_image` など）は `fdpocket` の同名のツールで、**どれも `project_id`（`.tokoyo.json` の `app_id`）と `session_id` を渡す**。
+画像のツール（`generate_image` など）は `fdpocket` の同名のツールで、**どれも `project_id`（`.fdpocket.json` の `project_id`）と `session_id` を渡す**。
 `kit.mjs clone` / `pull` / `push` と LFS の実体の上げ下ろしは、Kit 自身のログイン（`kit.mjs login`。MCP のログインとは別）で
 Platform を呼ぶ。ログインしていなければ最初にブラウザで許可を求められる（一度だけ）。
 
-MCP の `project_id` は Project の内部 ID。`.tokoyo.json` のキー名は互換性のため `app_id` のままなので、その値を `project_id` に渡す。`editor_url` は返却値をそのまま使い、URL のパスから ID を推測しない。
+MCP の `project_id` は Project の内部 ID（`.fdpocket.json` の `project_id`）。`editor_url` は返却値をそのまま使い、URL のパスから ID を推測しない。
 
 ### 8.3 取得 → 作る → 検査 → 送信
 
 1. **取得**: 作業ディレクトリがまだ無ければ新しいディレクトリで `kit.mjs clone --project-id <project_id> --session-id <session_id>`、
    あれば `kit.mjs pull`（`git pull --rebase` と同じ）。どちらも Kit が `get_git_bundles` を呼ぶ
-   （`get_git_bundles` の結果の JSON を `--bundles '<JSON>'` で渡してもよい）。
+   （`get_git_bundles({ project_id, session_id })` の結果の JSON を `--bundles '<JSON>'` で渡してもよい）。
    `pull` は commit していない変更があると断るので、先に `git commit` する。結果の `status` が `conflict` なら §8.4。
    空の Project なら §5 の `kit.mjs new` から。
 2. **作る**: §3 の工程。`source/` で `bun install`、ZModel を変えたら `kit.mjs generate` → `kit.mjs db diff`、`kit.mjs dev` で確かめる。区切りごとに `git commit` する。
@@ -214,7 +214,7 @@ MCP の `project_id` は Project の内部 ID。`.tokoyo.json` のキー名は�
    `packages/db-schema/pending/generated.sql` の衝突は解かずに `kit.mjs db diff` で作り直す。
 3. `kit.mjs push` で送り直す。
 
-main の参照権限がある場合は、同じ `session_id` の `get_git_bundles` の `main` があれば `refs/remotes/tokoyo/heads/main` が最新の main。
+main の参照権限がある場合は、同じ `session_id` の `get_git_bundles` の `main` があれば `refs/remotes/fdpocket/heads/main` が最新の main。
 必要なら main を自分のブランチへ `git merge` し、衝突を解いて確かめてから送る。pull だけでブランチを main に置き換えない。
 
 ### 8.5 ほかのエラー

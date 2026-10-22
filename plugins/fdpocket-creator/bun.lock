@@ -3,7 +3,7 @@
   "configVersion": 1,
   "workspaces": {
     "": {
-      "name": "tokoyo-creator-runtime",
+      "name": "fdpocket-creator-runtime",
       "dependencies": {
         "miniflare": "4.20260730.0",
       },

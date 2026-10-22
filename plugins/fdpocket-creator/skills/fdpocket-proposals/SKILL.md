@@ -6,13 +6,13 @@ user-invocable: false
 
 # 届いた提案を読んで決める
 
-作業ディレクトリ（main の `.tokoyo.json` のあるところ）で行う。手順・エラーの正本は **`<kit>/profile/instructions.md` §8.6**。要点:
+作業ディレクトリ（main の `.fdpocket.json` のあるところ）で行う。手順・エラーの正本は **`<kit>/profile/instructions.md` §8.6**。要点:
 
 1. `list_notifications({ unread_only: true })` の `proposal_opened` / `proposal_commented`、または
    `get_project({ project_id })` の `proposals.incoming_open_count` → `list_proposals({ project_id, status: "open" })`。
 2. `get_proposal({ proposal_id })`: 説明・頼んだこと（`requests`）・変更（`change_diff`）・マージできるか（`mergeability_current`）・コメント。
 3. 中身を読む: `get_proposal_inputs({ proposal_id })` の結果を `kit.mjs fetch-review --inputs '<JSON>'` に渡すと `fetched_as`
-   （`refs/remotes/tokoyo/proposals/<id>`）に入る。`source/` で `git diff --stat <base> <theirs>` と `git diff <base> <theirs>`（提案の変更）、
+   （`refs/remotes/fdpocket/proposals/<id>`）に入る。`source/` で `git diff --stat <base> <theirs>` と `git diff <base> <theirs>`（提案の変更）、
    `git diff --stat <base> <ours>`（その間に main で変わったこと）を読み、利用者に要点を伝える。
    特に `packages/db-schema/schema.zmodel`（データを壊す変更・ポリシーを緩める変更）と `infra/project.yaml`（capability・Role の追加）を見る。
    base が null なら `git diff <ours> <theirs>`。**ブランチは切り替えない（読むだけ）。**

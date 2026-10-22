@@ -6,10 +6,10 @@ user-invocable: false
 
 # Platform に送る
 
-作業ディレクトリ（`.tokoyo.json` のあるところ）で行う。`<kit>` は `.tokoyo.json` の `kit_root`。
+作業ディレクトリ（`.fdpocket.json` のあるところ）で行う。`<kit>` は `.fdpocket.json` の `kit_root`。
 手順・結果の扱い・エラーの正本は **`<kit>/profile/instructions.md` §8.3〜§8.5**。要点:
 
-1. **貢献のブランチなら規約を確かめる**: `get_contribution_policy({ project_id })`（`project_id` は `.tokoyo.json` の `app_id`）で最新の禁止事項・
+1. **貢献のブランチなら規約を確かめる**: `get_contribution_policy({ project_id })`（`project_id` は `.fdpocket.json` の `project_id`）で最新の禁止事項・
    ガイドラインを読み、依頼と差分全体が守っているか確かめる。抵触するなら該当規約と理由を述べて送らない。取得に失敗したら送らない。
    守っているなら、返った `revision` を 3. の `--policy-revision` に渡す。
 2. `source/` の変更を `git commit` する（未 commit の変更があると断られる。作者は `kit.mjs clone` が設定した本人のまま）。
