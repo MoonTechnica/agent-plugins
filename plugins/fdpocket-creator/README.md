@@ -46,9 +46,11 @@ Things to know up front:
 ### 1. Install
 
 ```text
-/plugin marketplace add https://github.com/MoonTechnica/agent-plugins
-/plugin install fdpocket-creator@moon-technica
+/plugin install fdpocket-creator --marketplace https://github.com/MoonTechnica/agent-plugins
 ```
+
+This adds the marketplace and installs the plugin in one step (Claude Code v2.1.275 or later).
+On older versions, run `/plugin marketplace add https://github.com/MoonTechnica/agent-plugins` first, then `/plugin install fdpocket-creator@moon-technica`.
 
 ### 2. Sign in
 
@@ -95,6 +97,18 @@ asks you to confirm each one every time (allow rules cannot skip this).
 ```text
 /plugin marketplace update moon-technica
 ```
+
+## Quick start (Claude app)
+
+You can install the Kit from the Claude desktop app without typing any commands.
+
+1. Open **Customize → Plugins**, choose **Add → Add marketplace**, and enter `https://github.com/MoonTechnica/agent-plugins`.
+2. Add **FDPocket Developer Kit** from the list.
+3. On the plugin's **Connectors** tab, connect `fdpocket` and approve the login in your browser.
+4. Open the **Code** tab, pick a working folder, and use the same commands as in Claude Code (for example `/fdpocket-creator:new`).
+
+The plugin is saved to your Claude account, so it also appears in Claude Code on your computer.
+Building and pushing run on your computer, so use the **Code** tab (chat cannot run the Kit's tools).
 
 ## Quick start (Codex)
 
