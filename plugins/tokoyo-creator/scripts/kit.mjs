@@ -9324,7 +9324,7 @@ var init_WavPackParser = __esm(() => {
 });
 
 // frontend/packages/creator-kit/src/cli.ts
-import { dirname as dirname4, resolve as resolve2 } from "node:path";
+import { dirname as dirname5, resolve as resolve2 } from "node:path";
 import { fileURLToPath } from "node:url";
 
 // frontend/packages/creator-kit/src/args.ts
@@ -9349,6 +9349,7 @@ var COMMANDS = {
   editor: { required: [], optional: ["scene"], switches: [] },
   blender: { required: [], optional: ["script", "model"], switches: [] },
   lsp: { required: [], optional: [], switches: [] },
+  "editor-sync": { required: [], optional: ["paths"], switches: ["hook"] },
   "codex-config": { required: [], optional: [], switches: [] }
 };
 var USAGE = `usage: node <kit>/scripts/kit.mjs <command> [--flag value]…
@@ -9407,7 +9408,7 @@ import { createHash as createHash5 } from "node:crypto";
 import { existsSync as existsSync7 } from "node:fs";
 import { cp as cp2, mkdir as mkdir5, mkdtemp as mkdtemp2, readdir as readdir4, readFile as readFile8, realpath as realpath3, rm as rm4, writeFile as writeFile5 } from "node:fs/promises";
 import { homedir, tmpdir as tmpdir2 } from "node:os";
-import { dirname as dirname3, isAbsolute as isAbsolute2, join as join11, relative as relative3, resolve } from "node:path";
+import { dirname as dirname4, isAbsolute as isAbsolute3, join as join11, relative as relative4, resolve } from "node:path";
 
 // frontend/packages/app-sdk/build-config/kit-build.ts
 import { spawn } from "node:child_process";
@@ -30623,6 +30624,51 @@ function isLfsRequest(request, lfsUrl) {
 }
 var CREDENTIAL_USERNAME = "tokoyo-kit";
 
+// frontend/packages/creator-kit/src/editor-sync.ts
+import { connect } from "node:net";
+import { dirname as dirname2, isAbsolute as isAbsolute2, relative as relative3 } from "node:path";
+var EDITOR_ANNOUNCEMENT = ".godot/tokoyo_live.json";
+var FILE_TOOLS = {
+  Edit: "file_path",
+  Write: "file_path",
+  MultiEdit: "file_path",
+  NotebookEdit: "notebook_path"
+};
+function syncRequestFromHook(input) {
+  if (!input || typeof input !== "object")
+    return null;
+  const { tool_name: tool, cwd, tool_input: toolInput } = input;
+  if (typeof tool !== "string" || typeof cwd !== "string")
+    return null;
+  if (tool === "Bash")
+    return { start: cwd, files: null };
+  const key = FILE_TOOLS[tool];
+  const file = key && toolInput && typeof toolInput === "object" ? toolInput[key] : undefined;
+  if (typeof file !== "string" || file === "")
+    return null;
+  return { start: dirname2(file), files: [file] };
+}
+function editorSyncPayload(project, files, token) {
+  if (files === null)
+    return JSON.stringify({ token, rescan: true });
+  const paths = files.map((file) => relative3(project, file).split("\\").join("/")).filter((path) => path !== "" && !path.startsWith("..") && !isAbsolute2(path));
+  return paths.length === 0 ? null : JSON.stringify({ token, paths });
+}
+function sendEditorMessage(port, line, timeoutMs = 1500) {
+  return new Promise((resolve) => {
+    const socket = connect(port, "127.0.0.1");
+    const done = (ok) => {
+      socket.destroy();
+      resolve(ok);
+    };
+    socket.setTimeout(timeoutMs, () => done(false));
+    socket.once("error", () => done(false));
+    socket.once("connect", () => socket.write(`${line}
+`));
+    socket.once("data", (data) => done(data.toString().startsWith("ok")));
+  });
+}
+
 // frontend/packages/creator-kit/src/git.ts
 import { spawn as spawn4 } from "node:child_process";
 
@@ -30674,7 +30720,7 @@ import { join as join6 } from "node:path";
 
 // frontend/packages/creator-kit/src/workdir.ts
 import { existsSync as existsSync2 } from "node:fs";
-import { dirname as dirname2, join as join5 } from "node:path";
+import { dirname as dirname3, join as join5 } from "node:path";
 var CONFIG_FILE = ".tokoyo.json";
 var WORKDIR_DIRS = {
   source: "source",
@@ -30737,10 +30783,10 @@ function serializeConfig(config) {
 `;
 }
 function locateWorkdir(start) {
-  for (let current = start;; current = dirname2(current)) {
+  for (let current = start;; current = dirname3(current)) {
     if (existsSync2(join5(current, CONFIG_FILE)))
       return current;
-    if (dirname2(current) === current)
+    if (dirname3(current) === current)
       return null;
   }
 }
@@ -30783,6 +30829,7 @@ function agentsMd(kitRoot) {
     "- 正式な確認は、送った版をアプリの制作画面で試遊すること。",
     "- 手元の Godot Editor（`node <kit>/scripts/kit.mjs editor` で開き F5）でも動かせるが、確認用。セーブは手元だけ、",
     "  対戦・ランキング・AI などは動かない（`<kit>/profile/instructions.md` §8.7）。手元で動いたことをアプリで動いたと言わない。",
+    "- 開いている Godot Editor には、Agent の変更がスターターのプラグイン（`addons/tokoyo_live`）で即時に反映される。hook が無い Agent は `source/godot` を変えたら `kit.mjs editor-sync --paths '<JSON 配列>'` を呼ぶ。",
     "- Agent が `source/` を書き換えている間は、利用者に Editor で保存しないよう伝える（Agent の変更を上書きする）。",
     "- 「Godot で開いて」「Blender で開いて」と頼まれたら `kit.mjs editor [--scene res://…]` / `kit.mjs blender --script art/3d/<name>.py | --model <GLB>` で開く（同 §8.7）。",
     "- push（`$tokoyo-push`）が `ready` になったら、`get_build` が返した `editor_url` を",
@@ -30869,7 +30916,7 @@ async function upload(name, url, bytes, contentType, fetchImpl = globalThis.fetc
 }
 
 // frontend/packages/creator-kit/src/revision.ts
-var KIT_REVISION = 7;
+var KIT_REVISION = 8;
 var CANONICAL_KIT_ROOT = "/workspace";
 
 // frontend/packages/creator-kit/src/kit-repo.ts
@@ -31098,7 +31145,7 @@ function loopbackAuthorize(openUrl) {
 
 // frontend/packages/creator-kit/src/lsp.ts
 import { spawn as spawn6 } from "node:child_process";
-import { connect, createServer as createServer2 } from "node:net";
+import { connect as connect2, createServer as createServer2 } from "node:net";
 import { basename } from "node:path";
 import { pathToFileURL } from "node:url";
 var HEADER_END = `\r
@@ -31201,7 +31248,7 @@ function connectWithRetry(port) {
   const deadline = Date.now() + CONNECT_TIMEOUT_MS;
   return new Promise((resolve, reject) => {
     const attempt = () => {
-      const socket = connect(port, "127.0.0.1");
+      const socket = connect2(port, "127.0.0.1");
       socket.once("connect", () => resolve(socket));
       socket.once("error", (error) => {
         socket.destroy();
@@ -31806,6 +31853,7 @@ function defaultContext(cwd, kitRoot) {
     godot: { version: godotVersion, launchEditor },
     blender: { version: blenderVersion, run: runBlender, launch: launchBlender },
     serveLsp: serveLspOverStdio,
+    sendEditor: sendEditorMessage,
     download: (url) => download(url),
     fetch: (url, init) => globalThis.fetch(url, init),
     stdout: (line) => process.stdout.write(`${line}
@@ -31858,6 +31906,8 @@ async function runCommand(args, context) {
         return await openBlender(context, flags);
       case "lsp":
         return await context.serveLsp(await lspTarget(context));
+      case "editor-sync":
+        return args.switches.includes("hook") ? await editorSyncHook(context) : await editorSync(context, flags);
       case "codex-config":
         return codexConfig(context);
     }
@@ -31913,7 +31963,7 @@ async function copyGodotSample(kitRoot, source) {
   await cp2(sample, source, {
     recursive: true,
     force: true,
-    filter: (path) => !relative3(sample, path).split(/[\\/]/).some((part) => generated.has(part))
+    filter: (path) => !relative4(sample, path).split(/[\\/]/).some((part) => generated.has(part))
   });
   const manifest = await readFile8(join11(sample, "package.json"), "utf8");
   await writeFile5(join11(source, "package.json"), newAppPackageJson(manifest, packages, kitRoot));
@@ -32303,7 +32353,7 @@ async function addAsset(context, flags) {
   const workdir = await findWorkdir(context.cwd);
   const bytes = await fetchVerified(context, path, flags.url, flags.sha256);
   const target = join11(sourceOf(workdir), ...segments);
-  await mkdir5(dirname3(target), { recursive: true });
+  await mkdir5(dirname4(target), { recursive: true });
   await writeFile5(target, bytes);
   print(context, {
     path,
@@ -32341,8 +32391,8 @@ async function fileInside(context, base, value, what) {
   } catch {
     throw new CommandError(`${what} not found: ${value}`);
   }
-  const within = relative3(root, resolved);
-  if (within === "" || within.startsWith("..") || isAbsolute2(within))
+  const within = relative4(root, resolved);
+  if (within === "" || within.startsWith("..") || isAbsolute3(within))
     throw new CommandError(`${what} must be inside ${base}: ${value}`);
   return { path: resolved, within: within.split("\\").join("/") };
 }
@@ -32417,6 +32467,60 @@ ${ran.output.trim().split(`
     next: "Edits in the Blender window are not saved to the game. To keep them, export GLB (game-3d-studio §6); do not save a .blend into source/."
   });
 }
+async function editorAnnouncement(project) {
+  const path = join11(project, EDITOR_ANNOUNCEMENT);
+  if (!existsSync7(path))
+    return null;
+  const value = JSON.parse(await readFile8(path, "utf8"));
+  if (!Number.isInteger(value.port) || typeof value.token !== "string")
+    return null;
+  return { port: value.port, token: value.token };
+}
+async function editorSync(context, flags) {
+  const project = godotProjectOf(await findWorkdir(context.cwd));
+  let files = null;
+  if (flags.paths !== undefined) {
+    const parsed = JSON.parse(flags.paths);
+    if (!Array.isArray(parsed) || parsed.some((path) => typeof path !== "string"))
+      throw new CommandError("--paths must be a JSON array of paths");
+    files = parsed.map((path) => resolve(context.cwd, path));
+  }
+  const editor = await editorAnnouncement(project);
+  if (editor === null) {
+    print(context, {
+      sent: false,
+      reason: "no Godot Editor with the TOKOYO live reload plugin is open"
+    });
+    return;
+  }
+  const payload = editorSyncPayload(project, files, editor.token);
+  if (payload === null) {
+    print(context, { sent: false, reason: "none of the paths are inside source/godot" });
+    return;
+  }
+  const sent = await context.sendEditor(editor.port, payload);
+  const message = JSON.parse(payload);
+  print(context, { sent, ...message.paths ? { paths: message.paths } : { rescan: true } });
+}
+async function editorSyncHook(context) {
+  try {
+    const request = syncRequestFromHook(JSON.parse(await context.stdin()));
+    if (request === null)
+      return;
+    const workdir = locateWorkdir(request.start);
+    if (workdir === null)
+      return;
+    const project = join11(workdir, WORKDIR_DIRS.source, "godot");
+    const editor = await editorAnnouncement(project);
+    if (editor === null)
+      return;
+    const payload = editorSyncPayload(project, request.files, editor.token);
+    if (payload !== null)
+      await context.sendEditor(editor.port, payload);
+  } catch (error) {
+    console.error(`tokoyo editor-sync: ${error instanceof Error ? error.message : String(error)}`);
+  }
+}
 async function lspTarget(context) {
   const start = context.env.CLAUDE_PROJECT_DIR || context.cwd;
   const clientRoot = locateWorkdir(start);
@@ -32439,7 +32543,7 @@ function codexConfig(context) {
 
 // frontend/packages/creator-kit/src/cli.ts
 function kitRootOf(scriptUrl) {
-  return resolve2(dirname4(fileURLToPath(scriptUrl)), "..");
+  return resolve2(dirname5(fileURLToPath(scriptUrl)), "..");
 }
 async function main(argv, scriptUrl) {
   let args;
