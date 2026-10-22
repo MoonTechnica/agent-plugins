@@ -78643,8 +78643,7 @@ async function wakeRealtime(scope, env) {
 
 // frontend/packages/miniapp-kit/src/dev/realtime.ts
 async function startRealtimeGateway(options2) {
-  const fromToolRoot = createRequire9(join23(process.env.KIT_TOOL_ROOT ?? process.cwd(), "package.json"));
-  const { Miniflare, Response: WorkerResponse } = fromToolRoot("miniflare");
+  const { Miniflare, Response: WorkerResponse } = requireMiniflare(options2.kitRoot);
   const source = await readFile15(join23(options2.kitRoot, "platform", "realtime-local.js"), "utf8");
   const runtime = new Miniflare({
     modules: true,
@@ -78733,6 +78732,19 @@ async function startRealtimeGateway(options2) {
     await runtime.dispose();
     throw error51;
   }
+}
+function requireMiniflare(kitRoot) {
+  const roots = [process.env.KIT_TOOL_ROOT, kitRoot, process.cwd()].filter((root) => Boolean(root));
+  for (const root of roots) {
+    try {
+      return createRequire9(join23(root, "package.json"))("miniflare");
+    } catch (error51) {
+      if (!(error51 instanceof Error) || !("code" in error51) || error51.code !== "MODULE_NOT_FOUND") {
+        throw error51;
+      }
+    }
+  }
+  throw new Error(`miniflare is not installed (looked in ${roots.join(", ")}); run bun install in the Kit`);
 }
 
 // frontend/packages/miniapp-kit/src/dev/vars.ts
