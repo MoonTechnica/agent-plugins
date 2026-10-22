@@ -1,6 +1,6 @@
 ---
 name: game-screen-layout
-description: ゲーム画面を、スマホの縦画面・横画面・PC の横長画面のどれでも崩れずに全面で見せる。新しく作るときと画面・HUD・タイトル・ポーズ・リザルトを作る/変えるときに使う。canvas の大きさと高解像度対応、プレイ領域の拡大縮小、HUD とスマホの操作部の置き場所、文字の描き方（大きさとコントラストの数値は game-ux）、ポーズと再開、タイトル・リザルト画面の作り方、リザルトの画面を共有するボタン（app.share.capture / app.ui.openShare）を扱う。layout, responsive, canvas, devicePixelRatio, HUD, safe area, orientation, pause.
+description: ゲーム画面を、スマホの縦画面・横画面・PC の横長画面のどれでも崩れずに全面で見せる。新しく作るときと画面・HUD・タイトル・ポーズ・リザルトを作る/変えるときに使う。Godot の stretch（720 基準・canvas_items・expand）と画面の大きさの変化への追従、プレイ領域の決め方、HUD とスマホの操作部の置き場所とセーフエリア、文字の描き方（大きさとコントラストの数値は game-ux）、ポーズと再開、タイトル・リザルト画面の作り方、リザルトの画面を共有するボタン（TokoyoApp.ui）を扱う。layout, responsive, stretch, viewport, HUD, safe area, orientation, pause.
 ---
 
 # ゲーム画面（どの画面の形でも崩れない）
@@ -9,36 +9,27 @@ Platform はゲームを**枠の全面**に出す。枠の形はスマホの縦�
 タブレット、PC の横長（例 1440×900）のどれにもなり、途中で変わる（回転・ウィンドウの大きさ変更・全画面の切り替え）。
 **どの形でも、遊べる大きさで、何も切れずに、全面が使われている**こと。
 
-## 1. canvas は全面・実ピクセルで描く
+## 1. 画面全体を使い、大きさの変化に追従する
 
-```ts
-const canvas = document.createElement('canvas')
-canvas.style.display = 'block'
-Object.assign(document.body.style, { margin: '0', overflow: 'hidden', background: '#0b1020' })
-document.body.appendChild(canvas)
-const ctx = canvas.getContext('2d')!
+スターターの設定（`project.godot`）をそのまま使う: 基準 `720×720`、`window/stretch/mode = "canvas_items"`、
+`window/stretch/aspect = "expand"`、`window/handheld/orientation = sensor`、`manifest.orientation = "any"`。
+短辺が 720 の論理 px になり、長辺方向は画面の形に合わせて広がる（`$game-godot`「Source and fixed toolchain」）。
 
-let view = { width: 0, height: 0 }                 // CSS px。ゲームの座標はこちらで考える
-function resize() {
-  const dpr = Math.min(window.devicePixelRatio || 1, 3)
-  view = { width: window.innerWidth, height: window.innerHeight }
-  canvas.style.width = `${view.width}px`
-  canvas.style.height = `${view.height}px`
-  canvas.width = Math.round(view.width * dpr)
-  canvas.height = Math.round(view.height * dpr)
-  ctx.setTransform(dpr, 0, 0, dpr, 0, 0)            // 以後は CSS px で描ける
-  layout()                                         // プレイ領域・HUD・盤面の位置を決め直す
-}
-window.addEventListener('resize', resize)
-resize()
+```gdscript
+func _ready() -> void:
+	get_viewport().size_changed.connect(_layout)
+	_layout()
+
+func _layout() -> void:
+	var visible := get_viewport().get_visible_rect()   # 論理座標の見える範囲（毎回変わる）
+	var safe := _host_safe_rect(visible)               # HUD・操作部だけに使う（スターターの main.gd と同じ）
+	# プレイ領域・カメラ・HUD・盤面・移動スティック（stick.set_safe_rect(safe)）をここで決め直す
 ```
 
-- `resize` は回転・全画面の切り替えでも来る。**大きさを起動時の 1 回だけで決めない。**
-- 全画面はゲームから出さない（`requestFullscreen()` を呼ばない）。Platform の枠の全画面ボタンが出す。
-  **カメラ / マイクを使うゲームでは呼んでもブラウザに断られる**（使用中の表示を隠さないため、Platform が枠ごと全画面にする）。
-- Godotのviewport/stretchと`TokoyoApp`のhost viewport契約を使い、worldはfullbleed、HUDだけsafe area内へ配置する。
-
-  canvas の CSS を `width: 100%; height: 100%` にし、`resize` で `engine.resize()`（カメラの縦横比はエンジンが反映）。
+- `size_changed` は回転・ウィンドウの大きさ変更・全画面の切り替えでも来る。**大きさを起動時の 1 回だけで決めない。**
+- 全画面はゲームから出さない（`DisplayServer.window_set_mode` を呼ばない）。Platform の枠の全画面ボタンが出す。
+- 世界と背景は見える範囲の端まで描き、HUD と操作部だけをセーフエリアの内側に置く（§3.1）。
+- 縦横比を `ignore` で歪めない・`keep` で帯を出さない。3D は向きに合わせてカメラの固定軸を変える（縦は横の視野、横は縦の視野を保つ）。
 - `manifest.json` の `orientation` は**実際に合う向き**を書く（`portrait` / `landscape` / `any`）。
   ただし Platform は向きを固定しない。**違う向きでも遊べる**レイアウトにする（§2）。
 
@@ -46,12 +37,12 @@ resize()
 
 | 方式 | 向くゲーム | 作り方 |
 |---|---|---|
-| **A. 固定の論理サイズを拡大縮小**（レターボックス） | 盤面・パズル・カード・固定画面のアクション・縦シュー | 論理サイズ（例 縦 360×640 / 横 640×360）を決め、`scale = min(view.width / W, view.height / H)` で**全体が収まる最大**に拡大して中央に置く。余りは背景（絵や色）で埋める。**黒い帯のままにしない** |
-| **B. 見える範囲を広げる** | 横スクロール・見下ろし・3D・ランナー | 1 単位の大きさ（例: キャラの高さ = 画面の短辺の 1/8）を短辺から決め、長辺方向は**見える範囲が広がる**。横長の PC では遠くまで見える |
+| **A. 決まった大きさの盤面を収める** | 盤面・パズル・カード・固定画面のアクション・縦シュー | 盤面の大きさ（例 600×600）を決め、`minf(visible.size.x / W, visible.size.y / H)` で**全体が収まる最大**に拡大して中央に置く（盤面のノードの `scale`、または Camera2D の `zoom`）。余りは背景（絵や色）で埋める。**黒い帯のままにしない** |
+| **B. 見える範囲を広げる**（スターターの既定） | 横スクロール・見下ろし・3D・ランナー | 短辺 720 を基準に大きさを決め、長辺方向は**見える範囲が広がる**。横長の PC では遠くまで見える |
 
 - どちらでも**遊びに要るものは全部見える**こと。B では「画面が広い方が有利」になりすぎないよう、敵の出現範囲などを
   見える範囲ではなく論理的な範囲で決める。
-- 盤面・マスは短辺から決め、**1 マス 44px 以上**を保つ。入り切らないならマス数ではなくレイアウト（縦並び⇔横並び）を変える。
+- 盤面・マスは短辺から決め、**1 マスが端末上で 44pt 以上**（スマホの 720 基準で約 80 以上）を保つ。入り切らないならマス数ではなくレイアウト（縦並び⇔横並び）を変える。
 - 縦長のスマホで横長の論理サイズ（またはその逆）を小さく出すだけにしない。向きごとに配置を変える
   （例: 縦ではスコア欄を上、横では右）。
 
@@ -63,48 +54,46 @@ resize()
 │                              │
 │         プレイ領域            │
 │                              │
-│ ◯ スティック     ジャンプ ◯  │ ← スマホのとき下の約 180px は操作部（$game-controls のキット）
+│ ◯ スティック     ジャンプ ◯  │ ← スマホのとき下の約 25% は操作部（$game-controls）
 └──────────────────────────────┘
 ```
 
-- **スマホの操作部が出ている間**（`input.mode === 'touch'`）は、下端から約 180px の左右の角に
+- HUD は `CanvasLayer` の下に Control で置き、アンカーとコンテナで並べる（座標を決め打ちしない）。HUD のルートと装飾は
+  `mouse_filter = MOUSE_FILTER_IGNORE`（タッチを食べない）。
+- **スマホの操作部が出ている間**（タッチで遊んでいる間）は、下端から約 25% の左右の角に
   重要な物（自機の立ち位置・足場・敵・ボタン）を置かない。方式 B ならカメラを少し上にずらす。方式 A なら
   プレイ領域の下端を操作部の上に合わせる（縦画面なら余りがあることが多い）。
 - 文字と操作部を**重ねない**。スコアの桁が増えても隣とぶつからないよう、欄の幅を先に確保する。
 - プレイ中に常に見せる情報は **2〜3 個まで**（`$game-ux` §3）。
-- 画面の端 16px には触る物を置かない（OS の端の操作、角の丸み、ノッチ）。
+- セーフエリアの端から 16 論理 px 以上内側に触る物を置く（OS の端の操作、角の丸み）。
 
 ### 3.1 セーフエリア（ノッチ・Dynamic Island・ホームインジケータ）
 
 **画面の端まで描き、HUD と操作部だけをセーフエリアの内側に置く**のが既定の作り方。
 
-1. `manifest.json` に **`"safeArea": "app"`** を書く。書かないと Host が描画領域をセーフエリアの内側に収め、
-   その外側（ノッチの横など）は黒い帯になる。
-2. **背景・世界・演出は画面の端まで**描く（canvas は親要素いっぱいのまま。セーフエリアで縮めない）。
-3. **押す物・読む物（HUD・ボタン・スティック・文字）はセーフエリアの内側**に置く。
-   - DOM の HUD は CSS 変数: `top: calc(var(--app-safe-area-top) + 16px); left: calc(var(--app-safe-area-left) + 16px);`
-     （`--app-safe-area-top` / `-right` / `-bottom` / `-left`。単位 px）
-   - canvas に描く HUD は `app.display.safeArea()`（`{ top, right, bottom, left }`）から位置を決め、
-     `app.display.onSafeAreaChange()` と `resize` で決め直す（端末を回すと左右と上下が入れ替わる）。
-   - `$game-controls` のキットの操作部は自動でこの内側に入る。
-4. `env(safe-area-inset-*)` は使わない（iframe の中では 0 になる端末がある）。
-5. **左上の角（約 56px 四方）は空けておく**。スマホのアプリでは Platform の「閉じる」ボタンが重なる。
+1. **背景・世界・演出は見える範囲の端まで**描く（セーフエリアで縮めない）。
+2. **押す物・読む物（HUD・ボタン・スティック・文字）はセーフエリアの内側**に置く。セーフエリアはスターターの
+   `_host_safe_rect()`（Host が渡す `tokoyo_host_viewport` を論理座標に直したもの）で求め、`size_changed` のたびに決め直す。
+   HUD の `MarginContainer` の余白と、`stick.set_safe_rect()` に同じ矩形を使う。
+3. `DisplayServer.get_display_safe_area()` は使わない（組み込みの実行では単位が合わない。`$game-godot`）。
+4. **左上の角（約 56pt 四方）は空けておく**。スマホのアプリでは Platform の「閉じる」ボタンが重なる。
 
 ```text
  ┌──────┬────────────────────────┬──────┐
- │ノッチ│ ⓧ  スコア・残り時間  ⏸ 🔈 │      │ ← 背景は端まで。HUD は --app-safe-area-* の内側
+ │ノッチ│ ⓧ  スコア・残り時間  ⏸ 🔈 │      │ ← 背景は端まで。HUD はセーフエリアの内側
  │（背景│                        │      │
  │ だけ）│      プレイ領域          │      │
  │      │ ◯ スティック  ジャンプ ◯ │      │
  └──────┴────────────────────────┴──────┘
-          ↑ ホームインジケータの上（--app-safe-area-bottom）に操作部
+          ↑ ホームインジケータの上（セーフエリアの下端）に操作部
 ```
 
 ## 4. 文字
 
-- **大きさ・コントラスト・背板と縁取りの数値は `$game-ux` §3**（本文 16px・プレイ中の数字 24px・4.5:1）。
-- GodotのUI themeのfont sizeと実際の表示倍率を確認し、小さい端末でも読める大きさにする。
-- 画面幅に比例して文字を大きくしない。大きさの段を決めて使う（見出し 28〜36px / 本文 16px / 補足 12〜14px）。
+- **大きさ・コントラスト・背板と縁取りの数値は `$game-ux` §3**（端末上で本文 16pt・プレイ中の数字 24pt・4.5:1）。
+- 文字の大きさはプロジェクトの Theme で決める。720 基準の段の目安: 見出し 48〜64 / 本文 28〜32 / 補足 22〜24 / プレイ中の数字 44 以上。
+  Label ごとに上書きしない。日本語のフォントを同梱する（`$game-ux` §3）。
+- 画面幅に比例して文字を大きくしない。
 - 長い文は行を折り返す。
 - 文言は日本語。
 
@@ -130,9 +119,9 @@ resize()
 - 通常/選択/押下/準備中/使用不可を区別する。操作部と文字の大きさ・背板・セーフエリアは §3/§4 と `$game-ux`。
   メニューの後ろの動きは同Skill §5 に従い、操作受付を遅らせる入場演出を作らない。
 
-## 5.1 リザルトを共有する（`app.share.capture` / `app.ui.openShare`）
+## 5.1 リザルトを共有する（`TokoyoApp.ui`）
 
-**API の正本は `<kit>/sdk/app-sdk/spec.md` §3.4 と §8.5**。
+**API の正本は `<kit>/sdk/app-sdk/spec.md` §3.4 と §8.5**、Godot の呼び方は `$game-godot`「Service facades」。
 
 スコア・勝敗・作った作品のように**人に見せたくなる結果がある遊び**なら、リザルトに「共有」ボタンを置く。
 結果が無い遊び（眺めるだけ・終わりが無い）には無理に付けない。
@@ -142,32 +131,26 @@ resize()
   Platform の App のページで、その画像がリンクの画像（SNS のカード）とページの先頭に出る。
   **リンク（URL）は App が作らない・渡せない**。共有シートもダイアログのボタンで開くので、App は開かない。
 
-```ts
-import { app } from '@workspace/app-sdk'
-
-async function shareResult(score: number) {
-  renderResult() // リザルトを描く（WebGL / WebGPU なら scene.render()）
-  let captureId: string | undefined
-  try {
-    // 描いた直後、同じ処理の中で呼ぶ（await を挟まない）。後で呼ぶと WebGL / WebGPU の画面は真っ黒になる
-    ;({ captureId } = await app.share.capture(canvas))
-  } catch (error) {
-    console.warn('share.capture failed', error) // 撮れなくてもリンクだけで共有を続ける
-  }
-  try {
-    await app.ui.openShare({ ...(captureId ? { captureId } : {}), text: `スコア ${score} 点！` })
-  } catch (error) {
-    console.warn('openShare failed', error)
-    // 公開前の試遊では共有できない。App の画面に短く「いまは共有できません」を出す（遊びは続ける）
-  }
-}
+```gdscript
+func share_result(score: int) -> void:
+	share_button.disabled = true                         # 連打で何枚も預けない
+	TokoyoApp.ui.capture_viewport(get_viewport(), func(ok: bool, result: Variant) -> void:
+		var options := {"text": "スコア %d 点！" % score}
+		if ok and result is Dictionary and result.has("captureId"):
+			options["captureId"] = result.captureId
+		else:
+			push_warning("share capture failed: %s" % str(result))   # 撮れなくてもリンクだけで共有を続ける
+		TokoyoApp.ui.open_share(options, func(opened: bool, code: Variant) -> void:
+			share_button.disabled = false
+			if not opened:
+				push_warning("openShare failed: %s" % str(code))
+				show_notice("いまは共有できません")))          # 公開前の試遊では共有できない。遊びは続ける
 ```
 
-- ボタンはリザルトの「もう一度」の隣。44px 以上、タップ / クリック / キー（例: `S`）のどれでも押せる。
+- ボタンはリザルトの「もう一度」の隣。44pt 以上、タップ / クリック / キー（例: `S`）のどれでも押せる。
   連打で何枚も預けないよう、押したら終わるまでボタンを無効にする（**1 分 6 枚・1 日 50 枚まで**。未登録の人は半分）。
-- 渡すのは `canvas`（`HTMLCanvasElement` / `OffscreenCanvas`）か画像の `Blob`。SDK が長辺 1600px の JPEG にする。
-  透明な部分は黒になるので、背景を塗ったリザルトを撮る。DOM の HUD は写らない（canvas だけ）。
-  スコアを画像に残したいなら canvas に描く。
+- `capture_viewport` は描き終わったフレームの画面を長辺 1600px の JPEG にする（`capture(image)` で `Image` を渡してもよい）。
+  透明な部分は黒になるので、背景を塗ったリザルトを撮る。スコアを画像に残したいなら画面に描いておく。
 - `text`（一言）は 100 文字まで。スコアや結果を短く。URL・ハッシュタグの羅列を入れない。
 - 画像は**公開**され（リンクを知っていれば誰でも見られる）、90 日で消える。**利用者が入力した文章・チャット・
   個人の情報が写る画面を撮らない**（表示名とスコアは可）。
@@ -176,20 +159,21 @@ async function shareResult(score: number) {
 
 ## 6. 止まる・再開する
 
-- `app.lifecycle.onPause` と、画面が隠れたとき（`document.visibilityState === 'hidden'`）に**ゲームを止める**:
-  ループ（`requestAnimationFrame` / `engine.stopRenderLoop()`）とタイマーを止め、音を `suspend()` し、
-  ポーズ画面にする。入力キットの押しっぱなしは自動で離される。
+- Host の一時停止（`TokoyoApp.is_paused()` / `lifecycle_changed`）と、アプリが背面に回ったとき（`NOTIFICATION_APPLICATION_FOCUS_OUT` /
+  `NOTIFICATION_APPLICATION_PAUSED`）に**ゲームを止める**: `get_tree().paused = true` にしてポーズ画面を出す（ポーズ画面のノードは
+  `process_mode = PROCESS_MODE_ALWAYS`）。押しっぱなしを離す（`stick.reset()`）。BGM は止めるか下げる。
 - 再開は**利用者の操作で**（ポーズ画面の「再開」）。戻った瞬間に敵が動き出して負けない。
-- `requestAnimationFrame` の時間差は上限を付ける（`dt = Math.min(dt, 1 / 30)`）。止まっていた時間ぶん一気に進めない。
+- オンライン対戦は相手が動き続けるので世界を止めない（入力を止めてメニューを重ねるだけ。`$game-multiplayer`）。
+- 一時停止中は保存を呼ばない（`$game-ux` §7）。
 
 ## 7. 出力前のチェック
 
 - [ ] 390×844（縦）・844×390（横）・1440×900（PC）のどれでも、切れず・はみ出さず・全面が使われている
-- [ ] `resize` でプレイ領域・HUD・盤面が決め直される
-- [ ] 高解像度でぼけない（DPR を掛けた canvas）
-- [ ] HUD・文字・スマホの操作部が互いに重ならない。触る物は 44px 以上・端から 16px 以上内側
-- [ ] `manifest.json` に `"safeArea": "app"`。背景は画面の端まで描き、HUD・操作部は `--app-safe-area-*`（canvas なら `app.display.safeArea()`）の内側。左上の角は空いている
+- [ ] `size_changed` でプレイ領域・カメラ・HUD・盤面・移動スティックが決め直される
+- [ ] スターターの stretch 設定（720・canvas_items・expand）のまま。縦横比を歪めず、帯を出していない
+- [ ] HUD・文字・スマホの操作部が互いに重ならない。触る物は端末上で 44pt 以上・セーフエリアの端から 16 論理 px 以上内側
+- [ ] 背景は画面の端まで描き、HUD・操作部は Host のセーフエリア（`_host_safe_rect()`）の内側。左上の角は空いている
 - [ ] ポーズ（ボタン / Escape / P）とミュートがあり、画面が隠れたら止まる
 - [ ] タイトル → プレイ → リザルト → もう一度 が、タップ / クリック / キーのどれでも回る
 - [ ] `$game-ux` §9 のチェックも満たしている
-- [ ] 共有を付けたなら: `share.capture` と `ui.openShare` を宣言し、リザルトを描いた直後に撮り、失敗してもリンクだけで開く・遊びは止まらない
+- [ ] 共有を付けたなら: `share.capture` と `ui.openShare` を宣言し、`TokoyoApp.ui` で撮って開き、失敗してもリンクだけで開く・遊びは止まらない

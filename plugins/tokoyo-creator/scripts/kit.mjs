@@ -40834,12 +40834,7 @@ import { join as join7 } from "node:path";
 var SDK_DIR = "sdk";
 var SDK_SHA_FILE = ".sdk-sha256";
 var ARCHIVE_ROOT_DEPTH = 1;
-var NOT_PACKAGES = new Set([
-  "node_modules",
-  "sample-app",
-  "sample-godot",
-  "sample-godot-multiplayer"
-]);
+var NOT_PACKAGES = new Set(["node_modules", "sample-godot", "sample-godot-multiplayer"]);
 var KIT_LOCKFILE = "npm-shrinkwrap.json";
 var NPM_CI_ARGS = ["ci", "--ignore-scripts", "--no-audit", "--no-fund"];
 

@@ -3,7 +3,7 @@
 `SKILL.md` §2 の 4 種類の出来事に、何をどれだけ出すか。数値は**既定の目安**で、遊びに合わせて上下してよい。
 ただし `SKILL.md` §5 の上限（画面の 20% 以上の点滅は 1 秒に 3 回まで・赤の全画面禁止）は超えない。
 
-目次: 1 量の表 / 2 共通の作り（`effects` とヒットストップ）/ 3 Canvas 2D / 4 Godotの2D/3D / 6 効果音の 3 種類
+目次: 1 量の表 / 2 共通の作り（`effects`・ヒットストップ・揺れ・伸び縮み）/ 4 Godotの2D/3D / 6 効果音の 3 種類
 
 ## 1. 量の表
 
@@ -30,61 +30,43 @@
 ## 2. 共通の作り
 
 - **`effects`（0〜1）は 1 か所で掛ける**。揺れ・点滅・パーティクルを作る関数の中で掛け、呼び出し側に分岐を散らさない。
-  `effects === 0` のとき、これらは呼ばれても何も起きない。**ヒットストップと音は `effects` に関係なく出す**。
-- **ヒットストップはゲームの時間だけを止める**。描画・入力キットの `endFrame()`・音は止めない（押しっぱなしの状態を壊さない）。
-  `setTimeout` で止めない（ポーズや画面が隠れたときに狂う）。フレームの経過時間で数える。
-- 揺れは**カメラ（描画のずらし）で**行い、ゲームの座標（当たり判定）は動かさない。
-- 浮かぶ数字・パーティクルは寿命付きの配列で持ち、寿命が尽きたら消す（上限 200 個程度。超えたら古い物から捨てる）。
+  `effects == 0` のとき、これらは呼ばれても何も起きない。**ヒットストップと音は `effects` に関係なく出す**。
+- **ヒットストップはゲームの時間だけを止める**。UI・音・入力の押下状態は止めない。実時間で解除する（ポーズや画面が隠れたときに狂わない）。
+- 揺れは**カメラ（`Camera2D.offset` / 3D はカメラの位置のずらし）で**行い、ゲームの座標（当たり判定）は動かさない。HUD は揺らさない。
+- 浮かぶ数字・パーティクルは寿命付きで持ち、寿命が尽きたら消す（同時に出す数に上限を決める）。
 
-```ts
-let effects = 1                      // SKILL.md §5 / §7 で 0 になる
-let hitstop = 0                      // 残り秒
-let trauma = 0                       // 揺れの強さ 0〜1
+```gdscript
+# juice.gd（ゲームに 1 つ。Camera2D を渡して使う）
+var effects := 1.0          # 設定の「画面の揺れ」で 0 になる（SKILL.md §5 / §7）
+var trauma := 0.0           # 揺れの強さ 0〜1
+var camera: Camera2D
+var _rng := RandomNumberGenerator.new()
 
-function hit(strength: number) {    // 悪い出来事。strength は 0〜1
-  hitstop = Math.max(hitstop, 0.05 + 0.05 * strength)
-  trauma = Math.min(1, trauma + strength * effects)
-  playSfx('bad')
-}
+func hit(strength: float) -> void:              # 悪い出来事。strength は 0〜1
+	hitstop(0.05 + 0.05 * strength)
+	trauma = minf(1.0, trauma + strength * effects)
+	sfx_bad.pitch_scale = _rng.randf_range(0.92, 1.08)
+	sfx_bad.play()
 
-function shakeOffset(dt: number, shortSide: number) {
-  trauma = Math.max(0, trauma - dt / 0.3)
-  const amount = trauma * trauma * shortSide * 0.02
-  return { x: (Math.random() * 2 - 1) * amount, y: (Math.random() * 2 - 1) * amount }
-}
+func hitstop(seconds: float) -> void:
+	Engine.time_scale = 0.05                    # 0 にはしない
+	await get_tree().create_timer(seconds, true, false, true).timeout   # 実時間で数える
+	Engine.time_scale = 1.0
+
+func _process(delta: float) -> void:
+	var real := delta / maxf(Engine.time_scale, 0.0001)   # 止まっている間も揺れは実時間で減る
+	trauma = maxf(0.0, trauma - real / 0.3)
+	var amount := trauma * trauma * 14.0                  # 720 基準の論理 px
+	camera.offset = Vector2(_rng.randf_range(-1, 1), _rng.randf_range(-1, 1)) * amount
+
+func squash(node: Node2D, stretch: Vector2) -> void:     # 例: ジャンプ (0.6, 1.4)、着地 (1.4, 0.6)
+	if effects <= 0.0: return
+	node.scale = stretch
+	node.create_tween().tween_property(node, "scale", Vector2.ONE, 0.25).set_trans(Tween.TRANS_CUBIC).set_ease(Tween.EASE_OUT)
 ```
 
-## 3. Canvas 2D
-
-```ts
-function frame(now: number) {
-  const raw = Math.min((now - last) / 1000, 1 / 30)
-  last = now
-  const dt = hitstop > 0 ? 0 : raw   // ヒットストップ中はゲームの時間を進めない
-  hitstop = Math.max(0, hitstop - raw)
-  step(dt)                            // ゲームの更新
-  const shake = shakeOffset(raw, Math.min(view.width, view.height))
-  ctx.save()
-  ctx.translate(shake.x, shake.y)     // 世界だけ揺らす
-  drawWorld()
-  drawParticles(raw)
-  ctx.restore()
-  drawHud()                           // HUD は揺らさない
-  input.endFrame()
-  requestAnimationFrame(frame)
-}
-
-function burst(x: number, y: number, color: string) {
-  const count = Math.round(10 * effects)
-  for (let i = 0; i < count; i += 1) {
-    const angle = Math.random() * Math.PI * 2
-    const speed = 80 + Math.random() * 160
-    particles.push({ x, y, vx: Math.cos(angle) * speed, vy: Math.sin(angle) * speed, life: 0.4, color })
-  }
-}
-```
-
-伸び縮みは描くときに `ctx.scale(sx, sy)`（足元を基準にするなら、足元へ `translate` してから `scale`）。
+- 同じ対象に続けて Tween を掛けるなら、前の Tween を変数に持って `kill()` してから作る（競合して元に戻らない）。
+- ヒットストップを重ねるとき（連続で当たる）は、長い方だけを残す（タイマーを数で持って最後の解除だけ効かせる）。
 
 ## 4. Godotの2D/3D
 
@@ -106,27 +88,32 @@ HUDは別CanvasLayerへ置く。全画面flashを使わない。不要なエフ�
 
 ## 6. 効果音の 3 種類
 
-最低限、**押す / 良い / 悪い** の 3 つを用意する。素材ツールで作るなら `$game-asset-tools` の効果音。無いときは Web Audio で合成する:
+最低限、**押す / 良い / 悪い** の 3 つを用意する。素材ツールで作るなら `$game-asset-tools` の効果音。
+無いときは起動時に PCM を合成して `AudioStreamWAV` にする（Web の sample 再生でも鳴る。`AudioStreamGenerator` の
+手続き生成は Web で鳴らないので使わない）。作るのは起動時に 1 回だけで、鳴らすたびに作らない:
 
-```ts
-function tone(from: number, to: number, seconds: number, type: OscillatorType, volume: number) {
-  const osc = audio.createOscillator()
-  const gain = audio.createGain()
-  const now = audio.currentTime
-  osc.type = type
-  osc.frequency.setValueAtTime(from, now)
-  osc.frequency.exponentialRampToValueAtTime(to, now + seconds)
-  gain.gain.setValueAtTime(volume, now)
-  gain.gain.exponentialRampToValueAtTime(0.001, now + seconds)
-  osc.connect(gain).connect(sfxGain)   // 効果音の GainNode（SKILL.md §7）に通す
-  osc.start(now)
-  osc.stop(now + seconds)
-}
-const sfx = {
-  press: () => tone(660, 520, 0.05, 'square', 0.15),
-  good: () => tone(660, 1320, 0.15, 'triangle', 0.25),
-  bad: () => tone(220, 90, 0.2, 'sawtooth', 0.25),
-}
+```gdscript
+func tone(from_hz: float, to_hz: float, seconds: float, volume: float, square := false) -> AudioStreamWAV:
+	var rate := 22050
+	var count := int(seconds * rate)
+	var data := PackedByteArray()
+	data.resize(count * 2)
+	var phase := 0.0
+	for i in count:
+		var t := float(i) / count
+		phase += TAU * lerpf(from_hz, to_hz, t) / rate
+		var wave := signf(sin(phase)) if square else sin(phase)
+		var envelope := (1.0 - t) * (1.0 - t)          # 立ち上がりは即、すぐ減衰
+		data.encode_s16(i * 2, int(clampf(wave * envelope * volume, -1.0, 1.0) * 32767.0))
+	var stream := AudioStreamWAV.new()
+	stream.format = AudioStreamWAV.FORMAT_16_BITS
+	stream.mix_rate = rate
+	stream.data = data
+	return stream
+
+# 起動時に: press = tone(660, 520, 0.05, 0.3, true) / good = tone(660, 1320, 0.15, 0.5) / bad = tone(220, 90, 0.2, 0.5, true)
 ```
 
-連続で良いことが起きる遊び（連鎖・コンボ）は、回数に応じて `good` の音程を少しずつ上げると続けた手応えが出る。
+鳴らす `AudioStreamPlayer` は `bus = &"SFX"`、`max_polyphony` 4〜8。鳴らす前に `pitch_scale` を 0.92〜1.08 で少し揺らす。
+
+連続で良いことが起きる遊び（連鎖・コンボ）は、回数に応じて `good` の `pitch_scale` を少しずつ上げると続けた手応えが出る。

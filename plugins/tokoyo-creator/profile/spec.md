@@ -32,7 +32,6 @@ Debug MenuのUIは各ゲームの`debug/`に作成する。SDKは検査・通信
 │   │   ├── types/
 │   │   ├── src/             # defineSpace の実体と createLocalSpace（ルールをサーバー無しで動かす）
 │   │   └── build-config/
-│   ├── sample-app/          # 従来JS契約の最小例
 │   ├── sample-godot/        # Godot Web/nativeの描画・保存・端末API
 │   ├── sample-godot-multiplayer/ # Godot Web/native対戦。GDScript画面とdefineSpaceサーバー
 │   ├── package.json         # 使える第三者ライブラリ（版は完全一致）
@@ -46,7 +45,7 @@ Debug MenuのUIは各ゲームの`debug/`に作成する。SDKは検査・通信
 │   ├── game-art-direction/  # 見た目の合意（コンセプト画像・スタイルガイド・素材の判定表）
 │   ├── game-level-design/   # ステージ/マップ（体験・進行・空間候補・仮組み・到達/進行検査・選定）
 │   ├── game-playtest/       # 自分で遊んで確かめる（rubric・ルール検査 assets/playtest-rules.mjs・前の版の試遊結果）
-│   ├── game-controls/       # PC とスマホの操作（入力キット assets/input.ts・ジャンル別の割り当て）
+│   ├── game-controls/       # PC とスマホの操作（InputMap・移動スティック・操作方法の画面・ジャンル別の割り当て）
 │   ├── game-screen-layout/  # 画面の追従・HUD・タイトル / ポーズ / リザルト
 │   ├── game-asset-tools/    # 参照検索CLI・制作レシピ・画像生成と素材ツール（MCP）
 │   ├── game-godot/          # サービス内Godot制作・Web/native出力・既存SDKとプレビューの接続
@@ -73,7 +72,7 @@ Debug MenuのUIは各ゲームの`debug/`に作成する。SDKは検査・通信
 | 1 | `<kit>/profile/instructions.md` | 何を作り、何を `outputs/` に置くか |
 | 2 | `<kit>/sdk/app-sdk/spec.md` | `manifest.json` の形、Capability、`app.*` の API、CSP と禁止事項 |
 | 3 | `<kit>/sdk/app-server-sdk/spec.md` | 対戦を作る場合のみ。`defineSpace` の書き方（状態・入力・`step`・`finish`） |
-| 4 | `<kit>/sdk/sample-app/` | 1〜3 を満たした最小実装。**構成はこれに倣う** |
+| 4 | `<kit>/sdk/sample-godot/`（対戦は `sample-godot-multiplayer/`） | 1〜3 を満たした最小の Godot 実装。**構成はこれに倣う** |
 | 4b | `<kit>/skills/*/SKILL.md` | 操作・画面・素材・3D・対戦・ランキング・ゲーム内 AI・掲載情報の作り方（`instructions.md` §0 の表のとおりに使う） |
 | 5 | `<kit>/sdk/*/build-config/` | バンドル設定。SDK を bundle に含めないための外部参照指定 |
 

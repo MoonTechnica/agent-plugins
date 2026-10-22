@@ -1,6 +1,6 @@
 ---
 name: game-ux
-description: ゲームを遊べる体験にする規則。新しく作るときと、体験の質（手応え・文字・音・開始画面・リザルト）を変えるときに使う。最初の 30 秒（遊びの中で教える・最初の課題は必ず成功できる）、入力への手応え（反応・ヒットストップ・揺れ・浮かぶ数字・効果音）、読める文字とコントラスト（16px・24px・4.5:1）、色だけ・音だけに頼らない、点滅と揺れの上限と prefers-reduced-motion、リザルトと操作 1 回の再挑戦、効果音と BGM の分離ミュートと設定の保存、読み込みの待ち時間を扱う。onboarding, juice, hit stop, screen shake, readability, contrast, photosensitivity, reduced motion, retry, mute, settings.
+description: ゲームを遊べる体験にする規則。新しく作るときと、体験の質（手応え・文字・音・開始画面・リザルト）を変えるときに使う。最初の 30 秒（遊びの中で教える・最初の課題は必ず成功できる）、入力への手応え（反応・ヒットストップ・揺れ・浮かぶ数字・効果音）、読める文字とコントラスト（16px・24px・4.5:1）、色だけ・音だけに頼らない、点滅と揺れの上限と揺れを止める設定、リザルトと操作 1 回の再挑戦、効果音と BGM の分離ミュートと設定の保存、読み込みの待ち時間を扱う。onboarding, juice, hit stop, screen shake, readability, contrast, photosensitivity, reduced motion, retry, mute, settings.
 ---
 
 # 遊べる体験にする（最初の 30 秒・手応え・読める画面・動きの安全・再挑戦）
@@ -47,16 +47,18 @@ description: ゲームを遊べる体験にする規則。新しく作るとき�
 
 | 対象 | 規則 |
 |---|---|
-| 本文（説明・ボタンの文字・メニュー） | **16px 以上** |
-| 補足（小さい注記） | **12px 未満にしない** |
-| プレイ中に読む数字（スコア・残り時間・残機） | **24px 以上** |
+| 本文（説明・ボタンの文字・メニュー） | **端末上で 16pt 以上**（スマホでは 720 基準の論理 px で **28〜32**。Godot の既定 16 は約 9pt で小さすぎる） |
+| 補足（小さい注記） | **端末上で 12pt 未満にしない**（720 基準で 22 以上） |
+| プレイ中に読む数字（スコア・残り時間・残機） | **端末上で 24pt 以上**（720 基準で 44 以上） |
 | 長い文 | 1 行 **40 文字まで**、行間 **1.5 倍**。入り切らないときは文字を小さくせず、行を増やすか文を短くする |
-| コントラスト | 文字と重要な HUD（ゲージ・照準・印）は、背景の**いちばん近い色の所**に対して **4.5:1 以上**。36px 以上の大きい文字は 3:1 以上 |
+| コントラスト | 文字と重要な HUD（ゲージ・照準・印）は、背景の**いちばん近い色の所**に対して **4.5:1 以上**。端末上で 36pt 以上の大きい文字は 3:1 以上 |
 | ゲーム画面の上の文字 | 背景は動いて色が変わるので、**背板（半透明の帯・α 0.5 以上）か縁取り（2px 以上）**を必ず付ける |
-| 画像の中の文字 | 生成する画像（看板・ボタン・背景）に文字を焼き込まない。文字は canvas / DOM で描く（拡大・縁取り・言語の変更が効かなくなる） |
+| 画像の中の文字 | 生成する画像（看板・ボタン・背景）に文字を焼き込まない。文字は Label などのテキストで描く（拡大・縁取り・言語の変更が効かなくなる） |
 | 常時表示 | プレイ中に常に見せる情報は **2〜3 個まで**（スコア・残り時間 / 残機・目標）。ほかは必要な瞬間だけ出す |
 
-大きさは実端末の表示倍率で確認する（`$game-screen-layout` §4）。
+720 基準（`canvas_items` + `expand`）では短辺が 720 になるので、スマホでは 1pt ≈ 1.8 論理 px。文字の大きさはプロジェクトの Theme の
+`default_font_size` で 1 か所に決め、Label ごとに上書きしない。**日本語のフォントを同梱する**（Web は端末のフォントを使えない。
+`$game-godot` references/best-practices.md）。大きさは実端末の表示倍率で確認する（`$game-screen-layout` §4）。
 
 ## 4. 色だけ・音だけに頼らない
 
@@ -74,12 +76,7 @@ description: ゲームを遊べる体験にする規則。新しく作るとき�
 | 白黒のようにコントラストの強い縞・格子を、画面の 20% 以上の大きさで動かさない | 模様も発作の引き金になる |
 | 一人称の頭の揺れ（bob）・武器の揺れを入れない。3D のカメラを利用者の操作なしに回さない | 揺れ酔い |
 | 読ませる画面（タイトル・ポーズ・リザルト）の後ろで背景を動かし続けない（止めるか、暗く落とす） | 読むのを妨げる |
-| **起動時に `matchMedia('(prefers-reduced-motion: reduce)').matches` が真なら `effects = 0`**（保存された設定より優先） | 端末の「視差効果を減らす」を尊重する |
-
-```ts
-const reduceMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches
-let effects = reduceMotion ? 0 : (settings.effects ?? 1)
-```
+| **設定に「画面の揺れ」（`effects` を 0 / 1）を置き、開始前から切り替えられるようにする** | Godot の標準の API では端末の「視差効果を減らす」を読めない（Web と組み込みの両方で同じように動く手段が無い）。揺れに弱い人が自分で止められるようにする |
 
 ## 6. 失敗と再挑戦
 
@@ -97,24 +94,15 @@ let effects = reduceMotion ? 0 : (settings.effects ?? 1)
 
 ## 7. 音と設定
 
-- `AudioContext` は 1 つ（`$game-controls` §3）。**効果音と BGM は別の `GainNode`** に通し、ミュートを別々に持つ。
-
-  ```ts
-  const audio = new AudioContext()
-  const sfxGain = audio.createGain()
-  const bgmGain = audio.createGain()
-  sfxGain.connect(audio.destination)
-  bgmGain.connect(audio.destination)
-  function applySettings() {
-    sfxGain.gain.value = settings.sfx ? 1 : 0
-    bgmGain.gain.value = settings.bgm ? 0.4 : 0
-  }
-  ```
+- **効果音と BGM は別のオーディオバス**（`default_bus_layout.tres` に `SFX` と `BGM`）に流し、ミュートを別々に持つ。
+  `AudioStreamPlayer.bus` で振り分け、設定は `AudioServer.set_bus_mute(AudioServer.get_bus_index(&"SFX"), not settings.sfx)` で反映する。
+  BGM は少し下げる（-6〜-10 dB）。Web ではバスの音量・ミュートは効くが、リバーブなどのエフェクトは鳴らない。
+  BGM は最初の操作の後に鳴らし始める（`$game-controls` §3）。
 
 - 右上のミュートボタン（`$game-controls` §3）は両方をまとめて切り替える。**開始画面とポーズ画面から同じ設定を開き、個別のトグル**を置く:
   「効果音」「BGM」（BGM があるときだけ）「画面の揺れ」（`effects` を 0 / 1）。44px 以上で、タップ・クリック・
-  キー / ゲームパッドのカーソル（`onNavigate`）のどれでも切り替えられる。
-- 設定は **`app.store` に保存**する（次に遊ぶときも効く）。Store をほかに使わないゲームでもこのために宣言する:
+  キー / ゲームパッドのカーソル（Control のフォーカス）のどれでも切り替えられる。
+- 設定は **Store に保存**する（`TokoyoApp.save(value)`。次に遊ぶときも効く）。Store をほかに使わないゲームでもこのために宣言する:
 
   ```json
   {
@@ -128,10 +116,11 @@ let effects = reduceMotion ? 0 : (settings.effects ?? 1)
   }
   ```
 
-  起動時に `app.store.get()` を読んでから遊びを始め、トグルを変えたときに `set` する（`expectedRevision` と
-  `requestId` は `<kit>/sdk/app-sdk/spec.md` §3.2）。**保存に失敗しても遊びは止めない**（`console.warn` して続ける）。
+  起動時は `TokoyoApp.store_loaded` か `save_status()` が `loaded` になってから `TokoyoApp.data` の設定を読み、
+  トグルを変えたときに設定を含むデータ全体を `TokoyoApp.save()` する（読み込み中・失敗中に上書きしない。`$game-godot`）。
+  **保存に失敗しても遊びは止めない**（`push_warning` して続け、`failed` を画面に小さく示す）。
   進行型は設定と進行の保存を一元化し、互いに上書きしない。未保存を表示し活動中に再試行する。
-  paused中APIは拒否されるためonPauseで保存APIを呼ばない。復帰後の活動中に再試行する。詳細は `$game-design` references/rpg.md。
+  一時停止中（`TokoyoApp.is_paused()`）は保存を呼ばない。復帰後の活動中に再試行する。詳細は `$game-design` references/rpg.md。
   自己ベストも同じ Store に `best` として持ってよい。前の版の `storeSchema` があるなら、**フィールドを足して**
   `storeSchemaVersion` を 1 つ上げる（消す・改名は不可）。
 - 音の素材と鳴らし方は `$game-asset-tools` §7。
@@ -149,9 +138,9 @@ let effects = reduceMotion ? 0 : (settings.effects ?? 1)
 - [ ] 開始から最初の入力まで、最初の 1 手が画面に示され、入力で消える
 - [ ] 最初の 10〜20 秒は失敗しにくく、難しさは滑らかに上がる
 - [ ] 良い / 悪い / 記録更新 / 無効な操作 の 4 種類に、見える反応と音がある
-- [ ] 揺れ・点滅・パーティクルが `effects` に掛かり、`prefers-reduced-motion` で 0 になる
+- [ ] 揺れ・点滅・パーティクルが `effects` に掛かり、設定の「画面の揺れ」で 0 になる
 - [ ] 画面の 20% 以上が光る点滅は 1 秒に 3 回まで（小さい物の点滅は透明度で）。赤の全画面フラッシュが無い
-- [ ] 本文 16px・補足 12px 以上・プレイ中の数字 24px 以上。長い文は 1 行 40 文字以内
+- [ ] 端末上で本文 16pt・補足 12pt 以上・プレイ中の数字 24pt 以上（720 基準で 28 / 22 / 44 以上）。日本語のフォントを同梱した。長い文は 1 行 40 文字以内
 - [ ] ゲーム画面の上の文字に背板か縁取りがあり、4.5:1 を満たす。画像に文字を焼き込んでいない
 - [ ] 色だけ・音だけで伝えている情報が無い
 - [ ] 短時間ゲームは結果と再挑戦、進行型は目的/進行/復帰先/続きから/保存状態がある

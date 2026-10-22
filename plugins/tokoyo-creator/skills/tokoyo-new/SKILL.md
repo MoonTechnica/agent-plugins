@@ -22,7 +22,6 @@ description: TOKOYO.games のミニゲームを手元の Coding Agent で新し�
    実行ファイルがPATHに無ければ`GODOT_BIN`へ絶対パスを指定する。`setup`のnpm処理だけではGodot本体は入らない。
    `source/godot/project.godot`を土台に、`$game-godot`と共有profileを読む。2D/3DともGDScriptとGodotシーンを使う。
    対戦には`<kit>/sdk/sample-godot-multiplayer/`を参照し、既存Spaceサーバーへ接続する。
-   `sample-app/`は共通SDKの検査fixtureで、新規制作の土台にしない。
 5. **画像や音を使うなら一度だけ** `node <kit>/scripts/kit.mjs login`（ブラウザで許可する。Git LFS の資格情報）。
 6. **作る**: `<kit>/profile/instructions.md` を読み、その約束（§4.1 と §8）どおりに `source/` で作り、`git commit` する。
 7. **送る**: `$tokoyo-push`。送った版は制作画面（`editor_url`）で試遊できる。

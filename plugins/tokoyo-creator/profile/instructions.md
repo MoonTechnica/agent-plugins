@@ -29,7 +29,7 @@
 `set_contribution_policy` を使う。貢献者の依頼では呼ばない。
 1. `<kit>/profile/spec.md` を読む（何がどこにあるか）
 2. `<kit>/sdk/app-sdk/spec.md` を読む（**App の API 契約。正本**）
-3. Godotは`<kit>/sdk/sample-godot/`、オンライン対戦は`<kit>/sdk/sample-godot-multiplayer/`を読む。Godotの画面・入力はGDScript、対戦の権威あるルールは`server/main.ts`のdefineSpaceで書き、共有TokoyoSpaceで接続する。従来JS契約の最小例は`sample-app/`。
+3. Godotは`<kit>/sdk/sample-godot/`、オンライン対戦は`<kit>/sdk/sample-godot-multiplayer/`を読む。Godotの画面・入力はGDScript、対戦の権威あるルールは`server/main.ts`のdefineSpaceで書き、共有TokoyoSpaceで接続する。
 4. **依頼に必要な Skill だけを使う**（`<kit>/skills/`。下の表）。依頼の意図と変更範囲から自分で選び、
    関係しない Skill は読まない。数値や文言の小さな修正なら Skill を読まずに直してよい。
    ただし**新しいゲーム・遊びの核や見た目の方向を変えるときは `$game-design` と `$game-art-direction` を必ず読む**。
@@ -47,8 +47,8 @@
 | `$game-level-design` | **ステージ・マップ・コース・盤面・敵/報酬の配置・マップメニューを作る/変えるとき**。体験/進行と空間の候補を検査・選定する。RPGの地域切替、メトロイドバニアの部屋/能力/再探索、実ステージと地図の対応は `references/transitions-and-map.md`。仕上げ後は影響する経路と実画面を再確認する |
 | `$game-playtest` | 遊びの核を作った/変えたとき・前の版の試遊結果（`input/playtest-report.json`）があるとき・利用者が確認を頼んだとき。自分で遊んで確かめる（ルールの検査・前の版の試遊結果。しっかりした試遊は利用者が頼んだときだけ） |
 | `$game-controls` | 新しく作るとき・操作を作る/変えるとき。PC（キーボード・マウス）とスマホ（画面の操作部・タップ・スワイプ）の両方で遊べる操作を作る。市販のコントローラー（ゲームパッド）はその上乗せで、対応度を `manifest.json` の `gamepad` に書く |
-| `$game-screen-layout` | 新しく作るとき・画面/HUD/タイトル/ポーズ/リザルトを作る/変えるとき。どの画面の形でも崩れない画面・HUD・タイトル・ポーズ・リザルト。画面の端まで描いて HUD と操作部だけをセーフエリアの内側に置く（`manifest.json` の `safeArea: "app"`。§3.1）。結果を人に見せたくなる遊びならリザルトに「共有」（`app.share.capture` / `app.ui.openShare`） |
-| `$game-ux` | 新しく作るとき・手応え/文字/音/開始画面/リザルトなど体験の質を変えるとき。遊べる体験: 最初の 1 手を画面で示す・最初の課題は必ず成功できる、入力への手応え（ヒットストップ・揺れ・パーティクル・音）、読める文字とコントラスト、色だけ・音だけに頼らない、点滅と揺れの上限と reduced-motion、リザルトとすぐの再挑戦、効果音 / BGM の分離ミュートと設定の保存（`app.store`） |
+| `$game-screen-layout` | 新しく作るとき・画面/HUD/タイトル/ポーズ/リザルトを作る/変えるとき。どの画面の形でも崩れない画面・HUD・タイトル・ポーズ・リザルト。画面の端まで描いて HUD と操作部だけをセーフエリアの内側に置く（§3.1）。結果を人に見せたくなる遊びならリザルトに「共有」（`TokoyoApp.ui`） |
+| `$game-ux` | 新しく作るとき・手応え/文字/音/開始画面/リザルトなど体験の質を変えるとき。遊べる体験: 最初の 1 手を画面で示す・最初の課題は必ず成功できる、入力への手応え（ヒットストップ・揺れ・パーティクル・音）、読める文字とコントラスト、色だけ・音だけに頼らない、点滅と揺れの上限と揺れを止める設定、リザルトとすぐの再挑戦、効果音 / BGM の分離ミュートと設定の保存（`TokoyoApp.save`） |
 | `$game-listing` | `input/listing.json` の `missing` があるとき・タイトルや遊びが変わり掲載情報と合わなくなったとき。公開ページの掲載情報を `listing/` に用意する。トップバナーはゲームタイトルをロゴ風に組み込んだキービジュアル、アイコンは小さくても識別できる専用の構図で生成し、最終画像を開いて確認する。初回は全部作り、2 回目以降は中身と合わなくなった項目だけ直す |
 | `$game-asset-tools` | 絵や音を用意/変更するとき。現行素材の参照検索、基準画像と原型の再利用、レシピ実行と差分制作（素材ツールがあるときは必ず） |
 | `$game-godot` | **Godotで制作・修正するとき、または既存 `manifest.json` に `godot` があるとき**。固定版の公式資料と同梱API定義を優先し、同じサービスのビルド・Artifact・Web／ネイティブ経路を使う。既存の旧エンジン作品はGodotへ移行する |
@@ -153,7 +153,7 @@ source-dirは`./source`。SDKのCLIと作業ディレクトリ側の`scripts/kit
 `dist.tar.gz` の中身（`tar -C dist -czf ../outputs/dist.tar.gz .` 相当。**`dist/` を入れ子にしない**）:
 
 ```text
-app.bundle.js        # 画面
+app.bundle.js        # Platform との橋渡し（kit build が作る。Godot の pack は assets/godot/ と bundles/godot_native/）
 server.bundle.js     # 対戦があるときだけ（server/main.ts の defineSpace）
 manifest.json        # 書庫の根に置く。入れ子にすると取り込みに落とされる
 assets/              # 最初の画面から要る画像・音声・フォント（起動前に全部届く）
@@ -184,11 +184,11 @@ ai/<key>.md          # ゲーム内 AI の指示文（`ai.chat` のときだけ�
 
 | 禁止 | 代わりに |
 |---|---|
-| `fetch` / `XMLHttpRequest` / `WebSocket` / `EventSource` | `app.space.join()`（対戦）・`app.ai.chat()`（ゲーム内 AI）。それ以外の通信手段は無い |
-| `localStorage` / `sessionStorage` / `indexedDB` / Cookie | `app.store.get()` / `app.store.set()` |
-| 外部 CDN の `<script>` / `<link>` / フォント / 画像 URL | `assets/` に同梱する |
-| `eval` / `new Function` / 文字列からのコード生成 | 素直に書く |
-| `__platform` への書き込み | 読むのも不要（`@workspace/app-sdk` を import する） |
+| `HTTPRequest` / `HTTPClient` / `WebSocketPeer` / `PacketPeerUDP` / `StreamPeerTCP` などの直接通信 | `TokoyoSpace`（対戦）・`TokoyoApp.ai`（ゲーム内 AI）・`TokoyoApp.documents` / `.leaderboard`。それ以外の通信手段は無い |
+| `FileAccess` / `ConfigFile` / `DirAccess` で `user://` に保存する | `TokoyoApp.save()`（Store。`$game-godot`） |
+| 外部 URL のフォント・画像・音 | ゲームの中（`godot/`）に同梱する |
+| `JavaScriptBridge` / `OS.execute` / 文字列からのスクリプト生成 | 使わない（Platform との接続は `TokoyoApp` / `TokoyoDevice` / `TokoyoSpace` だけ） |
+| GDExtension / C# / 追加の pack の読み込み | GDScript とシーンだけで書く |
 | 依存パッケージの追加 | Kitの固定lockfileだけを使う。Babylon core/Havok/Rapierはサーバー物理専用。Phaser・Babylon描画・JS codecは提供しない |
 | `manifest.json` に宣言していない Capability の API | 使うものを `capabilities` に宣言する |
 
@@ -230,24 +230,21 @@ ai/<key>.md          # ゲーム内 AI の指示文（`ai.chat` のときだけ�
 
 ### 4.1 新しく作るとき
 
-**Godotで制作する、または既存 `manifest.json` に `godot` がある場合は `$game-godot` と必要な公式参照を先に読む。**
-以下の JS 用 `sample-app/`・`src/main.ts`・`server/main.ts` の構成に置き換えず、
-`<kit>/sdk/sample-godot/` の `godot/` と manifest・package・debug catalog を土台にする。
-ルールと調整値の責務分離は GDScript の別ファイルで行い、TypeScript を重複実装しない。
-`kit build`・ソース commit・Artifact と掲載情報の提出は以下と同じ経路を必ず使う。
+**`$game-godot` と必要な公式参照を先に読む。** 新しいゲームはすべて Godot で作る（§4.2）。
 
-0. `$game-design` の段階 1〜3（企画・見た目の合意・素材の設計）を先に済ませる。
-1. `<kit>/sdk/sample-app/` を土台にして、**同じ構成**（`src/main.ts` / `server/main.ts` /
-   `manifest.json` / `package.json`）でプロジェクトを作る。sample-app の `package.json` の `scripts` は使わない（消してよい）。
+0. `$game-design` の段階 1〜3（企画・見た目の合意・素材の設計）を先に済ませる（新しいゲームの最初のターンは企画のターンで終える。§0）。
+1. `<kit>/sdk/sample-godot/`（オンライン対戦は `<kit>/sdk/sample-godot-multiplayer/`）を土台にして、**同じ構成**
+   （`godot/` / `manifest.json` / `package.json` / `debug/` / `.gitattributes`、対戦は `server/main.ts`）でプロジェクトを作る。
+   `.gitattributes` は画像・音・3D・フォントを Git LFS に置く規則なので必ず写す。
+   土台のキューブの場面は依頼のゲームに置き換え、`godot/tokoyo_*.gd`（Platform との接続・移動スティック）はそのまま残す。
+   ルールと調整値は GDScript の別ファイルに分ける（`$game-design` §3 の責務。TypeScript で重複して書かない）。
 2. `package.json` の依存は **ローカルパス参照**のまま変えない
    （`"@workspace/app-sdk": "file:/workspace/sdk/app-sdk"` のように、Sandbox 上の実パスへ向ける。
    手元では `file:<kit>/sdk/app-sdk` の絶対パスにする。commit には git のフィルタが `/workspace` の形で入れる。§8）。
    対戦サーバーで必要な場合だけ、固定のHavok/Rapier依存を参照する。描画はGodot。
    **rollup / typescriptはKitが固定する**。ゲームの依存へ追加しない。
-3. バンドルは `@workspace/app-sdk/build-config` と `@workspace/app-server-sdk/build-config` を
-   使う。SDK をバンドルに**含めない**ための設定なので、自前の設定に置き換えない。
-   対戦では、画面（`src/main.ts`）が `server/main.ts` の定義を import して `app.space.join()` に渡す
-   （ルールは 1 か所に書き、画面の予測と練習モードも同じ定義を使う）。
+3. 対戦は、権威あるルールを `server/main.ts` の `defineSpace`（`@workspace/app-server-sdk`）に書き、画面（GDScript）は
+   土台の `TokoyoSpace` で接続する（`$game-multiplayer`）。
 4. **ビルドは必ず `kit build` で行う**（Platform も版を合わせるときに、同じソースから同じ手順でビルドし直す）。
    プロジェクトのディレクトリで:
 
@@ -256,13 +253,10 @@ ai/<key>.md          # ゲーム内 AI の指示文（`ai.chat` のときだけ�
    ```
    手元では `source/` の上（作業ディレクトリ）で `node <kit>/scripts/kit.mjs build`（中身は同じ。§8.3）。
 
-   `kit build` は `dist/` を消してから、`build.mjs` があればそれを、無ければ既定の手順（`app.bundle.js`、
-   `server/main.ts` があれば `server.bundle.js`、`manifest.json` と `assets/` を `dist/` へ写す）を実行し、続けて `bundles.refs.json` → `dist/bundle-refs.json` と
-   ハッシュ一覧（`dist/.artifact-index.json`。取り込みは使わない）を書く。
-   既定の手順で足りないとき（`bundles/`・`ai/` を写す、画像や音をコードで作る）だけ `build.mjs` を書く。
-   `build.mjs` は build-config の `createAppBundleConfig()` / `createServerBundleConfig()` と `rollup` を使い、
-   プロジェクトのディレクトリを cwd として `dist/` に書く（`dist/` の外・ネットワークに触れない。`dist/` は消してから呼ばれる）。
-   `build.mjs` を `node` で直接実行しない（`bundle-refs.json` と一覧が作られず、合流のビルドと食い違う）。
+   `kit build` は `dist/` を消してから、`godot/project.godot` を見つけて Godot を取り込み、Web と native の pack・
+   固定の `app.bundle.js`（Platform との橋渡し）を出す。`server/main.ts` があれば `server.bundle.js` も作り、
+   続けて `bundles.refs.json` → `dist/bundle-refs.json` とハッシュ一覧（`dist/.artifact-index.json`）を書く。
+   Godot のゲームに `build.mjs` は書かない（ビルドの手順や生成済みの橋渡しのコードを変えない。`$game-godot`）。
    続けて**実際に動かして確かめる**（`node` で読み込める、構文エラーが無い、
    `manifest.json` が仕様どおり、ルールの検査が通る。`$game-playtest`）。
 5. 掲載情報を `listing/` に作る（`$game-listing`。ゲームが出来てから書くと、名前・説明・遊び方・画像が中身と合う）。
@@ -283,7 +277,7 @@ Godot物理との決定的一致を前提にせず、位置と向きの補間だ
 **何を素材・生成・描画・3D モデリングのどれで用意するか**は `$game-art-direction` §3 の判定表で決め、`design/asset-manifest.md` に理由と一緒に書いてから作る。
 **基本の評価順は「アセットライブラリ → Blenderでのモデリング → 生成AI」。** まずMCPで合う素材を調べ、無ければ簡単に必要な品質までモデリングできるか判断し、難しいものには生成AIを使う。採用を強制する順位ではなく、重要キャラの固有性・承認済みの絵柄・必要な動作を優先する。汎用人型を主役へ無理に流用しない。詳細と理由の記録は `$game-art-direction` §3・§4。
 道具の使い方は `$game-asset-tools` に従う（画像生成と素材ツール）。
-素材ツールが無いときは、Godotの描画とAudioStreamの合成で作る。
+素材ツールが無いときは、Godotの描画と、起動時にPCMを合成した`AudioStreamWAV`で作る（`$game-ux` references/feedback.md §6）。
 
 ### 制作画面で選べる素材の記録
 

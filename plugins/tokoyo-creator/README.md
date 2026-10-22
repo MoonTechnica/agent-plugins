@@ -46,7 +46,7 @@ Things to know up front:
 
 New games start from `sample-godot/`: GDScript and Godot scenes provide the same game source for Web and native.
 For online games, use the shared `sample-godot-multiplayer/` contract and the existing Space Server.
-`sample-app/` is a common SDK test fixture; Phaser and Babylon rendering templates are no longer provided.
+JavaScript, Phaser and Babylon rendering templates are no longer provided.
 
 ## Quick start (Claude Code)
 
