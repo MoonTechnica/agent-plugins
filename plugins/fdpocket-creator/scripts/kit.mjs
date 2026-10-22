@@ -79616,6 +79616,9 @@ var CREDENTIALS_FILE = "credentials.json";
 class LoginError extends Error {
   name = "LoginError";
 }
+
+class LoginInProgress extends LoginError {
+}
 async function readLogins(configDir) {
   const path = join26(configDir, CREDENTIALS_FILE);
   if (!existsSync17(path))
@@ -79736,6 +79739,26 @@ async function login(mcpUrl, deps) {
   await writeLogin(deps.configDir, mcpUrl, stored);
   return stored;
 }
+async function loginOrWait(mcpUrl, deps, options2 = {}) {
+  try {
+    const stored = await login(mcpUrl, deps);
+    if (stored.access_token === null)
+      throw new LoginError("the login did not return a token");
+    return stored.access_token;
+  } catch (error51) {
+    if (!(error51 instanceof LoginInProgress))
+      throw error51;
+  }
+  const sleep = options2.sleep ?? ((ms) => new Promise((r2) => setTimeout(r2, ms)));
+  const attempts = options2.attempts ?? Math.ceil(LOGIN_TIMEOUT_MS / 2000);
+  for (let attempt = 0;attempt < attempts; attempt += 1) {
+    await sleep(2000);
+    const token2 = await accessToken(mcpUrl, deps);
+    if (token2 !== null)
+      return token2;
+  }
+  throw new LoginError("another login was waiting in the browser and did not finish; run kit.mjs login again");
+}
 async function accessToken(mcpUrl, deps) {
   const stored = (await readLogins(deps.configDir))[mcpUrl];
   if (!stored)
@@ -79807,7 +79830,7 @@ function loopbackAuthorize(openUrl) {
         finish(null, code);
     });
     const timer = setTimeout(() => finish(new LoginError("the login timed out; run kit.mjs login again")), LOGIN_TIMEOUT_MS);
-    server.on("error", (error51) => finish(new LoginError(`cannot wait for the login on ${redirectUri}: ${error51.message}`)));
+    server.on("error", (error51) => finish("code" in error51 && error51.code === "EADDRINUSE" ? new LoginInProgress(`another login is waiting on ${redirectUri}`) : new LoginError(`cannot wait for the login on ${redirectUri}: ${error51.message}`)));
     server.listen(Number(redirect2.port), redirect2.hostname, () => {
       openUrl(url2).then((opened) => {
         if (!opened)
@@ -81500,10 +81523,7 @@ function mcpFor(context, mcpUrl) {
       if (token2 !== null)
         return token2;
       console.error(`kit: not logged in to ${mcpUrl}; opening the browser to log in`);
-      const stored = await login(mcpUrl, context);
-      if (stored.access_token === null)
-        throw new CommandError("the login did not return a token");
-      return stored.access_token;
+      return loginOrWait(mcpUrl, context);
     }
   });
 }
@@ -81585,10 +81605,7 @@ async function mcpServe(context, flags) {
     token: () => accessToken(mcpUrl, context),
     login: async () => {
       console.error(`kit mcp: opening the browser to log in to ${mcpUrl}`);
-      const stored = await login(mcpUrl, context);
-      if (stored.access_token === null)
-        throw new Error("the login did not return a token");
-      return stored.access_token;
+      return loginOrWait(mcpUrl, context);
     },
     forget: () => forgetAccessToken(mcpUrl, context.configDir)
   });
@@ -81920,6 +81937,20 @@ async function link(context) {
     });
     if (legacy.code === 0) {
       await gitOk(context.git, sourceOf(migrated), ["remote", "rename", LEGACY_REMOTE, "fdpocket"]);
+    }
+    const refs = await gitOk(context.git, sourceOf(migrated), [
+      "for-each-ref",
+      "--format=%(refname) %(objectname)",
+      `refs/remotes/${LEGACY_REMOTE}/`
+    ]);
+    for (const line of refs.split(`
+`).filter(Boolean)) {
+      const [name3, oid] = line.split(" ");
+      const moved = name3.replace(`refs/remotes/${LEGACY_REMOTE}/`, "refs/remotes/fdpocket/");
+      if (!await gitTest(context.git, sourceOf(migrated), ["rev-parse", "--verify", "-q", moved])) {
+        await gitOk(context.git, sourceOf(migrated), ["update-ref", moved, oid]);
+      }
+      await gitOk(context.git, sourceOf(migrated), ["update-ref", "-d", name3]);
     }
   }
   const workdir = await findWorkdir(context.cwd);
