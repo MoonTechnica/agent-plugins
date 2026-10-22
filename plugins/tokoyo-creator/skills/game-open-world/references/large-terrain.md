@@ -10,8 +10,8 @@
 - 高さデータは主 PCK に `res://terrain/height.bin`（1024² の 32 bit float、8 m 間隔）として入れる。
   `.bin` は資源ではないので、`export_presets.cfg` の Web / Native の `include_filter` に `terrain/*.bin` を足す。
   作るのは制作時に 1 回（`FastNoiseLite` か手描きの高さを書き出す）。起動のたびに生成しない。
-- 既知の課題: 段の境目で小さな隙間（白い点）が遠景に見える。気になる作品は、リングの外周に下へ垂らした縁（skirt）を足すか、
-  段の境目で頂点の高さを外側の段に合わせる（geomorph）。
+- 段の境目は、細かい段のリングの外周付近で頂点の高さを粗い段の高さへ寄せて（geomorph）隙間をなくしている。
+  リングの段数や格子の数を変えたら、シェーダの `cell_size` / `ring_half` も合わせる（`clipmap_terrain.gd` が設定する）。
 
 ## ring_mesh.gd
 
@@ -58,6 +58,9 @@ uniform sampler2D heightmap : filter_linear, repeat_disable;
 uniform float world_size = 8192.0;
 uniform float height_scale = 400.0;
 uniform float level_bias = 0.0;
+// Grid spacing and half width of this level; the outer band blends into the next, coarser level.
+uniform float cell_size = 2.0;
+uniform float ring_half = 64.0;
 
 varying float v_height;
 varying vec3 v_world_normal;
@@ -70,6 +73,13 @@ void vertex() {
 	vec2 xz = (MODEL_MATRIX * vec4(VERTEX, 1.0)).xz;
 	float texel = world_size / 1024.0;
 	float h = sample_height(xz);
+	// Geomorph: near the outer edge, take the height the coarser level draws at this point
+	// (the average of its two or four neighbours on the 2x grid), so the levels meet without cracks.
+	vec2 odd = mod(floor(VERTEX.xz / cell_size + 0.5), 2.0) * cell_size;
+	float coarse = 0.25 * (sample_height(xz + vec2(-odd.x, -odd.y)) + sample_height(xz + vec2(odd.x, -odd.y))
+		+ sample_height(xz + vec2(-odd.x, odd.y)) + sample_height(xz + vec2(odd.x, odd.y)));
+	float edge = max(abs(VERTEX.x), abs(VERTEX.z)) / ring_half;
+	h = mix(h, coarse, smoothstep(0.8, 0.97, edge));
 	VERTEX.y = h - level_bias;
 	float dx = sample_height(xz + vec2(texel, 0.0)) - sample_height(xz - vec2(texel, 0.0));
 	float dz = sample_height(xz + vec2(0.0, texel)) - sample_height(xz - vec2(0.0, texel));
@@ -131,6 +141,8 @@ func _ready() -> void:
 		material.shader = shader
 		material.set_shader_parameter("heightmap", texture)
 		material.set_shader_parameter("level_bias", level * 0.05)
+		material.set_shader_parameter("cell_size", BASE_CELL * pow(2, level))
+		material.set_shader_parameter("ring_half", CELLS * BASE_CELL * pow(2, level) / 2.0)
 		var ring := MeshInstance3D.new()
 		ring.mesh = RingMesh.build(level, CELLS, BASE_CELL)
 		ring.material_override = material

@@ -14409,8 +14409,8 @@ var bundlesManifestSchema = record(bundleNameSchema, strictObject({ load: litera
   message: `bundles must declare ${GODOT_NATIVE_BUNDLE}`
 });
 var regionNameSchema = string2().regex(/^[a-z][a-z0-9_]{0,31}$/, "invalid region name").refine((name) => name !== GODOT_NATIVE_BUNDLE, `${GODOT_NATIVE_BUNDLE} is reserved`).refine((name) => !name.startsWith("debug_"), "debug_ is reserved for development files");
-function regionPackPath(name, target) {
-  return `bundles/${name}/${target}.pck`;
+function regionPackPath(name) {
+  return `bundles/${name}/region.pck`;
 }
 var lowerIdentifierSchema = string2().regex(/^[a-z][a-z0-9_]{0,31}$/, "must be a lowercase identifier");
 var LEADERBOARD_ORDERS = ["desc", "asc"];
@@ -15781,7 +15781,7 @@ function validateGodotReferences(manifest, byPath, errors) {
     }
   }
   for (const region of manifest.godot.regions) {
-    const expected = new Set(["web", "native"].map((target) => regionPackPath(region, target)));
+    const expected = new Set([regionPackPath(region)]);
     for (const path of expected) {
       if (!byPath.has(path)) {
         errors.push({ code: "GODOT_FILE_MISSING", message: "Godot region pack is missing", path });
@@ -15791,7 +15791,7 @@ function validateGodotReferences(manifest, byPath, errors) {
       if (path.startsWith(`bundles/${region}/`) && !expected.has(path)) {
         errors.push({
           code: "REGION_FILE_UNEXPECTED",
-          message: `bundles/${region}/ may only hold web.pck and native.pck`,
+          message: `bundles/${region}/ may only hold region.pck`,
           path
         });
       }

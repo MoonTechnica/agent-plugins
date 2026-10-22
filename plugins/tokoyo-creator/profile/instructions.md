@@ -158,7 +158,7 @@ server.bundle.js     # 対戦があるときだけ（server/main.ts の defineSp
 manifest.json        # 書庫の根に置く。入れ子にすると取り込みに落とされる
 assets/godot/        # Web 用の game.js・game.wasm・game.pck（kit build が作る）
 bundles/godot_native/ # 組み込み native 用の game.pck（kit build が作る。ブラウザは取らない）
-bundles/<地域>/       # 地域ごとの追加 pack（web.pck・native.pck。godot.regions に宣言した地域だけ。kit build が作る）
+bundles/<地域>/       # 地域ごとの追加 pack（region.pck。godot.regions に宣言した地域だけ。kit build が作る）
 ai/<key>.md          # ゲーム内 AI の指示文（`ai.chat` のときだけ。`ai/schemas/*.json` も。`$game-ai`）
 ```
 
