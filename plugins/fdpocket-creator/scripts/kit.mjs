@@ -67299,6 +67299,11 @@ var ALLOWED_EXTENSIONS = new Set([
 ]);
 var TEXT_EXTENSIONS = new Set([".html", ".js", ".mjs", ".css"]);
 var REMOTE_LITERAL = String.raw`\s*['"\x60](?:https?|wss?):\/\/`;
+var SERVER_WARNING_RULES = new Set(["EVAL", "EXTERNAL_REQUEST"]);
+var SERVER_WHY = {
+  EVAL: "eval / new Function do not run in Workers (they throw); make sure the code does not depend on them",
+  EXTERNAL_REQUEST: "requests to hosts not declared in network.egress are blocked when the Worker runs"
+};
 var ERROR_RULES = [
   {
     code: "EVAL",
@@ -67358,6 +67363,7 @@ function checkDist(files, manifest2) {
       continue;
     const source = decoder2.decode(file2.bytes);
     const app = manifest2?.apps[file2.path.split("/")[0] ?? ""];
+    const server = app?.kind === "api" || app?.kind === "jobs";
     for (const rule of ERROR_RULES) {
       if (rule.code === "EXTERNAL_REQUEST" && app) {
         const requests = [
@@ -67365,13 +67371,22 @@ function checkDist(files, manifest2) {
         ];
         const allowed = requests.length > 0 && requests.every((match) => {
           const url2 = match[1];
-          return app.kind === "api" || app.kind === "jobs" ? checkEgress(url2, { egress: app.network?.egress ?? [] }).allowed : URL.canParse(url2) && (app.network?.browser ?? []).includes(new URL(url2).origin);
+          return server ? checkEgress(url2, { egress: app.network?.egress ?? [] }).allowed : URL.canParse(url2) && (app.network?.browser ?? []).includes(new URL(url2).origin);
         });
         if (allowed)
           continue;
       }
-      if (rule.pattern.test(source))
+      if (!rule.pattern.test(source))
+        continue;
+      if (server && SERVER_WARNING_RULES.has(rule.code)) {
+        warnings.push({
+          code: rule.code,
+          message: SERVER_WHY[rule.code] ?? rule.why,
+          path: file2.path
+        });
+      } else {
         errors5.push({ code: rule.code, message: rule.why, path: file2.path });
+      }
     }
     const hosts = new Set([...source.matchAll(ABSOLUTE_URL)].map((match) => match[0]).filter((url2) => !NAMESPACE_URL.test(url2) && !/^https?:\/\/(?:localhost|127\.0\.0\.1)\b/.test(url2)).map(hostOf));
     if (hosts.size > 0) {
