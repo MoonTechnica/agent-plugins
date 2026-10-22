@@ -83,7 +83,14 @@ export declare const AI_INSTRUCTIONS_KEY_PATTERN: RegExp;
 export declare const AI_SCHEMA_KEY_PATTERN: RegExp;
 export declare const AI_PROMPTS_PER_KIND_MAX = 8;
 export declare const AI_PROMPT_MAX_BYTES = 8192;
-export declare const AI_MAX_OUTPUT_TOKENS_DEFAULT = 400;
+/**
+ * 1 ターンの出力の上限（OpenRouter の `max_tokens`。推論するモデルでは推論のトークンも含む）。
+ * 既定は推論しても普通の応答が切れない量、上限は許可したモデルの最小の出力上限
+ * （2026-10-22 の OpenRouter のモデル一覧で Gemini 3.8 Flash の 65,536。他は 128,000 以上）。
+ * 課金は実際に使った分だけで、この値は 1 ターンの最大額を抑える
+ */
+export declare const AI_MAX_OUTPUT_TOKENS_DEFAULT = 16384;
+export declare const AI_MAX_OUTPUT_TOKENS_LIMIT = 65536;
 declare const baseSchema: z.ZodObject<{
     version: z.ZodLiteral<1>;
     sdkVersion: z.ZodLiteral<3>;

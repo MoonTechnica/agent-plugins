@@ -218,14 +218,21 @@ export const AI_INSTRUCTIONS_KEY_PATTERN = /^[a-z0-9][a-z0-9_-]{0,31}$/;
 export const AI_SCHEMA_KEY_PATTERN = /^[A-Za-z0-9_-]{1,64}$/;
 export const AI_PROMPTS_PER_KIND_MAX = 8;
 export const AI_PROMPT_MAX_BYTES = 8192;
-export const AI_MAX_OUTPUT_TOKENS_DEFAULT = 400;
+/**
+ * 1 ターンの出力の上限（OpenRouter の `max_tokens`。推論するモデルでは推論のトークンも含む）。
+ * 既定は推論しても普通の応答が切れない量、上限は許可したモデルの最小の出力上限
+ * （2026-10-22 の OpenRouter のモデル一覧で Gemini 3.8 Flash の 65,536。他は 128,000 以上）。
+ * 課金は実際に使った分だけで、この値は 1 ターンの最大額を抑える
+ */
+export const AI_MAX_OUTPUT_TOKENS_DEFAULT = 16_384;
+export const AI_MAX_OUTPUT_TOKENS_LIMIT = 65_536;
 /** 別名（auto / fast / quality）か、Platform が許可した OpenRouter のモデル ID（許可は DB が確かめる） */
 const aiModelSchema = z
     .string()
     .regex(/^(?:[a-z][a-z0-9-]{0,31}|~?[a-z0-9][a-z0-9._-]*\/[A-Za-z0-9][A-Za-z0-9._:-]{0,127})$/);
 const aiSchema = z.strictObject({
     model: aiModelSchema.optional(),
-    maxOutputTokens: z.number().int().min(1).max(2000).optional(),
+    maxOutputTokens: z.number().int().min(1).max(AI_MAX_OUTPUT_TOKENS_LIMIT).optional(),
     instructions: uniqueList(z.string().regex(AI_INSTRUCTIONS_KEY_PATTERN))
         .max(AI_PROMPTS_PER_KIND_MAX)
         .optional(),

@@ -64318,11 +64318,12 @@ var AI_INSTRUCTIONS_KEY_PATTERN = /^[a-z0-9][a-z0-9_-]{0,31}$/;
 var AI_SCHEMA_KEY_PATTERN = /^[A-Za-z0-9_-]{1,64}$/;
 var AI_PROMPTS_PER_KIND_MAX = 8;
 var AI_PROMPT_MAX_BYTES = 8192;
-var AI_MAX_OUTPUT_TOKENS_DEFAULT = 400;
+var AI_MAX_OUTPUT_TOKENS_DEFAULT = 16384;
+var AI_MAX_OUTPUT_TOKENS_LIMIT = 65536;
 var aiModelSchema = exports_external.string().regex(/^(?:[a-z][a-z0-9-]{0,31}|~?[a-z0-9][a-z0-9._-]*\/[A-Za-z0-9][A-Za-z0-9._:-]{0,127})$/);
 var aiSchema = exports_external.strictObject({
   model: aiModelSchema.optional(),
-  maxOutputTokens: exports_external.number().int().min(1).max(2000).optional(),
+  maxOutputTokens: exports_external.number().int().min(1).max(AI_MAX_OUTPUT_TOKENS_LIMIT).optional(),
   instructions: uniqueList(exports_external.string().regex(AI_INSTRUCTIONS_KEY_PATTERN)).max(AI_PROMPTS_PER_KIND_MAX).optional(),
   schemas: uniqueList(exports_external.string().regex(AI_SCHEMA_KEY_PATTERN)).max(AI_PROMPTS_PER_KIND_MAX).optional()
 });
