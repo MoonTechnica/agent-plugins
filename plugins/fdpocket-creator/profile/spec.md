@@ -118,7 +118,7 @@ apps:
       - name: STRIPE_SECRET_KEY
         description: { ja: "Stripe のシークレットキー", en: "Stripe secret key" }
         required: true
-    servicePermissions: [notifications.send, jobs.schedule, ai.chat]   # ai.chat: 利用者として AI を呼ぶ
+    servicePermissions: [notifications.send, jobs.schedule, ai.chat]   # ai.chat: 利用者として AI を呼ぶ（jobs にも書ける）
   digest:
     kind: jobs
     schedules:
@@ -152,7 +152,7 @@ ai:                                          # ミニアプリ内 AI を使う P
 | `network.egress` | api / jobs だけ。ホスト名（小文字・2 ラベル以上。先頭に `*.` を 1 つ）を 50 個まで。IP 直指定・`localhost`・`.local` / `.internal` などの内部名・Platform のホスト（Supabase / Turso / R2）は書けない。実行時も http・既定以外のポート・URL の資格情報を拒否し、リダイレクトを追わない |
 | `network.browser` | web だけ。`https://host` の形（パス・ポート・末尾の `/` なし）。秘密が要る API は書かず api 経由にする |
 | `secrets` | api / jobs だけ。名前は `[A-Z][A-Z0-9_]` で 50 個まで。`GATEWAY_URL` と `PLATFORM_` で始まる名前は予約。値はコード・manifest・`listing/` に書かない（取り込みの検証が落とす） |
-| `servicePermissions` | api / jobs だけ。`notifications.send`（通知を送る）・`jobs.schedule`（jobs へ仕事を予約する）・`jobs.consume`（予約を受ける jobs 側）・`ai.chat`（api だけ。利用者として AI を呼ぶ。jobs は書けない） |
+| `servicePermissions` | api / jobs だけ。`notifications.send`（通知を送る）・`jobs.schedule`（jobs へ仕事を予約する）・`jobs.consume`（予約を受ける jobs 側）・`ai.chat`（api は利用者として、jobs は実行中のジョブとして AI を呼ぶ。§3.8） |
 | `ai` | AI を使う版だけ書く（書くと利用者の初回の同意に「AI の利用」が加わり、既に同意した人にも出し直す）。`instructions` / `schemas` は宣言した名前のファイルだけが版に固定される（実行時にファイルを読み直さない） |
 | `schedules` | jobs だけ。UTC の 5 フィールドの cron と handler 名。main / prod だけで動く（branch / preview では動かない） |
 | `routes` | api だけ。`["/api/*"]` だけ |
@@ -371,6 +371,7 @@ notifications:
 |---|---|
 | `client.ai.chat(input)` | 1 ターン送って結果を待つ。`input`（`AiChatInput`）: `conversation`（会話の名前。`[A-Za-z0-9_.:-]` で 64 字まで。同じ名前の履歴を Platform が持つ）・`message`・`attachments`（`[{ fileId }]`。Storage のファイル、4 個まで）・`instructions`（宣言した指示文の名前）・`schema`（宣言した Schema の名前。JSON で返させる）・`model`・`onToken`（渡すと届いた分から順に呼ぶ）・`signal`（待つのをやめる） |
 | `client.ai.reset(conversation)` | 会話を切る（次のターンから履歴を送らない） |
+| `client.ai.openai()` | OpenAI 互換の接続先（`OpenAiCompatible`: `baseURL`・`apiKey`・`fetch`）。LangChain・Mastra・Vercel AI SDK・OpenAI SDK にそのまま渡し、エージェント（ツール呼び出しのループ）・構造化出力・ストリーミングを作る。会話の履歴はフレームワークが持つ |
 
 結果（`AiTurnResult`）: `text`・`json`（`schema` を指定し、正常に終わったときだけ）・`finishReason`（`AiFinishReason`。
 `stop` は正常、`length` は出力の上限で切れた、`content_filter` は提供元が止めた、`other` はそれ以外）・
@@ -383,8 +384,29 @@ notifications:
   ある・使いすぎは `RATE_LIMITED`、匿名・宣言の無い App は `FORBIDDEN`、AI のサービスの障害は `GATEWAY_UNAVAILABLE`。
   **AI が使えなくてもアプリの他の機能は使えるように作る**。
 - AI を使う画面には「AI を使うとクレジットを消費します」と分かる表示を置く。
-- api（サーバー）からは、利用者のリクエストを受けたときだけ、`asUser(request)` の戻り値の `ai`（同じ `chat` / `reset`）で
-  その利用者として呼ぶ（`servicePermissions: [ai.chat]`。その利用者のクレジットから引く）。jobs からは呼べない。
+- 回数・同時に動かす数の制限は無い（エージェントのように続けて・並べて呼べる）。上限は払う人のクレジットだけ。
+- api（サーバー）からは、利用者のリクエストを受けたときだけ、`asUser(request)` の戻り値の `ai`（同じ `chat` / `reset` /
+  `openai()`）でその利用者として呼ぶ（`servicePermissions: [ai.chat]`。その利用者のクレジットから引く）。
+- jobs からは、受け取った queue / scheduled のイベントを `createServerClient(...).forJob(event)` に渡し、`.ai.openai()` で呼ぶ
+  （`servicePermissions: [jobs.consume, ai.chat]`）。払うのは、`asUser(request).jobs.schedule(...)` で**利用者として登録した
+  ジョブならその利用者**、project.yaml の **cron なら Project の持ち主**。サーバーとして（`asUser` 無しで）登録したジョブは
+  払う人がいないので `FORBIDDEN`。呼べるのは配送中の間だけ。jobs では `fdpocket-file:` を使えない（Storage から読んで data URL で渡す）。
+
+`openai()` の要点（`model` は `auto`＝Jev Router か、project.yaml の `ai.model` / 許可一覧の ID）:
+
+```ts
+import { createOpenAI } from '@ai-sdk/openai'               // Mastra も同じ provider を使う
+const fdpocket = createOpenAI(client.ai.openai())
+const model = fdpocket.chat('auto')                          // Chat Completions（/responses ではない）
+
+import { ChatOpenAI } from '@langchain/openai'
+const { baseURL, apiKey, fetch } = client.ai.openai()
+const llm = new ChatOpenAI({ model: 'auto', apiKey, configuration: { baseURL, fetch } })
+```
+
+- 使えるのは Chat Completions（`/chat/completions`）だけ。Responses API・Embeddings・画像生成は無い。
+- Storage のファイルは画像・ファイル・音声・動画の場所に `fdpocket-file:<fileId>` と書く（read ポリシーで確かめて渡す）。
+- 断られたときは OpenAI の形のエラー（本文の `error.code` が `SdkErrorCode`）。`402`（`QUOTA_EXCEEDED`）は再試行しない。
 - 自分の API キーで外部の AI を呼ぶこともできる（`$fdpocket-app-integrations`。費用は作者持ち）。利用者に払ってもらうならこの `client.ai`。
 - 作り方（宣言・指示文と Schema・画面で必ずすること・`kit dev` の本物と模擬の使い分け）は `$fdpocket-app-ai`。
 

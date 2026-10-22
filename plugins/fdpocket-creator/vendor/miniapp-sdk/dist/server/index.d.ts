@@ -1,7 +1,7 @@
 import '../zod-jitless.ts';
 import { type NotificationSendRequest, type NotificationSendResponse } from '@workspace/project-protocol';
 import type { SchemaDef } from '@zenstackhq/schema';
-import { type Ai } from '../ai/client.ts';
+import { type Ai, type OpenAiCompatible } from '../ai/client.ts';
 import type { DbClient } from '../db/types.ts';
 import { type Storage } from '../storage/client.ts';
 import { createJobs } from './jobs.ts';
@@ -23,6 +23,21 @@ export interface ServerClient<S extends SchemaDef = SchemaDef> extends ServerDat
     };
     /** 利用者の Project token を渡す。受信した Request の Authorization も受け付ける。 */
     asUser(token: string | Request): ServerUserClient<S>;
+    /**
+     * jobs の App の queue / scheduled のイベントを渡す。今配送中の実行として AI を呼ぶ（tasks/0537）。
+     * 払うのは、`asUser(...).jobs.schedule` で登録したジョブならその利用者、project.yaml の cron なら
+     * Project の持ち主。利用者の無い `jobs.schedule`（サーバーとしての登録）のジョブは AI を使えない
+     */
+    forJob(event: JobRun): {
+        readonly ai: {
+            openai(): OpenAiCompatible;
+        };
+    };
+}
+/** queue のイベント（`id`）か scheduled のイベント（`id` と `cron`） */
+export interface JobRun {
+    readonly id: string;
+    readonly cron?: string;
 }
 export interface ServerUserClient<S extends SchemaDef = SchemaDef> extends ServerDataClient<S> {
     /**
@@ -30,6 +45,8 @@ export interface ServerUserClient<S extends SchemaDef = SchemaDef> extends Serve
      * App の `servicePermissions` に `ai.chat` が要る
      */
     readonly ai: Ai;
+    /** その利用者として登録する（ジョブの中の AI はこの利用者のクレジットから引く。tasks/0537） */
+    readonly jobs: ReturnType<typeof createJobs>;
 }
 /** Worker 専用。資格情報は Worker の binding に保ち、10 分の token だけを Gateway に送る。 */
 export declare function createServerClient<S extends SchemaDef = SchemaDef>(options: {
@@ -38,5 +55,5 @@ export declare function createServerClient<S extends SchemaDef = SchemaDef>(opti
     now?: () => number;
 }): ServerClient<S>;
 export type { JobCancelResponse, JobDelivery, JobScheduleRequest, JobScheduleResponse, } from '@workspace/project-protocol';
-export type { Ai, AiChatInput } from '../ai/client.ts';
+export type { Ai, AiChatInput, OpenAiCompatible } from '../ai/client.ts';
 export { SdkError } from '../errors.ts';

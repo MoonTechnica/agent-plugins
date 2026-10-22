@@ -4,6 +4,11 @@ import { z } from 'zod';
  * 添付は Storage の `fileId` だけで受ける（URL・本体は App から受けない。Gateway が read ポリシーで確かめる）。
  */
 /** 1 ターンの添付の数と合計（Worker のメモリと 1 リクエストの大きさの保護。§3.2） */
+/**
+ * jobs の App が AI を呼ぶときに添える、今配送中の実行（`queue:<job id>` か `schedule:<schedule id>`）。
+ * 払う人は Platform が決める（登録した利用者・cron は Project の持ち主。tasks/0537）
+ */
+export declare const AI_RUN_HEADER = "x-fdpocket-run";
 export declare const AI_ATTACHMENTS_MAX = 4;
 export declare const AI_ATTACHMENTS_MAX_BYTES: number;
 /** 1 ターンの本文（UTF-8） */

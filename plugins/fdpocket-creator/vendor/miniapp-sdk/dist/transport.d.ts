@@ -13,6 +13,11 @@ export interface Transport {
      * `SdkError` を投げる（フック側の「読み返せない書き込みを黙って undefined にする」分岐に入らない）
      */
     fetch(url: string, init?: RequestInit): Promise<Response>;
+    /**
+     * 認証だけ付けて、応答はそのまま返す（失敗の応答も投げない）。OpenAI 互換の SDK に渡す fetch
+     * （フレームワークが本文の `error` を読む。投げると接続エラー扱いで再試行される）。届かないときは `SdkError`
+     */
+    forward(url: string, init?: RequestInit): Promise<Response>;
 }
 /**
  * Gateway への送信（sdk.md §3.5）。Project トークンを付け、失敗はすべて `SdkError` にする。

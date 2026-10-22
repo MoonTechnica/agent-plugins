@@ -1,5 +1,5 @@
 import "../zod-jitless.js";
-import { ACT_AS_HEADER, notificationSendRequestSchema, notificationSendResponseSchema, SERVICE_CREDENTIAL_PATTERN, serviceTokenResponseSchema, } from '@workspace/project-protocol';
+import { ACT_AS_HEADER, AI_RUN_HEADER, notificationSendRequestSchema, notificationSendResponseSchema, SERVICE_CREDENTIAL_PATTERN, serviceTokenResponseSchema, } from '@workspace/project-protocol';
 import { createAi } from "../ai/client.js";
 import { createDbClient } from "../db/client.js";
 import { SdkError } from "../errors.js";
@@ -105,7 +105,28 @@ export function createServerClient(options) {
                 : /^Bearer\s+(\S+)$/i.exec(input.headers.get('authorization') ?? '')?.[1];
             if (!token || /\s/.test(token))
                 throw new SdkError('UNAUTHENTICATED', 'missing user token');
-            return { ...dataClient(token), ai: createAi(transportFor(token), base) };
+            const transport = transportFor(token);
+            return {
+                ...dataClient(token),
+                ai: createAi(transport, base),
+                jobs: createJobs((path, body) => transport.send(path, { method: 'POST', body })),
+            };
+        },
+        forJob(event) {
+            const run = `${event.cron === undefined ? 'queue' : 'schedule'}:${event.id}`;
+            const transport = createTransport({
+                gateway: base,
+                token: serviceToken,
+                fetch: (input, init) => {
+                    const headers = new Headers(init?.headers);
+                    headers.set(AI_RUN_HEADER, run);
+                    return fetchImpl(input, { ...init, headers });
+                },
+                onUnauthenticated: () => {
+                    held = null;
+                },
+            });
+            return { ai: { openai: () => createAi(transport, base).openai() } };
         },
     };
 }

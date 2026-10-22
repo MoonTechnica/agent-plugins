@@ -1,6 +1,6 @@
 import './zod-jitless.ts';
 export type { AiFinishReason, AiTurnResult, PlatformProfile, SdkErrorCode, Session, } from '@workspace/project-protocol';
-export type { Ai, AiChatInput } from './ai/client.ts';
+export type { Ai, AiChatInput, OpenAiCompatible } from './ai/client.ts';
 export { apiPath } from './api-path.ts';
 export { type Auth, type ClientOptions, createClient, type HostWindow, type ProjectClient, } from './client.ts';
 export { type AppDbClient, DB_OPERATIONS, type DbBatchOperation, type DbBatchResults, type DbClient, type DbOperation, type ModelCapabilities, } from './db/types.ts';

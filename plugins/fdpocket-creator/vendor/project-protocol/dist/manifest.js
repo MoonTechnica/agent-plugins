@@ -286,9 +286,6 @@ function refineServerFields(ctx, slug, app) {
             report(ctx, [...path, 'access'], 'not_allowed', `${app.kind} apps are not restricted`);
         }
     }
-    if (app.kind === 'jobs' && app.servicePermissions?.includes('ai.chat')) {
-        report(ctx, [...path, 'servicePermissions'], 'not_allowed', 'jobs have no user to pay for ai.chat');
-    }
     for (const key of ['secrets', 'servicePermissions']) {
         if (!server && app[key] !== undefined) {
             report(ctx, [...path, key], 'not_allowed', `only api / jobs apps take ${key}`);

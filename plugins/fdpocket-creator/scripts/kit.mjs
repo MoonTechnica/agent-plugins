@@ -64374,9 +64374,6 @@ function refineServerFields(ctx, slug, app) {
       report(ctx, [...path, "access"], "not_allowed", `${app.kind} apps are not restricted`);
     }
   }
-  if (app.kind === "jobs" && app.servicePermissions?.includes("ai.chat")) {
-    report(ctx, [...path, "servicePermissions"], "not_allowed", "jobs have no user to pay for ai.chat");
-  }
   for (const key of ["secrets", "servicePermissions"]) {
     if (!server && app[key] !== undefined) {
       report(ctx, [...path, key], "not_allowed", `only api / jobs apps take ${key}`);
@@ -64679,6 +64676,7 @@ function normalizeTrigger(trigger) {
 }
 
 // frontend/packages/project-protocol/src/ai.ts
+var AI_RUN_HEADER = "x-fdpocket-run";
 var AI_ATTACHMENTS_MAX = 4;
 var AI_ATTACHMENTS_MAX_BYTES = 20 * 1024 * 1024;
 var AI_MESSAGE_MAX_BYTES = 32 * 1024;
@@ -70598,7 +70596,10 @@ function createBaseApp(config2, logger) {
           ...errorContext(err)
         });
       }
-      return c.json(errorBody(err, requestId), statusOf(err.code));
+      const body = errorBody(err, requestId);
+      if (!body.error.retryable)
+        c.header("x-should-retry", "false");
+      return c.json(body, statusOf(err.code));
     }
     logger.log("error", "unhandled error", { request_id: requestId, ...errorContext(err) });
     const unavailable = new GatewayError("GATEWAY_UNAVAILABLE", "gateway unavailable");
@@ -71087,6 +71088,9 @@ async function userClaimsOf(c, adapters, allowActAs) {
   if (!current || current.credentialId !== service.cid || current.projectId !== service.aud || current.appSlug !== service.app || current.environment !== service.env || current.sessionId !== (service.br ?? null) || current.previewSessionId !== (service.pv ?? null) || service.permissions.some((permission) => !current.servicePermissions.includes(permission))) {
     throw new GatewayError("UNAUTHENTICATED", "service credential is no longer authorized");
   }
+  return verifyActAs(adapters, service, actAs);
+}
+async function verifyActAs(adapters, service, actAs) {
   if (!/^[A-Za-z0-9._-]+$/.test(actAs)) {
     throw new GatewayError("UNAUTHENTICATED", "malformed act-as token");
   }
@@ -71568,6 +71572,7 @@ async function findReadableFile(runtime, input) {
 // frontend/packages/project-gateway/src/ai/routes.ts
 var AI_COST = 2;
 function registerAiRoutes(app, adapters, config2, runtime, logger) {
+  const { open, loadAttachments } = createAiAccess(adapters, config2, runtime);
   app.post("/v1/ai/turns", async (c) => {
     const { claims, resolved, ai: ai2, db } = await open(c);
     const parsed = aiTurnRequestSchema.safeParse(await jsonBody(c));
@@ -71667,6 +71672,8 @@ function registerAiRoutes(app, adapters, config2, runtime, logger) {
     });
     return c.json({ conversation });
   });
+}
+function createAiAccess(adapters, config2, runtime) {
   async function open(c) {
     if (c.req.header(ACT_AS_HEADER) !== undefined) {
       const service = await adapters.signer.verifyService(bearerOf(c));
@@ -71719,6 +71726,7 @@ function registerAiRoutes(app, adapters, config2, runtime, logger) {
     }
     return attachments;
   }
+  return { open, loadAttachments };
 }
 async function requestBody(plan, message2, schemaKey, attachments, claims) {
   const content = [
@@ -71889,6 +71897,77 @@ function toBase64(bytes) {
   return btoa(binary);
 }
 
+// frontend/packages/project-gateway/src/ai/completion.ts
+var emptyCompletion = () => ({
+  id: null,
+  model: null,
+  created: null,
+  content: "",
+  toolCalls: [],
+  finishReason: null,
+  usage: null
+});
+async function readCompletion(stream, into = emptyCompletion()) {
+  const result = into;
+  for await (const data of sseData(stream)) {
+    if (data === "[DONE]")
+      break;
+    const chunk = JSON.parse(data);
+    if (chunk.id)
+      result.id = chunk.id;
+    if (chunk.model)
+      result.model = chunk.model;
+    if (chunk.created)
+      result.created = chunk.created;
+    if (chunk.usage)
+      result.usage = chunk.usage;
+    for (const choice of chunk.choices ?? []) {
+      if (choice.finish_reason)
+        result.finishReason = choice.finish_reason;
+      if (choice.delta?.content)
+        result.content += choice.delta.content;
+      for (const call of choice.delta?.tool_calls ?? []) {
+        const index2 = call.index ?? 0;
+        const current = result.toolCalls[index2] ?? {
+          id: "",
+          type: "function",
+          function: { name: "", arguments: "" }
+        };
+        result.toolCalls[index2] = current;
+        if (call.id)
+          current.id = call.id;
+        if (call.function?.name)
+          current.function.name += call.function.name;
+        if (call.function?.arguments)
+          current.function.arguments += call.function.arguments;
+      }
+    }
+  }
+  return result;
+}
+async function settleCompletion(platform, turnId, stream) {
+  const completion = emptyCompletion();
+  try {
+    await readCompletion(stream, completion);
+  } catch (cause) {
+    await platform.fail(turnId, completion.id, "stream_lost");
+    throw cause;
+  }
+  const cost = Number(completion.usage?.cost);
+  if (!completion.id || !completion.usage || !Number.isFinite(cost) || cost < 0) {
+    await platform.fail(turnId, completion.id, "usage_missing");
+    return completion;
+  }
+  await platform.settle({
+    turnId,
+    generationId: completion.id,
+    modelUsed: completion.model ?? "",
+    usage: completion.usage,
+    costUsd: cost
+  });
+  return completion;
+}
+
 // frontend/packages/project-gateway/src/ai/dev-routes.ts
 var KIT_AI_KEY_HEADER = "x-kit-ai-key";
 var contentPartSchema = exports_external.looseObject({ type: exports_external.string().min(1).max(32) });
@@ -71896,15 +71975,15 @@ var devChatSchema = exports_external.strictObject({
   sessionId: exports_external.uuid(),
   app: appSlugSchema,
   model: exports_external.string().min(1).max(160).optional(),
-  messages: exports_external.array(exports_external.strictObject({
-    role: exports_external.enum(["system", "user", "assistant"]),
-    content: exports_external.union([exports_external.string(), exports_external.array(contentPartSchema).max(16)])
-  })).min(1).max(200),
+  messages: exports_external.array(exports_external.looseObject({
+    role: exports_external.enum(["system", "developer", "user", "assistant", "tool"]),
+    content: exports_external.union([exports_external.string(), exports_external.array(contentPartSchema).max(64), exports_external.null()]).optional()
+  })).min(1).max(1000),
   maxTokens: exports_external.int().min(1).optional(),
-  responseFormat: exports_external.strictObject({
-    type: exports_external.literal("json_schema"),
-    json_schema: exports_external.looseObject({ name: exports_external.string().min(1).max(64), schema: exports_external.unknown() })
-  }).optional()
+  responseFormat: exports_external.looseObject({ type: exports_external.enum(["json_schema", "json_object", "text"]) }).optional(),
+  tools: exports_external.array(exports_external.looseObject({ type: exports_external.string().min(1).max(32) })).max(128).optional(),
+  toolChoice: exports_external.unknown().optional(),
+  parallelToolCalls: exports_external.boolean().optional()
 });
 function registerAiDevRoutes(app, adapters, logger) {
   app.post("/v1/ai/dev/chat", async (c) => {
@@ -71939,7 +72018,10 @@ function registerAiDevRoutes(app, adapters, logger) {
       stream: true,
       max_tokens: Math.min(request.maxTokens ?? AI_MAX_OUTPUT_TOKENS_LIMIT, AI_MAX_OUTPUT_TOKENS_LIMIT),
       messages: request.messages,
-      ...request.responseFormat && plan.model.supportsJsonSchema ? { response_format: request.responseFormat } : {},
+      ...request.responseFormat && (request.responseFormat.type !== "json_schema" || plan.model.supportsJsonSchema) ? { response_format: request.responseFormat } : {},
+      ...request.tools ? { tools: request.tools } : {},
+      ...request.toolChoice !== undefined ? { tool_choice: request.toolChoice } : {},
+      ...request.parallelToolCalls !== undefined ? { parallel_tool_calls: request.parallelToolCalls } : {},
       user: await sha256Hex3(plan.userId),
       provider: plan.model.kind === "router" ? { data_collection: "deny", zdr: true } : { only: [plan.model.providerSlug], allow_fallbacks: false, data_collection: "deny" }
     };
@@ -71955,7 +72037,7 @@ function registerAiDevRoutes(app, adapters, logger) {
       throw providerError(upstream.status);
     }
     const [forClient, forSettlement] = upstream.body.tee();
-    const settlement = settle(ai2, dev, turnId, forSettlement).catch((error51) => {
+    const settlement = settleCompletion(ai2.platform, turnId, forSettlement).catch((error51) => {
       logger.log("error", "dev ai settlement failed", { turn_id: turnId, error: String(error51) });
     });
     waitUntilOf(c)?.(settlement);
@@ -71964,32 +72046,226 @@ function registerAiDevRoutes(app, adapters, logger) {
     });
   });
 }
-async function settle(ai2, dev, turnId, stream) {
-  let generationId = null;
-  let model = null;
-  let usage = null;
-  try {
-    for await (const chunk of sseData(stream)) {
-      if (chunk === "[DONE]")
-        break;
-      const event = JSON.parse(chunk);
-      if (event.id)
-        generationId = event.id;
-      if (event.model)
-        model = event.model;
-      if (event.usage)
-        usage = event.usage;
+
+// frontend/packages/project-gateway/src/ai/openai-routes.ts
+init_zod();
+var FILE_REF = /^fdpocket-file:([0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12})$/i;
+var PASS_THROUGH = [
+  "tools",
+  "tool_choice",
+  "parallel_tool_calls",
+  "response_format",
+  "temperature",
+  "top_p",
+  "top_k",
+  "stop",
+  "seed",
+  "presence_penalty",
+  "frequency_penalty",
+  "repetition_penalty",
+  "logit_bias",
+  "logprobs",
+  "top_logprobs",
+  "reasoning"
+];
+var partSchema = exports_external.looseObject({ type: exports_external.string().min(1).max(32) });
+var messageSchema = exports_external.looseObject({
+  role: exports_external.enum(["system", "developer", "user", "assistant", "tool"]),
+  content: exports_external.union([exports_external.string(), exports_external.array(partSchema).max(64), exports_external.null()]).optional()
+});
+var requestSchema = exports_external.looseObject({
+  model: exports_external.string().min(1).max(160).optional(),
+  messages: exports_external.array(messageSchema).min(1).max(1000),
+  stream: exports_external.boolean().optional(),
+  max_tokens: exports_external.int().min(1).optional(),
+  max_completion_tokens: exports_external.int().min(1).optional()
+});
+var KIND_OF_PART = {
+  image_url: "image",
+  file: "file",
+  input_audio: "audio",
+  video_url: "video"
+};
+function registerAiOpenAiRoutes(app, adapters, config2, runtime, logger) {
+  const { open, loadAttachments } = createAiAccess(adapters, config2, runtime);
+  app.post("/v1/ai/openai/chat/completions", async (c) => {
+    const run = c.req.header(AI_RUN_HEADER);
+    const turnId = crypto.randomUUID();
+    if (run !== undefined) {
+      const job = await openJob(c);
+      const request2 = await parseRequest(c);
+      if (!/^(queue|schedule):[0-9a-f-]{36}$/i.test(run)) {
+        throw new GatewayError("VALIDATION_FAILED", "invalid run");
+      }
+      if (request2.messages.some((message2) => fileRefsOf(message2).length > 0)) {
+        throw new GatewayError("VALIDATION_FAILED", "file references need a user");
+      }
+      const plan2 = await job.ai.platform.beginJob({
+        turnId,
+        credentialId: job.credentialId,
+        run: run.toLowerCase(),
+        model: request2.model ?? null
+      });
+      return complete(c, job.ai, turnId, plan2, request2, request2.messages);
     }
-  } catch (cause) {
-    await ai2.platform.fail(turnId, generationId, "stream_lost");
-    throw cause;
+    const { claims, resolved, ai: ai2, db } = await open(c);
+    const request = await parseRequest(c);
+    const refs = [...new Set(request.messages.flatMap(fileRefsOf))];
+    if (refs.length > AI_ATTACHMENTS_MAX * 4) {
+      throw new GatewayError("VALIDATION_FAILED", "too many files");
+    }
+    const files = new Map((await loadAttachments(db, claims, resolved, refs.map((fileId) => ({ fileId })))).map((file2) => [file2.fileId, file2]));
+    const messages = request.messages.map((message2) => inlineFiles(message2, files));
+    const plan = await ai2.platform.beginRequest({
+      turnId,
+      projectId: claims.aud,
+      environment: claims.env,
+      versionId: resolved.versionId,
+      appSlug: claims.app,
+      userId: platformUserIdOf(claims.gid),
+      model: request.model ?? null
+    });
+    return complete(c, ai2, turnId, plan, request, messages);
+  });
+  async function parseRequest(c) {
+    const parsed = requestSchema.safeParse(await jsonBody(c));
+    if (!parsed.success)
+      throw new GatewayError("VALIDATION_FAILED", "invalid chat completion request");
+    return parsed.data;
   }
-  const cost = Number(usage?.cost);
-  if (!generationId || !usage || !Number.isFinite(cost) || cost < 0) {
-    await ai2.platform.fail(turnId, generationId, "usage_missing");
+  async function openJob(c) {
+    const service = await adapters.signer.verifyService(bearerOf(c));
+    const current = await adapters.services.current(service.cid);
+    if (!current || current.credentialId !== service.cid || current.projectId !== service.aud || current.appSlug !== service.app || current.environment !== service.env) {
+      throw new GatewayError("UNAUTHENTICATED", "service credential is no longer authorized");
+    }
+    if (!service.permissions.includes("ai.chat") || !current.servicePermissions.includes("ai.chat"))
+      throw new GatewayError("FORBIDDEN", "ai.chat is not granted to this service");
+    if (!adapters.ai)
+      throw new GatewayError("GATEWAY_UNAVAILABLE", "ai is not configured");
+    return { ai: adapters.ai, credentialId: service.cid };
+  }
+  async function complete(c, ai2, turnId, plan, request, messages) {
+    const kinds = new Set(messages.flatMap(partKindsOf));
+    if (plan.model.kind === "model" && [...kinds].some((k2) => !plan.model.inputModalities.includes(k2))) {
+      await ai2.platform.fail(turnId, null, "unsupported_attachment");
+      throw new GatewayError("VALIDATION_FAILED", "unsupported_attachment");
+    }
+    const requested = request.max_completion_tokens ?? request.max_tokens ?? plan.maxOutputTokens;
+    const body = {
+      ...Object.fromEntries(PASS_THROUGH.filter((key) => request[key] !== undefined).map((key) => [key, request[key]])),
+      model: plan.model.id,
+      messages,
+      stream: true,
+      max_tokens: Math.min(requested, plan.maxOutputTokens),
+      user: await sha256Hex3(plan.userId),
+      provider: plan.model.kind === "router" ? { data_collection: "deny", zdr: true } : { only: [plan.model.providerSlug], allow_fallbacks: false, data_collection: "deny" }
+    };
+    let upstream;
+    try {
+      upstream = await ai2.openRouter.chat(body);
+    } catch (cause) {
+      await ai2.platform.fail(turnId, null, "provider_unreachable");
+      if (cause instanceof GatewayError)
+        throw cause;
+      throw new GatewayError("GATEWAY_UNAVAILABLE", "ai provider is unreachable", { cause });
+    }
+    if (!upstream.ok || !upstream.body) {
+      await upstream.body?.cancel();
+      await ai2.platform.fail(turnId, null, `provider_${upstream.status}`);
+      throw providerError(upstream.status);
+    }
+    if (request.stream) {
+      const [forClient, forSettlement] = upstream.body.tee();
+      const settlement = settleCompletion(ai2.platform, turnId, forSettlement).catch((error51) => {
+        logger.log("error", "ai settlement failed", { turn_id: turnId, error: String(error51) });
+      });
+      waitUntilOf(c)?.(settlement);
+      return new Response(forClient, {
+        headers: { "content-type": "text/event-stream", "cache-control": "no-store" }
+      });
+    }
+    const completion = await settleCompletion(ai2.platform, turnId, upstream.body);
+    return c.json(chatCompletionOf(completion, plan.model.id));
+  }
+}
+function fileRefsOf(message2) {
+  if (!Array.isArray(message2.content))
+    return [];
+  return message2.content.flatMap((part) => {
+    const location = locationOf(part);
+    const match2 = location ? FILE_REF.exec(location) : null;
+    return match2?.[1] ? [match2[1].toLowerCase()] : [];
+  });
+}
+function locationOf(part) {
+  const value = part[part.type];
+  if (!value || typeof value !== "object")
     return;
-  }
-  await dev.settle({ turnId, generationId, modelUsed: model ?? "", usage, costUsd: cost });
+  const location = value.url ?? value.file_data ?? value.data;
+  return typeof location === "string" ? location : undefined;
+}
+function partKindsOf(message2) {
+  if (!Array.isArray(message2.content))
+    return [];
+  return message2.content.flatMap((part) => {
+    const kind = KIND_OF_PART[part.type];
+    return kind ? [kind] : [];
+  });
+}
+function inlineFiles(message2, files) {
+  if (!Array.isArray(message2.content))
+    return message2;
+  return {
+    ...message2,
+    content: message2.content.map((part) => {
+      const location = locationOf(part);
+      const match2 = location ? FILE_REF.exec(location) : null;
+      const file2 = match2?.[1] ? files.get(match2[1].toLowerCase()) : undefined;
+      if (!file2)
+        return part;
+      const data = `data:${file2.contentType};base64,${file2.base64}`;
+      switch (part.type) {
+        case "image_url":
+          return { ...part, image_url: { ...part.image_url, url: data } };
+        case "video_url":
+          return { ...part, video_url: { ...part.video_url, url: data } };
+        case "file":
+          return { ...part, file: { filename: file2.name, file_data: data } };
+        case "input_audio":
+          return {
+            ...part,
+            input_audio: {
+              data: file2.base64,
+              format: file2.contentType.includes("wav") ? "wav" : "mp3"
+            }
+          };
+        default:
+          return part;
+      }
+    })
+  };
+}
+function chatCompletionOf(completion, requestedModel) {
+  const toolCalls = completion.toolCalls.filter(Boolean);
+  return {
+    id: completion.id ?? `chatcmpl-${crypto.randomUUID()}`,
+    object: "chat.completion",
+    created: completion.created ?? Math.floor(Date.now() / 1000),
+    model: completion.model ?? requestedModel,
+    choices: [
+      {
+        index: 0,
+        message: {
+          role: "assistant",
+          content: completion.content === "" && toolCalls.length > 0 ? null : completion.content,
+          ...toolCalls.length > 0 ? { tool_calls: toolCalls } : {}
+        },
+        finish_reason: completion.finishReason ?? "stop"
+      }
+    ],
+    ...completion.usage ? { usage: completion.usage } : {}
+  };
 }
 
 // frontend/node_modules/hono/dist/middleware/body-limit/index.js
@@ -73650,9 +73926,11 @@ function registerJobRoutes(app, adapters) {
       const parsed = (action2 === "schedule" ? jobScheduleRequestSchema : jobCancelRequestSchema).safeParse(await jsonBody(c2));
       if (!parsed.success)
         throw new GatewayError("VALIDATION_FAILED", "invalid job request");
+      const actAs = c2.req.header(ACT_AS_HEADER);
+      const userId = action2 === "schedule" && actAs !== undefined ? platformUserIdOf((await verifyActAs(adapters, claims, actAs)).gid) : null;
       if (!adapters.jobs)
         throw new GatewayError("GATEWAY_UNAVAILABLE", "jobs unavailable");
-      const raw2 = await adapters.jobs.call(action2, claims.cid, parsed.data);
+      const raw2 = await adapters.jobs.call(action2, claims.cid, parsed.data, userId);
       const refusal = exports_external.object({ error: exports_external.enum(["FORBIDDEN", "VALIDATION_FAILED", "RATE_LIMITED"]) }).safeParse(raw2);
       if (refusal.success)
         throw new GatewayError(refusal.data.error, "job refused");
@@ -75206,6 +75484,7 @@ function createGateway(adapters, config3, logger = consoleLogger, realtimeTransp
   registerTokenRoutes(app, adapters, config3);
   registerAiRoutes(app, adapters, config3, runtime, logger);
   registerAiDevRoutes(app, adapters, logger);
+  registerAiOpenAiRoutes(app, adapters, config3, runtime, logger);
   registerDeliveryRoutes(app, adapters, config3);
   registerDirectAuthRoutes(app, adapters, config3);
   registerProfileRoutes(app, adapters, config3);
@@ -75905,7 +76184,7 @@ export default {
     const waitUntil = promise => pending.push(Promise.resolve(promise).catch(error=>{failed=true;failure=error}));
     const execution = {...ctx,waitUntil};
     try {
-      waitUntil(Promise.resolve().then(()=>worker.scheduled({cron:input.cron,scheduledTime:input.scheduledTime,handler:input.handler,noRetry(){noRetry=true}},env,execution)));
+      waitUntil(Promise.resolve().then(()=>worker.scheduled({...(typeof input.id==='string'?{id:input.id}:{}),cron:input.cron,scheduledTime:input.scheduledTime,handler:input.handler,noRetry(){noRetry=true}},env,execution)));
       while(pending.length) await Promise.all(pending.splice(0));
       if(failed) throw failure;
       return Response.json({ok:true});
@@ -77576,22 +77855,25 @@ function createDevAi(options2) {
     const content = await readFile13(path, "utf8");
     return kind === "schema" ? JSON.parse(content) : content;
   }
+  const modelOf2 = (requested) => {
+    const model = requested ?? options2.manifest.ai?.model ?? "auto";
+    return {
+      id: model === "auto" ? JEV_ROUTER : model,
+      kind: model === "auto" ? "router" : "model",
+      providerSlug: null,
+      inputModalities: ALL_MODALITIES,
+      supportsJsonSchema: true
+    };
+  };
   return {
     platform: {
       async begin(input) {
         lastApp = input.appSlug;
         const key = keyOf4(input.userId, input.conversation);
         pending.set(input.turnId, key);
-        const model = input.model ?? options2.manifest.ai?.model ?? "auto";
         return {
           turnId: input.turnId,
-          model: {
-            id: model === "auto" ? JEV_ROUTER : model,
-            kind: model === "auto" ? "router" : "model",
-            providerSlug: null,
-            inputModalities: ALL_MODALITIES,
-            supportsJsonSchema: true
-          },
+          model: modelOf2(input.model),
           maxOutputTokens: options2.manifest.ai?.maxOutputTokens ?? AI_MAX_OUTPUT_TOKENS_DEFAULT,
           instructions: await prompt("instructions", input.instructions),
           schema: await prompt("schema", input.schema),
@@ -77615,7 +77897,26 @@ function createDevAi(options2) {
       },
       async reset(input) {
         conversations.delete(keyOf4(input.userId, input.conversation));
-      }
+      },
+      async beginRequest(input) {
+        lastApp = input.appSlug;
+        return {
+          turnId: input.turnId,
+          model: modelOf2(input.model),
+          maxOutputTokens: options2.manifest.ai?.maxOutputTokens ?? AI_MAX_OUTPUT_TOKENS_DEFAULT,
+          userId: input.userId
+        };
+      },
+      async beginJob(input) {
+        lastApp = "jobs";
+        return {
+          turnId: input.turnId,
+          model: modelOf2(input.model),
+          maxOutputTokens: options2.manifest.ai?.maxOutputTokens ?? AI_MAX_OUTPUT_TOKENS_DEFAULT,
+          userId: "kit-dev"
+        };
+      },
+      async settle() {}
     },
     openRouter: {
       async chat(body) {
@@ -77656,7 +77957,10 @@ async function forward(proxy, app, body) {
       ...request.model ? { model: request.model } : {},
       ...request.max_tokens ? { maxTokens: request.max_tokens } : {},
       messages: request.messages,
-      ...request.response_format ? { responseFormat: request.response_format } : {}
+      ...request.response_format ? { responseFormat: request.response_format } : {},
+      ...request.tools ? { tools: request.tools } : {},
+      ...request.tool_choice !== undefined ? { toolChoice: request.tool_choice } : {},
+      ...request.parallel_tool_calls !== undefined ? { parallelToolCalls: request.parallel_tool_calls } : {}
     })
   });
   if (response.ok)

@@ -8,7 +8,7 @@ import { SdkError } from "./errors.js";
  */
 export function createTransport(options) {
     const base = options.gateway.replace(/\/+$/, '');
-    async function authorizedFetch(url, init = {}) {
+    async function forward(url, init = {}) {
         const token = await options.token();
         if (!token)
             throw new SdkError('UNAUTHENTICATED', 'no project session');
@@ -24,6 +24,13 @@ export function createTransport(options) {
                 cause,
             });
         }
+        if (response.status === 401) {
+            await readResponse(response.clone(), options.onUnauthenticated).catch(() => { });
+        }
+        return response;
+    }
+    async function authorizedFetch(url, init = {}) {
+        const response = await forward(url, init);
         if (!response.ok)
             await readResponse(response, options.onUnauthenticated);
         return response;
@@ -41,6 +48,7 @@ export function createTransport(options) {
             return readResponse(response, options.onUnauthenticated);
         },
         fetch: authorizedFetch,
+        forward,
     };
 }
 /** Gateway の応答を値か `SdkError` にする（トークン無しで呼ぶ refresh / revoke も同じ規則で読む） */

@@ -37,6 +37,14 @@ export function createAi(transport, gateway) {
                 });
             }
         },
+        openai() {
+            return {
+                baseURL: `${base}/v1/ai/openai`,
+                apiKey: 'fdpocket',
+                // OpenAI SDK・AI SDK・LangChain は (URL 文字列, init) で呼ぶ
+                fetch: (input, init) => transport.forward(input instanceof Request ? input.url : String(input), init),
+            };
+        },
     };
 }
 function resultOf(body) {
