@@ -1,6 +1,6 @@
 ---
 name: fdpocket-app-ai
-description: ミニアプリに AI の機能（要約・下書き・分類・チャット・画像や PDF の読み取り・ツールを使うエージェント）を入れるときに使う。LangChain・Vercel AI SDK・OpenAI SDK もそのまま使える。費用は使った利用者のクレジット。
+description: ミニアプリに AI の機能（要約・下書き・分類・チャット・画像や PDF の読み取り・ツールを使うエージェント）を入れるときに使う。Mastra・LangChain・Vercel AI SDK・OpenAI SDK もそのまま使える。費用は使った利用者のクレジット。
 ---
 
 # ミニアプリ内 AI（`client.ai`）
@@ -13,7 +13,7 @@ Platform が用意する AI を `client.ai.chat` か、OpenAI 互換の `client.
 | 頼まれたこと | 作り方 |
 |---|---|
 | 利用者の入力を要約・分類・下書き・翻訳する、画像や PDF を読ませる、相談相手のチャット | `client.ai.chat`（§3） |
-| AI に道具（DB の検索・計算・外部 API）を使わせて何手か進めるエージェント、ストリーミングの UI、構造化出力をフレームワークで扱う | `client.ai.openai()` ＋ Vercel AI SDK / LangChain.js（§3a） |
+| AI に道具（DB の検索・計算・外部 API）を使わせて何手か進めるエージェント、ストリーミングの UI、構造化出力をフレームワークで扱う | `client.ai.openai()` ＋ Mastra / Vercel AI SDK / LangChain.js を api の App で（§3a） |
 | 作者が契約している特定の AI（自社のモデル・独自の API）を使う、費用を作者が持つ | 自分の API キーで api から呼ぶ（`$fdpocket-app-integrations`。`network.egress` と `secrets`） |
 | AI が無くても成り立つ処理（並べ替え・集計・決まった文面） | AI を使わない（費用と待ち時間を利用者に負わせない） |
 
@@ -62,35 +62,85 @@ const summary = result.json                          // schema を指定し、�
 
 ## 3a. エージェント（フレームワークを使う）
 
-`client.ai.openai()` は OpenAI 互換の接続先（`baseURL`・`apiKey`・`fetch`）を返す。フレームワークにそのまま渡す。
-`model` は `auto`（Jev Router）か project.yaml の `ai.model`・許可一覧の ID。依存は普通の npm の追加（`$fdpocket-app-dependencies`）。
+`client.ai.openai()` は OpenAI 互換の接続先（`baseURL`・`apiKey`・`fetch`）を返す。Mastra・Vercel AI SDK・LangChain.js に
+そのまま渡す。`model` は `auto`（Jev Router）か project.yaml の `ai.model`・許可一覧の ID。依存は普通の npm の追加
+（`$fdpocket-app-dependencies`）。
 
-```ts
-// Vercel AI SDK。Chat Completions を使う（.chat）
-import { createOpenAI } from '@ai-sdk/openai'
-import { generateText, stepCountIs, tool } from 'ai'
-import { z } from 'zod'
+**エージェントは api の App で動かす**（道具がサーバーの処理を持つ・Mastra と LangChain はサーバー向け）。web は
+`client.fetch(apiPath('<api>', '/'))` で呼び、api は `asUser(request)` でその利用者として AI と DB を使う（払うのもその利用者）。
+api の Worker は Node の組み込み（`node:async_hooks`・`node:fs` など）が使える（`nodejs_compat`）。
 
-const fdpocket = createOpenAI(client.ai.openai())
-const { text } = await generateText({
-  model: fdpocket.chat('auto'),
-  tools: {
-    findNotes: tool({
-      description: 'メモを探す',
-      inputSchema: z.object({ query: z.string() }),
-      execute: async ({ query }) => client.db.note.findMany({ where: { title: { contains: query } }, take: 10 }),
-    }),
-  },
-  stopWhen: stepCountIs(5),        // ループの回数を必ず決める（1 手ごとに費用がかかる）
-  prompt: input,
-})
-
-// LangChain.js
-import { ChatOpenAI } from '@langchain/openai'
-const { baseURL, apiKey, fetch } = client.ai.openai()
-const llm = new ChatOpenAI({ model: 'auto', apiKey, configuration: { baseURL, fetch } })
+```yaml
+# infra/project.yaml
+apps:
+  ask:
+    kind: api
+    routes: ["/api/*"]
+    servicePermissions: [ai.chat]   # 利用者として AI を呼ぶ（web 側の capabilities.ai.chat も要る）
 ```
 
+```ts
+// apps/ask/src/index.ts（Mastra）
+import { createOpenAI } from '@ai-sdk/openai'
+import { Agent } from '@mastra/core/agent'
+import { createTool } from '@mastra/core/tools'
+import { createServerClient, type PlatformBindings } from '@workspace/miniapp-sdk/server'
+import type { SchemaType } from '@workspace/sdk'
+import { z } from 'zod'
+
+export default {
+  async fetch(request: Request, env: PlatformBindings) {
+    const user = createServerClient<SchemaType>({ env }).asUser(request)
+    const agent = new Agent({
+      id: 'memo-agent',
+      name: 'メモの助手',
+      instructions: 'searchNotes で利用者のメモを探し、その内容だけを根拠に答える',
+      model: createOpenAI(user.ai.openai()).chat('auto'),   // .chat（Chat Completions）を使う
+      tools: {
+        searchNotes: createTool({
+          id: 'searchNotes',
+          description: '利用者のメモを言葉で探す',
+          inputSchema: z.object({ query: z.string() }),
+          execute: async ({ query }) =>
+            user.db.note.findMany({ where: { body: { contains: query } }, take: 5 }),
+        }),
+      },
+    })
+    const { question } = await request.json()
+    const result = await agent.generate(question, { maxSteps: 5 })   // 手数を必ず区切る
+    return Response.json({ answer: result.text })
+  },
+}
+```
+
+```ts
+// Vercel AI SDK
+import { generateText, stepCountIs, tool } from 'ai'
+const { text } = await generateText({
+  model: createOpenAI(user.ai.openai()).chat('auto'),
+  system: '…',
+  prompt: question,
+  tools: { searchNotes: tool({ description: '…', inputSchema: z.object({ query: z.string() }), execute: searchNotes }) },
+  stopWhen: stepCountIs(5),
+})
+
+// LangChain.js（ツールの呼び出しを自分で回す）
+import { tool } from '@langchain/core/tools'
+import { ChatOpenAI } from '@langchain/openai'
+const { baseURL, apiKey, fetch } = user.ai.openai()
+const search = tool(async (input) => JSON.stringify(await searchNotes(input)), { name: 'searchNotes', description: '…', schema: z.object({ query: z.string() }) })
+const llm = new ChatOpenAI({ model: 'auto', apiKey, configuration: { baseURL, fetch } }).bindTools([search])
+const messages = [{ role: 'system', content: '…' }, { role: 'user', content: question }]
+for (let step = 0; step < 5; step++) {
+  const reply = await llm.invoke(messages)
+  messages.push(reply)
+  if (!reply.tool_calls?.length) break
+  for (const call of reply.tool_calls) messages.push(await search.invoke(call))
+}
+```
+
+- api の応答のエラーは Gateway と同じ形（`{ error: { code, message, retryable } }` と状態コード）で返すと、web の
+  `client.fetch` が `SdkError` にしてくれる（`QUOTA_EXCEEDED` は 429）。
 - 道具（tool）は**その利用者の権限の範囲**で動く（ブラウザなら本人の `client.db`、api なら `asUser(request)` の `db`）。
   サービスの資格情報で利用者の代わりに読ませない。
 - **ループの回数を必ず区切る**（`stopWhen` / `maxIterations`）。1 手ごとに利用者のクレジットが減る。

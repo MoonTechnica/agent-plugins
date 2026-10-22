@@ -68321,6 +68321,7 @@ async function createMockWorkerRuntime(input) {
     workers: input.workers.map((worker) => ({
       name: worker.slug,
       compatibilityDate: "2026-07-30",
+      compatibilityFlags: ["nodejs_compat"],
       modules: [{ type: "ESModule", path: "index.js", contents: worker.script }],
       bindings: worker.bindings,
       outboundService: async (request) => {
@@ -68370,9 +68371,11 @@ async function createMockWorkerRuntime(input) {
   }
   const fetchWorker = async (slug, request) => {
     const worker = await mf.getWorker(slug);
+    const headers = new Headers(request.headers);
+    headers.delete("origin");
     const response = await worker.fetch(request.url, {
       method: request.method,
-      headers: Object.fromEntries(request.headers),
+      headers: Object.fromEntries(headers),
       ...["GET", "HEAD"].includes(request.method) ? {} : { body: await request.arrayBuffer() }
     });
     return new Response([204, 205, 304].includes(response.status) ? null : await response.arrayBuffer(), {
@@ -68910,6 +68913,7 @@ function describeFile(bytes) {
 }
 
 // frontend/packages/miniapp-kit/src/worker-build.ts
+import { builtinModules } from "node:module";
 import { join as join16 } from "node:path";
 import { pathToFileURL as pathToFileURL7 } from "node:url";
 
@@ -76130,6 +76134,7 @@ export default {
 }
 
 // frontend/packages/miniapp-kit/src/worker-build.ts
+var NODE_BUILTINS = [/^node:/, ...builtinModules];
 async function buildWorkerBundle(input) {
   const vite = await import(pathToFileURL7(resolveViteEntry(input.appDir)).href);
   const scheduledEntry = join16(input.appDir, "__platform_scheduled__.ts");
@@ -76138,17 +76143,20 @@ async function buildWorkerBundle(input) {
     root: input.appDir,
     configFile: false,
     logLevel: "warn",
-    plugins: input.kind === "jobs" ? [
-      {
-        name: "platform-scheduled-adapter",
-        resolveId(id) {
-          return id === scheduledEntry ? scheduledModule : undefined;
-        },
-        load(id) {
-          return id === scheduledModule ? scheduledWorkerSource(join16(input.appDir, "src/index.ts")) : undefined;
+    plugins: [
+      ...vite.esmExternalRequirePlugin ? [vite.esmExternalRequirePlugin({ external: NODE_BUILTINS })] : [],
+      ...input.kind === "jobs" ? [
+        {
+          name: "platform-scheduled-adapter",
+          resolveId(id) {
+            return id === scheduledEntry ? scheduledModule : undefined;
+          },
+          load(id) {
+            return id === scheduledModule ? scheduledWorkerSource(join16(input.appDir, "src/index.ts")) : undefined;
+          }
         }
-      }
-    ] : [],
+      ] : []
+    ],
     build: {
       target: "es2022",
       outDir: join16(input.root, "dist", input.slug),
@@ -76160,7 +76168,10 @@ async function buildWorkerBundle(input) {
         formats: ["es"],
         fileName: () => "index.js"
       },
-      rolldownOptions: { external: ["cloudflare:workers"] }
+      rolldownOptions: {
+        external: ["cloudflare:workers"],
+        output: { codeSplitting: false }
+      }
     }
   });
   return "";

@@ -7,7 +7,7 @@ description: api / jobs の外部 API、秘密の名前、サーバー SDK、開
 
 `infra/project.yaml` の api / jobs に `network.egress`（HTTPS のホスト名）、`secrets`（名前・説明・required）を宣言する。値は作者がアプリ管理画面で設定する。秘密をコードや manifest に書かない。ブラウザで使ってよい公開 API だけ web の `network.browser` に HTTPS オリジンを宣言する。
 
-api は `src/index.ts` で `export default { fetch(request, env, ctx) {} }`、jobs は `export default { scheduled(controller, env, ctx) {} }` を公開する。jobs の `schedules` は UTC cron と handler 名を持つ。
+api は `src/index.ts` で `export default { fetch(request, env, ctx) {} }`（Worker は `nodejs_compat` で動き、`node:async_hooks`・`node:crypto` などの Node の組み込みも使える。動的 import も 1 ファイルにまとまる）、jobs は `export default { scheduled(controller, env, ctx) {} }` を公開する。jobs の `schedules` は UTC cron と handler 名を持つ。
 
 jobs の scheduled は `controller.handler` で manifest の handler 名を選ぶ。非同期処理は return / await するか `ctx.waitUntil()` に渡す。再試行しても復旧しない失敗だけ `controller.noRetry()` で止める。
 
