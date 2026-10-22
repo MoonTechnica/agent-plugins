@@ -23,9 +23,10 @@ description: 2D / 3D の画風・質感・光・影・色調・カメラを揃�
 | `key-art.png` | **プレイ画面の構図を想定した完成イメージ 1 枚**。主役・敵・背景・HUD の位置、画風・光・雰囲気を共有する。未実装のコンセプトで、実ゲームのスクリーンショットとは説明しない。文字は入れない。掲載カバーへ使う時は `$game-listing` のタイトル/構図に合わせる |
 | `hero.png` | 主役と主な敵 2〜3 体を**同じ縮尺**で並べた 1 枚（単色の背景・正面か側面）。以後の主役の絵はこれを元にする |
 | `title.png`（任意） | タイトル画面の構図を共有する見本 1 枚。既存の絵/実場面で方向を共有できるなら追加生成しない。文字と操作部は実装で重ねる |
+| `map.png`（空間が遊びの中心の作品） | **全体図**。広い世界・ダンジョン・複数の部屋/ステージ・RPG のフィールド・対戦マップなど。画像生成で作らず、`design/world-map.json` から `$game-level-design` references/world-layout.md のツール（`overview --concept`）で描く。番号の名前は `level-design.md` に書く |
 | `style-guide.md` | 下の 5 行（3D は + 3 行）を入口に、作品の明暗・質感・光・カメラ・UI / VFX の基準を必要に応じて追記（references §2） |
 
-- 画像は **PNG か WebP・長辺 1024px 以下・1 枚 1 MiB 以下・3 枚まで**（`key-art` `hero` `title` の名前だけがチャットに並ぶ。
+- 画像は **PNG か WebP・長辺 1024px 以下・1 枚 1 MiB 以下・4 枚まで**（`key-art` `hero` `title` `map` の名前だけがチャットに並ぶ。
   4 MiB を超えた画像は Platform が黙って落とす）。
 - `generate_image`（`size="landscape"` か `"square"`）で作り、`download_url` から取って `source/design/concept/` に置く。
 
@@ -45,7 +46,7 @@ description: 2D / 3D の画風・質感・光・影・色調・カメラを揃�
 - 画像生成の指示文は `design/prompts/<名前>.md` に保存する。次のターンも同じ文で作る。**全ての生成の指示に style-guide の 5 行と、その素材に関係する詳細基準を入れる**。
 - 作成したコンセプト・設定画・参考画像は、`$game-asset-tools`の素材一覧に
   `purposes:["reference"]`で記録する。企画ターンでも資料の実在するファイルをcommitする。
-  key-art/hero/titleのIDは`concept-key-art`/`concept-hero`/`concept-title`。
+  key-art/hero/title/mapのIDは`concept-key-art`/`concept-hero`/`concept-title`/`concept-map`。
   背景・掲載カバーとして採用する場合は同じ項目へ`game`の用途を追加する。
 - 利用者が絵柄・キャラ・参考画像を示していれば、それが方向になる（添付の扱いは `$game-asset-tools` §9）。
 - **コンセプトは雰囲気の共有と制作基準。** 見せる前に画像を開き、主役・場所・カメラ・明暗が依頼に合うか確認する。

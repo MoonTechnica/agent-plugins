@@ -76,8 +76,8 @@ CLIは参照検索と決定的なローカル加工だけで、有料生成・�
 - idは英数字/`_`/`-`で80文字まで。対象を直しても維持し、削除後に別の対象へ再利用しない。旧制作記録の行を移す場合は、行の名前のUTF-8 SHA256先頭24桁に`legacy-`を付けたIDを保つ。名前は一覧内で一意、100文字まで。
 - kindは`model_3d`/`image`/`audio`。sourcesは実在する相対ファイルパス、symbolは任意の関数などの目印。
 - `purposes`の要素は1〜2個で重複不可。設定画や参考画像には`reference`を指定する。
-  既存の`design/concept/key-art`/`hero`/`title`を一覧へ移すときのIDはそれぞれ
-  `concept-key-art`/`concept-hero`/`concept-title`を維持する。PNGからWebPへ変えてもIDは同じ。
+  既存の`design/concept/key-art`/`hero`/`title`/`map`を一覧へ移すときのIDはそれぞれ
+  `concept-key-art`/`concept-hero`/`concept-title`/`concept-map`を維持する。PNGからWebPへ変えてもIDは同じ。
 - 素材ツールのファイルを使う場合はその`asset_id`を添え、sourceには使っているコード/設定を指す。
 - descriptionは利用者に伝わる用途（1000文字まで）。Storage/コード生成/ツール名/関数名は書かない。
 - 最大500項目・256 KiB。一覧はソースでcommitし、`dist/`へコピーしない。Kitが形と参照先を検査する。

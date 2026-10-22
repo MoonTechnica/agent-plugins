@@ -7,9 +7,11 @@
 作品に合わせて変えてよい値: 世界の大きさ・高さの倍率・リングの段数・植生の量と種類・地域の大きさ。
 変えてはいけないこと: GDExtension を使わない、仕事を `_process` の時間予算で分ける、当たり判定は周辺だけ。
 
-- 高さデータは主 PCK に `res://terrain/height.bin`（1024² の 32 bit float、8 m 間隔）として入れる。
+- 地形のデータは `world.gd build`（`$game-level-design` references/world-layout.md）が `design/world-map.json` から作る:
+  `res://terrain/height.bin`（1024² の 32 bit float、0〜1 を `height_scale` 倍）、`vegetation.bin`（木の密度 0〜255）、
+  `features.bin`（1 川・2 道・3 町などの台地）。ノイズだけの地形にしない。
   `.bin` は資源ではないので、`export_presets.cfg` の Web / Native の `include_filter` に `terrain/*.bin` を足す。
-  作るのは制作時に 1 回（`FastNoiseLite` か手描きの高さを書き出す）。起動のたびに生成しない。
+  `HEIGHT` は `world-map.json` の `height_scale`、`WORLD` は `size` と同じ値にする。起動のたびに生成しない。
 - 段の境目は、細かい段のリングの外周付近で頂点の高さを粗い段の高さへ寄せて（geomorph）隙間をなくしている。
   リングの段数や格子の数を変えたら、シェーダの `cell_size` / `ring_half` も合わせる（`clipmap_terrain.gd` が設定する）。
 
@@ -55,6 +57,8 @@ shader_type spatial;
 render_mode cull_back;
 
 uniform sampler2D heightmap : filter_linear, repeat_disable;
+// Rivers (R), roads (G) and plateaus (B) from the world tool's features.bin, filtered so edges stay smooth.
+uniform sampler2D features : filter_linear, repeat_disable;
 uniform float world_size = 8192.0;
 uniform float height_scale = 400.0;
 uniform float level_bias = 0.0;
@@ -64,6 +68,7 @@ uniform float ring_half = 64.0;
 
 varying float v_height;
 varying vec3 v_world_normal;
+varying vec2 v_uv;
 
 float sample_height(vec2 xz) {
 	return textureLod(heightmap, xz / world_size + 0.5, 0.0).r * height_scale;
@@ -86,6 +91,7 @@ void vertex() {
 	v_world_normal = normalize(vec3(-dx, 2.0 * texel, -dz));
 	NORMAL = v_world_normal;
 	v_height = h;
+	v_uv = xz / world_size + 0.5;
 }
 
 void fragment() {
@@ -95,6 +101,10 @@ void fragment() {
 	vec3 snow = vec3(0.92, 0.93, 0.96);
 	vec3 color = mix(grass, rock, smoothstep(0.15, 0.35, slope));
 	color = mix(color, snow, smoothstep(260.0, 320.0, v_height) * (1.0 - smoothstep(0.3, 0.5, slope)));
+	vec3 feature = texture(features, v_uv).rgb;
+	color = mix(color, vec3(0.5, 0.46, 0.38), smoothstep(0.3, 0.6, feature.b) * 0.5);
+	color = mix(color, vec3(0.55, 0.47, 0.34), smoothstep(0.35, 0.55, feature.g));
+	color = mix(color, vec3(0.16, 0.32, 0.5), smoothstep(0.35, 0.55, feature.r));
 	ALBEDO = color;
 	ROUGHNESS = 0.92;
 }
@@ -124,6 +134,8 @@ const BUDGET_USEC := 3000
 
 var focus := Vector3.ZERO
 var heights := PackedFloat32Array()
+## Tree density per sample (0-255) from the world tool's vegetation mask; empty means everywhere.
+var vegetation := PackedByteArray()
 var _rings: Array[MeshInstance3D] = []
 var _chunks: Dictionary = {}
 var _trees: Dictionary = {}
@@ -133,13 +145,25 @@ var collision_ready := 0
 
 func _ready() -> void:
 	heights = FileAccess.get_file_as_bytes("res://terrain/height.bin").to_float32_array()
+	vegetation = FileAccess.get_file_as_bytes("res://terrain/vegetation.bin")
 	var image := Image.create_from_data(SAMPLES, SAMPLES, false, Image.FORMAT_RF, heights.to_byte_array())
 	var shader := load("res://terrain/terrain.gdshader") as Shader
 	var texture := ImageTexture.create_from_image(image)
+	var feature_bytes := FileAccess.get_file_as_bytes("res://terrain/features.bin")
+	var features: Texture2D = null
+	if feature_bytes.size() == SAMPLES * SAMPLES:
+		# One channel per feature so linear filtering blends edges instead of mixing kinds.
+		var channels := PackedByteArray()
+		channels.resize(SAMPLES * SAMPLES * 3)
+		for k in feature_bytes.size():
+			var kind := feature_bytes[k]
+			if kind >= 1 and kind <= 3: channels[k * 3 + kind - 1] = 255
+		features = ImageTexture.create_from_image(Image.create_from_data(SAMPLES, SAMPLES, false, Image.FORMAT_RGB8, channels))
 	for level in LEVELS:
 		var material := ShaderMaterial.new()
 		material.shader = shader
 		material.set_shader_parameter("heightmap", texture)
+		if features: material.set_shader_parameter("features", features)
 		material.set_shader_parameter("level_bias", level * 0.05)
 		material.set_shader_parameter("cell_size", BASE_CELL * pow(2, level))
 		material.set_shader_parameter("ring_half", CELLS * BASE_CELL * pow(2, level) / 2.0)
@@ -173,6 +197,12 @@ func height_at(x: float, z: float) -> float:
 	var a := lerpf(heights[y0 * SAMPLES + x0], heights[y0 * SAMPLES + x0 + 1], fx)
 	var b := lerpf(heights[(y0 + 1) * SAMPLES + x0], heights[(y0 + 1) * SAMPLES + x0 + 1], fx)
 	return lerpf(a, b, fy) * HEIGHT
+
+func density_at(x: float, z: float) -> float:
+	if vegetation.size() != SAMPLES * SAMPLES: return 255.0
+	var i := clampi(int((x / WORLD + 0.5) * SAMPLES), 0, SAMPLES - 1)
+	var j := clampi(int((z / WORLD + 0.5) * SAMPLES), 0, SAMPLES - 1)
+	return float(vegetation[j * SAMPLES + i])
 
 func _process(_delta: float) -> void:
 	for level in LEVELS:
@@ -257,7 +287,9 @@ func _plant(key: Vector2i, holder: MultiMeshInstance3D, batch: int) -> void:
 		var x := (key.x + rng.randf()) * TREE_CELL
 		var z := (key.y + rng.randf()) * TREE_CELL
 		var y := height_at(x, z)
-		multimesh.set_instance_transform(i, Transform3D(Basis.IDENTITY, Vector3(x, y + 4.5, z)))
+		# Keep roads, rivers and towns clear; thin trees where the mask is low.
+		var basis := Basis.IDENTITY if rng.randf() * 255.0 < density_at(x, z) else Basis.IDENTITY.scaled(Vector3.ZERO)
+		multimesh.set_instance_transform(i, Transform3D(basis, Vector3(x, y + 4.5, z)))
 	multimesh.visible_instance_count = mini(batch + 200, TREES_PER_CELL)
 ```
 
