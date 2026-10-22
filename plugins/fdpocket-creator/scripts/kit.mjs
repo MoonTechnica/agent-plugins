@@ -70963,6 +70963,106 @@ async function eraseProjectUser(db, input, removeObject) {
   }
   return { status: "erased", users: userIds.length, files: batch.length };
 }
+// frontend/packages/project-gateway/src/ai/dev-routes.ts
+init_zod();
+
+// frontend/packages/project-gateway/src/realtime/scope.ts
+async function realtimeDigest(value) {
+  const bytes = await crypto.subtle.digest("SHA-256", new TextEncoder().encode(JSON.stringify(value)));
+  return [...new Uint8Array(bytes)].map((byte) => byte.toString(16).padStart(2, "0")).join("");
+}
+function realtimeScopeOf(claims, resolved) {
+  return realtimeDigest([
+    claims.aud,
+    claims.env,
+    claims.br ?? null,
+    claims.pv ?? null,
+    resolved.db.group,
+    resolved.db.name
+  ]);
+}
+
+// frontend/packages/project-gateway/src/session.ts
+function bearerOf(c) {
+  const header2 = c.req.header("authorization");
+  const match2 = header2?.match(/^Bearer ([A-Za-z0-9._-]+)$/);
+  if (!match2?.[1])
+    throw new GatewayError("UNAUTHENTICATED", "missing bearer token");
+  return match2[1];
+}
+function platformUserIdOf(gid) {
+  return gid.slice(gid.lastIndexOf(":") + 1);
+}
+function activeOrThrow(result) {
+  if (result.revoked)
+    throw new GatewayError("UNAUTHENTICATED", "token revoked");
+  if (result.rateLimited)
+    throw new GatewayError("RATE_LIMITED", "too many requests");
+  if (result.status === "active")
+    return result;
+  if (result.status === "consent_required") {
+    throw new GatewayError("CONSENT_REQUIRED", "consent required", {
+      details: { consent: result.consent }
+    });
+  }
+  const code = errorCodeForResolveStatus(result.status);
+  throw new GatewayError(code ?? "FORBIDDEN", "project not available");
+}
+async function verifyProjectToken(c, adapters, config2, cost, options2 = {}) {
+  const claims = await userClaimsOf(c, adapters, options2.actAs ?? true);
+  return resolveProjectClaims(c, adapters, config2, cost, claims, options2);
+}
+async function resolveProjectClaims(c, adapters, config2, cost, claims, options2 = {}) {
+  const target = {
+    projectId: claims.aud,
+    environment: claims.env,
+    appSlug: claims.app,
+    userId: platformUserIdOf(claims.gid),
+    sessionId: claims.br ?? null,
+    previewSessionId: claims.pv ?? null
+  };
+  const resolved = activeOrThrow(await adapters.registry.resolve({ ...target, jti: claims.jti, cost }));
+  if (!options2.hostOrigin) {
+    allowProjectOrigin(c, config2, resolved.app.originHost, resolved.app.providerOrigin);
+  }
+  if (resolved.realtime?.models.length)
+    c.set("realtimeWakeScope", await realtimeScopeOf(claims, resolved));
+  return { claims, target, resolved };
+}
+async function userClaimsOf(c, adapters, allowActAs) {
+  const actAs = c.req.header(ACT_AS_HEADER);
+  if (actAs === undefined)
+    return adapters.signer.verify(bearerOf(c));
+  if (!allowActAs)
+    throw new GatewayError("FORBIDDEN", "act-as is not allowed here");
+  const service = await adapters.signer.verifyService(bearerOf(c));
+  const current = await adapters.services.current(service.cid);
+  if (!current || current.credentialId !== service.cid || current.projectId !== service.aud || current.appSlug !== service.app || current.environment !== service.env || current.sessionId !== (service.br ?? null) || current.previewSessionId !== (service.pv ?? null) || service.permissions.some((permission) => !current.servicePermissions.includes(permission))) {
+    throw new GatewayError("UNAUTHENTICATED", "service credential is no longer authorized");
+  }
+  if (!/^[A-Za-z0-9._-]+$/.test(actAs)) {
+    throw new GatewayError("UNAUTHENTICATED", "malformed act-as token");
+  }
+  const user = await adapters.signer.verify(actAs);
+  if (user.aud !== service.aud || user.env !== service.env || user.br !== service.br || user.pv !== service.pv) {
+    throw new GatewayError("TOKEN_SCOPE_MISMATCH", "act-as token is for another project");
+  }
+  return user;
+}
+function assertAppAccess(resolved, permissions) {
+  const required2 = resolved.app.requiredPermission;
+  if (resolved.app.access === "restricted" && (!required2 || !permissions.includes(required2))) {
+    throw new GatewayError("FORBIDDEN", "permission required");
+  }
+}
+async function jsonBody(c) {
+  try {
+    return await c.req.json();
+  } catch (cause) {
+    throw new GatewayError("VALIDATION_FAILED", "request body must be JSON", { cause });
+  }
+}
+
 // frontend/packages/project-gateway/src/internal/role-grants.ts
 var NO_BOOTSTRAP = { eligible: false, roles: [], legacyRoles: [] };
 var definitions = [
@@ -71208,103 +71308,6 @@ async function findProjectUsers(db, userIds) {
   return result.rows.map((row) => ({ id: String(row.id), globalUserId: String(row.globalUserId) }));
 }
 
-// frontend/packages/project-gateway/src/realtime/scope.ts
-async function realtimeDigest(value) {
-  const bytes = await crypto.subtle.digest("SHA-256", new TextEncoder().encode(JSON.stringify(value)));
-  return [...new Uint8Array(bytes)].map((byte) => byte.toString(16).padStart(2, "0")).join("");
-}
-function realtimeScopeOf(claims, resolved) {
-  return realtimeDigest([
-    claims.aud,
-    claims.env,
-    claims.br ?? null,
-    claims.pv ?? null,
-    resolved.db.group,
-    resolved.db.name
-  ]);
-}
-
-// frontend/packages/project-gateway/src/session.ts
-function bearerOf(c) {
-  const header2 = c.req.header("authorization");
-  const match2 = header2?.match(/^Bearer ([A-Za-z0-9._-]+)$/);
-  if (!match2?.[1])
-    throw new GatewayError("UNAUTHENTICATED", "missing bearer token");
-  return match2[1];
-}
-function platformUserIdOf(gid) {
-  return gid.slice(gid.lastIndexOf(":") + 1);
-}
-function activeOrThrow(result) {
-  if (result.revoked)
-    throw new GatewayError("UNAUTHENTICATED", "token revoked");
-  if (result.rateLimited)
-    throw new GatewayError("RATE_LIMITED", "too many requests");
-  if (result.status === "active")
-    return result;
-  if (result.status === "consent_required") {
-    throw new GatewayError("CONSENT_REQUIRED", "consent required", {
-      details: { consent: result.consent }
-    });
-  }
-  const code = errorCodeForResolveStatus(result.status);
-  throw new GatewayError(code ?? "FORBIDDEN", "project not available");
-}
-async function verifyProjectToken(c, adapters, config2, cost, options2 = {}) {
-  const claims = await userClaimsOf(c, adapters, options2.actAs ?? true);
-  return resolveProjectClaims(c, adapters, config2, cost, claims, options2);
-}
-async function resolveProjectClaims(c, adapters, config2, cost, claims, options2 = {}) {
-  const target = {
-    projectId: claims.aud,
-    environment: claims.env,
-    appSlug: claims.app,
-    userId: platformUserIdOf(claims.gid),
-    sessionId: claims.br ?? null,
-    previewSessionId: claims.pv ?? null
-  };
-  const resolved = activeOrThrow(await adapters.registry.resolve({ ...target, jti: claims.jti, cost }));
-  if (!options2.hostOrigin) {
-    allowProjectOrigin(c, config2, resolved.app.originHost, resolved.app.providerOrigin);
-  }
-  if (resolved.realtime?.models.length)
-    c.set("realtimeWakeScope", await realtimeScopeOf(claims, resolved));
-  return { claims, target, resolved };
-}
-async function userClaimsOf(c, adapters, allowActAs) {
-  const actAs = c.req.header(ACT_AS_HEADER);
-  if (actAs === undefined)
-    return adapters.signer.verify(bearerOf(c));
-  if (!allowActAs)
-    throw new GatewayError("FORBIDDEN", "act-as is not allowed here");
-  const service = await adapters.signer.verifyService(bearerOf(c));
-  const current = await adapters.services.current(service.cid);
-  if (!current || current.credentialId !== service.cid || current.projectId !== service.aud || current.appSlug !== service.app || current.environment !== service.env || current.sessionId !== (service.br ?? null) || current.previewSessionId !== (service.pv ?? null) || service.permissions.some((permission) => !current.servicePermissions.includes(permission))) {
-    throw new GatewayError("UNAUTHENTICATED", "service credential is no longer authorized");
-  }
-  if (!/^[A-Za-z0-9._-]+$/.test(actAs)) {
-    throw new GatewayError("UNAUTHENTICATED", "malformed act-as token");
-  }
-  const user = await adapters.signer.verify(actAs);
-  if (user.aud !== service.aud || user.env !== service.env || user.br !== service.br || user.pv !== service.pv) {
-    throw new GatewayError("TOKEN_SCOPE_MISMATCH", "act-as token is for another project");
-  }
-  return user;
-}
-function assertAppAccess(resolved, permissions) {
-  const required2 = resolved.app.requiredPermission;
-  if (resolved.app.access === "restricted" && (!required2 || !permissions.includes(required2))) {
-    throw new GatewayError("FORBIDDEN", "permission required");
-  }
-}
-async function jsonBody(c) {
-  try {
-    return await c.req.json();
-  } catch (cause) {
-    throw new GatewayError("VALIDATION_FAILED", "request body must be JSON", { cause });
-  }
-}
-
 // frontend/packages/project-gateway/src/internal/audit.ts
 function auditPolicyVersionOf(schema, policyVersion) {
   const fields = schema?.models?.AuditEvent?.fields;
@@ -71547,6 +71550,8 @@ function registerAiRoutes(app, adapters, config2, runtime, logger) {
       upstream = await ai2.openRouter.chat(await requestBody(plan, request.message, request.schema, attachments, claims));
     } catch (cause) {
       await ai2.platform.fail(turnId, null, "provider_unreachable");
+      if (cause instanceof GatewayError)
+        throw cause;
       throw new GatewayError("GATEWAY_UNAVAILABLE", "ai provider is unreachable", { cause });
     }
     if (!upstream.ok || !upstream.body) {
@@ -71835,6 +71840,109 @@ function toBase64(bytes) {
     binary += String.fromCharCode(...bytes.subarray(i, i + 32768));
   }
   return btoa(binary);
+}
+
+// frontend/packages/project-gateway/src/ai/dev-routes.ts
+var KIT_AI_KEY_HEADER = "x-kit-ai-key";
+var contentPartSchema = exports_external.looseObject({ type: exports_external.string().min(1).max(32) });
+var devChatSchema = exports_external.strictObject({
+  sessionId: exports_external.uuid(),
+  app: appSlugSchema,
+  model: exports_external.string().min(1).max(160).optional(),
+  messages: exports_external.array(exports_external.strictObject({
+    role: exports_external.enum(["system", "user", "assistant"]),
+    content: exports_external.union([exports_external.string(), exports_external.array(contentPartSchema).max(16)])
+  })).min(1).max(200),
+  maxTokens: exports_external.int().min(1).optional(),
+  responseFormat: exports_external.strictObject({
+    type: exports_external.literal("json_schema"),
+    json_schema: exports_external.looseObject({ name: exports_external.string().min(1).max(64), schema: exports_external.unknown() })
+  }).optional()
+});
+function registerAiDevRoutes(app, adapters, logger) {
+  app.post("/v1/ai/dev/chat", async (c) => {
+    const ai2 = adapters.ai;
+    const dev = ai2?.dev;
+    if (!ai2 || !dev)
+      throw new GatewayError("GATEWAY_UNAVAILABLE", "ai is not configured");
+    const liveKey = c.req.header(KIT_AI_KEY_HEADER);
+    let userId = null;
+    if (!liveKey) {
+      const token2 = bearerOf(c);
+      const identity2 = await adapters.jwks.verifySupabaseToken(token2);
+      if (identity2.isAnonymous)
+        throw new GatewayError("FORBIDDEN", "anonymous users cannot use ai");
+      userId = identity2.userId;
+    }
+    const parsed = devChatSchema.safeParse(await jsonBody(c));
+    if (!parsed.success)
+      throw new GatewayError("VALIDATION_FAILED", "invalid dev ai request");
+    const request = parsed.data;
+    const turnId = crypto.randomUUID();
+    const plan = await dev.begin({
+      turnId,
+      sessionId: request.sessionId,
+      userId,
+      liveKeyHash: liveKey ? await sha256Hex3(liveKey) : null,
+      app: request.app,
+      model: request.model ?? null
+    });
+    const body = {
+      model: plan.model.id,
+      stream: true,
+      max_tokens: Math.min(request.maxTokens ?? AI_MAX_OUTPUT_TOKENS_LIMIT, AI_MAX_OUTPUT_TOKENS_LIMIT),
+      messages: request.messages,
+      ...request.responseFormat && plan.model.supportsJsonSchema ? { response_format: request.responseFormat } : {},
+      user: await sha256Hex3(plan.userId),
+      provider: plan.model.kind === "router" ? { data_collection: "deny", zdr: true } : { only: [plan.model.providerSlug], allow_fallbacks: false, data_collection: "deny" }
+    };
+    let upstream;
+    try {
+      upstream = await ai2.openRouter.chat(body);
+    } catch (cause) {
+      await ai2.platform.fail(turnId, null, "provider_unreachable");
+      throw new GatewayError("GATEWAY_UNAVAILABLE", "ai provider is unreachable", { cause });
+    }
+    if (!upstream.ok || !upstream.body) {
+      await ai2.platform.fail(turnId, null, `provider_${upstream.status}`);
+      throw providerError(upstream.status);
+    }
+    const [forClient, forSettlement] = upstream.body.tee();
+    const settlement = settle(ai2, dev, turnId, forSettlement).catch((error51) => {
+      logger.log("error", "dev ai settlement failed", { turn_id: turnId, error: String(error51) });
+    });
+    waitUntilOf(c)?.(settlement);
+    return new Response(forClient, {
+      headers: { "content-type": "text/event-stream", "cache-control": "no-store" }
+    });
+  });
+}
+async function settle(ai2, dev, turnId, stream) {
+  let generationId = null;
+  let model = null;
+  let usage = null;
+  try {
+    for await (const chunk of sseData(stream)) {
+      if (chunk === "[DONE]")
+        break;
+      const event = JSON.parse(chunk);
+      if (event.id)
+        generationId = event.id;
+      if (event.model)
+        model = event.model;
+      if (event.usage)
+        usage = event.usage;
+    }
+  } catch (cause) {
+    await ai2.platform.fail(turnId, generationId, "stream_lost");
+    throw cause;
+  }
+  const cost = Number(usage?.cost);
+  if (!generationId || !usage || !Number.isFinite(cost) || cost < 0) {
+    await ai2.platform.fail(turnId, generationId, "usage_missing");
+    return;
+  }
+  await dev.settle({ turnId, generationId, modelUsed: model ?? "", usage, costUsd: cost });
 }
 
 // frontend/node_modules/hono/dist/middleware/body-limit/index.js
@@ -75050,6 +75158,7 @@ function createGateway(adapters, config3, logger = consoleLogger, realtimeTransp
   });
   registerTokenRoutes(app, adapters, config3);
   registerAiRoutes(app, adapters, config3, runtime, logger);
+  registerAiDevRoutes(app, adapters, logger);
   registerDeliveryRoutes(app, adapters, config3);
   registerDirectAuthRoutes(app, adapters, config3);
   registerProfileRoutes(app, adapters, config3);
@@ -77387,6 +77496,7 @@ var ALL_MODALITIES = ["text", "image", "file", "audio", "video"];
 function createDevAi(options2) {
   const conversations = new Map;
   const pending = new Map;
+  let lastApp = "web";
   const keyOf4 = (userId, conversation) => `${userId}\x00${conversation}`;
   async function prompt(kind, key) {
     if (key === null)
@@ -77402,6 +77512,7 @@ function createDevAi(options2) {
   return {
     platform: {
       async begin(input) {
+        lastApp = input.appSlug;
         const key = keyOf4(input.userId, input.conversation);
         pending.set(input.turnId, key);
         const model = input.model ?? options2.manifest.ai?.model ?? "auto";
@@ -77430,7 +77541,7 @@ function createDevAi(options2) {
             { role: "assistant", content: input.assistant }
           ]);
         }
-        return { credits: 0 };
+        return { credits: options2.proxy ? input.costUsd * 100 : 0 };
       },
       async fail(turnId) {
         pending.delete(turnId);
@@ -77441,6 +77552,8 @@ function createDevAi(options2) {
     },
     openRouter: {
       async chat(body) {
+        if (options2.proxy)
+          return forward(options2.proxy, lastApp, body);
         const request = body;
         const schema2 = request.response_format?.json_schema?.schema;
         const text = schema2 === undefined ? `（kit dev の模擬の応答。本番では AI が答えます）${lastUserText(request.messages)}` : JSON.stringify(sampleOf(schema2));
@@ -77463,6 +77576,29 @@ function createDevAi(options2) {
       }
     }
   };
+}
+async function forward(proxy, app, body) {
+  const request = body;
+  const send = proxy.fetch ?? globalThis.fetch;
+  const response = await send(`${proxy.gatewayUrl.replace(/\/+$/, "")}/v1/ai/dev/chat`, {
+    method: "POST",
+    headers: { "content-type": "application/json", ...await proxy.headers() },
+    body: JSON.stringify({
+      sessionId: proxy.sessionId,
+      app,
+      ...request.model ? { model: request.model } : {},
+      ...request.max_tokens ? { maxTokens: request.max_tokens } : {},
+      messages: request.messages,
+      ...request.response_format ? { responseFormat: request.response_format } : {}
+    })
+  });
+  if (response.ok)
+    return response;
+  const parsed = errorResponseSchema.safeParse(await response.json().catch(() => null));
+  if (parsed.success) {
+    throw new GatewayError(parsed.data.error.code, parsed.data.error.message);
+  }
+  throw new GatewayError("GATEWAY_UNAVAILABLE", `platform ai failed (${response.status})`);
 }
 function lastUserText(messages) {
   const content = messages?.filter((m3) => m3.role === "user").at(-1)?.content;
@@ -77800,7 +77936,7 @@ async function createDevRuntime(options2) {
     },
     services,
     jobs: jobs2.port,
-    ai: createDevAi({ root, manifest: manifest2 }),
+    ai: createDevAi({ root, manifest: manifest2, ...options2.aiProxy ? { proxy: options2.aiProxy } : {} }),
     jwks: {
       async verifySupabaseToken(token2) {
         const identity2 = identities.get(token2);
@@ -78084,6 +78220,61 @@ function createDevRegistry(input) {
     },
     async enqueueStorageJob() {}
   };
+}
+
+// frontend/packages/miniapp-kit/src/dev/ai-config.ts
+var KIT_AI_ENV = "KIT_AI";
+async function resolveDevAi(input) {
+  if (input.mode === "mock")
+    return { mode: "mock" };
+  const live = input.env[KIT_AI_ENV];
+  if (live) {
+    const { gatewayUrl: gatewayUrl2, key } = parseKitAi(live);
+    return {
+      mode: "platform",
+      proxy: {
+        gatewayUrl: gatewayUrl2,
+        sessionId: input.config.session_id,
+        headers: async () => ({ "x-kit-ai-key": key })
+      }
+    };
+  }
+  const unavailable = (reason) => {
+    if (input.mode === "platform") {
+      throw new DevError(reason === "not_logged_in" ? "real AI needs a login: run kit.mjs login (or use --ai mock)" : "real AI needs the Gateway URL: run kit.mjs pull (or use --ai mock)");
+    }
+    return { mode: "mock", reason };
+  };
+  const gatewayUrl = input.config.gateway_url;
+  if (!gatewayUrl)
+    return unavailable("no_gateway_url");
+  if (await input.accessToken() === null)
+    return unavailable("not_logged_in");
+  return {
+    mode: "platform",
+    proxy: {
+      gatewayUrl,
+      sessionId: input.config.session_id,
+      headers: async () => {
+        const token2 = await input.accessToken();
+        if (token2 === null)
+          throw new DevError("the login expired: run kit.mjs login");
+        return { authorization: `Bearer ${token2}` };
+      }
+    }
+  };
+}
+function parseKitAi(raw2) {
+  let value;
+  try {
+    value = JSON.parse(raw2);
+  } catch {
+    throw new DevError(`${KIT_AI_ENV} must be JSON`);
+  }
+  if (typeof value.gatewayUrl !== "string" || !/^https:\/\//.test(value.gatewayUrl) || typeof value.key !== "string" || value.key.length < 32) {
+    throw new DevError(`${KIT_AI_ENV} must be { gatewayUrl: https URL, key }`);
+  }
+  return { gatewayUrl: value.gatewayUrl, key: value.key };
 }
 
 // frontend/packages/miniapp-kit/src/dev/live.ts
@@ -78931,7 +79122,8 @@ async function startDev(options2) {
       hostOrigin: host.url,
       appsPort: distServer ? Number(new URL(distServer.url).port) : primaryApp ? appPorts[primaryApp] : 5173,
       objectsBaseUrl: live ? live.origins.objects : objects.url,
-      ...options2.quiet ? { quiet: true } : {}
+      ...options2.quiet ? { quiet: true } : {},
+      ...options2.aiProxy ? { aiProxy: options2.aiProxy } : {}
     });
     const started = runtime;
     closers.push(() => started.close());
@@ -79666,7 +79858,8 @@ function parsePulled(text) {
       ref_name: referenceName
     } : null,
     bundles: raw2.bundles.map(bundle),
-    lfs_url: url2(raw2.lfs_url, "lfs_url")
+    lfs_url: url2(raw2.lfs_url, "lfs_url"),
+    ...raw2.gateway_url === undefined ? {} : { gateway_url: url2(raw2.gateway_url, "gateway_url") }
   };
 }
 function fetchOrder(bundles) {
@@ -80401,7 +80594,7 @@ var REQUIRED = [
   "thread_ref",
   "lfs_url"
 ];
-var OPTIONAL = ["editor_url"];
+var OPTIONAL = ["editor_url", "gateway_url"];
 var NULLABLE = ["base_commit_oid"];
 var LISTS = ["fetched_bundles"];
 function parseConfig(text) {
@@ -80422,10 +80615,12 @@ function parseConfig(text) {
     }
     config3[key] = value;
   }
-  if (record3.editor_url !== undefined) {
-    if (typeof record3.editor_url !== "string" || record3.editor_url === "")
-      throw new ConfigError(`${CONFIG_FILE}: "editor_url" must be a non-empty string`);
-    config3.editor_url = record3.editor_url;
+  for (const key of OPTIONAL) {
+    if (record3[key] === undefined)
+      continue;
+    if (typeof record3[key] !== "string" || record3[key] === "")
+      throw new ConfigError(`${CONFIG_FILE}: "${key}" must be a non-empty string`);
+    config3[key] = record3[key];
   }
   for (const key of NULLABLE) {
     const value = record3[key] ?? null;
@@ -80655,6 +80850,7 @@ async function clone4(context, flags) {
     mcp_url: mcpUrlOf(flags["mcp-url"]),
     thread_ref: pulled.thread_ref,
     lfs_url: pulled.lfs_url,
+    ...pulled.gateway_url ? { gateway_url: pulled.gateway_url } : {},
     base_commit_oid: null,
     fetched_bundles: []
   };
@@ -80697,7 +80893,8 @@ async function pull(context, flags) {
     kit_root: context.kitRoot,
     kit_version: await kitVersion(context.kitRoot),
     lfs_url: pulled.lfs_url,
-    editor_url: pulled.editor_url
+    editor_url: pulled.editor_url,
+    ...pulled.gateway_url ? { gateway_url: pulled.gateway_url } : {}
   };
   await configureRepo(context.git, source, next, pulled.author);
   const fetched = await fetchBundles(context.git, source, pulled, config3.fetched_bundles, bundleDownloader(context));
@@ -80822,9 +81019,9 @@ async function check4(context) {
 }
 async function build(context, flags) {
   const workdir = await findWorkdir(context.cwd);
-  const gatewayUrl = flags["gateway-url"] ?? process.env[KIT_BUILD_ENV.gatewayUrl];
+  const gatewayUrl = flags["gateway-url"] ?? process.env[KIT_BUILD_ENV.gatewayUrl] ?? (await readConfig(workdir)).gateway_url;
   if (gatewayUrl === undefined || gatewayUrl === "") {
-    throw new CommandError(`pass --gateway-url (or set ${KIT_BUILD_ENV.gatewayUrl}): the Project Gateway the apps call`);
+    throw new CommandError(`pass --gateway-url (or set ${KIT_BUILD_ENV.gatewayUrl}, or run kit.mjs pull): the Project Gateway the apps call`);
   }
   const projectId = flags["project-id"] ?? process.env[KIT_BUILD_ENV.projectId] ?? (await readConfig(workdir)).app_id;
   const result = await buildProject({
@@ -80873,7 +81070,17 @@ async function dev(context, flags) {
     throw new CommandError(`--as must be one of ${DEV_PRINCIPAL_NAMES.join(", ")}`);
   }
   const workdir = await findWorkdir(context.cwd);
-  const projectId = flags["project-id"] ?? process.env[KIT_BUILD_ENV.projectId] ?? (await readConfig(workdir)).app_id;
+  const config3 = await readConfig(workdir);
+  const projectId = flags["project-id"] ?? process.env[KIT_BUILD_ENV.projectId] ?? config3.app_id;
+  if (flags.ai !== undefined && flags.ai !== "mock" && flags.ai !== "platform") {
+    throw new CommandError("--ai must be platform (the real AI through FDPocket) or mock");
+  }
+  const ai2 = await resolveDevAi({
+    mode: flags.ai,
+    env: process.env,
+    config: config3,
+    accessToken: () => accessToken(config3.mcp_url, context)
+  });
   const liveRaw = flags.live ? process.env[KIT_LIVE_CONFIG_ENV] : undefined;
   if (flags.live && !liveRaw) {
     throw new CommandError(`--live needs ${KIT_LIVE_CONFIG_ENV} (only in the live preview sandbox; use kit dev without --live elsewhere)`);
@@ -80883,7 +81090,8 @@ async function dev(context, flags) {
     kitRoot: context.kitRoot,
     projectId,
     as,
-    ...liveRaw ? { live: parseLiveConfig(liveRaw) } : {}
+    ...liveRaw ? { live: parseLiveConfig(liveRaw) } : {},
+    ...ai2.proxy ? { aiProxy: ai2.proxy } : {}
   });
   if (flags.trigger) {
     try {
@@ -80899,6 +81107,7 @@ async function dev(context, flags) {
     ...server.liveCheckUrl ? { check_url: server.liveCheckUrl } : {},
     gateway_url: server.gatewayUrl,
     apps: server.apps,
+    ai: ai2.mode === "platform" ? "real AI through FDPocket (spends your credits; --ai mock for the free mock)" : ai2.reason === "not_logged_in" ? "mock (run kit.mjs login to use the real AI)" : ai2.reason === "no_gateway_url" ? "mock (run kit.mjs pull to learn the Gateway, then the real AI is used)" : "mock (--ai mock)",
     next: "open host_url in a browser (switch the app and the user at the top); restart kit dev after kit generate; Ctrl-C to stop"
   });
   await context.untilStopped();
