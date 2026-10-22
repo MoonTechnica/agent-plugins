@@ -64704,8 +64704,10 @@ var aiTurnRequestSchema = exports_external.strictObject({
   model: exports_external.string().min(1).max(160).optional(),
   stream: exports_external.boolean().optional()
 });
+var AI_FINISH_REASONS = ["stop", "length", "content_filter", "other"];
 var aiTurnResultSchema = exports_external.strictObject({
   text: exports_external.string(),
+  finishReason: exports_external.enum(AI_FINISH_REASONS),
   json: exports_external.unknown().optional(),
   credits: exports_external.number().nonnegative(),
   responseId: exports_external.string(),
@@ -71709,6 +71711,7 @@ function createTurn(platform, input) {
     let model = input.plan.model.id;
     let usage = null;
     let refused = null;
+    let finishReason = "other";
     try {
       for await (const chunk of sseData(input.upstream)) {
         if (chunk === "[DONE]")
@@ -71720,6 +71723,9 @@ function createTurn(platform, input) {
           model = event.model;
         if (event.error)
           refused = event.error.message ?? "provider error";
+        const reason = event.choices?.[0]?.finish_reason;
+        if (reason)
+          finishReason = finishReasonOf(reason);
         const delta = event.choices?.[0]?.delta?.content;
         if (delta) {
           text += delta;
@@ -71749,7 +71755,8 @@ function createTurn(platform, input) {
     });
     return {
       text,
-      ...input.schema ? jsonOf(text) : {},
+      finishReason,
+      ...input.schema && finishReason === "stop" ? jsonOf(text) : {},
       credits,
       responseId: generationId,
       model
@@ -71784,6 +71791,9 @@ async function* sseData(stream) {
   }
   if (buffer.trim().startsWith("data:"))
     yield buffer.trim().slice(5).trim();
+}
+function finishReasonOf(reason) {
+  return AI_FINISH_REASONS.includes(reason) ? reason : "other";
 }
 function jsonOf(text) {
   try {

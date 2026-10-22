@@ -47,9 +47,15 @@ export const aiTurnRequestSchema = z.strictObject({
     /** true なら SSE（`delta` → `done`）、false なら完了後に JSON */
     stream: z.boolean().optional(),
 });
+/**
+ * 応答の終わり方（OpenRouter の正規化済み `finish_reason`）。`length` は出力の上限で切れた
+ * （推論するモデルでは推論のトークンも上限に含まれる）。tool_calls 等は `other`
+ */
+export const AI_FINISH_REASONS = ['stop', 'length', 'content_filter', 'other'];
 export const aiTurnResultSchema = z.strictObject({
     text: z.string(),
-    /** Schema を指定したときの JSON（読めなければ付かない） */
+    finishReason: z.enum(AI_FINISH_REASONS),
+    /** Schema を指定したときの JSON（読めない・`finishReason` が `stop` 以外なら付かない） */
     json: z.unknown().optional(),
     /** このターンで引いたクレジット */
     credits: z.number().nonnegative(),

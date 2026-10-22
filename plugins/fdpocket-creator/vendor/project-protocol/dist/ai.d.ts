@@ -25,8 +25,20 @@ export declare const aiTurnRequestSchema: z.ZodObject<{
     stream: z.ZodOptional<z.ZodBoolean>;
 }, z.core.$strict>;
 export type AiTurnRequest = z.infer<typeof aiTurnRequestSchema>;
+/**
+ * 応答の終わり方（OpenRouter の正規化済み `finish_reason`）。`length` は出力の上限で切れた
+ * （推論するモデルでは推論のトークンも上限に含まれる）。tool_calls 等は `other`
+ */
+export declare const AI_FINISH_REASONS: readonly ["stop", "length", "content_filter", "other"];
+export type AiFinishReason = (typeof AI_FINISH_REASONS)[number];
 export declare const aiTurnResultSchema: z.ZodObject<{
     text: z.ZodString;
+    finishReason: z.ZodEnum<{
+        length: "length";
+        stop: "stop";
+        content_filter: "content_filter";
+        other: "other";
+    }>;
     json: z.ZodOptional<z.ZodUnknown>;
     credits: z.ZodNumber;
     responseId: z.ZodString;
@@ -41,6 +53,12 @@ export declare const aiTurnEventSchema: z.ZodDiscriminatedUnion<[z.ZodObject<{
     type: z.ZodLiteral<"done">;
     result: z.ZodObject<{
         text: z.ZodString;
+        finishReason: z.ZodEnum<{
+            length: "length";
+            stop: "stop";
+            content_filter: "content_filter";
+            other: "other";
+        }>;
         json: z.ZodOptional<z.ZodUnknown>;
         credits: z.ZodNumber;
         responseId: z.ZodString;
