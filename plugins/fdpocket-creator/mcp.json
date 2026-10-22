@@ -2,8 +2,9 @@
   "$schema": "https://agent-plugins.org/schemas/1.0.0/mcp.schema.json",
   "mcpServers": {
     "fdpocket": {
-      "type": "streamable-http",
-      "url": "https://fdpocket.dev/mcp/creator"
+      "type": "stdio",
+      "command": "node",
+      "args": ["${PLUGIN_ROOT}/scripts/kit.mjs", "mcp"]
     }
   }
 }

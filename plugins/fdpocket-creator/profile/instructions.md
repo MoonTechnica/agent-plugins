@@ -177,8 +177,9 @@ git と Git LFS（`git lfs version`）・Bun・Node 22.12 以上が要る。`nod
 ### 8.2 素材ツール
 
 画像のツール（`generate_image` など）は `fdpocket` の同名のツールで、**どれも `project_id`（`.fdpocket.json` の `project_id`）と `session_id` を渡す**。
-`kit.mjs clone` / `pull` / `push` と LFS の実体の上げ下ろしは、Kit 自身のログイン（`kit.mjs login`。MCP のログインとは別）で
-Platform を呼ぶ。ログインしていなければ最初にブラウザで許可を求められる（一度だけ）。
+Plugin の MCP（`fdpocket`）と `kit.mjs clone` / `pull` / `push`・LFS の実体の上げ下ろしは、同じ Kit のログインで Platform を呼ぶ
+（Plugin の MCP は Kit が起動する local MCP）。ログインしていなければ最初の 1 回だけブラウザで許可を求められる。
+ツールが「FDPocket へのログインが要る」と返したら、利用者に開いたブラウザで許可してもらってからやり直す。
 
 MCP の `project_id` は Project の内部 ID（`.fdpocket.json` の `project_id`）。`editor_url` は返却値をそのまま使い、URL のパスから ID を推測しない。
 

@@ -57,8 +57,8 @@ On older versions, run `/plugin marketplace add https://github.com/MoonTechnica/
 
 ### 2. Sign in
 
-Run `/mcp`, select `plugin:fdpocket-creator:fdpocket`, and approve the login in your browser.
-You only need to do this once.
+Nothing to do yet: the first time the agent uses FDPocket, your browser opens and you approve the login once.
+The same login is used by the agent's tools and by the Kit (pull, push, Git LFS, the real AI in `kit dev`).
 
 ### 3. Make an app
 
@@ -114,8 +114,7 @@ You can install the Kit from the Claude desktop app without typing any commands.
 
 1. Open **Customize → Plugins**, choose **Add → Add marketplace**, and enter `https://github.com/MoonTechnica/agent-plugins`.
 2. Add **FDPocket Developer Kit** from the list.
-3. On the plugin's **Connectors** tab, connect `fdpocket` and approve the login in your browser.
-4. Open the **Code** tab, pick a working folder, and use the same commands as in Claude Code (for example `/fdpocket-creator:new`).
+3. Open the **Code** tab, pick a working folder, and use the same commands as in Claude Code (for example `/fdpocket-creator:new`).
 
 The plugin is saved to your Claude account, so it also appears in Claude Code on your computer.
 Building and pushing run on your computer, so use the **Code** tab (chat cannot run the Kit's tools).
@@ -127,10 +126,9 @@ Building and pushing run on your computer, so use the **Code** tab (chat cannot 
 ```text
 codex plugin marketplace add https://github.com/MoonTechnica/agent-plugins
 codex plugin add fdpocket-creator@moon-technica
-codex mcp login fdpocket
 ```
 
-Then start a new Codex session. (You can also install from `/plugins` inside Codex.)
+Then start a new Codex session. The first time the agent uses FDPocket, your browser opens and you approve the login once. (You can also install from `/plugins` inside Codex.)
 
 ### 2. Use it
 
@@ -190,9 +188,10 @@ Any agent that supports Skills and remote MCP servers can use the Kit.
    ```
    The Kit root is `~/fdpocket-creator-kit/plugins/fdpocket-creator`.
 2. **Install the Skills.** Link `plugins/fdpocket-creator/skills/*` into your agent's Skills folder (for example `.agents/skills/`).
-3. **Register the MCP server.** Transport: Streamable HTTP with OAuth. URL: `https://fdpocket.dev/mcp/creator`.
-   If your client lets you pin the OAuth callback port, use `43125`.
-4. **Sign in** from your agent's MCP screen.
+3. **Register the MCP server.** Either run the Kit's local server (stdio): `node ~/fdpocket-creator-kit/plugins/fdpocket-creator/scripts/kit.mjs mcp`
+   — it signs in once in your browser and shares the login with the Kit's commands — or connect directly to
+   `https://fdpocket.dev/mcp/creator` (Streamable HTTP with OAuth; pin the callback port to `43125` if your client allows,
+   and sign in from your agent's MCP screen; the Kit's commands then ask for their own login once).
 
 ## What happens in your working directory
 
@@ -240,6 +239,7 @@ node <kit>/scripts/kit.mjs <command> [--flag value]
 | `build` | Install with the lockfile and build every app into `source/dist/`. The only way to build. |
 | `pack` | Bundle your new commits as `outputs/source.bundle`, pack `outputs/dist.tar.gz`, and print the push arguments (used by `push`). |
 | `upload` | Upload the LFS files, then the packed files to the signed URLs from `begin_build` (used by `push`). |
+| `mcp` | The plugin's local MCP server (started by Claude Code / Codex). Uses the Kit's login, so you sign in once. |
 | `login` | Sign the Kit in (for `clone`, `pull`, `push`, Git LFS and the real AI in `kit dev`). `clone` / `pull` / `push` start it for you when needed; the token stays in `~/.config/fdpocket/`. |
 | `assets add` | Put an image from the asset library under `source/`. |
 | `open` | Open the editor URL in your browser. |
@@ -255,11 +255,11 @@ node <kit>/scripts/kit.mjs <command> [--flag value]
 | A Kit command stops with an environment error (`bun` not found, `mise ERROR …`) | Run `node <kit>/scripts/kit.mjs doctor` and follow each `fix`. |
 | `kit dev` does not start | It needs Node 22.12 or later. If `seed.ts` failed, the error is printed; ask the agent to fix it. |
 | "Someone changed the app first" / `STALE_BASE` | The app moved on. The agent pulls, rebases your commits, and pushes again. |
-| LFS asks for credentials / `LFS_OBJECT_MISSING` | Run `node <kit>/scripts/kit.mjs login` once, then push again. The Kit's login is separate from the MCP login in `/mcp`. |
+| LFS asks for credentials / `LFS_OBJECT_MISSING` | Run `node <kit>/scripts/kit.mjs login` once, then push again. |
 | `author_mismatch` | A commit is not in your name. Do not change `user.name` / `user.email` in `source/`; the agent resets the author and pushes again. |
 | Rate or quota limit | Wait a bit and try again. Do not resend repeatedly. |
 | Permission error on an app | You can only edit apps owned by your account or a team you belong to. |
-| `/mcp` shows the server as not signed in | Sign in again from `/mcp` (Claude Code) or run `codex mcp login fdpocket` (Codex). |
+| A tool says you need to log in to FDPocket | Approve the login in the browser window that opened, then ask again. If no window opened, run `node <kit>/scripts/kit.mjs login`. |
 
 ## Connecting to a different Platform environment
 

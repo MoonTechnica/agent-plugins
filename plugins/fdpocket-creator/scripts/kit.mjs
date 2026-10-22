@@ -62994,6 +62994,7 @@ var COMMANDS = {
   pull: { required: [], optional: ["bundles"] },
   push: { required: ["message"], optional: ["policy-revision", "request-key"], switches: ["open"] },
   doctor: { required: [], optional: [] },
+  mcp: { required: [], optional: ["mcp-url"] },
   "fetch-review": { required: ["inputs"], optional: [] },
   new: { required: ["name"], optional: ["title", "apps"] },
   generate: { required: [], optional: [] },
@@ -68480,6 +68481,7 @@ import { existsSync as existsSync23 } from "node:fs";
 import { mkdir as mkdir13, readdir as readdir11, readFile as readFile21, writeFile as writeFile15 } from "node:fs/promises";
 import { homedir } from "node:os";
 import { dirname as dirname12, join as join34, resolve as resolve3 } from "node:path";
+import { createInterface } from "node:readline";
 
 // frontend/packages/miniapp-kit/src/approval.ts
 var ASK_A_PERSON_TOOLS = [
@@ -79915,6 +79917,133 @@ function toolError(tool, text) {
   return new McpToolError(tool, code, undefined, {}, `${tool}: ${body}`);
 }
 
+// frontend/packages/miniapp-kit/src/mcp-proxy.ts
+var PROTOCOL_VERSION2 = "2025-06-18";
+function createMcpProxy(deps) {
+  let catalog = null;
+  let loggingIn = null;
+  const loadCatalog = () => {
+    catalog ??= (async () => {
+      const response = await deps.fetch(`${deps.mcpUrl.replace(/\/+$/, "")}/catalog`);
+      if (!response.ok) {
+        catalog = null;
+        throw new Error(`the FDPocket tool catalog is unavailable (HTTP ${response.status})`);
+      }
+      return await response.json();
+    })();
+    return catalog;
+  };
+  const loginOnce = () => {
+    loggingIn ??= deps.login().finally(() => {
+      loggingIn = null;
+    });
+    return loggingIn;
+  };
+  const send = (message2, token2) => deps.fetch(deps.mcpUrl, {
+    method: "POST",
+    headers: {
+      authorization: `Bearer ${token2}`,
+      "content-type": "application/json",
+      accept: "application/json, text/event-stream",
+      "mcp-protocol-version": PROTOCOL_VERSION2
+    },
+    body: JSON.stringify(message2)
+  });
+  async function forward2(message2) {
+    let token2;
+    try {
+      token2 = await deps.token() ?? await loginOnce();
+    } catch (error51) {
+      return loginRequired(message2, error51);
+    }
+    let response = await send(message2, token2);
+    if (response.status === 401) {
+      await deps.forget();
+      try {
+        token2 = await deps.token() ?? await loginOnce();
+      } catch (error51) {
+        return loginRequired(message2, error51);
+      }
+      response = await send(message2, token2);
+    }
+    if (!response.ok) {
+      return rpcError(message2, -32603, `FDPocket returned HTTP ${response.status}`);
+    }
+    return readMessage(response, message2.method ?? "request");
+  }
+  return {
+    async handle(message2) {
+      if (message2.id === undefined)
+        return null;
+      switch (message2.method) {
+        case "initialize": {
+          const loaded = await loadCatalog();
+          const requested = message2.params?.protocolVersion;
+          return {
+            jsonrpc: "2.0",
+            id: message2.id,
+            result: {
+              protocolVersion: typeof requested === "string" ? requested : PROTOCOL_VERSION2,
+              capabilities: { tools: {} },
+              serverInfo: loaded.serverInfo,
+              instructions: loaded.instructions
+            }
+          };
+        }
+        case "ping":
+          return { jsonrpc: "2.0", id: message2.id, result: {} };
+        case "tools/list":
+          return { jsonrpc: "2.0", id: message2.id, result: { tools: (await loadCatalog()).tools } };
+        default:
+          return forward2(message2);
+      }
+    }
+  };
+}
+function loginRequired(message2, error51) {
+  const reason = error51 instanceof Error ? error51.message : String(error51);
+  const text = `You need to log in to FDPocket: a browser window opened for it (${reason}). Approve it, then try again.`;
+  if (message2.method === "tools/call") {
+    return {
+      jsonrpc: "2.0",
+      id: message2.id,
+      result: { isError: true, content: [{ type: "text", text }] }
+    };
+  }
+  return rpcError(message2, -32001, text);
+}
+function rpcError(message2, code, text) {
+  return { jsonrpc: "2.0", id: message2.id, error: { code, message: text } };
+}
+async function serveMcpStdio(proxy, io) {
+  const pending = new Set;
+  for await (const line of io.input) {
+    if (line.trim() === "")
+      continue;
+    const task = (async () => {
+      let message2;
+      try {
+        message2 = JSON.parse(line);
+      } catch (error51) {
+        console.error(`kit mcp: not JSON (${String(error51)})`);
+        io.write(JSON.stringify(rpcError({ jsonrpc: "2.0", id: null }, -32700, "parse error")));
+        return;
+      }
+      try {
+        const response = await proxy.handle(message2);
+        if (response !== null)
+          io.write(JSON.stringify(response));
+      } catch (error51) {
+        console.error(`kit mcp: ${message2.method ?? "message"} failed`, error51);
+        io.write(JSON.stringify(rpcError(message2, -32603, error51 instanceof Error ? error51.message : String(error51))));
+      }
+    })();
+    pending.add(task);
+    task.finally(() => pending.delete(task));
+  }
+  await Promise.all(pending);
+}
+
 // frontend/packages/miniapp-kit/src/new.ts
 import { existsSync as existsSync18 } from "node:fs";
 import { mkdir as mkdir9, readdir as readdir10, readFile as readFile18, writeFile as writeFile10 } from "node:fs/promises";
@@ -81175,6 +81304,8 @@ async function runCommand(args, context) {
         return await push(context, flags);
       case "doctor":
         return await doctor(context);
+      case "mcp":
+        return await mcpServe(context, flags);
       case "fetch-review":
         return await fetchReview(context, flags);
       case "new":
@@ -81443,6 +81574,27 @@ async function writeBuildReport(workdir, built, policyRevision) {
   await mkdir13(dirname12(path), { recursive: true });
   await writeFile15(path, `${JSON.stringify(report2, null, 2)}
 `);
+}
+async function mcpServe(context, flags) {
+  const mcpUrl = mcpUrlOf(flags["mcp-url"]);
+  console.log = console.error;
+  console.info = console.error;
+  const proxy = createMcpProxy({
+    mcpUrl,
+    fetch: context.fetch,
+    token: () => accessToken(mcpUrl, context),
+    login: async () => {
+      console.error(`kit mcp: opening the browser to log in to ${mcpUrl}`);
+      const stored = await login(mcpUrl, context);
+      if (stored.access_token === null)
+        throw new Error("the login did not return a token");
+      return stored.access_token;
+    },
+    forget: () => forgetAccessToken(mcpUrl, context.configDir)
+  });
+  const input = createInterface({ input: process.stdin, crlfDelay: Number.POSITIVE_INFINITY });
+  await serveMcpStdio(proxy, { input, write: (line) => process.stdout.write(`${line}
+`) });
 }
 async function doctor(context) {
   const workdir = locateWorkdir(context.cwd);

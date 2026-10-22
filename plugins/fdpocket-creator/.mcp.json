@@ -1,9 +1,9 @@
 {
   "mcpServers": {
     "fdpocket": {
-      "type": "http",
-      "url": "${CREATOR_MCP_URL:-https://fdpocket.dev/mcp/creator}",
-      "oauth": { "callbackPort": 43125 }
+      "command": "node",
+      "args": ["${CLAUDE_PLUGIN_ROOT}/scripts/kit.mjs", "mcp"],
+      "env": { "CREATOR_MCP_URL": "${CREATOR_MCP_URL:-https://fdpocket.dev/mcp/creator}" }
     }
   }
 }
