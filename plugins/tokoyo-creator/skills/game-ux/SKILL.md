@@ -1,6 +1,6 @@
 ---
 name: game-ux
-description: ゲームを遊べる体験にする規則。どのゲームでも必ず使う。最初の 30 秒（遊びの中で教える・最初の課題は必ず成功できる）、入力への手応え（反応・ヒットストップ・揺れ・浮かぶ数字・効果音）、読める文字とコントラスト（16px・24px・4.5:1）、色だけ・音だけに頼らない、点滅と揺れの上限と prefers-reduced-motion、リザルトと操作 1 回の再挑戦、効果音と BGM の分離ミュートと設定の保存、読み込みの待ち時間を扱う。onboarding, juice, hit stop, screen shake, readability, contrast, photosensitivity, reduced motion, retry, mute, settings.
+description: ゲームを遊べる体験にする規則。新しく作るときと、体験の質（手応え・文字・音・開始画面・リザルト）を変えるときに使う。最初の 30 秒（遊びの中で教える・最初の課題は必ず成功できる）、入力への手応え（反応・ヒットストップ・揺れ・浮かぶ数字・効果音）、読める文字とコントラスト（16px・24px・4.5:1）、色だけ・音だけに頼らない、点滅と揺れの上限と prefers-reduced-motion、リザルトと操作 1 回の再挑戦、効果音と BGM の分離ミュートと設定の保存、読み込みの待ち時間を扱う。onboarding, juice, hit stop, screen shake, readability, contrast, photosensitivity, reduced motion, retry, mute, settings.
 ---
 
 # 遊べる体験にする（最初の 30 秒・手応え・読める画面・動きの安全・再挑戦）

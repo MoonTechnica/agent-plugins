@@ -1,6 +1,6 @@
 ---
 name: game-screen-layout
-description: ゲーム画面を、スマホの縦画面・横画面・PC の横長画面のどれでも崩れずに全面で見せる。どのゲームでも必ず使う。canvas の大きさと高解像度対応、プレイ領域の拡大縮小、HUD とスマホの操作部の置き場所、文字の描き方（大きさとコントラストの数値は game-ux）、ポーズと再開、タイトル・リザルト画面の作り方、リザルトの画面を共有するボタン（app.share.capture / app.ui.openShare）を扱う。layout, responsive, canvas, devicePixelRatio, HUD, safe area, orientation, pause.
+description: ゲーム画面を、スマホの縦画面・横画面・PC の横長画面のどれでも崩れずに全面で見せる。新しく作るときと画面・HUD・タイトル・ポーズ・リザルトを作る/変えるときに使う。canvas の大きさと高解像度対応、プレイ領域の拡大縮小、HUD とスマホの操作部の置き場所、文字の描き方（大きさとコントラストの数値は game-ux）、ポーズと再開、タイトル・リザルト画面の作り方、リザルトの画面を共有するボタン（app.share.capture / app.ui.openShare）を扱う。layout, responsive, canvas, devicePixelRatio, HUD, safe area, orientation, pause.
 ---
 
 # ゲーム画面（どの画面の形でも崩れない）

@@ -1,6 +1,6 @@
 ---
 name: game-controls
-description: ゲームの操作を PC（キーボード・マウス）とスマートフォン（画面のスティック・ボタン・タップ・スワイプ・ドラッグ）の両方で遊べるように作り、市販のゲームパッド（PS5 / Xbox / Switch Pro）でも遊べるようにする。どのゲームでも必ず使う。ジャンルごとの操作割り当て、入力キット assets/input.ts（コピーして使う）、操作説明の出し分け、音の開始、manifest の gamepad、マウス固定（Pointer Lock）・傾き・カメラ / マイクの入力を扱う。input, controls, touch, virtual joystick, gamepad, pointer lock, FPS, tilt, microphone.
+description: ゲームの操作を PC（キーボード・マウス）とスマートフォン（画面のスティック・ボタン・タップ・スワイプ・ドラッグ）の両方で遊べるように作り、市販のゲームパッド（PS5 / Xbox / Switch Pro）でも遊べるようにする。新しく作るときと操作を作る/変えるときに使う。ジャンルごとの操作割り当て、入力キット assets/input.ts（コピーして使う）、操作説明の出し分け、音の開始、manifest の gamepad、マウス固定（Pointer Lock）・傾き・カメラ / マイクの入力を扱う。input, controls, touch, virtual joystick, gamepad, pointer lock, FPS, tilt, microphone.
 ---
 
 # ゲームの操作（PC とスマホの両対応 + ゲームパッド）
