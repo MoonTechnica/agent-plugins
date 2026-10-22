@@ -65073,6 +65073,7 @@ var BRIDGE_OPS = [
   "ui.openShare",
   "ui.close",
   "ui.navigate",
+  "ui.openCredits",
   "notifications.requestPermission",
   "notifications.status",
   "notifications.openSettings",
@@ -65083,6 +65084,7 @@ var BRIDGE_OP_PAYLOAD_SCHEMAS = {
   "ui.openShare": exports_external.strictObject({ path: appPathSchema, text: exports_external.string().max(280).optional() }),
   "ui.close": exports_external.undefined(),
   "ui.navigate": exports_external.strictObject({ app: appSlugSchema, path: appPathSchema }),
+  "ui.openCredits": exports_external.undefined(),
   "notifications.requestPermission": exports_external.strictObject({ reason: exports_external.string().min(1).max(200) }),
   "notifications.status": exports_external.undefined(),
   "notifications.openSettings": exports_external.undefined(),
@@ -65460,6 +65462,7 @@ var projectConsentSchema = exports_external.strictObject({
   shares: exports_external.array(exports_external.enum(["display_name", "avatar"])),
   network: exports_external.strictObject({ egress: exports_external.array(exports_external.string()), browser: exports_external.array(exports_external.string()) }),
   notifications: exports_external.boolean(),
+  ai: exports_external.literal(true).optional(),
   privacySummary: localizedNameSchema.nullable()
 });
 var consentRequiredSchema = exports_external.strictObject({

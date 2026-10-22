@@ -158,6 +158,7 @@ export declare const projectConsentSchema: z.ZodObject<{
         browser: z.ZodArray<z.ZodString>;
     }, z.core.$strict>;
     notifications: z.ZodBoolean;
+    ai: z.ZodOptional<z.ZodLiteral<true>>;
     privacySummary: z.ZodNullable<z.ZodObject<{
         ja: z.ZodString;
         en: z.ZodString;
@@ -303,6 +304,7 @@ export declare const gatewayResolveResultSchema: z.ZodDiscriminatedUnion<[z.ZodO
             browser: z.ZodArray<z.ZodString>;
         }, z.core.$strict>;
         notifications: z.ZodBoolean;
+        ai: z.ZodOptional<z.ZodLiteral<true>>;
         privacySummary: z.ZodNullable<z.ZodObject<{
             ja: z.ZodString;
             en: z.ZodString;

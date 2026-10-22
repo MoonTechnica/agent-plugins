@@ -1,5 +1,6 @@
 import "../zod-jitless.js";
 import { ACT_AS_HEADER, notificationSendRequestSchema, notificationSendResponseSchema, SERVICE_CREDENTIAL_PATTERN, serviceTokenResponseSchema, } from '@workspace/project-protocol';
+import { createAi } from "../ai/client.js";
 import { createDbClient } from "../db/client.js";
 import { SdkError } from "../errors.js";
 import { createStorage } from "../storage/client.js";
@@ -41,8 +42,8 @@ export function createServerClient(options) {
         });
         return pending;
     }
-    function dataClient(userToken) {
-        const transport = createTransport({
+    function transportFor(userToken) {
+        return createTransport({
             gateway: base,
             token: serviceToken,
             fetch: (input, init) => {
@@ -55,6 +56,9 @@ export function createServerClient(options) {
                 held = null;
             },
         });
+    }
+    function dataClient(userToken) {
+        const transport = transportFor(userToken);
         return {
             db: createDbClient(transport),
             storage: createStorage(transport, fetchImpl, base),
@@ -101,7 +105,7 @@ export function createServerClient(options) {
                 : /^Bearer\s+(\S+)$/i.exec(input.headers.get('authorization') ?? '')?.[1];
             if (!token || /\s/.test(token))
                 throw new SdkError('UNAUTHENTICATED', 'missing user token');
-            return dataClient(token);
+            return { ...dataClient(token), ai: createAi(transportFor(token), base) };
         },
     };
 }

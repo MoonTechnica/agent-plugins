@@ -11,6 +11,11 @@ export interface Ui {
     }): Promise<void>;
     /** ミニアプリを閉じる */
     close(): Promise<void>;
+    /**
+     * スーパーアプリのクレジット購入を開く（AI の `QUOTA_EXCEEDED` のときなど。購入画面はミニアプリの中に
+     * 作らない。project-ai.md §7）。購入の完了は待たない
+     */
+    openCredits(): Promise<void>;
     /** 同じ Project の別 App へ（Host が起動を仲介する） */
     navigate(input: {
         app: string;

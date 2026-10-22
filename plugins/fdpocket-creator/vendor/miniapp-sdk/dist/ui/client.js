@@ -36,6 +36,9 @@ export function createUiBridge() {
             close: async () => {
                 await send('ui.close');
             },
+            openCredits: async () => {
+                await send('ui.openCredits');
+            },
             navigate: async (input) => {
                 await send('ui.navigate', input);
             },

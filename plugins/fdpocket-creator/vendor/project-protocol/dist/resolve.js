@@ -125,6 +125,11 @@ export const projectConsentSchema = z.strictObject({
     network: z.strictObject({ egress: z.array(z.string()), browser: z.array(z.string()) }),
     /** 「通知を送ることがあります」 */
     notifications: z.boolean(),
+    /**
+     * ミニアプリ内 AI を使う版だけ true（入力を OpenRouter と選ばれたモデルの提供元へ送り、利用者の
+     * クレジットを消費する。project-ai.md §1）。使わない版には無い（既存の同意を取り直させない）
+     */
+    ai: z.literal(true).optional(),
     /** 審査 Agent のデータの扱いの要約（{ ja, en }。審査の前・要約が使えなかった版は null。tasks/0464） */
     privacySummary: localizedNameSchema.nullable(),
 });

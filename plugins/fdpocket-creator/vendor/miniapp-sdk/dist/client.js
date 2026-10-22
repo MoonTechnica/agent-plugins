@@ -1,5 +1,6 @@
 import "./zod-jitless.js";
 import { contextMessageSchema, contextUpdateMessageSchema, DIRECT_AUTH_START_PATH, initMessageSchema, PROTOCOL_VERSION, projectTokenClaimsSchema, RUNTIME_VERSION, tokenExchangeResponseSchema, } from '@workspace/project-protocol';
+import { createAi } from "./ai/client.js";
 import { createDbClient } from "./db/client.js";
 import { SdkError } from "./errors.js";
 import { createNotifications } from "./notifications/client.js";
@@ -260,6 +261,7 @@ export function createClient(options) {
         safety: createSafety(transport, bridge),
         notifications: createNotifications(transport, bridge),
         workspaces: createWorkspaces(transport),
+        ai: createAi(transport, base),
         gateway: base,
         fetch: transport.fetch,
     };

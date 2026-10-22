@@ -1,6 +1,7 @@
 import './zod-jitless.ts';
 import { type Session } from '@workspace/project-protocol';
 import type { SchemaDef } from '@zenstackhq/schema';
+import { type Ai } from './ai/client.ts';
 import type { DbClient } from './db/types.ts';
 import { type Notifications } from './notifications/client.ts';
 import { type Profile } from './profile/client.ts';
@@ -73,6 +74,8 @@ export interface ProjectClient<S extends SchemaDef = SchemaDef> {
     readonly notifications: Notifications;
     /** Project 内 Workspace の作成・招待・受諾（gateway.md §5。sdk.md §3.4） */
     readonly workspaces: Workspaces;
+    /** ミニアプリ内 AI（使った本人のクレジットから引く。project-ai.md §7） */
+    readonly ai: Ai;
     /** Gateway の URL（`./react` が ZenStack のフックの endpoint に使う） */
     readonly gateway: string;
     /** 認証付きの fetch（ZenStack の TanStack Query フックの `fetch` に渡す）。失敗は `SdkError` を投げる */

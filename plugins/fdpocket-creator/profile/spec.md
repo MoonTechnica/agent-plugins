@@ -106,6 +106,7 @@ apps:
     capabilities:
       models:
         order: [read, create]
+      ai: { chat: true }                     # ミニアプリ内 AI（§3.8）。使う web App だけ
     network:
       browser: [https://maps.googleapis.com]   # ブラウザから直接呼ぶ公開 API（https のオリジン。CSP に足す）
   partner-api:
@@ -117,7 +118,7 @@ apps:
       - name: STRIPE_SECRET_KEY
         description: { ja: "Stripe のシークレットキー", en: "Stripe secret key" }
         required: true
-    servicePermissions: [notifications.send, jobs.schedule]
+    servicePermissions: [notifications.send, jobs.schedule, ai.chat]   # ai.chat: 利用者として AI を呼ぶ
   digest:
     kind: jobs
     schedules:
@@ -138,6 +139,11 @@ notifications:
         item: { maxLength: 40 }
         orderId: { maxLength: 36 }
       path: /orders/{{orderId}}              # App 内の相対パス
+ai:                                          # ミニアプリ内 AI を使う Project だけ（§3.8）
+  model: auto                                # 省略可。auto（Jev Router が選ぶ）/ fast / quality / 許可されたモデル ID
+  maxOutputTokens: 16384                     # 省略可。1 ターンの出力の上限（推論も含む。1〜65536）
+  instructions: [order-helper]               # ai/order-helper.md（システムの指示文。8 個・各 8 KiB まで）
+  schemas: [OrderSummary]                    # ai/schemas/OrderSummary.json（JSON Schema。8 個まで）
 ```
 
 | 規則 | 内容 |
@@ -146,7 +152,8 @@ notifications:
 | `network.egress` | api / jobs だけ。ホスト名（小文字・2 ラベル以上。先頭に `*.` を 1 つ）を 50 個まで。IP 直指定・`localhost`・`.local` / `.internal` などの内部名・Platform のホスト（Supabase / Turso / R2）は書けない。実行時も http・既定以外のポート・URL の資格情報を拒否し、リダイレクトを追わない |
 | `network.browser` | web だけ。`https://host` の形（パス・ポート・末尾の `/` なし）。秘密が要る API は書かず api 経由にする |
 | `secrets` | api / jobs だけ。名前は `[A-Z][A-Z0-9_]` で 50 個まで。`GATEWAY_URL` と `PLATFORM_` で始まる名前は予約。値はコード・manifest・`listing/` に書かない（取り込みの検証が落とす） |
-| `servicePermissions` | api / jobs だけ。`notifications.send`（通知を送る）・`jobs.schedule`（jobs へ仕事を予約する）・`jobs.consume`（予約を受ける jobs 側） |
+| `servicePermissions` | api / jobs だけ。`notifications.send`（通知を送る）・`jobs.schedule`（jobs へ仕事を予約する）・`jobs.consume`（予約を受ける jobs 側）・`ai.chat`（api だけ。利用者として AI を呼ぶ。jobs は書けない） |
+| `ai` | AI を使う版だけ書く（書くと利用者の初回の同意に「AI の利用」が加わり、既に同意した人にも出し直す）。`instructions` / `schemas` は宣言した名前のファイルだけが版に固定される（実行時にファイルを読み直さない） |
 | `schedules` | jobs だけ。UTC の 5 フィールドの cron と handler 名。main / prod だけで動く（branch / preview では動かない） |
 | `routes` | api だけ。`["/api/*"]` だけ |
 | `notifications` | テンプレートは 50 個まで。文中の `{{名前}}` はすべて `params` に宣言する。パスワード・金額・個人情報を文面とパラメータに入れない（ロック画面に出る） |
@@ -285,6 +292,7 @@ const files = await client.db.storageFile.findMany({ where: { bucket: 'attachmen
 | `client.ui.openShare({ path, text })` | スーパーアプリの共有シート（App 内の相対パスだけ） |
 | `client.ui.close()` | ミニアプリを閉じる |
 | `client.ui.navigate({ app, path })` | 同じ Project の別 App へ（Host が開ける人か確かめる） |
+| `client.ui.openCredits()` | スーパーアプリのクレジット購入を開く（AI の `QUOTA_EXCEEDED` のとき。購入画面はミニアプリに作らない） |
 | `client.ui.safeArea()` / `client.ui.onSafeAreaChange(listener)` | セーフエリア（埋め込まれていなければ 0） |
 
 埋め込まれていないときは no-op ではなく `HOST_UNAVAILABLE` を返す。`host()` を見て出し分ける。
@@ -353,6 +361,31 @@ notifications:
 - 失敗: Workspace の owner / admin でない → `FORBIDDEN`、居ない人・使えない人・ブロックし合っている人 → `NOT_FOUND`、
   既に招待済み・既にメンバー → `CONFLICT`、期限切れの受諾 → `NOT_FOUND`（`details.reason = 'expired'`）、匿名 → `FORBIDDEN`。
 - メンバーの一覧・役割の変更・外すのは `client.db.membership`（owner / admin のポリシーのとおり）。
+
+### 3.8 `client.ai` — ミニアプリ内 AI（`Ai`）
+
+`capabilities.ai.chat` を宣言した web App から、Platform が用意する AI を呼ぶ。**費用は使った本人のクレジット**から
+実際にかかった分だけ引く（所有者の財布からは引かない）。匿名の利用者は使えない。
+
+| API | 書き方 |
+|---|---|
+| `client.ai.chat(input)` | 1 ターン送って結果を待つ。`input`（`AiChatInput`）: `conversation`（会話の名前。`[A-Za-z0-9_.:-]` で 64 字まで。同じ名前の履歴を Platform が持つ）・`message`・`attachments`（`[{ fileId }]`。Storage のファイル、4 個まで）・`instructions`（宣言した指示文の名前）・`schema`（宣言した Schema の名前。JSON で返させる）・`model`・`onToken`（渡すと届いた分から順に呼ぶ）・`signal`（待つのをやめる） |
+| `client.ai.reset(conversation)` | 会話を切る（次のターンから履歴を送らない） |
+
+結果（`AiTurnResult`）: `text`・`json`（`schema` を指定し、正常に終わったときだけ）・`finishReason`（`AiFinishReason`。
+`stop` は正常、`length` は出力の上限で切れた、`content_filter` は提供元が止めた、`other` はそれ以外）・
+`credits`（このターンで引いたクレジット）・`responseId`・`model`（実際に使われたモデル）。
+
+- `finishReason` が `length` なら「途中で切れた」と出す（`maxOutputTokens` を上げるか、短く頼む）。`text` を完成した答えとして扱わない。
+- `signal` で止めても、始まったターンの費用は戻らない。
+- 添付は画像・PDF・音声・動画。読めないファイルは `NOT_FOUND`、扱わない種類は `VALIDATION_FAILED`。
+- 失敗は必ず画面に出す: 残高不足は `QUOTA_EXCEEDED`（`client.ui.openCredits()` を開くボタンを出す）、利用中のターンが
+  ある・使いすぎは `RATE_LIMITED`、匿名・宣言の無い App は `FORBIDDEN`、AI のサービスの障害は `GATEWAY_UNAVAILABLE`。
+  **AI が使えなくてもアプリの他の機能は使えるように作る**。
+- AI を使う画面には「AI を使うとクレジットを消費します」と分かる表示を置く。
+- api（サーバー）からは、利用者のリクエストを受けたときだけ、`asUser(request)` の戻り値の `ai`（同じ `chat` / `reset`）で
+  その利用者として呼ぶ（`servicePermissions: [ai.chat]`。その利用者のクレジットから引く）。jobs からは呼べない。
+- 自分の API キーで外部の AI を呼ぶこともできる（`$fdpocket-app-integrations`。費用は作者持ち）。利用者に払ってもらうならこの `client.ai`。
 
 ## 4. エラー（`SdkError`）
 
