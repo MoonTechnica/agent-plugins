@@ -39,6 +39,8 @@ export function appContentSecurityPolicy(input) {
         `img-src 'self' blob: data: ${[...new Set(connect)].join(' ')}`,
         "media-src 'self' blob: https:",
         "font-src 'self' data:",
+        // ホーム画面（PWA）の manifest は origin Worker が同じオリジンで出す（share-and-direct-access.md §6）
+        "manifest-src 'self'",
         `connect-src 'self' ${[...new Set(socketConnect)].join(' ')}`,
         `frame-ancestors ${ancestors.length > 0 ? ancestors.join(' ') : "'none'"}`,
         "object-src 'none'",

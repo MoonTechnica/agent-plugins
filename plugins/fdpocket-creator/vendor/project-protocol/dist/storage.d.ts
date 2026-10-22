@@ -23,24 +23,87 @@ export declare const storageBeginRequestSchema: z.ZodObject<{
     }>>;
 }, z.core.$strict>;
 export type StorageBeginRequest = z.infer<typeof storageBeginRequestSchema>;
-export declare const storageBeginResponseSchema: z.ZodObject<{
-    uploadId: z.ZodUUID;
-    fileId: z.ZodUUID;
+/** 100 MiB を超えるファイルは Multipart（storage.md §4.4） */
+export declare function usesMultipart(size: number): boolean;
+export declare function multipartPartCount(size: number): number;
+/** part の大きさ。最後の part だけ端数（Gateway の署名と検査、SDK の分割で同じ値を使う） */
+export declare function multipartPartLength(size: number, partNumber: number): number;
+export declare const storageSinglePutBeginResponseSchema: z.ZodObject<{
     url: z.ZodURL;
     headers: z.ZodObject<{
         'Content-Type': z.ZodString;
         'Content-Length': z.ZodString;
     }, z.core.$strict>;
+    uploadId: z.ZodUUID;
+    fileId: z.ZodUUID;
     expiresAt: z.ZodISODateTime;
 }, z.core.$strict>;
+export declare const storageMultipartBeginResponseSchema: z.ZodObject<{
+    multipart: z.ZodObject<{
+        r2UploadId: z.ZodString;
+        partSize: z.ZodLiteral<number>;
+        partCount: z.ZodInt;
+    }, z.core.$strict>;
+    uploadId: z.ZodUUID;
+    fileId: z.ZodUUID;
+    expiresAt: z.ZodISODateTime;
+}, z.core.$strict>;
+export type StorageMultipartBeginResponse = z.infer<typeof storageMultipartBeginResponseSchema>;
+export declare const storageBeginResponseSchema: z.ZodUnion<readonly [z.ZodObject<{
+    url: z.ZodURL;
+    headers: z.ZodObject<{
+        'Content-Type': z.ZodString;
+        'Content-Length': z.ZodString;
+    }, z.core.$strict>;
+    uploadId: z.ZodUUID;
+    fileId: z.ZodUUID;
+    expiresAt: z.ZodISODateTime;
+}, z.core.$strict>, z.ZodObject<{
+    multipart: z.ZodObject<{
+        r2UploadId: z.ZodString;
+        partSize: z.ZodLiteral<number>;
+        partCount: z.ZodInt;
+    }, z.core.$strict>;
+    uploadId: z.ZodUUID;
+    fileId: z.ZodUUID;
+    expiresAt: z.ZodISODateTime;
+}, z.core.$strict>]>;
 export type StorageBeginResponse = z.infer<typeof storageBeginResponseSchema>;
+/** `POST /v1/storage/uploads/{uploadId}/parts` */
+export declare const storageSignPartsRequestSchema: z.ZodObject<{
+    r2UploadId: z.ZodString;
+    partNumbers: z.ZodArray<z.ZodInt>;
+}, z.core.$strict>;
+export type StorageSignPartsRequest = z.infer<typeof storageSignPartsRequestSchema>;
+export declare const storageSignPartsResponseSchema: z.ZodObject<{
+    parts: z.ZodArray<z.ZodObject<{
+        partNumber: z.ZodInt;
+        url: z.ZodURL;
+        headers: z.ZodObject<{
+            'Content-Length': z.ZodString;
+        }, z.core.$strict>;
+    }, z.core.$strict>>;
+    expiresAt: z.ZodISODateTime;
+}, z.core.$strict>;
+export type StorageSignPartsResponse = z.infer<typeof storageSignPartsResponseSchema>;
 /** `POST /v1/storage/uploads/{uploadId}/complete` */
 export declare const storageCompleteRequestSchema: z.ZodObject<{
     checksum: z.ZodOptional<z.ZodObject<{
         sha256: z.ZodString;
     }, z.core.$strict>>;
+    r2UploadId: z.ZodOptional<z.ZodString>;
 }, z.core.$strict>;
 export type StorageCompleteRequest = z.infer<typeof storageCompleteRequestSchema>;
+/** `DELETE /v1/storage/uploads/{uploadId}`（Multipart の中断） */
+export declare const storageAbortRequestSchema: z.ZodObject<{
+    r2UploadId: z.ZodString;
+}, z.core.$strict>;
+export type StorageAbortRequest = z.infer<typeof storageAbortRequestSchema>;
+export declare const storageAbortResponseSchema: z.ZodObject<{
+    uploadId: z.ZodUUID;
+    status: z.ZodLiteral<"failed">;
+}, z.core.$strict>;
+export type StorageAbortResponse = z.infer<typeof storageAbortResponseSchema>;
 /** SDK に返す StorageFile（ZModel の行から objectKey・uploaderApp を除いたもの） */
 export declare const storageFileSchema: z.ZodObject<{
     id: z.ZodUUID;

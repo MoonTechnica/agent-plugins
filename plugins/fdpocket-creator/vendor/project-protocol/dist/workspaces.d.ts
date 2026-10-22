@@ -16,10 +16,10 @@ export declare const workspaceInviteRoleSchema: z.ZodEnum<{
 export type WorkspaceInviteRole = z.infer<typeof workspaceInviteRoleSchema>;
 /** Workspace の役割（`Membership.role`） */
 export declare const workspaceRoleSchema: z.ZodEnum<{
+    owner: "owner";
     admin: "admin";
     editor: "editor";
     viewer: "viewer";
-    owner: "owner";
 }>;
 export type WorkspaceRole = z.infer<typeof workspaceRoleSchema>;
 /** `POST /v1/workspaces` */
@@ -86,10 +86,10 @@ export type WorkspaceAnswerRequest = z.infer<typeof workspaceAnswerRequestSchema
 export declare const workspaceMembershipSchema: z.ZodObject<{
     workspaceId: z.ZodUUID;
     role: z.ZodEnum<{
+        owner: "owner";
         admin: "admin";
         editor: "editor";
         viewer: "viewer";
-        owner: "owner";
     }>;
 }, z.core.$strict>;
 export type WorkspaceMembership = z.infer<typeof workspaceMembershipSchema>;

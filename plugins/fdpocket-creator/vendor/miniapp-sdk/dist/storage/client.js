@@ -1,8 +1,13 @@
-import { STORAGE_FILE_MAX_BYTES, sdkErrorCodeForStatus, storageBeginResponseSchema, storageCompleteResponseSchema, storageDeleteResponseSchema, storageDownloadResponseSchema, } from '@workspace/project-protocol';
+import { multipartPartLength, STORAGE_FILE_MAX_BYTES, STORAGE_MULTIPART_PART_BYTES, STORAGE_MULTIPART_SIGN_MAX_PARTS, sdkErrorCodeForStatus, storageBeginResponseSchema, storageCompleteResponseSchema, storageDeleteResponseSchema, storageDownloadResponseSchema, storageSignPartsResponseSchema, } from '@workspace/project-protocol';
 import { createDbClient } from "../db/client.js";
 import { SdkError } from "../errors.js";
 /** complete を送る回数の上限（応答が届かなかったときの送り直し。Gateway の complete は冪等） */
 const COMPLETE_ATTEMPTS = 3;
+/** Multipart の同時に送る part 数と、1 part を送る回数の上限（storage.md §4.4） */
+const PART_CONCURRENCY = 4;
+const PART_ATTEMPTS = 3;
+/** 署名の期限のこれだけ前に取り直す */
+const SIGN_MARGIN_MS = 30_000;
 const META_SELECT = {
     id: true,
     bucket: true,
@@ -45,11 +50,17 @@ export function createStorage(transport, fetchImpl, gateway) {
                             ...(options.visibility === undefined ? {} : { visibility: options.visibility }),
                         },
                     }));
-                    // Content-Length はブラウザが Blob から付ける（禁止ヘッダー）。値は begin で署名済み
-                    await put(begun.url, blob, begun.headers['Content-Type'], options.onProgress);
+                    if ('multipart' in begun) {
+                        await putParts(begun, blob, options.onProgress);
+                    }
+                    else {
+                        // Content-Length はブラウザが Blob から付ける（禁止ヘッダー）。値は begin で署名済み
+                        await put(begun.url, blob, begun.headers['Content-Type'], options.onProgress);
+                    }
+                    const completeBody = 'multipart' in begun ? { r2UploadId: begun.multipart.r2UploadId } : {};
                     for (let attempt = 1;; attempt++) {
                         try {
-                            const completed = parse(storageCompleteResponseSchema, await transport.send(`/v1/storage/uploads/${encodeURIComponent(begun.uploadId)}/complete`, { method: 'POST', body: {} }));
+                            const completed = parse(storageCompleteResponseSchema, await transport.send(`/v1/storage/uploads/${encodeURIComponent(begun.uploadId)}/complete`, { method: 'POST', body: completeBody }));
                             return completed.file;
                         }
                         catch (error) {
@@ -89,6 +100,98 @@ export function createStorage(transport, fetchImpl, gateway) {
             };
         },
     };
+    /**
+     * 100 MiB 超（storage.md §4.4）。16 MiB の part を同時 4 本で送る。届かない・5xx は同じ URL で、
+     * 署名の拒否（403。期限切れ）は署名を取り直して、part ごとに最大 3 回。回復できなければ abort を送って投げる
+     */
+    async function putParts(begun, blob, onProgress) {
+        const { r2UploadId, partCount } = begun.multipart;
+        const uploads = `/v1/storage/uploads/${encodeURIComponent(begun.uploadId)}`;
+        const signed = new Map();
+        const signing = new Map();
+        const loaded = new Map();
+        const report = () => {
+            let sum = 0;
+            for (const value of loaded.values())
+                sum += value;
+            onProgress?.({ loaded: sum, total: blob.size });
+        };
+        /** part を含む 100 件の束をまとめて署名する（同じ束を同時に取りに行かない） */
+        async function sign(partNumber, fresh) {
+            const current = signed.get(partNumber);
+            if (!fresh && current && current.expiresAt - SIGN_MARGIN_MS > Date.now())
+                return current.url;
+            const first = fresh
+                ? partNumber
+                : Math.floor((partNumber - 1) / STORAGE_MULTIPART_SIGN_MAX_PARTS) *
+                    STORAGE_MULTIPART_SIGN_MAX_PARTS +
+                    1;
+            const key = fresh ? -partNumber : first;
+            let pending = signing.get(key);
+            if (!pending) {
+                const numbers = fresh
+                    ? [partNumber]
+                    : Array.from({ length: Math.min(STORAGE_MULTIPART_SIGN_MAX_PARTS, partCount - first + 1) }, (_, i) => first + i);
+                pending = (async () => {
+                    const response = parse(storageSignPartsResponseSchema, await transport.send(`${uploads}/parts`, {
+                        method: 'POST',
+                        body: { r2UploadId, partNumbers: numbers },
+                    }));
+                    const expiresAt = Date.parse(response.expiresAt);
+                    for (const part of response.parts)
+                        signed.set(part.partNumber, { url: part.url, expiresAt });
+                })().finally(() => signing.delete(key));
+                signing.set(key, pending);
+            }
+            await pending;
+            const url = signed.get(partNumber)?.url;
+            if (!url)
+                throw new SdkError('GATEWAY_UNAVAILABLE', 'part was not signed', { retryable: true });
+            return url;
+        }
+        async function send(partNumber) {
+            const start = (partNumber - 1) * STORAGE_MULTIPART_PART_BYTES;
+            const chunk = blob.slice(start, start + multipartPartLength(blob.size, partNumber));
+            let fresh = false;
+            for (let attempt = 1;; attempt++) {
+                const url = await sign(partNumber, fresh);
+                try {
+                    await put(url, chunk, null, (progress) => {
+                        loaded.set(partNumber, progress.loaded);
+                        report();
+                    });
+                    loaded.set(partNumber, chunk.size);
+                    report();
+                    return;
+                }
+                catch (error) {
+                    const status = error instanceof SdkError ? error.status : undefined;
+                    const retryable = status === 403 || (error instanceof SdkError && error.retryable);
+                    if (!retryable || attempt >= PART_ATTEMPTS)
+                        throw error;
+                    loaded.set(partNumber, 0);
+                    fresh = status === 403;
+                }
+            }
+        }
+        let next = 1;
+        try {
+            await Promise.all(Array.from({ length: Math.min(PART_CONCURRENCY, partCount) }, async () => {
+                for (let partNumber = next++; partNumber <= partCount; partNumber = next++) {
+                    await send(partNumber);
+                }
+            }));
+        }
+        catch (error) {
+            // 送れなくても元のエラーを優先する。残った upload は Gateway の掃除（24 時間後）が Abort する
+            await transport
+                .send(uploads, { method: 'DELETE', body: { r2UploadId } })
+                .catch((abortError) => {
+                console.error('Storage multipart abort failed', abortError);
+            });
+            throw error;
+        }
+    }
     /** 署名 URL へ PUT。進捗が要り XMLHttpRequest があればそれで（fetch は送信の進捗を取れない） */
     async function put(url, blob, contentType, onProgress) {
         const Xhr = globalThis.XMLHttpRequest;
@@ -96,7 +199,9 @@ export function createStorage(transport, fetchImpl, gateway) {
             const status = await new Promise((resolve, reject) => {
                 const xhr = new Xhr();
                 xhr.open('PUT', url);
-                xhr.setRequestHeader('content-type', contentType);
+                // part（Multipart）は Content-Type を署名に含めない
+                if (contentType)
+                    xhr.setRequestHeader('content-type', contentType);
                 xhr.upload.onprogress = (event) => {
                     if (event.lengthComputable)
                         onProgress({ loaded: event.loaded, total: event.total });
@@ -113,7 +218,7 @@ export function createStorage(transport, fetchImpl, gateway) {
         try {
             response = await fetchImpl(url, {
                 method: 'PUT',
-                headers: { 'content-type': contentType },
+                ...(contentType ? { headers: { 'content-type': contentType } } : {}),
                 body: blob,
             });
         }

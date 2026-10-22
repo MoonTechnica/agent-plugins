@@ -3,7 +3,7 @@
   "mcpServers": {
     "fdpocket": {
       "type": "streamable-http",
-      "url": "https://app-sns.vercel.app/mcp/creator"
+      "url": "https://fdpocket.dev/mcp/creator"
     }
   }
 }

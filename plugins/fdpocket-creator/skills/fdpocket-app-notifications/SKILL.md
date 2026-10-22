@@ -5,7 +5,7 @@ description: ミニアプリの同意付き通知テンプレートとサーバ�
 
 # 通知
 
-path付きテンプレートには対象のweb Appを `app: reports` のように明示する。manifest に通知テンプレート（日本語・英語の title / body / path と許可した params）を宣言する。サーバー app に `servicePermissions: [notifications.send]` を宣言し、`@workspace/sdk/server` の client から `notifications.send({ template, to, params, dedupeKey })` を呼ぶ。宛先は ProjectUserId。ブラウザにサーバー資格情報を置かない。
+path付きテンプレートには対象のweb Appを `app: reports` のように明示する。manifest に通知テンプレート（日本語・英語の title / body / path と許可した params）を宣言する。サーバー app に `servicePermissions: [notifications.send]` を宣言し、`@workspace/miniapp-sdk/server` の `createServerClient({ env })` で作った client から `notifications.send({ template, to, params, dedupeKey })` を呼ぶ。宛先は ProjectUserId。ブラウザにサーバー資格情報を置かない。
 
 利用者の通知同意と設定、承認済みテンプレート、送信上限は Platform が確認する。通知を止めた利用者へ送らない。秘密や個人情報を文面やパラメータに入れない。
 

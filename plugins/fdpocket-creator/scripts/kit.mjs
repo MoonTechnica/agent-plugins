@@ -23374,10 +23374,10 @@ var init_query_node = __esm(() => {
         where: node.where ? WhereNode.cloneWithOperation(node.where, "And", operation) : WhereNode.create(operation)
       });
     },
-    cloneWithJoin(node, join14) {
+    cloneWithJoin(node, join15) {
       return freeze({
         ...node,
-        joins: node.joins ? freeze([...node.joins, join14]) : freeze([join14])
+        joins: node.joins ? freeze([...node.joins, join15]) : freeze([join15])
       });
     },
     cloneWithReturning(node, selections) {
@@ -26136,8 +26136,8 @@ var init_with_schema_transformer = __esm(() => {
         this.#collectSchemableIdsFromTableExpr(node.table, schemableIds);
       }
       if ("joins" in node && node.joins) {
-        for (const join14 of node.joins) {
-          this.#collectSchemableIdsFromTableExpr(join14.table, schemableIds);
+        for (const join15 of node.joins) {
+          this.#collectSchemableIdsFromTableExpr(join15.table, schemableIds);
         }
       }
       if ("using" in node && node.using) {
@@ -35010,7 +35010,7 @@ class MssqlIntrospector {
     return await this.#db.selectFrom("sys.schemas").select("name").execute();
   }
   async getTables(options2 = { withInternalKyselyTables: false }) {
-    const rawColumns = await this.#db.selectFrom("sys.tables as tables").leftJoin("sys.schemas as table_schemas", "table_schemas.schema_id", "tables.schema_id").innerJoin("sys.columns as columns", "columns.object_id", "tables.object_id").innerJoin("sys.types as types", "types.user_type_id", "columns.user_type_id").leftJoin("sys.schemas as type_schemas", "type_schemas.schema_id", "types.schema_id").leftJoin("sys.extended_properties as comments", (join14) => join14.onRef("comments.major_id", "=", "tables.object_id").onRef("comments.minor_id", "=", "columns.column_id").on("comments.name", "=", "MS_Description")).$if(!options2.withInternalKyselyTables, (qb) => qb.where("tables.name", "!=", DEFAULT_MIGRATION_TABLE).where("tables.name", "!=", DEFAULT_MIGRATION_LOCK_TABLE)).select([
+    const rawColumns = await this.#db.selectFrom("sys.tables as tables").leftJoin("sys.schemas as table_schemas", "table_schemas.schema_id", "tables.schema_id").innerJoin("sys.columns as columns", "columns.object_id", "tables.object_id").innerJoin("sys.types as types", "types.user_type_id", "columns.user_type_id").leftJoin("sys.schemas as type_schemas", "type_schemas.schema_id", "types.schema_id").leftJoin("sys.extended_properties as comments", (join15) => join15.onRef("comments.major_id", "=", "tables.object_id").onRef("comments.minor_id", "=", "columns.column_id").on("comments.name", "=", "MS_Description")).$if(!options2.withInternalKyselyTables, (qb) => qb.where("tables.name", "!=", DEFAULT_MIGRATION_TABLE).where("tables.name", "!=", DEFAULT_MIGRATION_LOCK_TABLE)).select([
       "tables.name as table_name",
       (eb) => eb.ref("tables.type").$castTo().as("table_type"),
       "table_schemas.name as table_schema_name",
@@ -35025,7 +35025,7 @@ class MssqlIntrospector {
       "types.name as type_name",
       "type_schemas.name as type_schema_name",
       "comments.value as column_comment"
-    ]).unionAll(this.#db.selectFrom("sys.views as views").leftJoin("sys.schemas as view_schemas", "view_schemas.schema_id", "views.schema_id").innerJoin("sys.columns as columns", "columns.object_id", "views.object_id").innerJoin("sys.types as types", "types.user_type_id", "columns.user_type_id").leftJoin("sys.schemas as type_schemas", "type_schemas.schema_id", "types.schema_id").leftJoin("sys.extended_properties as comments", (join14) => join14.onRef("comments.major_id", "=", "views.object_id").onRef("comments.minor_id", "=", "columns.column_id").on("comments.name", "=", "MS_Description")).select([
+    ]).unionAll(this.#db.selectFrom("sys.views as views").leftJoin("sys.schemas as view_schemas", "view_schemas.schema_id", "views.schema_id").innerJoin("sys.columns as columns", "columns.object_id", "views.object_id").innerJoin("sys.types as types", "types.user_type_id", "columns.user_type_id").leftJoin("sys.schemas as type_schemas", "type_schemas.schema_id", "types.schema_id").leftJoin("sys.extended_properties as comments", (join15) => join15.onRef("comments.major_id", "=", "views.object_id").onRef("comments.minor_id", "=", "columns.column_id").on("comments.name", "=", "MS_Description")).select([
       "views.name as table_name",
       "views.type as table_type",
       "view_schemas.name as table_schema_name",
@@ -39916,14 +39916,14 @@ var require_utils = __commonJS((exports) => {
     if (hl % 2)
       throw new Error("hex string expected, got unpadded hex of length " + hl);
     const array2 = new Uint8Array(al);
-    for (let ai = 0, hi = 0;ai < al; ai++, hi += 2) {
+    for (let ai2 = 0, hi = 0;ai2 < al; ai2++, hi += 2) {
       const n1 = asciiToBase16(hex3.charCodeAt(hi));
       const n2 = asciiToBase16(hex3.charCodeAt(hi + 1));
       if (n1 === undefined || n2 === undefined) {
         const char = hex3[hi] + hex3[hi + 1];
         throw new Error('hex string expected, got non-hex character "' + char + '" at index ' + hi);
       }
-      array2[ai] = n1 * 16 + n2;
+      array2[ai2] = n1 * 16 + n2;
     }
     return array2;
   }
@@ -44299,9 +44299,9 @@ var import_cuid, import_json_stable_stringify, import_toposort, ORMErrorReason, 
       return query;
     }
     const joinAlias = tmpAlias(`${modelAlias}$ob$${index2}`);
-    const joined = query.leftJoin(`${relationModel} as ${joinAlias}`, (join14) => {
+    const joined = query.leftJoin(`${relationModel} as ${joinAlias}`, (join15) => {
       const joinPairs = buildJoinPairs(this.schema, model, modelAlias, field3, joinAlias);
-      return join14.on((eb) => this.and(...joinPairs.map(([left, right]) => eb(this.eb.ref(left), "=", this.eb.ref(right)))));
+      return join15.on((eb) => this.and(...joinPairs.map(([left, right]) => eb(this.eb.ref(left), "=", this.eb.ref(right)))));
     });
     return this.buildOrderBy(joined, relationModel, joinAlias, value, negated, take);
   }
@@ -44436,7 +44436,7 @@ var import_cuid, import_json_stable_stringify, import_toposort, ORMErrorReason, 
       const subQueryAlias = tmpAlias(`${parentAlias}$_${field3}$count`);
       const m2m = getManyToManyRelation(this.schema, model, field3);
       if (m2m)
-        fieldCountQuery = this.buildModelSelect(fieldModel, subQueryAlias, value, false).innerJoin(m2m.joinTable, (join14) => join14.onRef(`${m2m.joinTable}.${m2m.otherFkName}`, "=", `${subQueryAlias}.${m2m.otherPKName}`).onRef(`${m2m.joinTable}.${m2m.parentFkName}`, "=", `${parentAlias}.${m2m.parentPKName}`)).select(eb.fn.countAll().as(`_count$${field3}`));
+        fieldCountQuery = this.buildModelSelect(fieldModel, subQueryAlias, value, false).innerJoin(m2m.joinTable, (join15) => join15.onRef(`${m2m.joinTable}.${m2m.otherFkName}`, "=", `${subQueryAlias}.${m2m.otherPKName}`).onRef(`${m2m.joinTable}.${m2m.parentFkName}`, "=", `${parentAlias}.${m2m.parentPKName}`)).select(eb.fn.countAll().as(`_count$${field3}`));
       else {
         fieldCountQuery = this.buildModelSelect(fieldModel, subQueryAlias, value, false).select(eb.fn.countAll().as(`_count$${field3}`));
         const joinPairs = buildJoinPairs(this.schema, model, parentAlias, field3, subQueryAlias);
@@ -48473,7 +48473,7 @@ var init_dist7 = __esm(() => {
         tbl = this.buildRelationObjectSelect(relationModel, relationSelectName, relationFieldDef, tbl, payload, resultName);
         tbl = this.buildRelationJoins(tbl, relationModel, relationSelectName, payload, resultName);
         return tbl.as(resultName);
-      }, (join14) => join14.onTrue());
+      }, (join15) => join15.onTrue());
     }
     buildRelationJoinFilter(query, model, relationField, relationModel, relationModelAlias, parentAlias) {
       const m2m = getManyToManyRelation(this.schema, model, relationField);
@@ -50513,16 +50513,16 @@ var init_dist7 = __esm(() => {
       const processedFroms = node.from.froms.map((from) => this.processSelectTable(from));
       const processedJoins = [];
       const cumulativeScopes = [...processedFroms.map(({ scope }) => scope)];
-      for (const join14 of node.joins ?? []) {
-        const processedJoin = this.withScopes(cumulativeScopes, () => this.processSelectTable(join14.table));
+      for (const join15 of node.joins ?? []) {
+        const processedJoin = this.withScopes(cumulativeScopes, () => this.processSelectTable(join15.table));
         processedJoins.push(processedJoin);
         cumulativeScopes.push(processedJoin.scope);
       }
       return this.withScopes(cumulativeScopes, () => {
-        const joins = node.joins ? node.joins.map((join14, i2) => ({
-          ...join14,
+        const joins = node.joins ? node.joins.map((join15, i2) => ({
+          ...join15,
           table: processedJoins[i2].node,
-          on: this.transformNode(join14.on)
+          on: this.transformNode(join15.on)
         })) : undefined;
         const selections = this.processSelectQuerySelections(node);
         return {
@@ -52562,7 +52562,7 @@ var ColumnCollector, ExpressionEvaluator = class {
   transformManyToManyRelationAccess(m2m, context, relationAlias) {
     const eb = expressionBuilder();
     const joinTableAlias = `${relationAlias}$join`;
-    return eb.selectFrom(`${m2m.otherModel} as ${relationAlias}`).innerJoin(`${m2m.joinTable} as ${joinTableAlias}`, (join14) => join14.onRef(`${relationAlias}.${m2m.otherPKName}`, "=", `${joinTableAlias}.${m2m.otherFkName}`).onRef(`${joinTableAlias}.${m2m.parentFkName}`, "=", `${context.alias ?? context.modelOrType}.${m2m.parentPKName}`)).toOperationNode();
+    return eb.selectFrom(`${m2m.otherModel} as ${relationAlias}`).innerJoin(`${m2m.joinTable} as ${joinTableAlias}`, (join15) => join15.onRef(`${relationAlias}.${m2m.otherPKName}`, "=", `${joinTableAlias}.${m2m.otherFkName}`).onRef(`${joinTableAlias}.${m2m.parentFkName}`, "=", `${context.alias ?? context.modelOrType}.${m2m.parentPKName}`)).toOperationNode();
   }
   createColumnRef(column, context) {
     const tableName = context.alias ?? context.modelOrType;
@@ -52932,8 +52932,8 @@ var init_dist8 = __esm(() => {
         const rows = beforeUpdateInfo.rows.map((r2) => beforeUpdateInfo.fields.map((f3) => r2[f3]));
         beforeUpdateTable = this.dialect.buildValuesTableSelect(fieldDefs, rows).toOperationNode();
       }
-      if (!(await proceed(eb.selectFrom(model).select(() => [eb(eb.fn("COUNT", [eb.lit(1)]), "=", Number(updateResult.numAffectedRows ?? 0)).as("$condition")]).where(() => new ExpressionWrapper(conjunction(this.dialect, [idConditions, postUpdateFilter]))).$if(needsBeforeUpdateJoin, (qb) => qb.leftJoin(() => new ExpressionWrapper(beforeUpdateTable).as("$before"), (join14) => {
-        return query_utils_exports.requireIdFields(this.client.$schema, model).reduce((acc, f3) => acc.onRef(`${model}.${f3}`, "=", `$before.${f3}`), join14);
+      if (!(await proceed(eb.selectFrom(model).select(() => [eb(eb.fn("COUNT", [eb.lit(1)]), "=", Number(updateResult.numAffectedRows ?? 0)).as("$condition")]).where(() => new ExpressionWrapper(conjunction(this.dialect, [idConditions, postUpdateFilter]))).$if(needsBeforeUpdateJoin, (qb) => qb.leftJoin(() => new ExpressionWrapper(beforeUpdateTable).as("$before"), (join15) => {
+        return query_utils_exports.requireIdFields(this.client.$schema, model).reduce((acc, f3) => acc.onRef(`${model}.${f3}`, "=", `$before.${f3}`), join15);
       })).toOperationNode())).rows[0]?.$condition)
         throw createRejectedByPolicyError2(model, RejectedByPolicyReason.NO_ACCESS, "some or all updated rows failed to pass post-update policy check");
     }
@@ -61127,7 +61127,7 @@ var import_ts_japi, import_url_pattern, loggerSchema, fieldSlicingSchema, modelS
       match2.type = this.reverseModelNameMapping[match2.type];
     return match2;
   }
-  async handleRequest({ client, method, path, query, requestBody }) {
+  async handleRequest({ client, method, path, query, requestBody: requestBody2 }) {
     method = method.toUpperCase();
     if (!path.startsWith("/"))
       path = "/" + path;
@@ -61139,7 +61139,7 @@ var import_ts_japi, import_url_pattern, loggerSchema, fieldSlicingSchema, modelS
           method,
           proc,
           query,
-          requestBody
+          requestBody: requestBody2
         });
       }
       switch (method) {
@@ -61162,46 +61162,46 @@ var import_ts_japi, import_url_pattern, loggerSchema, fieldSlicingSchema, modelS
           return this.makeError("invalidPath");
         }
         case "POST": {
-          if (!requestBody)
+          if (!requestBody2)
             return this.makeError("invalidPayload");
           const nestedMatch = this.matchUrlPattern(path, UrlPatterns.FETCH_RELATIONSHIP);
           if (nestedMatch && this.nestedRoutes && this.resolveNestedRelation(nestedMatch.type, nestedMatch.relationship)?.isCollection)
-            return await this.processNestedCreate(client, nestedMatch.type, nestedMatch.id, nestedMatch.relationship, query, requestBody);
+            return await this.processNestedCreate(client, nestedMatch.type, nestedMatch.id, nestedMatch.relationship, query, requestBody2);
           let match2 = this.matchUrlPattern(path, UrlPatterns.COLLECTION);
           if (match2) {
-            const body = requestBody;
+            const body = requestBody2;
             if (this.upsertMetaSchema.safeParse(body).success)
-              return await this.processUpsert(client, match2.type, query, requestBody);
+              return await this.processUpsert(client, match2.type, query, requestBody2);
             else
-              return await this.processCreate(client, match2.type, query, requestBody);
+              return await this.processCreate(client, match2.type, query, requestBody2);
           }
           match2 = this.matchUrlPattern(path, UrlPatterns.RELATIONSHIP);
           if (match2)
-            return await this.processRelationshipCRUD(client, "create", match2.type, match2.id, match2.relationship, query, requestBody);
+            return await this.processRelationshipCRUD(client, "create", match2.type, match2.id, match2.relationship, query, requestBody2);
           return this.makeError("invalidPath");
         }
         case "PUT":
         case "PATCH": {
-          if (!requestBody)
+          if (!requestBody2)
             return this.makeError("invalidPayload");
           let match2 = this.matchUrlPattern(path, UrlPatterns.RELATIONSHIP);
           if (match2)
-            return await this.processRelationshipCRUD(client, "update", match2.type, match2.id, match2.relationship, query, requestBody);
+            return await this.processRelationshipCRUD(client, "update", match2.type, match2.id, match2.relationship, query, requestBody2);
           const nestedToOnePatchMatch = this.matchUrlPattern(path, UrlPatterns.FETCH_RELATIONSHIP);
           if (nestedToOnePatchMatch && this.nestedRoutes && this.resolveNestedRelation(nestedToOnePatchMatch.type, nestedToOnePatchMatch.relationship) && !this.resolveNestedRelation(nestedToOnePatchMatch.type, nestedToOnePatchMatch.relationship)?.isCollection)
-            return await this.processNestedUpdate(client, nestedToOnePatchMatch.type, nestedToOnePatchMatch.id, nestedToOnePatchMatch.relationship, undefined, query, requestBody);
+            return await this.processNestedUpdate(client, nestedToOnePatchMatch.type, nestedToOnePatchMatch.id, nestedToOnePatchMatch.relationship, undefined, query, requestBody2);
           const nestedPatchMatch = this.matchUrlPattern(path, UrlPatterns.NESTED_SINGLE);
           if (nestedPatchMatch && this.nestedRoutes && this.resolveNestedRelation(nestedPatchMatch.type, nestedPatchMatch.relationship)?.isCollection)
-            return await this.processNestedUpdate(client, nestedPatchMatch.type, nestedPatchMatch.id, nestedPatchMatch.relationship, nestedPatchMatch.childId, query, requestBody);
+            return await this.processNestedUpdate(client, nestedPatchMatch.type, nestedPatchMatch.id, nestedPatchMatch.relationship, nestedPatchMatch.childId, query, requestBody2);
           match2 = this.matchUrlPattern(path, UrlPatterns.SINGLE);
           if (match2)
-            return await this.processUpdate(client, match2.type, match2.id, query, requestBody);
+            return await this.processUpdate(client, match2.type, match2.id, query, requestBody2);
           return this.makeError("invalidPath");
         }
         case "DELETE": {
           let match2 = this.matchUrlPattern(path, UrlPatterns.RELATIONSHIP);
           if (match2)
-            return await this.processRelationshipCRUD(client, "delete", match2.type, match2.id, match2.relationship, query, requestBody);
+            return await this.processRelationshipCRUD(client, "delete", match2.type, match2.id, match2.relationship, query, requestBody2);
           const nestedDeleteMatch = this.matchUrlPattern(path, UrlPatterns.NESTED_SINGLE);
           if (nestedDeleteMatch && this.nestedRoutes && this.resolveNestedRelation(nestedDeleteMatch.type, nestedDeleteMatch.relationship)?.isCollection)
             return await this.processNestedDelete(client, nestedDeleteMatch.type, nestedDeleteMatch.id, nestedDeleteMatch.relationship, nestedDeleteMatch.childId);
@@ -61228,7 +61228,7 @@ var import_ts_japi, import_url_pattern, loggerSchema, fieldSlicingSchema, modelS
 ` + err.stack : ""}`);
     return resp;
   }
-  async processProcedureRequest({ client, method, proc, query, requestBody }) {
+  async processProcedureRequest({ client, method, proc, query, requestBody: requestBody2 }) {
     if (!proc)
       return this.makeProcBadInputErrorResponse("missing procedure name");
     const procDef = getProcedureDef(this.schema, proc);
@@ -61239,7 +61239,7 @@ var import_ts_japi, import_url_pattern, loggerSchema, fieldSlicingSchema, modelS
         return this.makeProcBadInputErrorResponse("invalid request method, only POST is supported");
     } else if (method !== "GET")
       return this.makeProcBadInputErrorResponse("invalid request method, only GET is supported");
-    const { result: processedArgsPayload, error: error51 } = await processSuperJsonRequestPayload(method === "POST" ? requestBody : query);
+    const { result: processedArgsPayload, error: error51 } = await processSuperJsonRequestPayload(method === "POST" ? requestBody2 : query);
     if (error51)
       return this.makeProcBadInputErrorResponse(error51);
     let procInput;
@@ -61550,14 +61550,14 @@ var import_ts_japi, import_url_pattern, loggerSchema, fieldSlicingSchema, modelS
       })
     };
   }
-  async processNestedCreate(client, parentType, parentId, parentRelation, _query, requestBody) {
+  async processNestedCreate(client, parentType, parentId, parentRelation, _query, requestBody2) {
     const resolved = this.resolveNestedRelation(parentType, parentRelation);
     if (!resolved)
       return this.makeError("invalidPath");
     const parentInfo = this.getModelInfo(parentType);
     const childType = resolved.childType;
     const childInfo = this.getModelInfo(childType);
-    const { attributes, relationships, error: error51 } = this.processRequestBody(requestBody);
+    const { attributes, relationships, error: error51 } = this.processRequestBody(requestBody2);
     if (error51)
       return error51;
     const createData = { ...attributes };
@@ -61604,8 +61604,8 @@ var import_ts_japi, import_url_pattern, loggerSchema, fieldSlicingSchema, modelS
       } })
     };
   }
-  buildNestedUpdatePayload(childType, typeInfo, rev, requestBody) {
-    const { attributes, relationships, error: error51 } = this.processRequestBody(requestBody);
+  buildNestedUpdatePayload(childType, typeInfo, rev, requestBody2) {
+    const { attributes, relationships, error: error51 } = this.processRequestBody(requestBody2);
     if (error51)
       return { error: error51 };
     const updateData = { ...attributes };
@@ -61630,14 +61630,14 @@ var import_ts_japi, import_url_pattern, loggerSchema, fieldSlicingSchema, modelS
       }
     return { updateData };
   }
-  async processNestedUpdate(client, parentType, parentId, parentRelation, childId, _query, requestBody) {
+  async processNestedUpdate(client, parentType, parentId, parentRelation, childId, _query, requestBody2) {
     const resolved = this.resolveNestedRelation(parentType, parentRelation);
     if (!resolved)
       return this.makeError("invalidPath");
     const parentInfo = this.getModelInfo(parentType);
     const childType = resolved.childType;
     const typeInfo = this.getModelInfo(childType);
-    const { updateData, error: error51 } = this.buildNestedUpdatePayload(childType, typeInfo, resolved.reverseRelation, requestBody);
+    const { updateData, error: error51 } = this.buildNestedUpdatePayload(childType, typeInfo, resolved.reverseRelation, requestBody2);
     if (error51)
       return error51;
     if (childId) {
@@ -61749,8 +61749,8 @@ var import_ts_japi, import_url_pattern, loggerSchema, fieldSlicingSchema, modelS
       }) : null
     }));
   }
-  processRequestBody(requestBody) {
-    let body = requestBody;
+  processRequestBody(requestBody2) {
+    let body = requestBody2;
     if (body.meta?.serialization)
       body = dist_default.deserialize({
         json: body,
@@ -61769,11 +61769,11 @@ var import_ts_japi, import_url_pattern, loggerSchema, fieldSlicingSchema, modelS
       error: undefined
     };
   }
-  async processCreate(client, type, _query, requestBody) {
+  async processCreate(client, type, _query, requestBody2) {
     const typeInfo = this.getModelInfo(type);
     if (!typeInfo)
       return this.makeUnsupportedModelError(type);
-    const { attributes, relationships, error: error51 } = this.processRequestBody(requestBody);
+    const { attributes, relationships, error: error51 } = this.processRequestBody(requestBody2);
     if (error51)
       return error51;
     const createPayload = { data: { ...attributes } };
@@ -61803,15 +61803,15 @@ var import_ts_japi, import_url_pattern, loggerSchema, fieldSlicingSchema, modelS
       body: await this.serializeItems(type, entity)
     };
   }
-  async processUpsert(client, type, _query, requestBody) {
+  async processUpsert(client, type, _query, requestBody2) {
     const typeInfo = this.getModelInfo(type);
     if (!typeInfo)
       return this.makeUnsupportedModelError(type);
     const modelName = typeInfo.name;
-    const { attributes, relationships, error: error51 } = this.processRequestBody(requestBody);
+    const { attributes, relationships, error: error51 } = this.processRequestBody(requestBody2);
     if (error51)
       return error51;
-    const parseResult = this.upsertMetaSchema.safeParse(requestBody);
+    const parseResult = this.upsertMetaSchema.safeParse(requestBody2);
     if (parseResult.error)
       return this.makeError("invalidPayload", getZodErrorMessage(parseResult.error));
     const matchFields = parseResult.data.meta.matchFields;
@@ -61850,7 +61850,7 @@ var import_ts_japi, import_url_pattern, loggerSchema, fieldSlicingSchema, modelS
     const modelDef = this.requireModel(type);
     return Object.entries(modelDef.uniqueFields).map(([k3, v3]) => typeof v3.type === "string" ? [k3] : Object.keys(v3));
   }
-  async processRelationshipCRUD(client, mode, type, resourceId, relationship, _query, requestBody) {
+  async processRelationshipCRUD(client, mode, type, resourceId, relationship, _query, requestBody2) {
     const typeInfo = this.getModelInfo(type);
     if (!typeInfo)
       return this.makeUnsupportedModelError(type);
@@ -61870,7 +61870,7 @@ var import_ts_japi, import_url_pattern, loggerSchema, fieldSlicingSchema, modelS
       }
     };
     if (!relationInfo.isCollection) {
-      const parsed = this.updateSingleRelationSchema.safeParse(requestBody);
+      const parsed = this.updateSingleRelationSchema.safeParse(requestBody2);
       if (!parsed.success)
         return this.makeError("invalidPayload", getZodErrorMessage(parsed.error));
       if (parsed.data.data === null) {
@@ -61880,7 +61880,7 @@ var import_ts_japi, import_url_pattern, loggerSchema, fieldSlicingSchema, modelS
       } else
         updateArgs.data = { [relationship]: { connect: this.makeIdConnect(relationInfo.idFields, parsed.data.data.id) } };
     } else {
-      const parsed = this.updateCollectionRelationSchema.safeParse(requestBody);
+      const parsed = this.updateCollectionRelationSchema.safeParse(requestBody2);
       if (!parsed.success)
         return this.makeError("invalidPayload", getZodErrorMessage(parsed.error));
       const relationVerb = mode === "create" ? "connect" : mode === "delete" ? "disconnect" : "set";
@@ -61896,11 +61896,11 @@ var import_ts_japi, import_url_pattern, loggerSchema, fieldSlicingSchema, modelS
       })
     };
   }
-  async processUpdate(client, type, resourceId, _query, requestBody) {
+  async processUpdate(client, type, resourceId, _query, requestBody2) {
     const typeInfo = this.getModelInfo(type);
     if (!typeInfo)
       return this.makeUnsupportedModelError(type);
-    const { attributes, relationships, error: error51 } = this.processRequestBody(requestBody);
+    const { attributes, relationships, error: error51 } = this.processRequestBody(requestBody2);
     if (error51)
       return error51;
     const updatePayload = {
@@ -62606,7 +62606,7 @@ var import_ts_japi, import_url_pattern, loggerSchema, fieldSlicingSchema, modelS
   get log() {
     return this.options.log;
   }
-  async handleRequest({ client, method, path, query, requestBody }) {
+  async handleRequest({ client, method, path, query, requestBody: requestBody2 }) {
     const parts = path.split("/").filter((p3) => !!p3);
     const op = parts.pop();
     let model = parts.pop();
@@ -62618,14 +62618,14 @@ var import_ts_japi, import_url_pattern, loggerSchema, fieldSlicingSchema, modelS
         method: method.toUpperCase(),
         proc: op,
         query,
-        requestBody
+        requestBody: requestBody2
       });
     if (model === TRANSACTION_ROUTE_PREFIX)
       return this.handleTransaction({
         client,
         method: method.toUpperCase(),
         type: op,
-        requestBody
+        requestBody: requestBody2
       });
     model = lowerCaseFirst(model);
     method = method.toUpperCase();
@@ -62638,9 +62638,9 @@ var import_ts_japi, import_url_pattern, loggerSchema, fieldSlicingSchema, modelS
       case "upsert":
         if (method !== "POST")
           return this.makeBadInputErrorResponse("invalid request method, only POST is supported");
-        if (!requestBody)
+        if (!requestBody2)
           return this.makeBadInputErrorResponse("missing request body");
-        args = requestBody;
+        args = requestBody2;
         resCode = 201;
         break;
       case "findFirst":
@@ -62663,9 +62663,9 @@ var import_ts_japi, import_url_pattern, loggerSchema, fieldSlicingSchema, modelS
       case "updateManyAndReturn":
         if (method !== "PUT" && method !== "PATCH")
           return this.makeBadInputErrorResponse("invalid request method, only PUT or PATCH are supported");
-        if (!requestBody)
+        if (!requestBody2)
           return this.makeBadInputErrorResponse("missing request body");
-        args = requestBody;
+        args = requestBody2;
         break;
       case "delete":
       case "deleteMany":
@@ -62709,16 +62709,16 @@ var import_ts_japi, import_url_pattern, loggerSchema, fieldSlicingSchema, modelS
         return this.makeGenericErrorResponse(err);
     }
   }
-  async handleTransaction({ client, method, type, requestBody }) {
+  async handleTransaction({ client, method, type, requestBody: requestBody2 }) {
     if (method !== "POST")
       return this.makeBadInputErrorResponse("invalid request method, only POST is supported");
     if (type !== "sequential")
       return this.makeBadInputErrorResponse(`unsupported transaction type: ${type}`);
-    if (!requestBody || !Array.isArray(requestBody) || requestBody.length === 0)
+    if (!requestBody2 || !Array.isArray(requestBody2) || requestBody2.length === 0)
       return this.makeBadInputErrorResponse("request body must be a non-empty array of operations");
     const processedOps = [];
-    for (let i2 = 0;i2 < requestBody.length; i2++) {
-      const item = requestBody[i2];
+    for (let i2 = 0;i2 < requestBody2.length; i2++) {
+      const item = requestBody2[i2];
       if (!item || typeof item !== "object")
         return this.makeBadInputErrorResponse(`operation at index ${i2} must be an object`);
       const { model: itemModel, op: itemOp, args: itemArgs } = item;
@@ -62764,7 +62764,7 @@ var import_ts_japi, import_url_pattern, loggerSchema, fieldSlicingSchema, modelS
       return this.makeGenericErrorResponse(err);
     }
   }
-  async handleProcedureRequest({ client, method, proc, query, requestBody }) {
+  async handleProcedureRequest({ client, method, proc, query, requestBody: requestBody2 }) {
     if (!proc)
       return this.makeBadInputErrorResponse("missing procedure name");
     const procDef = getProcedureDef(this.options.schema, proc);
@@ -62775,7 +62775,7 @@ var import_ts_japi, import_url_pattern, loggerSchema, fieldSlicingSchema, modelS
         return this.makeBadInputErrorResponse("invalid request method, only POST is supported");
     } else if (method !== "GET")
       return this.makeBadInputErrorResponse("invalid request method, only GET is supported");
-    let argsPayload = method === "POST" ? requestBody : undefined;
+    let argsPayload = method === "POST" ? requestBody2 : undefined;
     if (method === "GET")
       try {
         argsPayload = query?.["q"] ? unmarshalQ(query["q"], query["meta"]) : undefined;
@@ -63005,7 +63005,7 @@ var COMMANDS = {
   check: { required: [], optional: [] },
   validate: {
     required: ["archive", "out", "gateway-url", "project-id"],
-    optional: ["source", "base"],
+    optional: ["source", "base", "captures"],
     switches: ["sdk-update"]
   },
   pack: { required: [], optional: [] },
@@ -63070,11 +63070,75 @@ function splitFlag(flag) {
 }
 
 // frontend/packages/miniapp-kit/src/check.ts
-import { existsSync as existsSync7 } from "node:fs";
+import { existsSync as existsSync8 } from "node:fs";
 import { readdir as readdir5 } from "node:fs/promises";
 import { createRequire as createRequire6 } from "node:module";
-import { join as join10 } from "node:path";
+import { join as join11 } from "node:path";
 import { pathToFileURL as pathToFileURL5 } from "node:url";
+
+// frontend/packages/project-protocol/src/ai.ts
+init_zod();
+
+// frontend/packages/project-protocol/src/errors.ts
+init_zod();
+var SDK_ERROR_CODES = [
+  "UNAUTHENTICATED",
+  "SESSION_EXPIRED",
+  "TOKEN_SCOPE_MISMATCH",
+  "FORBIDDEN",
+  "NOT_FOUND",
+  "VALIDATION_FAILED",
+  "POST_WRITE_READ_DENIED",
+  "CONFLICT",
+  "RATE_LIMITED",
+  "QUOTA_EXCEEDED",
+  "PAYLOAD_TOO_LARGE",
+  "CONSENT_REQUIRED",
+  "GATEWAY_UNAVAILABLE",
+  "HOST_UNAVAILABLE",
+  "REALTIME_DISABLED",
+  "REALTIME_CAPACITY",
+  "RESYNC_REQUIRED"
+];
+var sdkErrorCodeSchema = exports_external.enum(SDK_ERROR_CODES);
+var HTTP_STATUS_BY_ERROR = {
+  UNAUTHENTICATED: 401,
+  SESSION_EXPIRED: 401,
+  TOKEN_SCOPE_MISMATCH: 403,
+  FORBIDDEN: 403,
+  NOT_FOUND: 404,
+  VALIDATION_FAILED: 422,
+  POST_WRITE_READ_DENIED: 403,
+  CONFLICT: 409,
+  RATE_LIMITED: 429,
+  QUOTA_EXCEEDED: 429,
+  PAYLOAD_TOO_LARGE: 413,
+  CONSENT_REQUIRED: 403,
+  GATEWAY_UNAVAILABLE: 503,
+  HOST_UNAVAILABLE: 503,
+  REALTIME_DISABLED: 403,
+  REALTIME_CAPACITY: 429,
+  RESYNC_REQUIRED: 409
+};
+var RETRYABLE = new Set([
+  "REALTIME_CAPACITY",
+  "CONFLICT",
+  "RATE_LIMITED",
+  "GATEWAY_UNAVAILABLE"
+]);
+function isRetryable(code) {
+  return RETRYABLE.has(code);
+}
+var errorResponseSchema = exports_external.strictObject({
+  error: exports_external.strictObject({
+    code: sdkErrorCodeSchema,
+    message: exports_external.string(),
+    requestId: exports_external.string().optional(),
+    retryable: exports_external.boolean(),
+    committed: exports_external.boolean().optional(),
+    details: exports_external.unknown().optional()
+  })
+});
 
 // frontend/packages/project-protocol/src/manifest.ts
 init_zod();
@@ -63102,7 +63166,10 @@ var DB_INCLUDE_DEPTH_MAX = 3;
 var DB_CREATE_MANY_MAX = 500;
 var REQUEST_BODY_MAX_BYTES = 1024 * 1024;
 var RESPONSE_BODY_MAX_BYTES = 5 * 1024 * 1024;
-var STORAGE_FILE_MAX_BYTES = 100 * 1024 * 1024;
+var STORAGE_FILE_MAX_BYTES = 5 * 1024 * 1024 * 1024;
+var STORAGE_SINGLE_PUT_MAX_BYTES = 100 * 1024 * 1024;
+var STORAGE_MULTIPART_PART_BYTES = 16 * 1024 * 1024;
+var STORAGE_MULTIPART_SIGN_MAX_PARTS = 100;
 var PROJECT_BUCKETS_MAX = 10;
 var PROJECT_APPS_MAX = 16;
 var IDEMPOTENCY_TTL_SECONDS = 10 * 60;
@@ -64127,7 +64194,12 @@ var MODEL_KEY_PATTERN = /^[a-z][A-Za-z0-9]{0,63}$/;
 var CONTENT_TYPE_PATTERN = /^[a-z]+\/([a-z0-9.+-]+|\*)$/;
 var APP_KINDS = ["web", "api", "jobs"];
 var SERVER_APP_KINDS = ["api", "jobs"];
-var SERVICE_PERMISSIONS = ["notifications.send", "jobs.schedule", "jobs.consume"];
+var SERVICE_PERMISSIONS = [
+  "notifications.send",
+  "jobs.schedule",
+  "jobs.consume",
+  "ai.chat"
+];
 var SECRET_NAME_PATTERN = /^[A-Z][A-Z0-9_]{0,63}$/;
 var RESERVED_SECRET_NAMES = ["GATEWAY_URL"];
 var RESERVED_SECRET_PREFIX = "PLATFORM_";
@@ -64163,7 +64235,8 @@ var appSchema = exports_external.strictObject({
   capabilities: exports_external.strictObject({
     models: exports_external.record(exports_external.string(), uniqueList(exports_external.enum(MODEL_OPERATIONS))).optional(),
     buckets: exports_external.record(exports_external.string(), uniqueList(exports_external.enum(BUCKET_OPERATIONS))).optional(),
-    realtime: exports_external.record(exports_external.string(), uniqueList(exports_external.enum(["broadcastReceive", "broadcastSend", "presenceRead", "presenceTrack"]))).optional()
+    realtime: exports_external.record(exports_external.string(), uniqueList(exports_external.enum(["broadcastReceive", "broadcastSend", "presenceRead", "presenceTrack"]))).optional(),
+    ai: exports_external.strictObject({ chat: exports_external.boolean() }).optional()
   }).optional(),
   anonymous: exports_external.strictObject({ allowed: exports_external.boolean(), write: exports_external.boolean() }).optional(),
   network: exports_external.strictObject({
@@ -64241,6 +64314,18 @@ var notificationsSchema = exports_external.strictObject({
 });
 var SENSITIVE_NAME_PATTERN = /pass(?:word|code)?|secret|token|api_?key|credential|e?mail|phone|tel(?:ephone)?|address|birth|card|cvv|ssn|amount|price|salary|balance|bank|iban/i;
 var placeholdersOf = (text) => [...(text ?? "").matchAll(PLACEHOLDER_PATTERN)].map((m2) => m2[1]);
+var AI_INSTRUCTIONS_KEY_PATTERN = /^[a-z0-9][a-z0-9_-]{0,31}$/;
+var AI_SCHEMA_KEY_PATTERN = /^[A-Za-z0-9_-]{1,64}$/;
+var AI_PROMPTS_PER_KIND_MAX = 8;
+var AI_PROMPT_MAX_BYTES = 8192;
+var AI_MAX_OUTPUT_TOKENS_DEFAULT = 400;
+var aiModelSchema = exports_external.string().regex(/^(?:[a-z][a-z0-9-]{0,31}|~?[a-z0-9][a-z0-9._-]*\/[A-Za-z0-9][A-Za-z0-9._:-]{0,127})$/);
+var aiSchema = exports_external.strictObject({
+  model: aiModelSchema.optional(),
+  maxOutputTokens: exports_external.number().int().min(1).max(2000).optional(),
+  instructions: uniqueList(exports_external.string().regex(AI_INSTRUCTIONS_KEY_PATTERN)).max(AI_PROMPTS_PER_KIND_MAX).optional(),
+  schemas: uniqueList(exports_external.string().regex(AI_SCHEMA_KEY_PATTERN)).max(AI_PROMPTS_PER_KIND_MAX).optional()
+});
 var baseSchema = exports_external.strictObject({
   version: exports_external.literal(PROJECT_MANIFEST_VERSION),
   sdkVersion: exports_external.literal(PROJECT_SDK_VERSION),
@@ -64250,7 +64335,8 @@ var baseSchema = exports_external.strictObject({
   defaultRoles: uniqueList(exports_external.string()).optional(),
   ownerBootstrap: uniqueList(exports_external.string()).optional(),
   notifications: notificationsSchema.optional(),
-  realtime: realtimeManifestSchema.optional()
+  realtime: realtimeManifestSchema.optional(),
+  ai: aiSchema.optional()
 });
 function report(ctx, path, code, message) {
   ctx.addIssue({ code: "custom", path, message, params: { code } });
@@ -64283,6 +64369,9 @@ function refineServerFields(ctx, slug, app) {
     if (app.access !== undefined && app.access !== "public") {
       report(ctx, [...path, "access"], "not_allowed", `${app.kind} apps are not restricted`);
     }
+  }
+  if (app.kind === "jobs" && app.servicePermissions?.includes("ai.chat")) {
+    report(ctx, [...path, "servicePermissions"], "not_allowed", "jobs have no user to pay for ai.chat");
   }
   for (const key of ["secrets", "servicePermissions"]) {
     if (!server && app[key] !== undefined) {
@@ -64319,6 +64408,7 @@ function refineServerFields(ctx, slug, app) {
   }
 }
 function refineManifest(m2, ctx) {
+  let aiUsed = false;
   if (Object.keys(m2.apps).length === 0)
     report(ctx, ["apps"], "required", "at least one App is required");
   const buckets = m2.buckets ?? {};
@@ -64401,6 +64491,8 @@ function refineManifest(m2, ctx) {
       report(ctx, ["apps", slug], "reserved_slug", "api is reserved for the API namespace; use another web App slug");
     }
     refineServerFields(ctx, slug, app);
+    if (usesAi(app))
+      aiUsed = true;
     if (app.access === "restricted" && !app.requiredPermission) {
       report(ctx, ["apps", slug, "requiredPermission"], "required", "restricted apps need requiredPermission");
     }
@@ -64429,6 +64521,12 @@ function refineManifest(m2, ctx) {
       }
     }
   }
+  if (m2.ai && !aiUsed) {
+    report(ctx, ["ai"], "not_allowed", "no App uses ai.chat (capabilities.ai.chat or servicePermissions)");
+  }
+}
+function usesAi(app) {
+  return app.capabilities?.ai?.chat === true || (app.servicePermissions ?? []).includes("ai.chat");
 }
 var projectManifestSchema = baseSchema.superRefine(refineManifest);
 function parseProjectManifest(input) {
@@ -64492,7 +64590,8 @@ function normalizeProjectManifest(manifest) {
       capabilities: {
         models: sortedRecord(app.capabilities?.models, sorted),
         buckets: sortedRecord(app.capabilities?.buckets, sorted),
-        ...app.capabilities?.realtime ? { realtime: sortedRecord(app.capabilities.realtime, sorted) } : {}
+        ...app.capabilities?.realtime ? { realtime: sortedRecord(app.capabilities.realtime, sorted) } : {},
+        ...app.capabilities?.ai ? { ai: { chat: app.capabilities.ai.chat } } : {}
       },
       anonymous: app.anonymous ?? { allowed: false, write: false },
       network: {
@@ -64537,6 +64636,14 @@ function normalizeProjectManifest(manifest) {
           }))
         }
       } : {},
+      ...Object.values(manifest.apps).some(usesAi) ? {
+        ai: {
+          ...manifest.ai?.model ? { model: manifest.ai.model } : {},
+          maxOutputTokens: manifest.ai?.maxOutputTokens ?? AI_MAX_OUTPUT_TOKENS_DEFAULT,
+          instructions: sorted(manifest.ai?.instructions),
+          schemas: sorted(manifest.ai?.schemas)
+        }
+      } : {},
       ...manifest.notifications ? {
         notifications: {
           templates: sortedRecord(manifest.notifications.templates, (t) => ({
@@ -64567,6 +64674,49 @@ function normalizeTrigger(trigger) {
   };
 }
 
+// frontend/packages/project-protocol/src/ai.ts
+var AI_ATTACHMENTS_MAX = 4;
+var AI_ATTACHMENTS_MAX_BYTES = 20 * 1024 * 1024;
+var AI_MESSAGE_MAX_BYTES = 32 * 1024;
+var ATTACHMENT_KINDS = {
+  "image/png": "image",
+  "image/jpeg": "image",
+  "image/webp": "image",
+  "image/gif": "image",
+  "application/pdf": "file",
+  "audio/wav": "audio",
+  "audio/x-wav": "audio",
+  "audio/mpeg": "audio",
+  "audio/mp3": "audio",
+  "video/mp4": "video",
+  "video/webm": "video",
+  "video/quicktime": "video"
+};
+function aiAttachmentKindOf(contentType) {
+  return ATTACHMENT_KINDS[contentType.split(";")[0]?.trim().toLowerCase() ?? ""] ?? null;
+}
+var aiTurnRequestSchema = exports_external.strictObject({
+  conversation: exports_external.string().regex(/^[A-Za-z0-9_.:-]{1,64}$/),
+  message: exports_external.string().min(1).refine((text) => new TextEncoder().encode(text).byteLength <= AI_MESSAGE_MAX_BYTES, "message is too long"),
+  attachments: exports_external.array(exports_external.strictObject({ fileId: exports_external.uuid() })).max(AI_ATTACHMENTS_MAX).optional(),
+  instructions: exports_external.string().regex(AI_INSTRUCTIONS_KEY_PATTERN).optional(),
+  schema: exports_external.string().regex(AI_SCHEMA_KEY_PATTERN).optional(),
+  model: exports_external.string().min(1).max(160).optional(),
+  stream: exports_external.boolean().optional()
+});
+var aiTurnResultSchema = exports_external.strictObject({
+  text: exports_external.string(),
+  json: exports_external.unknown().optional(),
+  credits: exports_external.number().nonnegative(),
+  responseId: exports_external.string(),
+  model: exports_external.string()
+});
+var aiTurnEventSchema = exports_external.discriminatedUnion("type", [
+  exports_external.strictObject({ type: exports_external.literal("delta"), text: exports_external.string() }),
+  exports_external.strictObject({ type: exports_external.literal("done"), result: aiTurnResultSchema }),
+  exports_external.strictObject({ type: exports_external.literal("error"), code: exports_external.enum(SDK_ERROR_CODES), message: exports_external.string() })
+]);
+var aiResetResponseSchema = exports_external.strictObject({ conversation: exports_external.string() });
 // frontend/packages/project-protocol/src/api-path.ts
 function parseApiPath(pathname) {
   const [, prefix, app, ...parts] = pathname.split("/");
@@ -64741,67 +64891,6 @@ async function buildArtifactIndex(dist, apps) {
 }
 // frontend/packages/project-protocol/src/bridge.ts
 init_zod();
-
-// frontend/packages/project-protocol/src/errors.ts
-init_zod();
-var SDK_ERROR_CODES = [
-  "UNAUTHENTICATED",
-  "SESSION_EXPIRED",
-  "TOKEN_SCOPE_MISMATCH",
-  "FORBIDDEN",
-  "NOT_FOUND",
-  "VALIDATION_FAILED",
-  "POST_WRITE_READ_DENIED",
-  "CONFLICT",
-  "RATE_LIMITED",
-  "QUOTA_EXCEEDED",
-  "PAYLOAD_TOO_LARGE",
-  "CONSENT_REQUIRED",
-  "GATEWAY_UNAVAILABLE",
-  "HOST_UNAVAILABLE",
-  "REALTIME_DISABLED",
-  "REALTIME_CAPACITY",
-  "RESYNC_REQUIRED"
-];
-var sdkErrorCodeSchema = exports_external.enum(SDK_ERROR_CODES);
-var HTTP_STATUS_BY_ERROR = {
-  UNAUTHENTICATED: 401,
-  SESSION_EXPIRED: 401,
-  TOKEN_SCOPE_MISMATCH: 403,
-  FORBIDDEN: 403,
-  NOT_FOUND: 404,
-  VALIDATION_FAILED: 422,
-  POST_WRITE_READ_DENIED: 403,
-  CONFLICT: 409,
-  RATE_LIMITED: 429,
-  QUOTA_EXCEEDED: 429,
-  PAYLOAD_TOO_LARGE: 413,
-  CONSENT_REQUIRED: 403,
-  GATEWAY_UNAVAILABLE: 503,
-  HOST_UNAVAILABLE: 503,
-  REALTIME_DISABLED: 403,
-  REALTIME_CAPACITY: 429,
-  RESYNC_REQUIRED: 409
-};
-var RETRYABLE = new Set([
-  "REALTIME_CAPACITY",
-  "CONFLICT",
-  "RATE_LIMITED",
-  "GATEWAY_UNAVAILABLE"
-]);
-function isRetryable(code) {
-  return RETRYABLE.has(code);
-}
-var errorResponseSchema = exports_external.strictObject({
-  error: exports_external.strictObject({
-    code: sdkErrorCodeSchema,
-    message: exports_external.string(),
-    requestId: exports_external.string().optional(),
-    retryable: exports_external.boolean(),
-    committed: exports_external.boolean().optional(),
-    details: exports_external.unknown().optional()
-  })
-});
 
 // frontend/packages/project-protocol/src/safety.ts
 init_zod();
@@ -65058,6 +65147,7 @@ function appContentSecurityPolicy(input) {
     `img-src 'self' blob: data: ${[...new Set(connect)].join(" ")}`,
     "media-src 'self' blob: https:",
     "font-src 'self' data:",
+    "manifest-src 'self'",
     `connect-src 'self' ${[...new Set(socketConnect)].join(" ")}`,
     `frame-ancestors ${ancestors.length > 0 ? ancestors.join(" ") : "'none'"}`,
     "object-src 'none'",
@@ -65242,6 +65332,21 @@ function resolveAppOrigin(input) {
   }
   return providerOriginSchema.parse(input.providerOrigin);
 }
+// frontend/packages/project-protocol/src/origin-listing.ts
+init_zod();
+var originListingSchema = exports_external.strictObject({
+  title: exports_external.string().min(1).max(200),
+  iconKey: exports_external.string().min(1).max(1024).nullable(),
+  owner: exports_external.strictObject({
+    accountName: exports_external.string().min(1).max(64),
+    displayName: exports_external.string().max(200).nullable(),
+    avatarKey: exports_external.string().min(1).max(1024).nullable()
+  }),
+  apps: exports_external.array(exports_external.strictObject({
+    slug: exports_external.string().regex(APP_SLUG_PATTERN),
+    displayName: exports_external.object({ ja: exports_external.string().max(100).optional(), en: exports_external.string().max(100).optional() }).nullable()
+  }))
+}).nullable();
 // frontend/packages/project-protocol/src/paths.ts
 var PROJECT_PATHS = {
   manifest: "infra/project.yaml",
@@ -65438,15 +65543,58 @@ var storageBeginRequestSchema = exports_external.strictObject({
   workspaceId: exports_external.string().min(1).optional(),
   visibility: fileVisibilitySchema.optional()
 });
-var storageBeginResponseSchema = exports_external.strictObject({
-  uploadId: exports_external.uuid(),
-  fileId: exports_external.uuid(),
+function usesMultipart(size) {
+  return size > STORAGE_SINGLE_PUT_MAX_BYTES;
+}
+function multipartPartCount(size) {
+  return Math.ceil(size / STORAGE_MULTIPART_PART_BYTES);
+}
+function multipartPartLength(size, partNumber) {
+  const count = multipartPartCount(size);
+  if (!Number.isInteger(partNumber) || partNumber < 1 || partNumber > count) {
+    throw new RangeError(`part ${partNumber} is outside 1..${count}`);
+  }
+  return partNumber < count ? STORAGE_MULTIPART_PART_BYTES : size - STORAGE_MULTIPART_PART_BYTES * (count - 1);
+}
+var r2UploadIdSchema = exports_external.string().regex(/^[A-Za-z0-9_\-.~+/=]{1,1024}$/);
+var beginBase = { uploadId: exports_external.uuid(), fileId: exports_external.uuid(), expiresAt: isoSchema };
+var storageSinglePutBeginResponseSchema = exports_external.strictObject({
+  ...beginBase,
   url: exports_external.url(),
-  headers: exports_external.strictObject({ "Content-Type": exports_external.string(), "Content-Length": exports_external.string() }),
+  headers: exports_external.strictObject({ "Content-Type": exports_external.string(), "Content-Length": exports_external.string() })
+});
+var storageMultipartBeginResponseSchema = exports_external.strictObject({
+  ...beginBase,
+  multipart: exports_external.strictObject({
+    r2UploadId: r2UploadIdSchema,
+    partSize: exports_external.literal(STORAGE_MULTIPART_PART_BYTES),
+    partCount: exports_external.int().min(2).max(1e4)
+  })
+});
+var storageBeginResponseSchema = exports_external.union([
+  storageSinglePutBeginResponseSchema,
+  storageMultipartBeginResponseSchema
+]);
+var storageSignPartsRequestSchema = exports_external.strictObject({
+  r2UploadId: r2UploadIdSchema,
+  partNumbers: exports_external.array(exports_external.int().min(1).max(1e4)).min(1).max(STORAGE_MULTIPART_SIGN_MAX_PARTS).refine((numbers) => new Set(numbers).size === numbers.length, "duplicate part number")
+});
+var storageSignPartsResponseSchema = exports_external.strictObject({
+  parts: exports_external.array(exports_external.strictObject({
+    partNumber: exports_external.int().min(1).max(1e4),
+    url: exports_external.url(),
+    headers: exports_external.strictObject({ "Content-Length": exports_external.string() })
+  })),
   expiresAt: isoSchema
 });
 var storageCompleteRequestSchema = exports_external.strictObject({
-  checksum: exports_external.strictObject({ sha256: exports_external.string().regex(/^[0-9a-f]{64}$/) }).optional()
+  checksum: exports_external.strictObject({ sha256: exports_external.string().regex(/^[0-9a-f]{64}$/) }).optional(),
+  r2UploadId: r2UploadIdSchema.optional()
+});
+var storageAbortRequestSchema = exports_external.strictObject({ r2UploadId: r2UploadIdSchema });
+var storageAbortResponseSchema = exports_external.strictObject({
+  uploadId: exports_external.uuid(),
+  status: exports_external.literal("failed")
 });
 var storageFileSchema = exports_external.strictObject({
   id: exports_external.uuid(),
@@ -65473,6 +65621,10 @@ var storageDeleteResponseSchema = exports_external.strictObject({
   fileId: exports_external.uuid(),
   status: exports_external.enum(["deleting", "deleted"])
 });
+// frontend/packages/project-protocol/src/storage-egress.ts
+var UUID2 = "[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}";
+var STAGING_KEY = new RegExp(`^[a-z][a-z0-9-]{1,31}/(?:apps/[a-z][a-z0-9-]*/)?${UUID2}$`);
+var PART_KEY = new RegExp(`^[a-z][a-z0-9-]{1,31}/(?:apps/[a-z][a-z0-9-]*/)?objects/${UUID2}$`);
 // frontend/packages/project-protocol/src/validation-report.ts
 init_zod();
 var VALIDATION_STAGES = ["import", "static", "dynamic"];
@@ -66783,12 +66935,21 @@ function buildReport(input) {
     artifactHash: input.index?.artifactHash ?? null,
     index: input.index,
     manifest: input.manifest ?? null,
-    normalized: input.manifest ? normalizeProjectManifest(input.manifest) : null,
+    normalized: input.manifest ? withAiPrompts(normalizeProjectManifest(input.manifest), input.aiPrompts) : null,
     schema: input.schema ?? null,
     screenshots: input.screenshots ?? [],
     stages: input.stages,
     passed: input.stages.length > 0 && input.stages.every((stage) => stage.status === "passed")
   });
+}
+function withAiPrompts(normalized, prompts) {
+  const ai2 = normalized.manifest.ai;
+  if (!ai2)
+    return normalized;
+  return {
+    ...normalized,
+    manifest: { ...normalized.manifest, ai: { ...ai2, prompts: prompts ?? [] } }
+  };
 }
 // frontend/packages/project-validator/src/schema/check.ts
 import { createHash as createHash2 } from "node:crypto";
@@ -67470,9 +67631,67 @@ function checkManifestText(text, models) {
   return { manifest: manifest2, errors: errors5, warnings };
 }
 // frontend/packages/project-validator/src/static/source.ts
-import { existsSync as existsSync6 } from "node:fs";
-import { readdir as readdir4, readFile as readFile4 } from "node:fs/promises";
-import { join as join8 } from "node:path";
+import { existsSync as existsSync7 } from "node:fs";
+import { readdir as readdir4, readFile as readFile5 } from "node:fs/promises";
+import { join as join9 } from "node:path";
+
+// frontend/packages/project-validator/src/static/ai-prompts.ts
+import { createHash as createHash3 } from "node:crypto";
+import { existsSync as existsSync4 } from "node:fs";
+import { readFile as readFile3 } from "node:fs/promises";
+import { join as join6 } from "node:path";
+async function readAiPrompts(root, manifest2) {
+  const errors5 = [];
+  const prompts = [];
+  const declared = [
+    ...(manifest2.ai?.instructions ?? []).map((key) => ({
+      kind: "instructions",
+      key,
+      path: `ai/${key}.md`
+    })),
+    ...(manifest2.ai?.schemas ?? []).map((key) => ({
+      kind: "schema",
+      key,
+      path: `ai/schemas/${key}.json`
+    }))
+  ];
+  for (const { kind, key, path } of declared) {
+    const file2 = join6(root, path);
+    if (!existsSync4(file2)) {
+      errors5.push({
+        code: "AI_PROMPT_MISSING",
+        path,
+        message: `${path} is declared in project.yaml but missing`
+      });
+      continue;
+    }
+    const content = await readFile3(file2, "utf8");
+    if (Buffer.byteLength(content) > AI_PROMPT_MAX_BYTES) {
+      errors5.push({
+        code: "AI_PROMPT_TOO_LARGE",
+        path,
+        message: `at most ${AI_PROMPT_MAX_BYTES} bytes`
+      });
+      continue;
+    }
+    if (kind === "schema" && !isJsonSchemaObject(content)) {
+      errors5.push({ code: "AI_SCHEMA_INVALID", path, message: "must be a JSON Schema object" });
+      continue;
+    }
+    prompts.push({ kind, key, content, sha256: createHash3("sha256").update(content).digest("hex") });
+  }
+  return { errors: errors5, prompts };
+}
+function isJsonSchemaObject(text) {
+  try {
+    const value = JSON.parse(text);
+    return typeof value === "object" && value !== null && !Array.isArray(value);
+  } catch (error51) {
+    if (error51 instanceof SyntaxError)
+      return false;
+    throw error51;
+  }
+}
 
 // frontend/packages/project-validator/src/static/network.ts
 function checkAppNetwork(manifest2, sources) {
@@ -67515,9 +67734,9 @@ function checkAppNetwork(manifest2, sources) {
 }
 
 // frontend/packages/project-validator/src/static/webhooks.ts
-import { existsSync as existsSync4 } from "node:fs";
-import { readdir as readdir3, readFile as readFile3 } from "node:fs/promises";
-import { join as join6 } from "node:path";
+import { existsSync as existsSync5 } from "node:fs";
+import { readdir as readdir3, readFile as readFile4 } from "node:fs/promises";
+import { join as join7 } from "node:path";
 function webhookWarnings(files) {
   const entries = Object.entries(files);
   const hook = entries.find(([path, source]) => /hooks?/i.test(path) || /['"`]\/api\/hooks(?:\/|['"`])/.test(source));
@@ -67539,15 +67758,15 @@ async function checkWebhooks(root, manifest2) {
   for (const [slug, app] of Object.entries(manifest2.apps)) {
     if (app.kind !== "api")
       continue;
-    const directory = join6(root, "apps", slug, "src");
-    if (!existsSync4(directory))
+    const directory = join7(root, "apps", slug, "src");
+    if (!existsSync5(directory))
       continue;
     const files = {};
     for (const entry of await readdir3(directory, { recursive: true, withFileTypes: true })) {
       if (!entry.isFile() || !/\.[cm]?[jt]sx?$/.test(entry.name))
         continue;
-      const path = join6(entry.parentPath, entry.name);
-      files[path.slice(root.length + 1)] = await readFile3(path, "utf8");
+      const path = join7(entry.parentPath, entry.name);
+      files[path.slice(root.length + 1)] = await readFile4(path, "utf8");
     }
     warnings.push(...webhookWarnings(files));
   }
@@ -67555,8 +67774,8 @@ async function checkWebhooks(root, manifest2) {
 }
 
 // frontend/packages/project-validator/src/static/zmodel.ts
-import { existsSync as existsSync5 } from "node:fs";
-import { join as join7 } from "node:path";
+import { existsSync as existsSync6 } from "node:fs";
+import { join as join8 } from "node:path";
 var ZMODEL_MODELS_MAX = 200;
 var ZMODEL_FIELDS_MAX = 100;
 var isNode = (value) => typeof value === "object" && value !== null && typeof value.$type === "string";
@@ -67618,10 +67837,10 @@ function isOpenCondition(node) {
 var filtersBlocked = (node) => isNode(node) && [node, ...descendants(node)].some((child) => child.$type === "BinaryExpr" && child.operator === "in" && isNode(child.right) && child.right.$type === "MemberAccessExpr" && refText(child.right.member) === "blockedUserIds" && isAuthCall(child.right.operand));
 async function checkZModel(root, load) {
   const path = PROJECT_PATHS.schema;
-  const entry = join7(root, path);
+  const entry = join8(root, path);
   const errors5 = [];
   const warnings = [];
-  if (!existsSync5(entry)) {
+  if (!existsSync6(entry)) {
     errors5.push({
       code: "ZMODEL_MISSING",
       path,
@@ -67825,17 +68044,17 @@ async function checkZModel(root, load) {
 var KIT_LAYOUT = { platform: "platform/platform.zmodel", vendor: "vendor" };
 async function readTree2(dir) {
   const files = new Map;
-  if (!existsSync6(dir))
+  if (!existsSync7(dir))
     return files;
   const walk = async (relative) => {
-    for (const entry of await readdir4(join8(dir, relative), { withFileTypes: true })) {
+    for (const entry of await readdir4(join9(dir, relative), { withFileTypes: true })) {
       if (relative === "" && entry.name === "node_modules")
         continue;
       const path = relative === "" ? entry.name : `${relative}/${entry.name}`;
       if (entry.isDirectory())
         await walk(path);
       else
-        files.set(path, await readFile4(join8(dir, path), "base64"));
+        files.set(path, await readFile5(join9(dir, path), "base64"));
     }
   };
   await walk("");
@@ -67850,11 +68069,11 @@ function sameTree(a, b2) {
   return true;
 }
 async function modifiedVendoredPackages(root, kitRoot) {
-  const vendor = join8(kitRoot, KIT_LAYOUT.vendor);
-  const dirs = existsSync6(vendor) ? (await readdir4(vendor, { withFileTypes: true })).filter((entry) => entry.isDirectory()).map((entry) => entry.name).sort() : [];
+  const vendor = join9(kitRoot, KIT_LAYOUT.vendor);
+  const dirs = existsSync7(vendor) ? (await readdir4(vendor, { withFileTypes: true })).filter((entry) => entry.isDirectory()).map((entry) => entry.name).sort() : [];
   const modified = [];
   for (const dir of dirs) {
-    if (!sameTree(await readTree2(join8(vendor, dir)), await readTree2(join8(root, "packages", dir)))) {
+    if (!sameTree(await readTree2(join9(vendor, dir)), await readTree2(join9(root, "packages", dir)))) {
       modified.push(dir);
     }
   }
@@ -67865,8 +68084,8 @@ async function validateSource(options2) {
   const errors5 = [];
   const warnings = [];
   const skipped = [];
-  const platformPath = join8(root, PROJECT_PATHS.platform);
-  const platformOk = existsSync6(platformPath) && await readFile4(platformPath, "utf8") === await readFile4(join8(kitRoot, KIT_LAYOUT.platform), "utf8");
+  const platformPath = join9(root, PROJECT_PATHS.platform);
+  const platformOk = existsSync7(platformPath) && await readFile5(platformPath, "utf8") === await readFile5(join9(kitRoot, KIT_LAYOUT.platform), "utf8");
   if (!platformOk) {
     errors5.push({
       code: "PLATFORM_MODIFIED",
@@ -67884,16 +68103,16 @@ async function validateSource(options2) {
   const zmodel = platformOk ? await checkZModel(root, options2.loadZModel) : { errors: [], warnings: [], models: null };
   errors5.push(...zmodel.errors);
   warnings.push(...zmodel.warnings);
-  const manifestPath = join8(root, PROJECT_PATHS.manifest);
+  const manifestPath = join9(root, PROJECT_PATHS.manifest);
   let manifest2 = null;
-  if (!existsSync6(manifestPath)) {
+  if (!existsSync7(manifestPath)) {
     errors5.push({
       code: "MANIFEST_MISSING",
       path: PROJECT_PATHS.manifest,
       message: "project.yaml is missing"
     });
   } else {
-    const checked = checkManifestText(await readFile4(manifestPath, "utf8"), zmodel.models);
+    const checked = checkManifestText(await readFile5(manifestPath, "utf8"), zmodel.models);
     manifest2 = checked.manifest;
     errors5.push(...checked.errors);
     warnings.push(...checked.warnings);
@@ -67902,7 +68121,7 @@ async function validateSource(options2) {
   if (manifest2) {
     const sources = new Map;
     for (const slug of Object.keys(manifest2.apps)) {
-      for (const [path, bytes] of await readTree2(join8(root, "apps", slug, "src"))) {
+      for (const [path, bytes] of await readTree2(join9(root, "apps", slug, "src"))) {
         sources.set(`${slug}/src/${path}`, Buffer.from(bytes, "base64").toString("utf8"));
       }
     }
@@ -67910,6 +68129,8 @@ async function validateSource(options2) {
   }
   if (manifest2)
     warnings.push(...await checkWebhooks(root, manifest2));
+  const ai2 = manifest2 ? await readAiPrompts(root, manifest2) : { errors: [], prompts: [] };
+  errors5.push(...ai2.errors);
   try {
     await readMigrations(root);
   } catch (error51) {
@@ -67935,11 +68156,11 @@ async function validateSource(options2) {
       reason: options2.changedMigrations.skipped
     });
   }
-  return { manifest: manifest2, errors: errors5, warnings, skipped };
+  return { manifest: manifest2, aiPrompts: ai2.prompts, errors: errors5, warnings, skipped };
 }
 async function checkLockfile(root, options2, errors5, warnings) {
-  const path = join8(root, "bun.lock");
-  if (!existsSync6(path)) {
+  const path = join9(root, "bun.lock");
+  if (!existsSync7(path)) {
     errors5.push({
       code: "LOCKFILE_MISSING",
       path: "bun.lock",
@@ -67947,7 +68168,7 @@ async function checkLockfile(root, options2, errors5, warnings) {
     });
     return;
   }
-  const text = await readFile4(path, "utf8");
+  const text = await readFile5(path, "utf8");
   try {
     for (const violation of checkBunLockfile(text)) {
       errors5.push({
@@ -68056,6 +68277,7 @@ async function validateProject(archive, source, options2 = {}) {
       screenshots,
       index,
       manifest: checked.manifest,
+      aiPrompts: checked.aiPrompts,
       schema: artifacts && {
         schemaVersion: artifacts.schemaVersion,
         policyVersion: artifacts.policyVersion,
@@ -68074,10 +68296,10 @@ async function validateProject(archive, source, options2 = {}) {
 }
 // frontend/packages/project-validator/src/worker-runtime.ts
 import { createRequire as createRequire5 } from "node:module";
-import { join as join9 } from "node:path";
+import { join as join10 } from "node:path";
 import { pathToFileURL as pathToFileURL4 } from "node:url";
 async function createMockWorkerRuntime(input) {
-  const entry = createRequire5(join9(input.root, "package.json")).resolve("miniflare");
+  const entry = createRequire5(join10(input.root, "package.json")).resolve("miniflare");
   const { Miniflare, Response: WorkerResponse } = await import(pathToFileURL4(entry).href);
   const events = [];
   const record2 = (event) => {
@@ -68185,7 +68407,7 @@ function projectZModelLoader(root) {
   let loaded;
   return async (entry, mergeImports) => {
     loaded ??= (async () => {
-      const fromProject = createRequire6(join10(root, "package.json"));
+      const fromProject = createRequire6(join11(root, "package.json"));
       const fromCli = createRequire6(fromProject.resolve("@zenstackhq/cli/package.json"));
       const cjs = fromCli.resolve("@zenstackhq/language");
       return import(pathToFileURL5(cjs.replace(/index\.cjs$/, "index.mjs")).href);
@@ -68226,7 +68448,7 @@ async function changedMigrations(options2) {
     };
   }
   if (base === null) {
-    const entries = existsSync7(join10(root, dir)) ? await readdir5(join10(root, dir)) : [];
+    const entries = existsSync8(join11(root, dir)) ? await readdir5(join11(root, dir)) : [];
     return {
       changed: entries.filter((name3) => name3 !== ".gitkeep").sort().map((name3) => `${dir}/${name3}`)
     };
@@ -68245,11 +68467,11 @@ ${untracked.code === 0 ? untracked.stdout : ""}`.split(`
 }
 
 // frontend/packages/miniapp-kit/src/commands.ts
-import { createHash as createHash7 } from "node:crypto";
-import { existsSync as existsSync21 } from "node:fs";
-import { mkdir as mkdir13, readdir as readdir11, readFile as readFile18, writeFile as writeFile14 } from "node:fs/promises";
+import { createHash as createHash8 } from "node:crypto";
+import { existsSync as existsSync22 } from "node:fs";
+import { mkdir as mkdir13, readdir as readdir11, readFile as readFile19, writeFile as writeFile14 } from "node:fs/promises";
 import { homedir } from "node:os";
-import { dirname as dirname12, join as join31, resolve as resolve3 } from "node:path";
+import { dirname as dirname12, join as join33, resolve as resolve3 } from "node:path";
 
 // frontend/packages/miniapp-kit/src/approval.ts
 var ASK_A_PERSON_TOOLS = [
@@ -68327,15 +68549,15 @@ function openInBrowser(url2) {
 
 // frontend/packages/miniapp-kit/src/build.ts
 import { spawn as spawn3 } from "node:child_process";
-import { existsSync as existsSync11, readFileSync as readFileSync3 } from "node:fs";
-import { readFile as readFile8, rm as rm5, writeFile as writeFile4 } from "node:fs/promises";
+import { existsSync as existsSync12, readFileSync as readFileSync3 } from "node:fs";
+import { readFile as readFile9, rm as rm5, writeFile as writeFile4 } from "node:fs/promises";
 import { createRequire as createRequire8 } from "node:module";
-import { dirname as dirname5, join as join16 } from "node:path";
+import { dirname as dirname5, join as join17 } from "node:path";
 
 // frontend/packages/miniapp-kit/src/generate.ts
-import { existsSync as existsSync9 } from "node:fs";
-import { mkdir as mkdir3, readdir as readdir7, readFile as readFile6, rm as rm4, writeFile as writeFile3 } from "node:fs/promises";
-import { dirname as dirname3, join as join12 } from "node:path";
+import { existsSync as existsSync10 } from "node:fs";
+import { mkdir as mkdir3, readdir as readdir7, readFile as readFile7, rm as rm4, writeFile as writeFile3 } from "node:fs/promises";
+import { dirname as dirname3, join as join13 } from "node:path";
 
 // frontend/packages/miniapp-kit/src/env-types.ts
 var SERVER_ENV_TYPES_PATH = "packages/sdk/src/env.ts";
@@ -68376,9 +68598,9 @@ function renderServerEnvTypes(manifest2) {
 }
 
 // frontend/packages/miniapp-kit/src/vendor.ts
-import { existsSync as existsSync8 } from "node:fs";
-import { cp, mkdir as mkdir2, readdir as readdir6, readFile as readFile5, rm as rm3, writeFile as writeFile2 } from "node:fs/promises";
-import { join as join11 } from "node:path";
+import { existsSync as existsSync9 } from "node:fs";
+import { cp, mkdir as mkdir2, readdir as readdir6, readFile as readFile6, rm as rm3, writeFile as writeFile2 } from "node:fs/promises";
+import { join as join12 } from "node:path";
 var VENDORED_PACKAGES = [
   { name: "@workspace/project-protocol", dir: "project-protocol" },
   { name: "@workspace/miniapp-sdk", dir: "miniapp-sdk" }
@@ -68390,17 +68612,17 @@ class VendorError extends Error {
 }
 async function readTree3(root) {
   const files = new Map;
-  if (!existsSync8(root))
+  if (!existsSync9(root))
     return files;
   const walk = async (relative) => {
-    for (const entry of await readdir6(join11(root, relative), { withFileTypes: true })) {
+    for (const entry of await readdir6(join12(root, relative), { withFileTypes: true })) {
       if (relative === "" && entry.name === "node_modules")
         continue;
       const path = relative === "" ? entry.name : `${relative}/${entry.name}`;
       if (entry.isDirectory())
         await walk(path);
       else
-        files.set(path, await readFile5(join11(root, path), "base64"));
+        files.set(path, await readFile6(join12(root, path), "base64"));
     }
   };
   await walk("");
@@ -68417,20 +68639,20 @@ function sameTree2(a, b2) {
 async function placeVendoredPackages(root, kitRoot) {
   const result = {};
   for (const pkg of VENDORED_PACKAGES) {
-    const source = join11(kitRoot, KIT_VENDOR_DIR, pkg.dir);
-    if (!existsSync8(join11(source, "package.json"))) {
+    const source = join12(kitRoot, KIT_VENDOR_DIR, pkg.dir);
+    if (!existsSync9(join12(source, "package.json"))) {
       throw new VendorError(`the Kit has no ${KIT_VENDOR_DIR}/${pkg.dir} (${pkg.name}); the Kit is incomplete, reinstall it`);
     }
-    const target = join11(root, "packages", pkg.dir);
+    const target = join12(root, "packages", pkg.dir);
     if (sameTree2(await readTree3(source), await readTree3(target))) {
       result[pkg.dir] = "unchanged";
       continue;
     }
-    const existed = existsSync8(target);
+    const existed = existsSync9(target);
     if (existed) {
       for (const entry of await readdir6(target)) {
         if (entry !== "node_modules")
-          await rm3(join11(target, entry), { recursive: true, force: true });
+          await rm3(join12(target, entry), { recursive: true, force: true });
       }
     }
     await cp(source, target, { recursive: true });
@@ -68451,7 +68673,7 @@ async function generateProject(options2) {
   const platform = await placePlatform(root, options2.kitRoot);
   const vendored = await placeVendoredPackages(root, options2.kitRoot);
   const cli = cliOf(root, options2.resolveCli ?? resolveZenStackCli);
-  const sdk = join12(root, PROJECT_PATHS.sdk);
+  const sdk = join13(root, PROJECT_PATHS.sdk);
   await rm4(sdk, { recursive: true, force: true });
   await runZen(cli, root, [
     "generate",
@@ -68463,11 +68685,11 @@ async function generateProject(options2) {
     "--no-tips",
     "--silent"
   ], fail3);
-  const generated = join12(root, PROJECT_PATHS.generated);
+  const generated = join13(root, PROJECT_PATHS.generated);
   await mkdir3(generated, { recursive: true });
-  await writeFile3(join12(generated, "project.json"), stableJson(manifest2));
-  await writeFile3(join12(generated, "schema.json"), stableJson(await loadSchema(root, sdk, fail3)));
-  await writeFile3(join12(root, SERVER_ENV_TYPES_PATH), renderServerEnvTypes(manifest2));
+  await writeFile3(join13(generated, "project.json"), stableJson(manifest2));
+  await writeFile3(join13(generated, "schema.json"), stableJson(await loadSchema(root, sdk, fail3)));
+  await writeFile3(join13(root, SERVER_ENV_TYPES_PATH), renderServerEnvTypes(manifest2));
   const sdkFiles = (await readdir7(sdk)).sort().map((name3) => `${PROJECT_PATHS.sdk}/${name3}`);
   return {
     platform,
@@ -68483,12 +68705,12 @@ async function generateProject(options2) {
   };
 }
 async function readManifest(root) {
-  const path = join12(root, PROJECT_PATHS.manifest);
-  if (!existsSync9(path))
+  const path = join13(root, PROJECT_PATHS.manifest);
+  if (!existsSync10(path))
     throw new GenerateError(`${PROJECT_PATHS.manifest} is missing`);
   let raw;
   try {
-    raw = $parse(await readFile6(path, "utf8"));
+    raw = $parse(await readFile7(path, "utf8"));
   } catch (error51) {
     throw new GenerateError(`${PROJECT_PATHS.manifest} is not valid YAML: ${error51 instanceof Error ? error51.message : String(error51)}`);
   }
@@ -68502,9 +68724,9 @@ ${lines.join(`
   return { manifest: normalizeProjectManifest(parsed.manifest).manifest, warnings: parsed.warnings };
 }
 async function placePlatform(root, kitRoot) {
-  const kitCopy = await readFile6(join12(kitRoot, KIT_PLATFORM_ZMODEL), "utf8");
-  const path = join12(root, PROJECT_PATHS.platform);
-  const current = existsSync9(path) ? await readFile6(path, "utf8") : null;
+  const kitCopy = await readFile7(join13(kitRoot, KIT_PLATFORM_ZMODEL), "utf8");
+  const path = join13(root, PROJECT_PATHS.platform);
+  const current = existsSync10(path) ? await readFile7(path, "utf8") : null;
   if (current === kitCopy)
     return "unchanged";
   await mkdir3(dirname3(path), { recursive: true });
@@ -68521,9 +68743,9 @@ function cliOf(root, resolve2) {
 var fail3 = (message2) => new GenerateError(message2);
 
 // frontend/packages/miniapp-kit/src/pack.ts
-import { createHash as createHash3 } from "node:crypto";
-import { lstat, readdir as readdir8, readFile as readFile7 } from "node:fs/promises";
-import { join as join13 } from "node:path";
+import { createHash as createHash4 } from "node:crypto";
+import { lstat, readdir as readdir8, readFile as readFile8 } from "node:fs/promises";
+import { join as join14 } from "node:path";
 
 // frontend/packages/miniapp-kit/src/tar.ts
 import { gzipSync } from "node:zlib";
@@ -68595,17 +68817,17 @@ class PackError extends Error {
 async function collectFiles(root) {
   const files = [];
   const walk = async (relative) => {
-    const entries = await readdir8(join13(root, relative), { withFileTypes: true });
+    const entries = await readdir8(join14(root, relative), { withFileTypes: true });
     for (const entry of entries) {
       const path = relative === "" ? entry.name : `${relative}/${entry.name}`;
-      const info = await lstat(join13(root, path));
+      const info = await lstat(join14(root, path));
       if (info.isSymbolicLink()) {
         throw new PackError(`${path} is a symbolic link; Platform rejects links, copy the file instead`);
       }
       if (info.isDirectory())
         await walk(path);
       else if (info.isFile()) {
-        files.push({ path, bytes: new Uint8Array(await readFile7(join13(root, path))) });
+        files.push({ path, bytes: new Uint8Array(await readFile8(join14(root, path))) });
       }
     }
   };
@@ -68633,17 +68855,17 @@ function buildDistArchive(files) {
   return gzipTar(content);
 }
 function describeFile(bytes) {
-  return { size: bytes.byteLength, sha256: createHash3("sha256").update(bytes).digest("hex") };
+  return { size: bytes.byteLength, sha256: createHash4("sha256").update(bytes).digest("hex") };
 }
 
 // frontend/packages/miniapp-kit/src/worker-build.ts
-import { join as join15 } from "node:path";
+import { join as join16 } from "node:path";
 import { pathToFileURL as pathToFileURL7 } from "node:url";
 
 // frontend/packages/miniapp-kit/src/dev/seed.ts
-import { existsSync as existsSync10, readFileSync as readFileSync2 } from "node:fs";
+import { existsSync as existsSync11, readFileSync as readFileSync2 } from "node:fs";
 import { createRequire as createRequire7 } from "node:module";
-import { dirname as dirname4, join as join14 } from "node:path";
+import { dirname as dirname4, join as join15 } from "node:path";
 import { pathToFileURL as pathToFileURL6 } from "node:url";
 // frontend/packages/logger/redact.ts
 var REDACTED = "[REDACTED]";
@@ -70235,6 +70457,7 @@ function errorContext(error51) {
 // frontend/packages/project-gateway/src/app.ts
 var REQUEST_ID_PATTERN = /^[A-Za-z0-9._-]{1,64}$/;
 var HOST_ONLY_PATHS = new Set([
+  "/v1/apps",
   "/v1/token/exchange",
   "/v1/delivery/open",
   "/v1/auth/direct/issue"
@@ -70734,48 +70957,6 @@ async function eraseProjectUser(db, input, removeObject) {
   }
   return { status: "erased", users: userIds.length, files: batch.length };
 }
-// frontend/node_modules/hono/dist/middleware/body-limit/index.js
-var ERROR_MESSAGE = "Payload Too Large";
-var bodyLimit = (options2) => {
-  const onError = options2.onError || (() => {
-    const res = new Response(ERROR_MESSAGE, { status: 413 });
-    throw new HTTPException(413, { res });
-  });
-  const maxSize = options2.maxSize;
-  return async function bodyLimit2(c, next) {
-    if (!c.req.raw.body)
-      return next();
-    const hasTransferEncoding = c.req.raw.headers.has("transfer-encoding");
-    if (c.req.raw.headers.has("content-length") && !hasTransferEncoding)
-      return parseInt(c.req.raw.headers.get("content-length") || "0", 10) > maxSize ? onError(c) : next();
-    let size = 0;
-    const chunks = [];
-    const rawReader = c.req.raw.body.getReader();
-    for (;; ) {
-      const { done, value } = await rawReader.read();
-      if (done)
-        break;
-      size += value.length;
-      if (size > maxSize)
-        return onError(c);
-      chunks.push(value);
-    }
-    const requestInit = {
-      body: new ReadableStream({ start(controller) {
-        for (const chunk of chunks)
-          controller.enqueue(chunk);
-        controller.close();
-      } }),
-      duplex: "half"
-    };
-    c.req.raw = new Request(c.req.raw, requestInit);
-    return next();
-  };
-};
-
-// frontend/packages/project-gateway/src/api/routes.ts
-init_zod();
-
 // frontend/packages/project-gateway/src/internal/role-grants.ts
 var NO_BOOTSTRAP = { eligible: false, roles: [], legacyRoles: [] };
 var definitions = [
@@ -71118,7 +71299,571 @@ async function jsonBody(c) {
   }
 }
 
+// frontend/packages/project-gateway/src/internal/audit.ts
+function auditPolicyVersionOf(schema, policyVersion) {
+  const fields = schema?.models?.AuditEvent?.fields;
+  return fields && "policyVersion" in fields ? policyVersion : null;
+}
+function auditColumnsOf(event) {
+  const pairs = [
+    ["id", crypto.randomUUID()],
+    ["at", event.at.toISOString()],
+    ["requestId", event.requestId],
+    ["appSlug", event.appSlug],
+    ["actorId", event.actorId],
+    ["action", event.action],
+    ["resource", event.resource ?? null],
+    ["decision", event.decision],
+    ["reason", event.reason ?? null]
+  ];
+  if (event.policyVersion)
+    pairs.push(["policyVersion", event.policyVersion]);
+  return {
+    columns: pairs.map(([name3]) => `"${name3}"`).join(", "),
+    values: pairs.map(([, value]) => value)
+  };
+}
+async function writeAuditEvent(db, event) {
+  const { columns, values } = auditColumnsOf(event);
+  await db.execute({
+    sql: `INSERT INTO "AuditEvent" (${columns}) VALUES (${values.map(() => "?").join(", ")})`,
+    args: values
+  });
+}
+async function writeAuditEventSafely(db, logger, event) {
+  try {
+    await writeAuditEvent(db, event);
+  } catch (error51) {
+    logger.log("error", "audit write failed", {
+      request_id: event.requestId,
+      action: event.action,
+      decision: event.decision,
+      ...errorContext(error51)
+    });
+  }
+}
+
+// frontend/packages/project-gateway/src/internal/storage-files.ts
+var IN_PROGRESS = [
+  "initiated",
+  "uploading",
+  "validating"
+];
+var COLUMNS = `"id", "bucket", "objectKey", "ownerId", "workspaceId", "visibility", "status",
+  "originalName", "contentType", "sizeBytes", "createdAt"`;
+function auditStatement(context, action2, fileId, decision, reason) {
+  const { columns, values } = auditColumnsOf({
+    ...context,
+    action: action2,
+    resource: `storageFile:${fileId}`,
+    decision,
+    reason
+  });
+  return {
+    sql: `INSERT INTO "AuditEvent" (${columns}) VALUES (${values.map(() => "?").join(", ")})`,
+    args: values
+  };
+}
+function toRow(row) {
+  const text = (value) => value === null || value === undefined ? null : String(value);
+  return {
+    id: String(row.id),
+    bucket: String(row.bucket),
+    objectKey: String(row.objectKey),
+    ownerId: String(row.ownerId),
+    workspaceId: text(row.workspaceId),
+    visibility: String(row.visibility),
+    status: String(row.status),
+    originalName: text(row.originalName),
+    contentType: text(row.contentType),
+    sizeBytes: row.sizeBytes === null ? null : Number(row.sizeBytes),
+    createdAt: toIso(String(row.createdAt))
+  };
+}
+function toIso(value) {
+  const normalized = /^\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2}$/.test(value) ? `${value.replace(" ", "T")}Z` : value;
+  return new Date(normalized).toISOString();
+}
+async function workspaceRoleOf(db, workspaceId, userId) {
+  const result = await db.execute({
+    sql: `SELECT "role" FROM "Membership" WHERE "workspaceId" = ? AND "userId" = ?`,
+    args: [workspaceId, userId]
+  });
+  const role = result.rows[0]?.role;
+  return role === undefined || role === null ? null : String(role);
+}
+var COUNTED_STATUSES = `"status" NOT IN ('failed', 'deleted')`;
+async function insertUpload(db, file2, context, quotaBytes) {
+  const at = context.at.toISOString();
+  const [inserted] = await db.batch([
+    {
+      sql: `INSERT INTO "StorageFile" ("id", "bucket", "objectKey", "ownerId", "workspaceId", "uploaderApp",
+                "visibility", "status", "originalName", "contentType", "sizeBytes", "createdAt", "updatedAt")
+              SELECT ?, ?, ?, ?, ?, ?, ?, 'uploading', ?, ?, ?, ?, ?
+              WHERE ? IS NULL
+                 OR (SELECT COALESCE(SUM("sizeBytes"), 0) FROM "StorageFile" WHERE ${COUNTED_STATUSES}) + ? <= ?`,
+      args: [
+        file2.id,
+        file2.bucket,
+        file2.objectKey,
+        file2.ownerId,
+        file2.workspaceId,
+        file2.uploaderApp,
+        file2.visibility,
+        file2.originalName,
+        file2.contentType,
+        file2.sizeBytes,
+        at,
+        at,
+        quotaBytes,
+        file2.sizeBytes,
+        quotaBytes
+      ]
+    },
+    conditionalAuditStatement(context, "storage.upload.initiated", file2.id, null)
+  ], "write");
+  if ((inserted?.rowsAffected ?? 0) > 0)
+    return true;
+  await db.execute(auditStatement(context, "storage.upload.initiated", file2.id, "deny", "quota"));
+  return false;
+}
+async function findOwnUpload(db, id, ownerId) {
+  const result = await db.execute({
+    sql: `SELECT ${COLUMNS} FROM "StorageFile" WHERE "id" = ? AND "ownerId" = ?`,
+    args: [id, ownerId]
+  });
+  const row = result.rows[0];
+  return row ? toRow(row) : null;
+}
+async function findStorageFile(db, id) {
+  const result = await db.execute({
+    sql: `SELECT ${COLUMNS} FROM "StorageFile" WHERE "id" = ?`,
+    args: [id]
+  });
+  const row = result.rows[0];
+  return row ? toRow(row) : null;
+}
+function conditionalAuditStatement(context, action2, fileId, reason) {
+  const { columns, values } = auditColumnsOf({
+    ...context,
+    action: action2,
+    resource: `storageFile:${fileId}`,
+    decision: "allow",
+    reason
+  });
+  return {
+    sql: `INSERT INTO "AuditEvent" (${columns}) SELECT ${values.map(() => "?").join(", ")} WHERE changes() > 0`,
+    args: values
+  };
+}
+async function transitionStorageFile(db, input, context) {
+  const placeholders = input.from.map(() => "?").join(", ");
+  const [update, , select] = await db.batch([
+    {
+      sql: `UPDATE "StorageFile" SET "status" = ?, "updatedAt" = ? WHERE "id" = ? AND "status" IN (${placeholders})`,
+      args: [input.to, context.at.toISOString(), input.id, ...input.from]
+    },
+    conditionalAuditStatement(context, input.action, input.id, input.reason ?? null),
+    { sql: `SELECT ${COLUMNS} FROM "StorageFile" WHERE "id" = ?`, args: [input.id] }
+  ], "write");
+  const row = select?.rows[0];
+  return { changed: (update?.rowsAffected ?? 0) > 0, file: row ? toRow(row) : null };
+}
+async function auditStorage(db, context, action2, fileId) {
+  await db.execute(auditStatement(context, action2, fileId, "allow", null));
+}
+
+// frontend/packages/project-gateway/src/storage/access.ts
+function inAppScope(file2, claims) {
+  const scoped = file2.objectKey.match(/\/apps\/([^/]+)\/objects\//);
+  return !scoped || scoped[1] === claims.app;
+}
+function hasCapability(resolved, claims, bucket, op) {
+  if (claims.anon && op !== "read" && !resolved.app.anonymous.write)
+    return false;
+  return resolved.app.capabilities.buckets[bucket]?.includes(op) ?? false;
+}
+function assertCapability(resolved, claims, bucket, op, code) {
+  if (!hasCapability(resolved, claims, bucket, op))
+    throw new GatewayError(code, "operation not allowed");
+}
+async function policyClientFor(runtime, db, claims, resolved, schema) {
+  const actor = await loadProjectActor(db, claims.sub, blockedGlobalUserIds(claims.gid, resolved.user.blockedUserIds), resolved.user.bootstrap);
+  if (!actor || !schema)
+    throw new GatewayError("UNAUTHENTICATED", "project user not found");
+  return runtime.policyClient({
+    schema,
+    db,
+    actor,
+    appSlug: claims.app,
+    isAnonymous: claims.anon
+  });
+}
+async function findReadableFile(runtime, input) {
+  const { db, claims, resolved, schema, fileId } = input;
+  const client = await policyClientFor(runtime, db, claims, resolved, schema);
+  const visible = await client.storageFile.findUnique({ where: { id: fileId }, select: { id: true } });
+  const file2 = visible ? await findStorageFile(db, visible.id) : null;
+  if (!file2 || !inAppScope(file2, claims) || !hasCapability(resolved, claims, file2.bucket, "read"))
+    return null;
+  return file2;
+}
+
+// frontend/packages/project-gateway/src/ai/routes.ts
+var AI_COST = 2;
+function registerAiRoutes(app, adapters, config2, runtime, logger) {
+  app.post("/v1/ai/turns", async (c) => {
+    const { claims, resolved, ai: ai2, db } = await open(c);
+    const parsed = aiTurnRequestSchema.safeParse(await jsonBody(c));
+    if (!parsed.success)
+      throw new GatewayError("VALIDATION_FAILED", "invalid ai turn request");
+    const request = parsed.data;
+    const attachments = await loadAttachments(db, claims, resolved, request.attachments ?? []);
+    const turnId = crypto.randomUUID();
+    const plan = await ai2.platform.begin({
+      turnId,
+      projectId: claims.aud,
+      environment: claims.env,
+      versionId: resolved.versionId,
+      appSlug: claims.app,
+      userId: platformUserIdOf(claims.gid),
+      conversation: request.conversation,
+      model: request.model ?? null,
+      instructions: request.instructions ?? null,
+      schema: request.schema ?? null
+    });
+    if (plan.model.kind === "model" && attachments.some((a) => !plan.model.inputModalities.includes(a.kind))) {
+      await ai2.platform.fail(turnId, null, "unsupported_attachment");
+      throw new GatewayError("VALIDATION_FAILED", "unsupported_attachment");
+    }
+    let upstream;
+    try {
+      upstream = await ai2.openRouter.chat(await requestBody(plan, request.message, request.schema, attachments, claims));
+    } catch (cause) {
+      await ai2.platform.fail(turnId, null, "provider_unreachable");
+      throw new GatewayError("GATEWAY_UNAVAILABLE", "ai provider is unreachable", { cause });
+    }
+    if (!upstream.ok || !upstream.body) {
+      await upstream.body?.cancel();
+      await ai2.platform.fail(turnId, null, `provider_${upstream.status}`);
+      throw providerError(upstream.status);
+    }
+    const turn = createTurn(ai2.platform, {
+      turnId,
+      plan,
+      upstream: upstream.body,
+      message: request.message,
+      attachments,
+      schema: request.schema
+    });
+    waitUntilOf(c)?.(turn.done.catch(() => {
+      return;
+    }));
+    if (!request.stream)
+      return c.json(await turn.done);
+    const { readable, writable } = new TransformStream;
+    const writer = writable.getWriter();
+    const encoder3 = new TextEncoder;
+    let connected = true;
+    const send = async (event) => {
+      if (!connected)
+        return;
+      try {
+        await writer.write(encoder3.encode(`data: ${JSON.stringify(event)}
+
+`));
+      } catch {
+        connected = false;
+        logger.log("info", "ai client disconnected", {
+          request_id: c.get("requestId"),
+          turn_id: turnId
+        });
+      }
+    };
+    turn.onDelta((text) => send({ type: "delta", text }));
+    turn.done.then((result) => send({ type: "done", result })).catch((error51) => send({
+      type: "error",
+      code: error51 instanceof GatewayError ? error51.code : "GATEWAY_UNAVAILABLE",
+      message: error51 instanceof GatewayError ? error51.message : "ai turn failed"
+    })).finally(() => writer.close().catch(() => {
+      return;
+    }));
+    return new Response(readable, {
+      headers: {
+        "content-type": "text/event-stream; charset=utf-8",
+        "cache-control": "no-store",
+        "x-content-type-options": "nosniff"
+      }
+    });
+  });
+  app.post("/v1/ai/conversations/:conversation/reset", async (c) => {
+    const { claims, ai: ai2 } = await open(c);
+    const conversation = c.req.param("conversation");
+    if (!/^[A-Za-z0-9_.:-]{1,64}$/.test(conversation))
+      throw new GatewayError("VALIDATION_FAILED", "invalid conversation");
+    await ai2.platform.reset({
+      projectId: claims.aud,
+      environment: claims.env,
+      userId: platformUserIdOf(claims.gid),
+      conversation
+    });
+    return c.json({ conversation });
+  });
+  async function open(c) {
+    if (c.req.header(ACT_AS_HEADER) !== undefined) {
+      const service = await adapters.signer.verifyService(bearerOf(c));
+      if (!service.permissions.includes("ai.chat"))
+        throw new GatewayError("FORBIDDEN", "ai.chat is not granted to this service");
+    }
+    const { claims, resolved } = await verifyProjectToken(c, adapters, config2, AI_COST);
+    if (claims.anon)
+      throw new GatewayError("FORBIDDEN", "anonymous_user");
+    const ai2 = adapters.ai;
+    if (!ai2)
+      throw new GatewayError("GATEWAY_UNAVAILABLE", "ai is not configured");
+    const db = await adapters.turso.connect(resolved.db);
+    if (resolved.app.access === "restricted") {
+      const actor = await loadProjectActor(db, claims.sub, [], resolved.user.bootstrap);
+      assertAppAccess(resolved, actor?.permissions ?? []);
+    }
+    return { claims, resolved, ai: ai2, db };
+  }
+  async function loadAttachments(db, claims, resolved, requested) {
+    if (requested.length === 0)
+      return [];
+    const schema = await runtime.schemaOf(resolved);
+    const attachments = [];
+    let total = 0;
+    for (const { fileId } of requested) {
+      const file2 = await findReadableFile(runtime, { db, claims, resolved, schema, fileId });
+      if (!file2 || file2.status !== "active")
+        throw new GatewayError("NOT_FOUND", "file not found");
+      const kind = aiAttachmentKindOf(file2.contentType ?? "");
+      if (!kind || !file2.contentType)
+        throw new GatewayError("VALIDATION_FAILED", "unsupported_attachment");
+      total += file2.sizeBytes ?? 0;
+      if (total > AI_ATTACHMENTS_MAX_BYTES)
+        throw new GatewayError("PAYLOAD_TOO_LARGE", "attachments are too large");
+      const object3 = await adapters.storage.get({
+        tier: tierOf(claims.env),
+        area: "private",
+        key: file2.objectKey
+      });
+      if (!object3)
+        throw new GatewayError("NOT_FOUND", "file not found");
+      attachments.push({
+        fileId,
+        kind,
+        contentType: file2.contentType.split(";")[0]?.trim().toLowerCase() ?? file2.contentType,
+        name: file2.originalName ?? "attachment",
+        base64: toBase64(new Uint8Array(await object3.arrayBuffer()))
+      });
+    }
+    return attachments;
+  }
+}
+async function requestBody(plan, message2, schemaKey, attachments, claims) {
+  const content = [
+    { type: "text", text: message2 },
+    ...attachments.map((a) => {
+      const data = `data:${a.contentType};base64,${a.base64}`;
+      switch (a.kind) {
+        case "image":
+          return { type: "image_url", image_url: { url: data } };
+        case "file":
+          return { type: "file", file: { filename: a.name, file_data: data } };
+        case "audio":
+          return {
+            type: "input_audio",
+            input_audio: { data: a.base64, format: a.contentType.includes("wav") ? "wav" : "mp3" }
+          };
+        default:
+          return { type: "video_url", video_url: { url: data } };
+      }
+    })
+  ];
+  return {
+    model: plan.model.id,
+    stream: true,
+    max_tokens: plan.maxOutputTokens,
+    messages: [
+      ...plan.instructions ? [{ role: "system", content: plan.instructions }] : [],
+      ...plan.history,
+      { role: "user", content }
+    ],
+    ...schemaKey && plan.schema ? {
+      response_format: {
+        type: "json_schema",
+        json_schema: { name: schemaKey, strict: true, schema: plan.schema }
+      }
+    } : {},
+    user: await sha256Hex3(platformUserIdOf(claims.gid)),
+    provider: plan.model.kind === "router" ? { data_collection: "deny", zdr: true } : { only: [plan.model.providerSlug], allow_fallbacks: false, data_collection: "deny" }
+  };
+}
+function createTurn(platform, input) {
+  let listener = () => {};
+  const done = (async () => {
+    let text = "";
+    let generationId = null;
+    let model = input.plan.model.id;
+    let usage = null;
+    let refused = null;
+    try {
+      for await (const chunk of sseData(input.upstream)) {
+        if (chunk === "[DONE]")
+          break;
+        const event = JSON.parse(chunk);
+        if (event.id)
+          generationId = event.id;
+        if (event.model)
+          model = event.model;
+        if (event.error)
+          refused = event.error.message ?? "provider error";
+        const delta = event.choices?.[0]?.delta?.content;
+        if (delta) {
+          text += delta;
+          listener(delta);
+        }
+        if (event.usage)
+          usage = event.usage;
+      }
+    } catch (cause) {
+      await platform.fail(input.turnId, generationId, "stream_lost");
+      throw new GatewayError("GATEWAY_UNAVAILABLE", "ai stream was interrupted", { cause });
+    }
+    const cost = Number(usage?.cost);
+    if (!generationId || !usage || !Number.isFinite(cost) || cost < 0) {
+      await platform.fail(input.turnId, generationId, refused ? "provider_refused" : "usage_missing");
+      throw refused ? new GatewayError("VALIDATION_FAILED", "provider_refused") : new GatewayError("GATEWAY_UNAVAILABLE", "ai usage was not reported");
+    }
+    const { credits } = await platform.finish({
+      turnId: input.turnId,
+      generationId,
+      modelUsed: model,
+      usage,
+      costUsd: cost,
+      userContent: input.message,
+      userAttachments: input.attachments.map(({ fileId, kind }) => ({ fileId, kind })),
+      assistant: text
+    });
+    return {
+      text,
+      ...input.schema ? jsonOf(text) : {},
+      credits,
+      responseId: generationId,
+      model
+    };
+  })();
+  return {
+    done,
+    onDelta(next) {
+      listener = next;
+    }
+  };
+}
+async function* sseData(stream) {
+  const reader = stream.getReader();
+  const decoder2 = new TextDecoder;
+  let buffer = "";
+  for (;; ) {
+    const { value, done } = await reader.read();
+    if (done)
+      break;
+    buffer += decoder2.decode(value, { stream: true });
+    let index2 = buffer.indexOf(`
+`);
+    while (index2 >= 0) {
+      const line = buffer.slice(0, index2).trim();
+      buffer = buffer.slice(index2 + 1);
+      if (line.startsWith("data:"))
+        yield line.slice(5).trim();
+      index2 = buffer.indexOf(`
+`);
+    }
+  }
+  if (buffer.trim().startsWith("data:"))
+    yield buffer.trim().slice(5).trim();
+}
+function jsonOf(text) {
+  try {
+    return { json: JSON.parse(text) };
+  } catch (error51) {
+    if (error51 instanceof SyntaxError)
+      return {};
+    throw error51;
+  }
+}
+function providerError(status) {
+  if (status === 429)
+    return new GatewayError("RATE_LIMITED", "ai provider is busy");
+  if (status === 400 || status === 403)
+    return new GatewayError("VALIDATION_FAILED", "provider_refused");
+  return new GatewayError("GATEWAY_UNAVAILABLE", `ai provider failed (${status})`);
+}
+function waitUntilOf(c) {
+  try {
+    const ctx = c.executionCtx;
+    return (task) => ctx.waitUntil(task);
+  } catch (error51) {
+    if (error51 instanceof Error)
+      return null;
+    throw error51;
+  }
+}
+async function sha256Hex3(text) {
+  const digest2 = await crypto.subtle.digest("SHA-256", new TextEncoder().encode(text));
+  return [...new Uint8Array(digest2)].map((b2) => b2.toString(16).padStart(2, "0")).join("");
+}
+function toBase64(bytes) {
+  let binary = "";
+  for (let i = 0;i < bytes.length; i += 32768) {
+    binary += String.fromCharCode(...bytes.subarray(i, i + 32768));
+  }
+  return btoa(binary);
+}
+
+// frontend/node_modules/hono/dist/middleware/body-limit/index.js
+var ERROR_MESSAGE = "Payload Too Large";
+var bodyLimit = (options2) => {
+  const onError = options2.onError || (() => {
+    const res = new Response(ERROR_MESSAGE, { status: 413 });
+    throw new HTTPException(413, { res });
+  });
+  const maxSize = options2.maxSize;
+  return async function bodyLimit2(c, next) {
+    if (!c.req.raw.body)
+      return next();
+    const hasTransferEncoding = c.req.raw.headers.has("transfer-encoding");
+    if (c.req.raw.headers.has("content-length") && !hasTransferEncoding)
+      return parseInt(c.req.raw.headers.get("content-length") || "0", 10) > maxSize ? onError(c) : next();
+    let size = 0;
+    const chunks = [];
+    const rawReader = c.req.raw.body.getReader();
+    for (;; ) {
+      const { done, value } = await rawReader.read();
+      if (done)
+        break;
+      size += value.length;
+      if (size > maxSize)
+        return onError(c);
+      chunks.push(value);
+    }
+    const requestInit = {
+      body: new ReadableStream({ start(controller) {
+        for (const chunk of chunks)
+          controller.enqueue(chunk);
+        controller.close();
+      } }),
+      duplex: "half"
+    };
+    c.req.raw = new Request(c.req.raw, requestInit);
+    return next();
+  };
+};
+
 // frontend/packages/project-gateway/src/api/routes.ts
+init_zod();
 var inputSchema = exports_external.strictObject({
   projectId: exports_external.uuid(),
   versionId: exports_external.uuid(),
@@ -71165,50 +71910,6 @@ function registerApiAuthorizationRoutes(app, adapters, config2) {
     assertAppAccess(destination, actor.permissions);
     return c.body(null, 204);
   });
-}
-
-// frontend/packages/project-gateway/src/internal/audit.ts
-function auditPolicyVersionOf(schema, policyVersion) {
-  const fields = schema?.models?.AuditEvent?.fields;
-  return fields && "policyVersion" in fields ? policyVersion : null;
-}
-function auditColumnsOf(event) {
-  const pairs = [
-    ["id", crypto.randomUUID()],
-    ["at", event.at.toISOString()],
-    ["requestId", event.requestId],
-    ["appSlug", event.appSlug],
-    ["actorId", event.actorId],
-    ["action", event.action],
-    ["resource", event.resource ?? null],
-    ["decision", event.decision],
-    ["reason", event.reason ?? null]
-  ];
-  if (event.policyVersion)
-    pairs.push(["policyVersion", event.policyVersion]);
-  return {
-    columns: pairs.map(([name3]) => `"${name3}"`).join(", "),
-    values: pairs.map(([, value]) => value)
-  };
-}
-async function writeAuditEvent(db, event) {
-  const { columns, values } = auditColumnsOf(event);
-  await db.execute({
-    sql: `INSERT INTO "AuditEvent" (${columns}) VALUES (${values.map(() => "?").join(", ")})`,
-    args: values
-  });
-}
-async function writeAuditEventSafely(db, logger, event) {
-  try {
-    await writeAuditEvent(db, event);
-  } catch (error51) {
-    logger.log("error", "audit write failed", {
-      request_id: event.requestId,
-      action: event.action,
-      decision: event.decision,
-      ...errorContext(error51)
-    });
-  }
 }
 
 // frontend/packages/project-gateway/src/db/args.ts
@@ -73335,131 +74036,6 @@ function blocksOf(userIds) {
   return { userIds: [...new Set(userIds)].sort() };
 }
 
-// frontend/packages/project-gateway/src/internal/storage-files.ts
-var COLUMNS = `"id", "bucket", "objectKey", "ownerId", "workspaceId", "visibility", "status",
-  "originalName", "contentType", "sizeBytes", "createdAt"`;
-function auditStatement(context, action2, fileId, decision, reason) {
-  const { columns, values } = auditColumnsOf({
-    ...context,
-    action: action2,
-    resource: `storageFile:${fileId}`,
-    decision,
-    reason
-  });
-  return {
-    sql: `INSERT INTO "AuditEvent" (${columns}) VALUES (${values.map(() => "?").join(", ")})`,
-    args: values
-  };
-}
-function toRow(row) {
-  const text = (value) => value === null || value === undefined ? null : String(value);
-  return {
-    id: String(row.id),
-    bucket: String(row.bucket),
-    objectKey: String(row.objectKey),
-    ownerId: String(row.ownerId),
-    workspaceId: text(row.workspaceId),
-    visibility: String(row.visibility),
-    status: String(row.status),
-    originalName: text(row.originalName),
-    contentType: text(row.contentType),
-    sizeBytes: row.sizeBytes === null ? null : Number(row.sizeBytes),
-    createdAt: toIso(String(row.createdAt))
-  };
-}
-function toIso(value) {
-  const normalized = /^\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2}$/.test(value) ? `${value.replace(" ", "T")}Z` : value;
-  return new Date(normalized).toISOString();
-}
-async function workspaceRoleOf(db, workspaceId, userId) {
-  const result = await db.execute({
-    sql: `SELECT "role" FROM "Membership" WHERE "workspaceId" = ? AND "userId" = ?`,
-    args: [workspaceId, userId]
-  });
-  const role = result.rows[0]?.role;
-  return role === undefined || role === null ? null : String(role);
-}
-var COUNTED_STATUSES = `"status" NOT IN ('failed', 'deleted')`;
-async function insertUpload(db, file2, context, quotaBytes) {
-  const at = context.at.toISOString();
-  const [inserted] = await db.batch([
-    {
-      sql: `INSERT INTO "StorageFile" ("id", "bucket", "objectKey", "ownerId", "workspaceId", "uploaderApp",
-                "visibility", "status", "originalName", "contentType", "sizeBytes", "createdAt", "updatedAt")
-              SELECT ?, ?, ?, ?, ?, ?, ?, 'uploading', ?, ?, ?, ?, ?
-              WHERE ? IS NULL
-                 OR (SELECT COALESCE(SUM("sizeBytes"), 0) FROM "StorageFile" WHERE ${COUNTED_STATUSES}) + ? <= ?`,
-      args: [
-        file2.id,
-        file2.bucket,
-        file2.objectKey,
-        file2.ownerId,
-        file2.workspaceId,
-        file2.uploaderApp,
-        file2.visibility,
-        file2.originalName,
-        file2.contentType,
-        file2.sizeBytes,
-        at,
-        at,
-        quotaBytes,
-        file2.sizeBytes,
-        quotaBytes
-      ]
-    },
-    conditionalAuditStatement(context, "storage.upload.initiated", file2.id, null)
-  ], "write");
-  if ((inserted?.rowsAffected ?? 0) > 0)
-    return true;
-  await db.execute(auditStatement(context, "storage.upload.initiated", file2.id, "deny", "quota"));
-  return false;
-}
-async function findOwnUpload(db, id, ownerId) {
-  const result = await db.execute({
-    sql: `SELECT ${COLUMNS} FROM "StorageFile" WHERE "id" = ? AND "ownerId" = ?`,
-    args: [id, ownerId]
-  });
-  const row = result.rows[0];
-  return row ? toRow(row) : null;
-}
-async function findStorageFile(db, id) {
-  const result = await db.execute({
-    sql: `SELECT ${COLUMNS} FROM "StorageFile" WHERE "id" = ?`,
-    args: [id]
-  });
-  const row = result.rows[0];
-  return row ? toRow(row) : null;
-}
-function conditionalAuditStatement(context, action2, fileId, reason) {
-  const { columns, values } = auditColumnsOf({
-    ...context,
-    action: action2,
-    resource: `storageFile:${fileId}`,
-    decision: "allow",
-    reason
-  });
-  return {
-    sql: `INSERT INTO "AuditEvent" (${columns}) SELECT ${values.map(() => "?").join(", ")} WHERE changes() > 0`,
-    args: values
-  };
-}
-async function transitionStorageFile(db, input, context) {
-  const placeholders = input.from.map(() => "?").join(", ");
-  const [update, , select] = await db.batch([
-    {
-      sql: `UPDATE "StorageFile" SET "status" = ?, "updatedAt" = ? WHERE "id" = ? AND "status" IN (${placeholders})`,
-      args: [input.to, context.at.toISOString(), input.id, ...input.from]
-    },
-    conditionalAuditStatement(context, input.action, input.id, input.reason ?? null),
-    { sql: `SELECT ${COLUMNS} FROM "StorageFile" WHERE "id" = ?`, args: [input.id] }
-  ], "write");
-  const row = select?.rows[0];
-  return { changed: (update?.rowsAffected ?? 0) > 0, file: row ? toRow(row) : null };
-}
-async function auditStorage(db, context, action2, fileId) {
-  await db.execute(auditStatement(context, action2, fileId, "allow", null));
-}
-
 // frontend/packages/project-gateway/src/storage/keys.ts
 function stagingKeyOf(objectKey) {
   return `staging/${objectKey.replace(/\/objects\/([^/]+)$/, "/$1")}`;
@@ -73538,6 +74114,20 @@ function registerStorageRoutes(app, adapters, config3, runtime) {
     }, session, resolved.storage.quotaBytes);
     if (!inserted)
       throw new GatewayError("QUOTA_EXCEEDED", "project storage quota exceeded");
+    if (usesMultipart(request.expectedSize)) {
+      const r2UploadId = await adapters.storage.createMultipart({ tier: tierOf(claims.env), area: "private", key: `${prefix2}/objects/${id}` }, { contentType: request.contentType });
+      const response2 = {
+        uploadId: id,
+        fileId: id,
+        multipart: {
+          r2UploadId,
+          partSize: STORAGE_MULTIPART_PART_BYTES,
+          partCount: multipartPartCount(request.expectedSize)
+        },
+        expiresAt: new Date(session.at.getTime() + STAGING_CLEANUP_AFTER_MS).toISOString()
+      };
+      return c2.json(response2);
+    }
     const url2 = await adapters.storage.signPut({ tier: tierOf(claims.env), area: "private", key: stagingKeyOf(`${prefix2}/objects/${id}`) }, {
       contentType: request.contentType,
       contentLength: request.expectedSize,
@@ -73557,7 +74147,8 @@ function registerStorageRoutes(app, adapters, config3, runtime) {
   });
   app.post("/v1/storage/uploads/:uploadId/complete", async (c2) => {
     const { session, db, resolved, claims } = await open(c2);
-    if (!storageCompleteRequestSchema.safeParse(await jsonBody(c2)).success) {
+    const request = storageCompleteRequestSchema.safeParse(await jsonBody(c2));
+    if (!request.success) {
       throw new GatewayError("VALIDATION_FAILED", "invalid complete request");
     }
     const file2 = await findOwnUpload(db, c2.req.param("uploadId"), claims.sub);
@@ -73569,6 +74160,11 @@ function registerStorageRoutes(app, adapters, config3, runtime) {
       return c2.json(completed(file2, tierOf(claims.env)));
     if (file2.status === "failed")
       throw new GatewayError("VALIDATION_FAILED", "upload failed validation");
+    if (file2.sizeBytes !== null && usesMultipart(file2.sizeBytes)) {
+      if (!request.data.r2UploadId)
+        throw new GatewayError("VALIDATION_FAILED", "r2UploadId is required");
+      return c2.json(await completeMultipart(file2, request.data.r2UploadId, claims, session, db));
+    }
     const tier = tierOf(claims.env);
     const staging = {
       tier,
@@ -73606,17 +74202,70 @@ function registerStorageRoutes(app, adapters, config3, runtime) {
     }
     return c2.json(completed(activated, tier));
   });
+  app.post("/v1/storage/uploads/:uploadId/parts", async (c2) => {
+    const { db, resolved, claims } = await open(c2);
+    const request = storageSignPartsRequestSchema.safeParse(await jsonBody(c2));
+    if (!request.success)
+      throw new GatewayError("VALIDATION_FAILED", "invalid parts request");
+    const file2 = await multipartUpload(db, c2.req.param("uploadId"), claims, resolved);
+    const count = multipartPartCount(file2.size);
+    if (request.data.partNumbers.some((n2) => n2 > count)) {
+      throw new GatewayError("VALIDATION_FAILED", "part number out of range");
+    }
+    const location = { tier: tierOf(claims.env), area: "private", key: file2.row.objectKey };
+    const parts = await Promise.all(request.data.partNumbers.map(async (partNumber) => {
+      const contentLength = multipartPartLength(file2.size, partNumber);
+      const url2 = await adapters.storage.signUploadPart(location, {
+        uploadId: request.data.r2UploadId,
+        partNumber,
+        contentLength,
+        expiresIn: STORAGE_UPLOAD_URL_TTL_SECONDS
+      });
+      return { partNumber, url: url2, headers: { "Content-Length": String(contentLength) } };
+    }));
+    const response = {
+      parts,
+      expiresAt: new Date(adapters.clock().getTime() + STORAGE_UPLOAD_URL_TTL_SECONDS * 1000).toISOString()
+    };
+    return c2.json(response);
+  });
+  app.delete("/v1/storage/uploads/:uploadId", async (c2) => {
+    const { session, db, resolved, claims } = await open(c2);
+    const request = storageAbortRequestSchema.safeParse(await jsonBody(c2));
+    if (!request.success)
+      throw new GatewayError("VALIDATION_FAILED", "invalid abort request");
+    const uploadId = c2.req.param("uploadId");
+    const row = await findOwnUpload(db, uploadId, claims.sub);
+    if (!row || !inAppScope(row, claims))
+      throw new GatewayError("NOT_FOUND", "upload not found");
+    assertCapability(resolved, claims, row.bucket, "write", "FORBIDDEN");
+    const response = { uploadId, status: "failed" };
+    if (row.status === "failed")
+      return c2.json(response);
+    if (!IN_PROGRESS.includes(row.status) || row.sizeBytes === null || !usesMultipart(row.sizeBytes)) {
+      throw new GatewayError("VALIDATION_FAILED", "upload cannot be aborted");
+    }
+    await adapters.storage.abortMultipart({ tier: tierOf(claims.env), area: "private", key: row.objectKey }, request.data.r2UploadId);
+    await transitionStorageFile(db, {
+      id: row.id,
+      from: IN_PROGRESS,
+      to: "failed",
+      action: "storage.upload.failed",
+      reason: "aborted"
+    }, session);
+    return c2.json(response);
+  });
   app.get("/v1/storage/files/:fileId/download", async (c2) => {
     const { session, db, resolved, claims, schema: schema2 } = await open(c2, true);
-    const client = await policyClientFor(db, claims, resolved, schema2);
-    const visible = await client.storageFile.findUnique({
-      where: { id: c2.req.param("fileId") },
-      select: { id: true }
+    const file2 = await findReadableFile(runtime, {
+      db,
+      claims,
+      resolved,
+      schema: schema2,
+      fileId: c2.req.param("fileId")
     });
-    const file2 = visible ? await findStorageFile(db, visible.id) : null;
-    if (!file2 || !inAppScope(file2, claims) || !hasCapability(resolved, claims, file2.bucket, "read")) {
+    if (!file2)
       throw new GatewayError("NOT_FOUND", "file not found");
-    }
     const tier = tierOf(claims.env);
     if (resolved.storage.buckets[file2.bucket]?.delivery === "proxy") {
       const iat = Math.floor(session.at.getTime() / 1000);
@@ -73664,7 +74313,7 @@ function registerStorageRoutes(app, adapters, config3, runtime) {
     if (resolved.versionId !== ticket.versionId)
       throw new GatewayError("NOT_FOUND", "file not found");
     const { session, db, schema: schema2 } = await open(c2, true, { claims, resolved });
-    const client = await policyClientFor(db, claims, resolved, schema2);
+    const client = await policyClientFor(runtime, db, claims, resolved, schema2);
     const visible = await client.storageFile.findUnique({
       where: { id: ticket.fileId },
       select: { id: true }
@@ -73698,14 +74347,14 @@ function registerStorageRoutes(app, adapters, config3, runtime) {
     });
     if (c2.req.method === "HEAD") {
       await auditStorage(db, session, "storage.download.granted", file2.id);
-      return new Response(null, { headers });
+      return c2.newResponse(null, { headers });
     }
     const rawRange = c2.req.header("Range");
     const range = rawRange && !c2.req.header("If-Range") ? byteRange(rawRange, size) : undefined;
     if (range === null) {
       headers.set("Content-Range", `bytes */${size}`);
       headers.set("Content-Length", "0");
-      return new Response(null, { status: 416, headers });
+      return c2.newResponse(null, { status: 416, headers });
     }
     const upstream = await adapters.storage.get(location, {
       ...range ? { range } : {},
@@ -73732,12 +74381,12 @@ function registerStorageRoutes(app, adapters, config3, runtime) {
       await upstream.body.cancel();
       throw error51;
     }
-    return new Response(upstream.body, { status, headers });
+    return c2.newResponse(upstream.body, { status, headers });
   });
   app.delete("/v1/storage/files/:fileId", async (c2) => {
     const { session, db, resolved, claims, schema: schema2 } = await open(c2, true);
     const fileId = c2.req.param("fileId");
-    const client = await policyClientFor(db, claims, resolved, schema2);
+    const client = await policyClientFor(runtime, db, claims, resolved, schema2);
     if (!await canDelete(client, fileId))
       throw new GatewayError("NOT_FOUND", "file not found");
     const file2 = await findStorageFile(db, fileId);
@@ -73766,6 +74415,68 @@ function registerStorageRoutes(app, adapters, config3, runtime) {
     };
     return c2.json(response);
   });
+  async function multipartUpload(db, uploadId, claims, resolved) {
+    const row = await findOwnUpload(db, uploadId, claims.sub);
+    if (!row || !inAppScope(row, claims) || !IN_PROGRESS.includes(row.status)) {
+      throw new GatewayError("NOT_FOUND", "upload not found");
+    }
+    assertCapability(resolved, claims, row.bucket, "write", "FORBIDDEN");
+    if (row.sizeBytes === null || !usesMultipart(row.sizeBytes)) {
+      throw new GatewayError("VALIDATION_FAILED", "upload is not multipart");
+    }
+    return { row, size: row.sizeBytes };
+  }
+  async function completeMultipart(file2, r2UploadId, claims, session, db) {
+    const tier = tierOf(claims.env);
+    const size = file2.sizeBytes ?? 0;
+    const target = { tier, area: "private", key: file2.objectKey };
+    const fail4 = async (reason) => {
+      await adapters.storage.abortMultipart(target, r2UploadId);
+      await transitionStorageFile(db, { id: file2.id, from: IN_PROGRESS, to: "failed", action: "storage.upload.failed", reason }, session);
+      throw new GatewayError("VALIDATION_FAILED", "uploaded file does not match the request");
+    };
+    const parts = await adapters.storage.listParts(target, r2UploadId);
+    if (parts) {
+      const count = multipartPartCount(size);
+      if (parts.some((p3) => p3.partNumber > count || p3.size !== multipartPartLength(size, p3.partNumber))) {
+        await fail4("mismatch");
+      }
+      if (parts.length !== count) {
+        throw new GatewayError("VALIDATION_FAILED", "file has not been uploaded");
+      }
+      await adapters.storage.completeMultipart(target, r2UploadId, parts);
+    }
+    const head = await adapters.storage.head(target);
+    if (!head)
+      throw new GatewayError("VALIDATION_FAILED", "file has not been uploaded");
+    if (head.contentLength !== size || !file2.contentType || !sameMediaType(head.contentType, file2.contentType)) {
+      await adapters.storage.remove(target);
+      await fail4("mismatch");
+    }
+    if (file2.visibility === "public")
+      await copyToPublic(target, size, file2.contentType ?? "");
+    const { file: activated } = await transitionStorageFile(db, { id: file2.id, from: IN_PROGRESS, to: "active", action: "storage.upload.activated" }, session);
+    if (!activated || activated.status !== "active") {
+      throw new GatewayError("CONFLICT", "upload state changed");
+    }
+    return completed(activated, tier);
+  }
+  async function copyToPublic(from, size, contentType) {
+    const to = { ...from, area: "public" };
+    const uploadId = await adapters.storage.createMultipart(to, { contentType });
+    const parts = [];
+    for (let partNumber = 1;partNumber <= multipartPartCount(size); partNumber++) {
+      const start = (partNumber - 1) * STORAGE_MULTIPART_PART_BYTES;
+      const end = start + multipartPartLength(size, partNumber) - 1;
+      const etag = await adapters.storage.copyPart(from, to, {
+        uploadId,
+        partNumber,
+        range: { start, end }
+      });
+      parts.push({ partNumber, etag });
+    }
+    await adapters.storage.completeMultipart(to, uploadId, parts);
+  }
   async function open(c2, withSchema = false, verified) {
     const { claims, resolved } = verified ?? await verifyProjectToken(c2, adapters, config3, STORAGE_COST);
     const db = await adapters.turso.connect(resolved.db);
@@ -73784,18 +74495,6 @@ function registerStorageRoutes(app, adapters, config3, runtime) {
     const schema2 = withSchema ? loaded : null;
     return { claims, resolved, db, session, schema: schema2 };
   }
-  async function policyClientFor(db, claims, resolved, schema2) {
-    const actor = await loadProjectActor(db, claims.sub, blockedGlobalUserIds(claims.gid, resolved.user.blockedUserIds), resolved.user.bootstrap);
-    if (!actor || !schema2)
-      throw new GatewayError("UNAUTHENTICATED", "project user not found");
-    return runtime.policyClient({
-      schema: schema2,
-      db,
-      actor,
-      appSlug: claims.app,
-      isAnonymous: claims.anon
-    });
-  }
   function completed(file2, tier) {
     return { fileId: file2.id, file: toStorageFile(file2, adapters, tier) };
   }
@@ -73807,10 +74506,6 @@ function jobScopeOf(claims) {
     sessionId: claims.br ?? null,
     previewSessionId: claims.pv ?? null
   };
-}
-function inAppScope(file2, claims) {
-  const scoped = file2.objectKey.match(/\/apps\/([^/]+)\/objects\//);
-  return !scoped || scoped[1] === claims.app;
 }
 
 class DryRun extends Error {
@@ -73834,15 +74529,6 @@ async function canDelete(client, id) {
     throw error51;
   }
   throw new Error("dry-run transaction was not rolled back");
-}
-function hasCapability(resolved, claims, bucket, op) {
-  if (claims.anon && op !== "read" && !resolved.app.anonymous.write)
-    return false;
-  return resolved.app.capabilities.buckets[bucket]?.includes(op) ?? false;
-}
-function assertCapability(resolved, claims, bucket, op, code) {
-  if (!hasCapability(resolved, claims, bucket, op))
-    throw new GatewayError(code, "operation not allowed");
 }
 function contentTypeMatches(pattern, contentType) {
   const p3 = pattern.toLowerCase();
@@ -74349,6 +75035,7 @@ function createGateway(adapters, config3, logger = consoleLogger, realtimeTransp
     return c2.json(await adapters.signer.publicJwks());
   });
   registerTokenRoutes(app, adapters, config3);
+  registerAiRoutes(app, adapters, config3, runtime, logger);
   registerDeliveryRoutes(app, adapters, config3);
   registerDirectAuthRoutes(app, adapters, config3);
   registerProfileRoutes(app, adapters, config3);
@@ -74975,16 +75662,16 @@ function viteImporter(viteEntry, root) {
   };
 }
 function resolveViteEntry(appDir) {
-  const manifestPath = createRequire7(join14(appDir, "package.json")).resolve("vite/package.json");
+  const manifestPath = createRequire7(join15(appDir, "package.json")).resolve("vite/package.json");
   const entry = JSON.parse(readFileSync2(manifestPath, "utf8")).exports?.["."];
   const file2 = typeof entry === "string" ? entry : entry?.import?.default ?? entry?.import;
   if (typeof file2 !== "string")
     throw new Error("vite has no ESM entry");
-  return join14(dirname4(manifestPath), file2);
+  return join15(dirname4(manifestPath), file2);
 }
 async function runSeed(input) {
-  const path = join14(input.root, PROJECT_PATHS.seed);
-  if (!existsSync10(path))
+  const path = join15(input.root, PROJECT_PATHS.seed);
+  if (!existsSync11(path))
     return false;
   let seed;
   try {
@@ -75063,7 +75750,7 @@ export default {
 // frontend/packages/miniapp-kit/src/worker-build.ts
 async function buildWorkerBundle(input) {
   const vite = await import(pathToFileURL7(resolveViteEntry(input.appDir)).href);
-  const scheduledEntry = join15(input.appDir, "__platform_scheduled__.ts");
+  const scheduledEntry = join16(input.appDir, "__platform_scheduled__.ts");
   const scheduledModule = "\x00platform-scheduled";
   await vite.build({
     root: input.appDir,
@@ -75076,18 +75763,18 @@ async function buildWorkerBundle(input) {
           return id === scheduledEntry ? scheduledModule : undefined;
         },
         load(id) {
-          return id === scheduledModule ? scheduledWorkerSource(join15(input.appDir, "src/index.ts")) : undefined;
+          return id === scheduledModule ? scheduledWorkerSource(join16(input.appDir, "src/index.ts")) : undefined;
         }
       }
     ] : [],
     build: {
       target: "es2022",
-      outDir: join15(input.root, "dist", input.slug),
+      outDir: join16(input.root, "dist", input.slug),
       emptyOutDir: true,
       copyPublicDir: false,
       sourcemap: false,
       lib: {
-        entry: input.kind === "jobs" ? scheduledEntry : join15(input.appDir, "src/index.ts"),
+        entry: input.kind === "jobs" ? scheduledEntry : join16(input.appDir, "src/index.ts"),
         formats: ["es"],
         fileName: () => "index.js"
       },
@@ -75101,13 +75788,13 @@ async function buildWorkerBundle(input) {
 class BuildError extends Error {
   name = "BuildError";
 }
-var UUID2 = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+var UUID3 = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 async function buildProject(options2) {
   const { root, kitRoot } = options2;
   if (options2.projectId === "") {
     throw new BuildError("the project id is required (--project-id; kit pull writes it)");
   }
-  if (!UUID2.test(options2.projectId))
+  if (!UUID3.test(options2.projectId))
     throw new BuildError("--project-id must be a uuid");
   if (!/^https?:\/\/[^/]/.test(options2.gatewayUrl)) {
     throw new BuildError("--gateway-url must be an http(s) URL");
@@ -75117,7 +75804,7 @@ async function buildProject(options2) {
     kitRoot,
     ...options2.install ? { install: options2.install } : {}
   });
-  const dist = join16(root, "dist");
+  const dist = join17(root, "dist");
   await rm5(dist, { recursive: true, force: true });
   const apps = Object.values(manifest2.apps);
   const env = {
@@ -75128,7 +75815,7 @@ async function buildProject(options2) {
   for (const app of apps) {
     const input = {
       slug: app.slug,
-      appDir: join16(root, "apps", app.slug),
+      appDir: join17(root, "apps", app.slug),
       env
     };
     const output = app.kind === "web" ? await (options2.runVite ?? viteBuild)(input) : await (options2.runWorker ?? buildWorkerBundle)({ ...input, root, kind: app.kind });
@@ -75137,13 +75824,13 @@ async function buildProject(options2) {
   }
   let index2;
   try {
-    index2 = await buildArtifactIndex(existsSync11(dist) ? await collectFiles(dist) : [], apps.map((app) => ({ slug: app.slug, entry: app.entry.replace(/^dist\//, "") })));
+    index2 = await buildArtifactIndex(existsSync12(dist) ? await collectFiles(dist) : [], apps.map((app) => ({ slug: app.slug, entry: app.entry.replace(/^dist\//, "") })));
   } catch (error51) {
     throw new BuildError(error51 instanceof Error ? error51.message : String(error51));
   }
-  await writeFile4(join16(dist, ARTIFACT_INDEX_PATH), `${JSON.stringify(index2, null, 1)}
+  await writeFile4(join17(dist, ARTIFACT_INDEX_PATH), `${JSON.stringify(index2, null, 1)}
 `);
-  const schemaVersion = schemaVersionOf(await readFile8(join16(root, PROJECT_PATHS.generated, "schema.json"), "utf8"));
+  const schemaVersion = schemaVersionOf(await readFile9(join17(root, PROJECT_PATHS.generated, "schema.json"), "utf8"));
   return {
     artifactHash: index2.artifactHash,
     apps: index2.apps,
@@ -75159,16 +75846,16 @@ async function prepareProject(options2) {
   await placeVendoredPackages(root, kitRoot);
   await (options2.install ?? bunInstall)(root);
   const generate = await generateProject({ root, kitRoot });
-  const manifest2 = JSON.parse(await readFile8(join16(root, PROJECT_PATHS.generated, "project.json"), "utf8"));
+  const manifest2 = JSON.parse(await readFile9(join17(root, PROJECT_PATHS.generated, "project.json"), "utf8"));
   return { generate, manifest: manifest2 };
 }
 async function checkLockfile2(root) {
-  const path = join16(root, "bun.lock");
-  if (!existsSync11(path)) {
+  const path = join17(root, "bun.lock");
+  if (!existsSync12(path)) {
     throw new BuildError("bun.lock is missing; run bun install in source/ and commit bun.lock");
   }
   try {
-    const violations = checkBunLockfile(await readFile8(path, "utf8"));
+    const violations = checkBunLockfile(await readFile9(path, "utf8"));
     if (violations.length > 0) {
       const lines = violations.map((v3) => `  ${v3.key}: ${v3.reason}`);
       throw new BuildError(`bun.lock may only contain npm registry packages (with sha512 integrity) and workspace packages (sdk.md §5.2):
@@ -75202,15 +75889,15 @@ ${text}`));
   });
 }
 async function ensureKitRuntimeDependencies(kitRoot) {
-  const manifest2 = join16(kitRoot, "package.json");
-  if (!existsSync11(manifest2))
+  const manifest2 = join17(kitRoot, "package.json");
+  if (!existsSync12(manifest2))
     return;
-  const authored = JSON.parse(await readFile8(manifest2, "utf8"));
+  const authored = JSON.parse(await readFile9(manifest2, "utf8"));
   if (authored.name !== "tokoyo-creator-runtime")
     return;
   const require2 = createRequire8(manifest2);
   try {
-    const installed = JSON.parse(await readFile8(require2.resolve("miniflare/package.json"), "utf8"));
+    const installed = JSON.parse(await readFile9(require2.resolve("miniflare/package.json"), "utf8"));
     if (installed.version === authored.dependencies?.miniflare)
       return;
   } catch (error51) {
@@ -75225,12 +75912,12 @@ async function bunInstall(root) {
 }
 function resolveViteBin(appDir) {
   try {
-    const manifestPath = createRequire8(join16(appDir, "package.json")).resolve("vite/package.json");
+    const manifestPath = createRequire8(join17(appDir, "package.json")).resolve("vite/package.json");
     const declared = JSON.parse(readFileSync3(manifestPath, "utf8")).bin;
     const relative = typeof declared === "string" ? declared : declared?.vite;
     if (typeof relative !== "string")
       throw new Error('vite has no "vite" bin');
-    return join16(dirname5(manifestPath), relative);
+    return join17(dirname5(manifestPath), relative);
   } catch (error51) {
     throw new BuildError(`vite is not installed for ${appDir}; run bun install (${error51 instanceof Error ? error51.message : String(error51)})`);
   }
@@ -75270,16 +75957,16 @@ function isLfsRequest(request, lfsUrl) {
 var CREDENTIAL_USERNAME = "tokoyo-kit";
 
 // frontend/packages/miniapp-kit/src/db/diff.ts
-import { existsSync as existsSync12 } from "node:fs";
-import { mkdir as mkdir4, readFile as readFile9, writeFile as writeFile5 } from "node:fs/promises";
-import { dirname as dirname6, join as join17 } from "node:path";
+import { existsSync as existsSync13 } from "node:fs";
+import { mkdir as mkdir4, readFile as readFile10, writeFile as writeFile5 } from "node:fs/promises";
+import { dirname as dirname6, join as join18 } from "node:path";
 var fail4 = (message2) => new DbError(message2);
 async function diffDatabase(options2) {
   const { root } = options2;
   await placePlatform(root, options2.kitRoot);
   const pending = await renderPendingSql(root);
-  const path = join17(root, PENDING_SQL_PATH);
-  const current = existsSync12(path) ? await readFile9(path, "utf8") : null;
+  const path = join18(root, PENDING_SQL_PATH);
+  const current = existsSync13(path) ? await readFile10(path, "utf8") : null;
   if (current !== pending.sql) {
     await mkdir4(dirname6(path), { recursive: true });
     await writeFile5(path, pending.sql);
@@ -75295,10 +75982,10 @@ async function diffDatabase(options2) {
 }
 
 // frontend/packages/miniapp-kit/src/db/finalize.ts
-import { createHash as createHash4 } from "node:crypto";
-import { existsSync as existsSync13 } from "node:fs";
-import { mkdir as mkdir5, readFile as readFile10, rm as rm6, writeFile as writeFile6 } from "node:fs/promises";
-import { dirname as dirname7, join as join18 } from "node:path";
+import { createHash as createHash5 } from "node:crypto";
+import { existsSync as existsSync14 } from "node:fs";
+import { mkdir as mkdir5, readFile as readFile11, rm as rm6, writeFile as writeFile6 } from "node:fs/promises";
+import { dirname as dirname7, join as join19 } from "node:path";
 
 // frontend/packages/miniapp-kit/src/db/migration-policy.ts
 var PENDING_POLICY_FILE = "migration-policy.json";
@@ -75371,28 +76058,28 @@ function migrationSlug(text) {
   return slug === "" ? "merge" : slug;
 }
 async function readIfPresent(path) {
-  return existsSync13(path) ? await readFile10(path, "utf8") : null;
+  return existsSync14(path) ? await readFile11(path, "utf8") : null;
 }
 async function clearPending(root) {
-  const generated = join18(root, PENDING_SQL_PATH);
+  const generated = join19(root, PENDING_SQL_PATH);
   await mkdir5(dirname7(generated), { recursive: true });
   await writeFile6(generated, PENDING_SQL_HEADER);
-  await rm6(join18(root, PENDING_DATA_PATH), { force: true });
-  await rm6(join18(root, PENDING_INTENT_PATH), { force: true });
-  await rm6(join18(root, PROJECT_PATHS.pending, PENDING_POLICY_FILE), { force: true });
+  await rm6(join19(root, PENDING_DATA_PATH), { force: true });
+  await rm6(join19(root, PENDING_INTENT_PATH), { force: true });
+  await rm6(join19(root, PROJECT_PATHS.pending, PENDING_POLICY_FILE), { force: true });
 }
 async function finalizeMigration(options2) {
   const { root } = options2;
   await placePlatform(root, options2.kitRoot);
   const pending = await renderPendingSql(root);
-  const data = (await readIfPresent(join18(root, PENDING_DATA_PATH)))?.trim() ?? "";
+  const data = (await readIfPresent(join19(root, PENDING_DATA_PATH)))?.trim() ?? "";
   if (pending.body === "" && data === "") {
     await clearPending(root);
     return { status: "empty", migration: null, changes: [] };
   }
   const createClient = options2.createLibsqlClient ?? await loadProjectLibsql(root, fail5);
   const changes = await classifyPending(pending, createClient);
-  const parsed = parseIntent(await readIfPresent(join18(root, PENDING_INTENT_PATH)));
+  const parsed = parseIntent(await readIfPresent(join19(root, PENDING_INTENT_PATH)));
   if (parsed.error !== null) {
     return {
       status: "blocked",
@@ -75422,7 +76109,7 @@ async function finalizeMigration(options2) {
   const sql3 = attachMigrationPolicy(data === "" ? body : `${body}
 -- pending/data.sql
 ${data}
-`, intent2, await readIfPresent(join18(root, PROJECT_PATHS.pending, PENDING_POLICY_FILE)), changes);
+`, intent2, await readIfPresent(join19(root, PROJECT_PATHS.pending, PENDING_POLICY_FILE)), changes);
   const shadow = await checkShadow({
     migrations: pending.migrations,
     prodMigrations: options2.prodMigrations ?? null,
@@ -75438,28 +76125,28 @@ ${data}
   const last = pending.migrations.at(-1)?.name.slice(0, 4);
   const number4 = String((last ? Number(last) : 0) + 1).padStart(4, "0");
   const name3 = `${number4}_${migrationSlug(options2.slug)}`;
-  const dir = join18(root, PROJECT_PATHS.migrations, name3);
+  const dir = join19(root, PROJECT_PATHS.migrations, name3);
   await mkdir5(dir, { recursive: true });
-  await writeFile6(join18(dir, "migration.sql"), sql3);
+  await writeFile6(join19(dir, "migration.sql"), sql3);
   const meta3 = {
     author: options2.author,
     changes,
     intent: intent2 ?? [],
     name: name3,
-    sha256: createHash4("sha256").update(sql3).digest("hex"),
+    sha256: createHash5("sha256").update(sql3).digest("hex"),
     sourceBranch: options2.branch
   };
-  await writeFile6(join18(dir, "meta.json"), `${JSON.stringify(meta3, null, 2)}
+  await writeFile6(join19(dir, "meta.json"), `${JSON.stringify(meta3, null, 2)}
 `);
   await clearPending(root);
   return { status: "finalized", migration: name3, changes, warnings: shadow.warnings };
 }
 
 // frontend/packages/miniapp-kit/src/dev/runtime.ts
-import { createHash as createHash5, randomBytes } from "node:crypto";
-import { existsSync as existsSync14 } from "node:fs";
-import { mkdir as mkdir7, readFile as readFile12, rm as rm8, writeFile as writeFile8 } from "node:fs/promises";
-import { dirname as dirname9, join as join19 } from "node:path";
+import { createHash as createHash6, randomBytes } from "node:crypto";
+import { existsSync as existsSync15 } from "node:fs";
+import { mkdir as mkdir7, readFile as readFile13, rm as rm8, writeFile as writeFile8 } from "node:fs/promises";
+import { dirname as dirname9, join as join21 } from "node:path";
 
 // frontend/node_modules/@hono/node-server/dist/index.mjs
 import { Http2ServerRequest, constants } from "node:http2";
@@ -76369,8 +77056,8 @@ var upgradeWebSocket = defineWebSocketHelper(async (c2, events, options2) => {
 
 // frontend/packages/project-gateway/src/storage/local-store.ts
 import { createReadStream } from "node:fs";
-import { copyFile, mkdir as mkdir6, readdir as readdir9, readFile as readFile11, rm as rm7, stat, writeFile as writeFile7 } from "node:fs/promises";
-import { dirname as dirname8, resolve as resolve2, sep } from "node:path";
+import { copyFile, mkdir as mkdir6, readdir as readdir9, readFile as readFile12, rm as rm7, stat, writeFile as writeFile7 } from "node:fs/promises";
+import { dirname as dirname8, join as join20, resolve as resolve2, sep } from "node:path";
 import { Readable as Readable2 } from "node:stream";
 var encoder6 = new TextEncoder;
 function createLocalObjectStore(options2) {
@@ -76401,6 +77088,40 @@ function createLocalObjectStore(options2) {
     url2.searchParams.set("sig", await signature([method, url2.pathname, exp2, ...Object.values(extra)]));
     return url2.toString();
   }
+  const multipartRoot = resolve2(root, ".multipart");
+  function uploadDir(uploadId) {
+    const dir = resolve2(multipartRoot, uploadId);
+    if (!/^[0-9a-f-]{36}$/.test(uploadId) || !dir.startsWith(`${multipartRoot}${sep}`)) {
+      throw new Error("invalid upload id");
+    }
+    return dir;
+  }
+  async function readUpload(location, uploadId) {
+    let dir;
+    try {
+      dir = uploadDir(uploadId);
+    } catch {
+      return null;
+    }
+    let meta3;
+    try {
+      meta3 = JSON.parse(await readFile12(join20(dir, "meta.json"), "utf8"));
+    } catch (error51) {
+      if (error51.code === "ENOENT")
+        return null;
+      throw error51;
+    }
+    const same = meta3.area === location.area && meta3.tier === location.tier && meta3.key === location.key;
+    return same ? { dir, meta: meta3 } : null;
+  }
+  async function partsOf(dir) {
+    const names = (await readdir9(dir)).filter((name3) => /^\d+$/.test(name3));
+    const parts = await Promise.all(names.map(async (name3) => {
+      const size = (await stat(join20(dir, name3))).size;
+      return { partNumber: Number(name3), etag: `"local-${name3}-${size}"`, size };
+    }));
+    return parts.sort((a2, b3) => a2.partNumber - b3.partNumber);
+  }
   async function writeObject(location, body, contentType2) {
     const path = pathOf(location);
     await mkdir6(dirname8(path), { recursive: true });
@@ -76409,7 +77130,7 @@ function createLocalObjectStore(options2) {
   }
   async function readMeta(path) {
     try {
-      return JSON.parse(await readFile11(`${path}.meta.json`, "utf8"));
+      return JSON.parse(await readFile12(`${path}.meta.json`, "utf8"));
     } catch (error51) {
       if (error51.code === "ENOENT")
         return null;
@@ -76497,6 +77218,61 @@ function createLocalObjectStore(options2) {
         return null;
       return `${base}/public/${location.tier}/${location.key}`;
     },
+    async createMultipart(location, { contentType: contentType2 }) {
+      pathOf(location);
+      const uploadId = crypto.randomUUID();
+      const dir = uploadDir(uploadId);
+      await mkdir6(dir, { recursive: true });
+      const meta3 = { ...location, contentType: contentType2 };
+      await writeFile7(join20(dir, "meta.json"), JSON.stringify(meta3));
+      return uploadId;
+    },
+    signUploadPart(location, { uploadId, partNumber, contentLength, expiresIn }) {
+      return signedUrl("PUT", location, expiresIn, {
+        uploadId,
+        partNumber: String(partNumber),
+        cl: String(contentLength)
+      });
+    },
+    async listParts(location, uploadId) {
+      const upload = await readUpload(location, uploadId);
+      return upload ? partsOf(upload.dir) : null;
+    },
+    async completeMultipart(location, uploadId, parts) {
+      const upload = await readUpload(location, uploadId);
+      if (!upload)
+        throw new Error("multipart upload not found");
+      const ordered = [...parts].sort((a2, b3) => a2.partNumber - b3.partNumber);
+      const chunks = await Promise.all(ordered.map((part) => readFile12(join20(upload.dir, String(part.partNumber)))));
+      await writeObject(location, Buffer.concat(chunks), upload.meta.contentType);
+      await rm7(upload.dir, { recursive: true, force: true });
+    },
+    async abortMultipart(location, uploadId) {
+      const upload = await readUpload(location, uploadId);
+      if (upload)
+        await rm7(upload.dir, { recursive: true, force: true });
+    },
+    async listMultipartUploads(location) {
+      let ids;
+      try {
+        ids = await readdir9(multipartRoot);
+      } catch (error51) {
+        if (error51.code === "ENOENT")
+          return [];
+        throw error51;
+      }
+      const found = await Promise.all(ids.map(async (id) => await readUpload(location, id) ? id : null));
+      return found.filter((id) => id !== null);
+    },
+    async copyPart(from, to, { uploadId, partNumber, range }) {
+      const upload = await readUpload(to, uploadId);
+      if (!upload)
+        throw new Error("multipart upload not found");
+      const source = await readFile12(pathOf(from));
+      const chunk = source.subarray(range.start, range.end + 1);
+      await writeFile7(join20(upload.dir, String(partNumber)), chunk);
+      return `"local-${partNumber}-${chunk.byteLength}"`;
+    },
     async handle(request) {
       const url2 = new URL(request.url);
       const cors = { "access-control-allow-origin": request.headers.get("origin") ?? "*" };
@@ -76528,7 +77304,8 @@ function createLocalObjectStore(options2) {
       if (!location || !method)
         return new Response(null, { status: 404, headers: cors });
       const exp2 = url2.searchParams.get("exp") ?? "";
-      const extra = method === "PUT" ? ["ct", "cl"] : url2.searchParams.has("dn") ? ["dn"] : [];
+      const isPart = method === "PUT" && url2.searchParams.has("uploadId");
+      const extra = isPart ? ["uploadId", "partNumber", "cl"] : method === "PUT" ? ["ct", "cl"] : url2.searchParams.has("dn") ? ["dn"] : [];
       const expected = await signature([
         method,
         url2.pathname,
@@ -76544,6 +77321,17 @@ function createLocalObjectStore(options2) {
         for (const [name3, value] of Object.entries(cors))
           response.headers.set(name3, value);
         return response;
+      }
+      if (isPart) {
+        const upload = await readUpload(location, url2.searchParams.get("uploadId") ?? "");
+        if (!upload)
+          return new Response(null, { status: 404, headers: cors });
+        const part = new Uint8Array(await request.arrayBuffer());
+        if (String(part.byteLength) !== url2.searchParams.get("cl")) {
+          return new Response(null, { status: 403, headers: cors });
+        }
+        await writeFile7(join20(upload.dir, url2.searchParams.get("partNumber") ?? ""), part);
+        return new Response(null, { status: 200, headers: cors });
       }
       const body = new Uint8Array(await request.arrayBuffer());
       const contentType2 = request.headers.get("content-type") ?? "";
@@ -76779,18 +77567,18 @@ function versionIdOf(hash3) {
   return `${hash3.slice(0, 8)}-${hash3.slice(8, 12)}-4${hash3.slice(13, 16)}-8${hash3.slice(17, 20)}-${hash3.slice(20, 32)}`;
 }
 async function readGenerated(root, file2) {
-  const path = join19(root, PROJECT_PATHS.generated, file2);
-  if (!existsSync14(path)) {
+  const path = join21(root, PROJECT_PATHS.generated, file2);
+  if (!existsSync15(path)) {
     throw new DevError(`${PROJECT_PATHS.generated}/${file2} is missing; run kit.mjs generate first`);
   }
-  return readFile12(path, "utf8");
+  return readFile13(path, "utf8");
 }
 async function createDevRuntime(options2) {
   const { root, projectId } = options2;
   const manifest2 = JSON.parse(await readGenerated(root, "project.json"));
   const schemaText = await readGenerated(root, "schema.json");
   const schema2 = JSON.parse(schemaText);
-  const schemaHash = createHash5("sha256").update(schemaText).digest("hex");
+  const schemaHash = createHash6("sha256").update(schemaText).digest("hex");
   const versionId = versionIdOf(schemaHash);
   const originHost = devOriginHost(options2.projectName, projectId);
   const { db, recreated, stamp } = await openDevDatabase(options2);
@@ -76804,7 +77592,7 @@ async function createDevRuntime(options2) {
         schema: schema2,
         importModule: options2.importModule ?? defaultImporter(root, manifest2)
       });
-      await writeFile8(join19(root, DEV_DB_STAMP), `${stamp}
+      await writeFile8(join21(root, DEV_DB_STAMP), `${stamp}
 `);
     }
   } catch (error51) {
@@ -76815,7 +77603,7 @@ async function createDevRuntime(options2) {
   }
   const key = await createTestEs256Key("kit-dev");
   const objects = createLocalObjectStore({
-    root: join19(root, DEV_OBJECTS_DIR),
+    root: join21(root, DEV_OBJECTS_DIR),
     baseUrl: options2.objectsBaseUrl,
     secret: crypto.randomUUID()
   });
@@ -76839,7 +77627,7 @@ async function createDevRuntime(options2) {
   }
   const services = {
     async resolve(hash3) {
-      return [...credentials.values()].find((c2) => createHash5("sha256").update(c2.secret).digest("hex") === hash3)?.context ?? null;
+      return [...credentials.values()].find((c2) => createHash6("sha256").update(c2.secret).digest("hex") === hash3)?.context ?? null;
     },
     async current(id) {
       return [...credentials.values()].find((c2) => c2.context.credentialId === id)?.context ?? null;
@@ -76933,16 +77721,16 @@ var silentLogger = { log: () => {
 async function openDevDatabase(options2) {
   const { root } = options2;
   const sql3 = await devDatabaseSql(root);
-  const hash3 = createHash5("sha256");
+  const hash3 = createHash6("sha256");
   for (const part of sql3)
     hash3.update(`${part.what}\x00${part.sql}\x00`);
-  const seedPath = join19(root, PROJECT_PATHS.seed);
-  hash3.update(`seed\x00${existsSync14(seedPath) ? await readFile12(seedPath, "utf8") : ""}`);
+  const seedPath = join21(root, PROJECT_PATHS.seed);
+  hash3.update(`seed\x00${existsSync15(seedPath) ? await readFile13(seedPath, "utf8") : ""}`);
   const stamp = hash3.digest("hex");
-  const path = join19(root, DEV_DB_PATH);
-  const stampPath = join19(root, DEV_DB_STAMP);
-  const current = existsSync14(stampPath) ? (await readFile12(stampPath, "utf8")).trim() : null;
-  const recreated = current !== stamp || !existsSync14(path);
+  const path = join21(root, DEV_DB_PATH);
+  const stampPath = join21(root, DEV_DB_STAMP);
+  const current = existsSync15(stampPath) ? (await readFile13(stampPath, "utf8")).trim() : null;
+  const recreated = current !== stamp || !existsSync15(path);
   if (recreated) {
     for (const file2 of [stampPath, path, `${path}-wal`, `${path}-shm`, `${path}-journal`])
       await rm8(file2, { force: true });
@@ -76970,15 +77758,15 @@ async function devDatabaseSql(root) {
       throw new DevError(error51.message);
     throw error51;
   }
-  const pending = join19(root, PENDING_SQL_PATH);
-  if (!existsSync14(pending)) {
+  const pending = join21(root, PENDING_SQL_PATH);
+  if (!existsSync15(pending)) {
     throw new DevError(`${PENDING_SQL_PATH} is missing; run kit.mjs db diff first`);
   }
-  const data = join19(root, PENDING_DATA_PATH);
+  const data = join21(root, PENDING_DATA_PATH);
   return [
     ...migrations.map((m3) => ({ what: `${PROJECT_PATHS.migrations}/${m3.name}`, sql: m3.sql })),
-    { what: PENDING_SQL_PATH, sql: await readFile12(pending, "utf8") },
-    ...existsSync14(data) ? [{ what: PENDING_DATA_PATH, sql: await readFile12(data, "utf8") }] : []
+    { what: PENDING_SQL_PATH, sql: await readFile13(pending, "utf8") },
+    ...existsSync15(data) ? [{ what: PENDING_DATA_PATH, sql: await readFile13(data, "utf8") }] : []
   ];
 }
 function defaultImporter(root, manifest2) {
@@ -76988,7 +77776,7 @@ function defaultImporter(root, manifest2) {
     for (const slug of slugs) {
       let entry;
       try {
-        entry = resolveViteEntry(join19(root, "apps", slug));
+        entry = resolveViteEntry(join21(root, "apps", slug));
       } catch (error51) {
         reasons.push(`apps/${slug}: ${error51 instanceof Error ? error51.message : String(error51)}`);
         continue;
@@ -77259,7 +78047,7 @@ async function errorCode(response) {
 import { spawn as spawn5 } from "node:child_process";
 import { readFileSync as readFileSync4 } from "node:fs";
 import { createServer } from "node:http";
-import { join as join22 } from "node:path";
+import { join as join24 } from "node:path";
 
 // frontend/packages/miniapp-kit/src/verify/dist-server.ts
 function createDistHandler(options2) {
@@ -77448,7 +78236,8 @@ const roleLabel = (name) => ['member', 'admin', 'anonymous'].includes(name) ? t[
 const tools = document.getElementById('tools')
 const showTools = () => { if (!tools.open) tools.showModal() }
 const embedded = config.live && params.get('host') === 'studio'
-document.getElementById('host-header').hidden = Boolean(embedded)
+// chrome=none: only the app, for the gallery's screenshots (listing-gallery.md §2.4).
+document.getElementById('host-header').hidden = Boolean(embedded) || params.get('chrome') === 'none'
 document.getElementById('open-tools').addEventListener('click', showTools)
 document.getElementById('error-tools').addEventListener('click', showTools)
 document.getElementById('close-tools').addEventListener('click', () => tools.close())
@@ -77469,7 +78258,8 @@ let session = null
 let port = null
 let nonce = null
 let refreshTimer = null
-let pendingPath = ''
+// path: the page to open first (/today). Only a same-app path, never //host.
+let pendingPath = /^\\/(?!\\/)/.test(params.get('path') ?? '') ? params.get('path') : ''
 
 function setStatus(text, isError = false) {
   statusEl.textContent = text
@@ -77673,9 +78463,9 @@ void open()
 }
 
 // frontend/packages/miniapp-kit/src/dev/realtime.ts
-import { readFile as readFile13 } from "node:fs/promises";
+import { readFile as readFile14 } from "node:fs/promises";
 import { createRequire as createRequire9 } from "node:module";
-import { join as join20 } from "node:path";
+import { join as join22 } from "node:path";
 
 // infra/workers/gateway/src/realtime.ts
 var MAX_CONNECTIONS = REALTIME_LIMITS.connections;
@@ -77720,9 +78510,9 @@ async function wakeRealtime(scope, env) {
 
 // frontend/packages/miniapp-kit/src/dev/realtime.ts
 async function startRealtimeGateway(options2) {
-  const fromToolRoot = createRequire9(join20(process.env.KIT_TOOL_ROOT ?? process.cwd(), "package.json"));
+  const fromToolRoot = createRequire9(join22(process.env.KIT_TOOL_ROOT ?? process.cwd(), "package.json"));
   const { Miniflare, Response: WorkerResponse } = fromToolRoot("miniflare");
-  const source = await readFile13(join20(options2.kitRoot, "platform", "realtime-local.js"), "utf8");
+  const source = await readFile14(join22(options2.kitRoot, "platform", "realtime-local.js"), "utf8");
   const runtime = new Miniflare({
     modules: true,
     script: source,
@@ -77813,8 +78603,8 @@ async function startRealtimeGateway(options2) {
 }
 
 // frontend/packages/miniapp-kit/src/dev/vars.ts
-import { readFile as readFile14 } from "node:fs/promises";
-import { join as join21 } from "node:path";
+import { readFile as readFile15 } from "node:fs/promises";
+import { join as join23 } from "node:path";
 import { parseEnv } from "node:util";
 
 // frontend/packages/miniapp-kit/src/git.ts
@@ -77866,7 +78656,7 @@ async function readDevVars(root, hosted) {
   if (hosted)
     return {};
   try {
-    const values = parseEnv(await readFile14(join21(root, ".kit/dev.vars"), "utf8"));
+    const values = parseEnv(await readFile15(join23(root, ".kit/dev.vars"), "utf8"));
     const result = {};
     for (const [name3, value] of Object.entries(values)) {
       if (value !== undefined && name3 !== "GATEWAY_URL" && !name3.startsWith("PLATFORM_"))
@@ -77903,7 +78693,7 @@ async function startDev(options2) {
   });
   const createLibsqlClient = options2.createLibsqlClient ?? await loadProjectLibsql(root, (m3) => new DevError(m3));
   await diffDatabase({ root, kitRoot, createLibsqlClient });
-  const projectName = String(JSON.parse(readFileSync4(join22(root, "package.json"), "utf8")).name ?? "");
+  const projectName = String(JSON.parse(readFileSync4(join24(root, "package.json"), "utf8")).name ?? "");
   const ports = options2.ports ?? DEV_PORTS;
   const webApps = Object.values(manifest2.apps).filter((app) => app.kind === "web").map((app) => app.slug).sort();
   const appPorts = allocateAppPorts(webApps);
@@ -78035,11 +78825,11 @@ async function startDev(options2) {
         if (!dist)
           await buildWorkerBundle({
             root,
-            appDir: join22(root, "apps", app.slug),
+            appDir: join24(root, "apps", app.slug),
             slug: app.slug,
             kind: app.kind
           });
-        const bytes = dist ? dist.files.get(`${app.slug}/index.js`) : readFileSync4(join22(root, "dist", app.slug, "index.js"));
+        const bytes = dist ? dist.files.get(`${app.slug}/index.js`) : readFileSync4(join24(root, "dist", app.slug, "index.js"));
         if (!bytes)
           throw new DevError(`missing Worker bundle: ${app.slug}/index.js`);
         return {
@@ -78103,7 +78893,7 @@ async function startDev(options2) {
     for (const slug of dist ? [] : webApps) {
       const vite = await (options2.startVite ?? viteDev)({
         slug,
-        appDir: join22(root, "apps", slug),
+        appDir: join24(root, "apps", slug),
         port: appPorts[slug],
         env: live ? {
           ...env,
@@ -78283,12 +79073,12 @@ var encoder7 = new TextEncoder;
 var decoder2 = new TextDecoder;
 
 // frontend/packages/miniapp-kit/src/login.ts
-import { createHash as createHash6, randomBytes as randomBytes2 } from "node:crypto";
-import { existsSync as existsSync15 } from "node:fs";
-import { chmod, mkdir as mkdir8, readFile as readFile15, rename, writeFile as writeFile9 } from "node:fs/promises";
+import { createHash as createHash7, randomBytes as randomBytes2 } from "node:crypto";
+import { existsSync as existsSync16 } from "node:fs";
+import { chmod, mkdir as mkdir8, readFile as readFile16, rename, writeFile as writeFile9 } from "node:fs/promises";
 import { createServer as createServer2 } from "node:http";
-import { join as join23 } from "node:path";
-var DEFAULT_MCP_URL = "https://app-sns.vercel.app/mcp/creator";
+import { join as join25 } from "node:path";
+var DEFAULT_MCP_URL = "https://fdpocket.dev/mcp/creator";
 var REDIRECT_URI = "http://127.0.0.1:43126/callback";
 var REFRESH_MARGIN_MS = 60000;
 var LOGIN_TIMEOUT_MS = 5 * 60000;
@@ -78298,10 +79088,10 @@ class LoginError extends Error {
   name = "LoginError";
 }
 async function readLogins(configDir) {
-  const path = join23(configDir, CREDENTIALS_FILE);
-  if (!existsSync15(path))
+  const path = join25(configDir, CREDENTIALS_FILE);
+  if (!existsSync16(path))
     return {};
-  const parsed = JSON.parse(await readFile15(path, "utf8"));
+  const parsed = JSON.parse(await readFile16(path, "utf8"));
   return parsed.logins ?? {};
 }
 async function writeLogin(configDir, mcpUrl, login) {
@@ -78311,7 +79101,7 @@ async function writeLogin(configDir, mcpUrl, login) {
   else
     logins[mcpUrl] = login;
   await mkdir8(configDir, { recursive: true, mode: 448 });
-  const path = join23(configDir, CREDENTIALS_FILE);
+  const path = join25(configDir, CREDENTIALS_FILE);
   const temporary = `${path}.${process.pid}.tmp`;
   await writeFile9(temporary, `${JSON.stringify({ logins }, null, 2)}
 `, { mode: 384 });
@@ -78396,7 +79186,7 @@ async function login(mcpUrl, deps) {
     client_id: clientId,
     redirect_uri: REDIRECT_URI,
     state,
-    code_challenge: base64url3(createHash6("sha256").update(verifier).digest()),
+    code_challenge: base64url3(createHash7("sha256").update(verifier).digest()),
     code_challenge_method: "S256"
   }).toString();
   const code = await deps.authorize(url2.toString(), REDIRECT_URI, state);
@@ -78499,9 +79289,9 @@ function loopbackAuthorize(openUrl) {
 }
 
 // frontend/packages/miniapp-kit/src/new.ts
-import { existsSync as existsSync16 } from "node:fs";
-import { mkdir as mkdir9, readdir as readdir10, readFile as readFile16, writeFile as writeFile10 } from "node:fs/promises";
-import { dirname as dirname10, join as join24, relative } from "node:path";
+import { existsSync as existsSync17 } from "node:fs";
+import { mkdir as mkdir9, readdir as readdir10, readFile as readFile17, writeFile as writeFile10 } from "node:fs/promises";
+import { dirname as dirname10, join as join26, relative } from "node:path";
 var TEMPLATE_DIR = "templates/project";
 var DEFAULT_APP_SPECS = ["web", "admin"];
 var NAME_PATTERN = /^[a-z][a-z0-9-]{0,63}$/;
@@ -78532,22 +79322,22 @@ async function newProject(options2) {
   });
   if (!declarations.length || declarations.length > PROJECT_APPS_MAX || new Set(declarations.map((a2) => a2.slug)).size !== declarations.length)
     throw new NewProjectError(`declare 1–${PROJECT_APPS_MAX} unique Apps`);
-  if (existsSync16(root) && (await readdir10(root)).some((entry) => entry !== ".git")) {
+  if (existsSync17(root) && (await readdir10(root)).some((entry) => entry !== ".git")) {
     throw new NewProjectError(`${root} is not empty; kit new only fills an empty Project`);
   }
-  const template = join24(options2.kitRoot, TEMPLATE_DIR);
+  const template = join26(options2.kitRoot, TEMPLATE_DIR);
   const files = [];
   const sources = await listFiles(template);
   const put = async (target, text) => {
-    await mkdir9(dirname10(join24(root, target)), { recursive: true });
-    await writeFile10(join24(root, target), text);
+    await mkdir9(dirname10(join26(root, target)), { recursive: true });
+    await writeFile10(join26(root, target), text);
     files.push(target);
   };
   for (const source of sources) {
     if (source.startsWith("apps/"))
       continue;
     const target = targetPath(source);
-    let text = fill(await readFile16(join24(template, source), "utf8"), { name: name3, title });
+    let text = fill(await readFile17(join26(template, source), "utf8"), { name: name3, title });
     if (target === PROJECT_PATHS.manifest) {
       const document2 = $parseDocument(text);
       const original = document2.toJS().apps;
@@ -78587,7 +79377,7 @@ async function newProject(options2) {
     const prefix2 = `apps/${templateSlug}/`;
     for (const source of sources.filter((path) => path.startsWith(prefix2))) {
       const target = `apps/${slug}/${source.slice(prefix2.length)}`;
-      let text = fill(await readFile16(join24(template, source), "utf8"), { name: name3, title });
+      let text = fill(await readFile17(join26(template, source), "utf8"), { name: name3, title });
       if (target.endsWith("/vite.config.ts"))
         text = text.replace(`createAppConfig("${templateSlug}"`, `createAppConfig("${slug}"`);
       if (target.endsWith("/package.json")) {
@@ -78614,7 +79404,7 @@ async function listFiles(root) {
   const files = [];
   const walk = async (dir) => {
     for (const entry of await readdir10(dir, { withFileTypes: true })) {
-      const path = join24(dir, entry.name);
+      const path = join26(dir, entry.name);
       if (entry.isDirectory())
         await walk(path);
       else if (entry.isFile())
@@ -78746,16 +79536,16 @@ function trackingRef(threadRef) {
 var REMOTE_REFS = "refs/remotes/tokoyo";
 
 // frontend/packages/miniapp-kit/src/repo.ts
-import { existsSync as existsSync17 } from "node:fs";
-import { appendFile, mkdir as mkdir10, readFile as readFile17, rm as rm9, writeFile as writeFile11 } from "node:fs/promises";
-import { join as join25 } from "node:path";
+import { existsSync as existsSync18 } from "node:fs";
+import { appendFile, mkdir as mkdir10, readFile as readFile18, rm as rm9, writeFile as writeFile11 } from "node:fs/promises";
+import { join as join27 } from "node:path";
 class RepoError extends Error {
   name = "RepoError";
 }
 function kitCommand(kitRoot, ...args) {
   return [
     shellQuote(process.execPath),
-    shellQuote(join25(kitRoot, "scripts", "kit.mjs")),
+    shellQuote(join27(kitRoot, "scripts", "kit.mjs")),
     ...args
   ].join(" ");
 }
@@ -78791,10 +79581,10 @@ async function configureRepo(git, source, config3, author) {
   await set2(git, source, `branch.${branch}.remote`, ".");
   await set2(git, source, `branch.${branch}.merge`, trackingRef(config3.thread_ref));
   await set2(git, source, `branch.${branch}.rebase`, "true");
-  const info = join25(source, ".git", "info");
+  const info = join27(source, ".git", "info");
   await mkdir10(info, { recursive: true });
-  const excludePath = join25(info, "exclude");
-  const excluded = existsSync17(excludePath) ? (await readFile17(excludePath, "utf8")).split(`
+  const excludePath = join27(info, "exclude");
+  const excluded = existsSync18(excludePath) ? (await readFile18(excludePath, "utf8")).split(`
 `) : [];
   const missing = EXCLUDES.filter((line) => !excluded.includes(line));
   if (missing.length > 0)
@@ -78808,12 +79598,12 @@ async function requireGitLfs(git, cwd) {
   }
 }
 function requireRepo(source) {
-  if (!existsSync17(join25(source, ".git"))) {
+  if (!existsSync18(join27(source, ".git"))) {
     throw new RepoError(`${source} is not a git repository; run kit.mjs clone in a new directory`);
   }
 }
 async function requireClean(git, source, what) {
-  if (existsSync17(join25(source, ".git", "rebase-merge")) || existsSync17(join25(source, ".git", "rebase-apply"))) {
+  if (existsSync18(join27(source, ".git", "rebase-merge")) || existsSync18(join27(source, ".git", "rebase-apply"))) {
     throw new RepoError("a git rebase is in progress in source/; finish it (git rebase --continue) first");
   }
   if (await gitOk(git, source, ["status", "--porcelain"]) !== "") {
@@ -78823,13 +79613,13 @@ async function requireClean(git, source, what) {
 async function fetchBundles(git, source, pulled, already, download2) {
   const listed = new Set(pulled.bundles.map((bundle2) => bundle2.sha256));
   const fetched = already.filter((sha) => listed.has(sha));
-  const dir = join25(source, ".git", "tokoyo-bundles");
+  const dir = join27(source, ".git", "tokoyo-bundles");
   await mkdir10(dir, { recursive: true });
   for (const bundle2 of fetchOrder(pulled.bundles)) {
     if (fetched.includes(bundle2.sha256))
       continue;
     const bytes = await download2(`bundle ${bundle2.seq}`, bundle2.url, bundle2.sha256);
-    const file2 = join25(dir, `${bundle2.sha256}.bundle`);
+    const file2 = join27(dir, `${bundle2.sha256}.bundle`);
     await writeFile11(file2, bytes);
     try {
       await gitOk(git, source, [
@@ -78882,6 +79672,44 @@ async function integrate(git, source, threadRef) {
   return { status: "conflict", conflicts };
 }
 
+// frontend/packages/miniapp-kit/src/verify/captures.ts
+var CAPTURE_VIEWPORTS = {
+  mobile: { viewport: { width: 390, height: 844 }, deviceScaleFactor: 2 },
+  desktop: { viewport: { width: 1440, height: 900 }, deviceScaleFactor: 1 }
+};
+var UUID4 = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/;
+var PAGE_PATH = /^\/(?!\/)\S{0,199}$/;
+function parseCaptures(text) {
+  const parsed = JSON.parse(text);
+  if (!Array.isArray(parsed))
+    throw new Error("--captures must be a JSON array");
+  return parsed.map((item) => {
+    const page = item;
+    if (typeof page.id !== "string" || !UUID4.test(page.id) || page.viewport !== "mobile" && page.viewport !== "desktop" || typeof page.app !== "string" || typeof page.path !== "string" || !PAGE_PATH.test(page.path) || !DEV_PRINCIPAL_NAMES.includes(page.as)) {
+      throw new Error(`a capture does not follow the rules: ${JSON.stringify(item)}`);
+    }
+    return {
+      id: page.id,
+      viewport: page.viewport,
+      app: page.app,
+      path: page.path,
+      as: page.as
+    };
+  });
+}
+function captureUrl(hostUrl, capture) {
+  const params = new URLSearchParams({
+    app: capture.app,
+    as: capture.as,
+    path: capture.path,
+    chrome: "none"
+  });
+  return `${hostUrl}/?${params}`;
+}
+function captureName(id) {
+  return `screenshots/listing-${id}.png`;
+}
+
 // frontend/packages/miniapp-kit/src/verify/failed.ts
 class ValidationFailed extends Error {
   report;
@@ -78895,16 +79723,16 @@ class ValidationFailed extends Error {
 
 // frontend/packages/miniapp-kit/src/verify/validate.ts
 import { mkdir as mkdir12, writeFile as writeFile13 } from "node:fs/promises";
-import { join as join29 } from "node:path";
+import { join as join31 } from "node:path";
 
 // frontend/packages/miniapp-kit/src/verify/dynamic.ts
 import { mkdir as mkdir11, writeFile as writeFile12 } from "node:fs/promises";
-import { join as join28 } from "node:path";
+import { join as join30 } from "node:path";
 
 // frontend/packages/miniapp-kit/src/verify/browser.ts
-import { existsSync as existsSync18 } from "node:fs";
+import { existsSync as existsSync19 } from "node:fs";
 import { createRequire as createRequire10 } from "node:module";
-import { join as join26 } from "node:path";
+import { join as join28 } from "node:path";
 import { pathToFileURL as pathToFileURL8 } from "node:url";
 
 class BrowserUnavailableError extends Error {
@@ -78914,7 +79742,7 @@ function resolvePlaywright() {
   const bases = [process.env.KIT_PLAYWRIGHT_DIR, process.cwd()].filter((base) => Boolean(base));
   for (const base of bases) {
     try {
-      return createRequire10(join26(base, "noop.js")).resolve("playwright-core");
+      return createRequire10(join28(base, "noop.js")).resolve("playwright-core");
     } catch {}
   }
   try {
@@ -78927,7 +79755,7 @@ var launchChromium = async () => {
   const loaded = await import(pathToFileURL8(resolvePlaywright()).href);
   const module = loaded.default ?? loaded;
   const executablePath = process.env.KIT_CHROMIUM_PATH;
-  if (executablePath && !existsSync18(executablePath)) {
+  if (executablePath && !existsSync19(executablePath)) {
     throw new BrowserUnavailableError(`KIT_CHROMIUM_PATH does not exist: ${executablePath}`);
   }
   return module.chromium.launch({
@@ -78937,10 +79765,10 @@ var launchChromium = async () => {
 };
 
 // frontend/packages/miniapp-kit/src/verify/erase.ts
-import { existsSync as existsSync19 } from "node:fs";
+import { existsSync as existsSync20 } from "node:fs";
 import { mkdtemp as mkdtemp2, rm as rm10 } from "node:fs/promises";
 import { tmpdir as tmpdir2 } from "node:os";
-import { join as join27 } from "node:path";
+import { join as join29 } from "node:path";
 var failed = (message2) => ({
   code: "ERASE_TEST_FAILED",
   path: PROJECT_PATHS.eraseTest,
@@ -78949,7 +79777,7 @@ var failed = (message2) => ({
 var describe4 = (error51) => error51 instanceof Error ? error51.message : String(error51);
 async function runEraseTest(options2) {
   const { root } = options2;
-  if (!existsSync19(join27(root, PROJECT_PATHS.eraseTest))) {
+  if (!existsSync20(join29(root, PROJECT_PATHS.eraseTest))) {
     return {
       errors: [],
       warnings: [
@@ -78964,8 +79792,8 @@ async function runEraseTest(options2) {
   const manifest2 = JSON.parse(await readGenerated(root, "project.json"));
   const schema2 = JSON.parse(await readGenerated(root, "schema.json"));
   const importModule = options2.importModule ?? defaultImporter(root, manifest2);
-  const dir = await mkdtemp2(join27(tmpdir2(), "kit-erase-"));
-  const db = options2.createLibsqlClient({ url: `file:${join27(dir, "erase.db")}` });
+  const dir = await mkdtemp2(join29(tmpdir2(), "kit-erase-"));
+  const db = options2.createLibsqlClient({ url: `file:${join29(dir, "erase.db")}` });
   try {
     for (const part of await devDatabaseSql(root))
       await applySql(db, part.sql);
@@ -78973,7 +79801,7 @@ async function runEraseTest(options2) {
     await runSeed({ root, db, schema: schema2, importModule });
     let test;
     try {
-      test = (await importModule(join27(root, PROJECT_PATHS.eraseTest))).default;
+      test = (await importModule(join29(root, PROJECT_PATHS.eraseTest))).default;
     } catch (error51) {
       return { errors: [failed(`could not be loaded: ${describe4(error51)}`)], warnings: [] };
     }
@@ -79201,18 +80029,34 @@ async function runDynamicChecks(options2) {
   });
   const browser = await (options2.launch ?? launchChromium)();
   try {
-    await mkdir11(join28(options2.outDir, "screenshots"), { recursive: true });
+    await mkdir11(join30(options2.outDir, "screenshots"), { recursive: true });
     const observations = [];
+    const at = (app) => ({
+      hostUrl: dev.hostUrl,
+      gatewayUrl: dev.gatewayUrl,
+      appsOrigin: dev.appsOrigin,
+      bakedGateway: new URL(options2.gatewayUrl),
+      browserOrigins: options2.manifest.apps[app]?.network?.browser ?? [],
+      outDir: options2.outDir,
+      timeoutMs: options2.timeoutMs ?? 20000
+    });
     for (const visit2 of plannedVisits(options2.manifest)) {
-      observations.push(await observe(await browser.newContext({ viewport: MOBILE_VIEWPORT }), visit2, {
-        hostUrl: dev.hostUrl,
-        gatewayUrl: dev.gatewayUrl,
-        appsOrigin: dev.appsOrigin,
-        bakedGateway: new URL(options2.gatewayUrl),
-        browserOrigins: options2.manifest.apps[visit2.app]?.network?.browser ?? [],
-        outDir: options2.outDir,
-        timeoutMs: options2.timeoutMs ?? 20000
-      }));
+      observations.push(await observe(await browser.newContext({ viewport: MOBILE_VIEWPORT }), visit2, at(visit2.app)));
+    }
+    const captureWarnings = [];
+    for (const capture of options2.captures ?? []) {
+      const seen = options2.manifest.apps[capture.app]?.kind !== "web" ? null : await observe(await browser.newContext(CAPTURE_VIEWPORTS[capture.viewport]), { app: capture.app, principal: capture.as }, at(capture.app), {
+        url: captureUrl(dev.hostUrl, capture),
+        name: captureName(capture.id),
+        settleMs: 1000
+      });
+      if (seen?.screenshot == null) {
+        captureWarnings.push({
+          code: "LISTING_CAPTURE_FAILED",
+          message: `${capture.app} ${capture.path} as ${capture.as} (${capture.viewport}) could not be captured`,
+          path: capture.app
+        });
+      }
     }
     const matrix = await runPermissionMatrix({
       plan: planPermissionMatrix(options2.manifest),
@@ -79221,7 +80065,7 @@ async function runDynamicChecks(options2) {
       gatewayUrl: dev.gatewayUrl,
       appsOrigin: dev.appsOrigin
     });
-    await writeFile12(join28(options2.outDir, "permission-matrix.json"), `${JSON.stringify(matrix, null, 1)}
+    await writeFile12(join30(options2.outDir, "permission-matrix.json"), `${JSON.stringify(matrix, null, 1)}
 `);
     const erase = await runEraseTest({
       root: options2.root,
@@ -79229,7 +80073,7 @@ async function runDynamicChecks(options2) {
     });
     const judged = judgeDynamic(options2.manifest, observations);
     const workerResults = await dev.checkWorkers();
-    await writeFile12(join28(options2.outDir, "worker-mocks.json"), `${JSON.stringify({ results: workerResults, events: dev.workerEvents() }, null, 1)}
+    await writeFile12(join30(options2.outDir, "worker-mocks.json"), `${JSON.stringify({ results: workerResults, events: dev.workerEvents() }, null, 1)}
 `);
     const workerErrors = workerResults.filter((result) => result.status >= (result.kind === "jobs" ? 400 : 500)).map((result) => ({
       code: "WORKER_RUNTIME_FAILED",
@@ -79244,14 +80088,14 @@ async function runDynamicChecks(options2) {
         ...erase.errors,
         ...workerErrors
       ],
-      warnings: [...judged.warnings, ...erase.warnings]
+      warnings: [...judged.warnings, ...erase.warnings, ...captureWarnings]
     };
   } finally {
     await browser.close();
     await dev.close();
   }
 }
-async function observe(context, visit2, at) {
+async function observe(context, visit2, at, shot) {
   const observation = {
     ...visit2,
     exchangeError: null,
@@ -79290,7 +80134,7 @@ async function observe(context, visit2, at) {
     });
     const page = await context.newPage();
     watchConsole(page, observation);
-    await page.goto(`${at.hostUrl}/?app=${encodeURIComponent(visit2.app)}&as=${encodeURIComponent(visit2.principal)}`);
+    await page.goto(shot?.url ?? `${at.hostUrl}/?app=${encodeURIComponent(visit2.app)}&as=${encodeURIComponent(visit2.principal)}`);
     const status = await page.waitForFunction(() => document.body.dataset.kitStatus ?? null, undefined, {
       timeout: at.timeoutMs
     }).then((handle) => handle.jsonValue()).catch(() => null);
@@ -79302,8 +80146,12 @@ async function observe(context, visit2, at) {
     if (!observation.connected)
       return observation;
     observation.rendered = await rendered(page, at.timeoutMs);
-    const name3 = `screenshots/${visit2.app}-${visit2.principal}.png`;
-    await writeFile12(join28(at.outDir, name3), await page.locator("#frame").screenshot());
+    if (shot && !observation.rendered)
+      return observation;
+    if (shot)
+      await page.waitForTimeout(shot.settleMs);
+    const name3 = shot?.name ?? `screenshots/${visit2.app}-${visit2.principal}.png`;
+    await writeFile12(join30(at.outDir, name3), await page.locator("#frame").screenshot());
     observation.screenshot = name3;
     return observation;
   } finally {
@@ -79372,22 +80220,23 @@ async function validateVersion(options2) {
       ...options2.createLibsqlClient ? { createLibsqlClient: options2.createLibsqlClient } : {},
       ...options2.ports ? { ports: options2.ports } : {},
       ...options2.launch ? { launch: options2.launch } : {},
-      ...options2.timeoutMs ? { timeoutMs: options2.timeoutMs } : {}
+      ...options2.timeoutMs ? { timeoutMs: options2.timeoutMs } : {},
+      ...options2.captures ? { captures: options2.captures } : {}
     })
   });
   const report2 = reportSchema.parse(result.report);
   await mkdir12(options2.outDir, { recursive: true });
-  await writeFile13(join29(options2.outDir, "report.json"), `${JSON.stringify(report2, null, 2)}
+  await writeFile13(join31(options2.outDir, "report.json"), `${JSON.stringify(report2, null, 2)}
 `);
   if (result.schemaJson !== undefined) {
-    await writeFile13(join29(options2.outDir, "schema.json"), result.schemaJson);
+    await writeFile13(join31(options2.outDir, "schema.json"), result.schemaJson);
   }
   return report2;
 }
 
 // frontend/packages/miniapp-kit/src/workdir.ts
-import { existsSync as existsSync20 } from "node:fs";
-import { dirname as dirname11, join as join30 } from "node:path";
+import { existsSync as existsSync21 } from "node:fs";
+import { dirname as dirname11, join as join32 } from "node:path";
 var CONFIG_FILE = ".tokoyo.json";
 var WORKDIR_DIRS = {
   source: "source",
@@ -79456,7 +80305,7 @@ function serializeConfig(config3) {
 }
 function locateWorkdir(start) {
   for (let current = start;; current = dirname11(current)) {
-    if (existsSync20(join30(current, CONFIG_FILE)))
+    if (existsSync21(join32(current, CONFIG_FILE)))
       return current;
     if (dirname11(current) === current)
       return null;
@@ -79516,7 +80365,7 @@ class CommandError extends Error {
 }
 function defaultConfigDir() {
   const xdg = process.env.XDG_CONFIG_HOME;
-  return join31(xdg && xdg !== "" ? xdg : join31(homedir(), ".config"), "tokoyo");
+  return join33(xdg && xdg !== "" ? xdg : join33(homedir(), ".config"), "tokoyo");
 }
 async function readStdin() {
   const chunks = [];
@@ -79595,35 +80444,35 @@ async function runCommand(args, context) {
 var print = (context, value) => context.stdout(JSON.stringify(value, null, 2));
 var mcpUrlOf = (flag) => flag ?? process.env.CREATOR_MCP_URL ?? DEFAULT_MCP_URL;
 async function kitVersion(kitRoot) {
-  const manifest2 = join31(kitRoot, ".claude-plugin", "plugin.json");
-  if (!existsSync21(manifest2))
+  const manifest2 = join33(kitRoot, ".claude-plugin", "plugin.json");
+  if (!existsSync22(manifest2))
     throw new CommandError(`${manifest2} is missing; reinstall the Kit`);
-  const version3 = JSON.parse(await readFile18(manifest2, "utf8")).version;
+  const version3 = JSON.parse(await readFile19(manifest2, "utf8")).version;
   if (typeof version3 !== "string")
     throw new CommandError(`${manifest2} has no version`);
   return version3;
 }
 async function readConfig(workdir) {
-  return parseConfig(await readFile18(join31(workdir, CONFIG_FILE), "utf8"));
+  return parseConfig(await readFile19(join33(workdir, CONFIG_FILE), "utf8"));
 }
 async function saveConfig(workdir, config3) {
-  await writeFile14(join31(workdir, CONFIG_FILE), serializeConfig(config3));
+  await writeFile14(join33(workdir, CONFIG_FILE), serializeConfig(config3));
 }
-var sourceOf = (workdir) => join31(workdir, WORKDIR_DIRS.source);
+var sourceOf = (workdir) => join33(workdir, WORKDIR_DIRS.source);
 var AGENTS_TITLE = agentsMd("").split(`
 `)[0];
 async function writeAgentFiles(workdir, kitRoot) {
-  const agents = join31(workdir, "AGENTS.md");
-  if (!existsSync21(agents) || (await readFile18(agents, "utf8")).startsWith(AGENTS_TITLE)) {
+  const agents = join33(workdir, "AGENTS.md");
+  if (!existsSync22(agents) || (await readFile19(agents, "utf8")).startsWith(AGENTS_TITLE)) {
     await writeFile14(agents, agentsMd(kitRoot));
   }
-  const claude = join31(workdir, "CLAUDE.md");
-  if (!existsSync21(claude))
+  const claude = join33(workdir, "CLAUDE.md");
+  if (!existsSync22(claude))
     await writeFile14(claude, CLAUDE_MD);
 }
 async function fetchVerified(context, name3, url3, sha2562) {
   const bytes = await context.download(url3);
-  const actual = createHash7("sha256").update(bytes).digest("hex");
+  const actual = createHash8("sha256").update(bytes).digest("hex");
   if (sha2562 !== undefined && actual !== sha2562.toLowerCase()) {
     throw new CommandError(`${name3}: sha256 is ${actual}, expected ${sha2562}; nothing was changed`);
   }
@@ -79634,8 +80483,8 @@ var NEXT_EDIT = "change source/, git commit, then kit.mjs pack";
 async function clone4(context, flags) {
   const pulled = parsePulled(flags.bundles);
   const workdir = context.cwd;
-  const path = join31(workdir, CONFIG_FILE);
-  if (existsSync21(path)) {
+  const path = join33(workdir, CONFIG_FILE);
+  if (existsSync22(path)) {
     const existing = await readConfig(workdir);
     if (existing.app_id !== pulled.project_id) {
       throw new CommandError(`${path} belongs to App ${existing.app_id}; use another directory for App ${pulled.project_id}`);
@@ -79643,12 +80492,12 @@ async function clone4(context, flags) {
     throw new CommandError(`${workdir} already has App ${pulled.project_id}; run kit.mjs pull instead`);
   }
   const source = sourceOf(workdir);
-  if (existsSync21(source) && (await readdir11(source)).length > 0) {
+  if (existsSync22(source) && (await readdir11(source)).length > 0) {
     throw new CommandError(`${source} is not empty; clone into a new directory`);
   }
   await requireGitLfs(context.git, workdir);
   for (const dir of Object.values(WORKDIR_DIRS))
-    await mkdir13(join31(workdir, dir), { recursive: true });
+    await mkdir13(join33(workdir, dir), { recursive: true });
   const branch = threadBranch(pulled.thread_ref);
   await gitOk(context.git, workdir, ["init", "-q", "-b", branch, source]);
   await gitOk(context.git, source, ["lfs", "install", "--local"]);
@@ -79799,7 +80648,7 @@ async function publishedFlags(flags) {
   }
   if (flags["published-schema"] !== undefined) {
     try {
-      out.publishedSchema = JSON.parse(await readFile18(flags["published-schema"], "utf8"));
+      out.publishedSchema = JSON.parse(await readFile19(flags["published-schema"], "utf8"));
     } catch (error51) {
       throw new CommandError(`--published-schema must be a readable JSON file: ${error51 instanceof Error ? error51.message : String(error51)}`);
     }
@@ -79854,12 +80703,13 @@ async function validate(context, flags) {
     root,
     kitRoot: context.kitRoot,
     git: context.git,
-    archive: new Uint8Array(await readFile18(resolve3(context.cwd, flags.archive))),
+    archive: new Uint8Array(await readFile19(resolve3(context.cwd, flags.archive))),
     outDir: resolve3(context.cwd, flags.out),
     projectId: flags["project-id"],
     gatewayUrl: flags["gateway-url"],
     base: flags.base === undefined ? undefined : flags.base === "none" ? null : flags.base,
-    sdkUpdate: flags["sdk-update"] === "true"
+    sdkUpdate: flags["sdk-update"] === "true",
+    ...flags.captures ? { captures: parseCaptures(await readFile19(resolve3(context.cwd, flags.captures), "utf8")) } : {}
   });
   print(context, {
     passed: report2.passed,
@@ -79935,16 +80785,16 @@ async function pack(context) {
   if (tip === base) {
     throw new CommandError("no new commits since the head kit.mjs pull took (base_commit_oid); git commit first");
   }
-  const outputs = join31(workdir, WORKDIR_DIRS.outputs);
-  const reportPath = join31(outputs, "build-report.json");
-  if (!existsSync21(reportPath)) {
+  const outputs = join33(workdir, WORKDIR_DIRS.outputs);
+  const reportPath = join33(outputs, "build-report.json");
+  if (!existsSync22(reportPath)) {
     throw new CommandError("outputs/build-report.json is missing; write it first (instructions.md §2)");
   }
-  const dist = join31(source, "dist");
-  if (!existsSync21(dist))
+  const dist = join33(source, "dist");
+  if (!existsSync22(dist))
     throw new CommandError("source/dist is missing; kit.mjs build first");
   await mkdir13(outputs, { recursive: true });
-  const bundlePath = join31(outputs, "source.bundle");
+  const bundlePath = join33(outputs, "source.bundle");
   await gitOk(context.git, source, [
     "bundle",
     "create",
@@ -79954,12 +80804,12 @@ async function pack(context) {
     ...base === null ? [] : [`^${base}`]
   ]);
   const distArchive = buildDistArchive(await collectFiles(dist));
-  await writeFile14(join31(outputs, "dist.tar.gz"), distArchive);
+  await writeFile14(join33(outputs, "dist.tar.gz"), distArchive);
   print(context, {
     files: {
-      "source.bundle": describeFile(new Uint8Array(await readFile18(bundlePath))),
+      "source.bundle": describeFile(new Uint8Array(await readFile19(bundlePath))),
       "dist.tar.gz": describeFile(distArchive),
-      "build-report.json": describeFile(new Uint8Array(await readFile18(reportPath)))
+      "build-report.json": describeFile(new Uint8Array(await readFile19(reportPath)))
     },
     project_id: config3.app_id,
     session_id: config3.session_id,
@@ -79989,7 +80839,7 @@ async function uploadOutputs(context, flags) {
     throw new CommandError(`uploading the LFS files failed: ${lfs.stderr.trim()} (not logged in? run kit.mjs login)`);
   }
   for (const [name3, contentType2] of Object.entries(OUTPUT_FILES)) {
-    const bytes = new Uint8Array(await readFile18(join31(workdir, WORKDIR_DIRS.outputs, name3)));
+    const bytes = new Uint8Array(await readFile19(join33(workdir, WORKDIR_DIRS.outputs, name3)));
     await upload(name3, urls[name3], bytes, contentType2, context.fetch);
   }
   print(context, { uploaded: Object.keys(OUTPUT_FILES) });
@@ -80049,7 +80899,7 @@ async function addAsset(context, flags) {
   }
   const workdir = await findWorkdir(context.cwd);
   const bytes = await fetchVerified(context, path, flags.url, flags.sha256);
-  const target = join31(sourceOf(workdir), ...segments);
+  const target = join33(sourceOf(workdir), ...segments);
   await mkdir13(dirname12(target), { recursive: true });
   await writeFile14(target, bytes);
   print(context, {

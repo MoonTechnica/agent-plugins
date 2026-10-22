@@ -74,7 +74,7 @@ apps:
 buckets:
   attachments:
     public: false                        # true のバケットだけ visibility: public を CDN で配れる
-    maxBytes: 10485760                   # 100 MiB まで
+    maxBytes: 10485760                   # 5 GiB まで
     contentTypes: [image/*, application/pdf]
     # delivery: proxy                    # 毎回認可する表示用URL。public: false 必須
     # appScoped: true                    # App間で共有しない場合。public: false 必須
@@ -93,6 +93,63 @@ ownerBootstrap: [admin]                  # Project の作者に付く
 | バケット | 10 個まで。名前は `[a-z][a-z0-9-]{1,31}` |
 | 匿名 | `anonymous.allowed` が false の App は匿名の利用者を開かない。`write: true` は `allowed: true` が要る |
 | Role | Permission の付与は Role 経由だけ。Role を変えると次のリクエストから両方の App に効く |
+
+api / jobs・外部サービス・通知を使う Project は、次の項目を足す（手順は `$fdpocket-app-integrations` と `$fdpocket-app-notifications`）。
+
+```yaml
+version: 1
+sdkVersion: 3
+apps:
+  web:
+    kind: web
+    access: public
+    capabilities:
+      models:
+        order: [read, create]
+    network:
+      browser: [https://maps.googleapis.com]   # ブラウザから直接呼ぶ公開 API（https のオリジン。CSP に足す）
+  partner-api:
+    kind: api
+    routes: ["/api/*"]                       # Project オリジンの /api/* を受ける
+    network:
+      egress: [api.stripe.com]               # サーバーが呼べるホスト名（HTTPS だけ）。*.example.com も可
+    secrets:                                 # 名前だけ。値は作者がアプリ管理画面で入れる
+      - name: STRIPE_SECRET_KEY
+        description: { ja: "Stripe のシークレットキー", en: "Stripe secret key" }
+        required: true
+    servicePermissions: [notifications.send, jobs.schedule]
+  digest:
+    kind: jobs
+    schedules:
+      - { cron: "0 0 * * *", handler: dailyDigest }   # UTC。実行の間隔は 5 分以上
+    network:
+      egress: [hooks.slack.com]
+    secrets:
+      - name: SLACK_WEBHOOK_URL
+    servicePermissions: [notifications.send, jobs.consume]
+notifications:
+  templates:
+    order_shipped:                           # キーは [a-z][a-z0-9_]
+      app: web                               # path を開く web App（path を書くなら必須）
+      category: orders                       # 利用者がカテゴリごとに止められる
+      title: { ja: "注文を発送しました", en: "Your order has shipped" }   # 60 字まで
+      body: { ja: "{{item}} を発送しました", en: "{{item}} is on its way" } # 120 字まで
+      params:
+        item: { maxLength: 40 }
+        orderId: { maxLength: 36 }
+      path: /orders/{{orderId}}              # App 内の相対パス
+```
+
+| 規則 | 内容 |
+|---|---|
+| api / jobs | `access`（public 以外）・`capabilities`・`anonymous`・`requiredPermission`・`displayName` を書けない。利用者の代わりに呼ぶときは `asUser` で、その利用者の web App の capability で判定される |
+| `network.egress` | api / jobs だけ。ホスト名（小文字・2 ラベル以上。先頭に `*.` を 1 つ）を 50 個まで。IP 直指定・`localhost`・`.local` / `.internal` などの内部名・Platform のホスト（Supabase / Turso / R2）は書けない。実行時も http・既定以外のポート・URL の資格情報を拒否し、リダイレクトを追わない |
+| `network.browser` | web だけ。`https://host` の形（パス・ポート・末尾の `/` なし）。秘密が要る API は書かず api 経由にする |
+| `secrets` | api / jobs だけ。名前は `[A-Z][A-Z0-9_]` で 50 個まで。`GATEWAY_URL` と `PLATFORM_` で始まる名前は予約。値はコード・manifest・`listing/` に書かない（取り込みの検証が落とす） |
+| `servicePermissions` | api / jobs だけ。`notifications.send`（通知を送る）・`jobs.schedule`（jobs へ仕事を予約する）・`jobs.consume`（予約を受ける jobs 側） |
+| `schedules` | jobs だけ。UTC の 5 フィールドの cron と handler 名。main / prod だけで動く（branch / preview では動かない） |
+| `routes` | api だけ。`["/api/*"]` だけ |
+| `notifications` | テンプレートは 50 個まで。文中の `{{名前}}` はすべて `params` に宣言する。パスワード・金額・個人情報を文面とパラメータに入れない（ロック画面に出る） |
 
 ## 3. SDK（`@workspace/miniapp-sdk`）
 
@@ -214,7 +271,7 @@ const files = await client.db.storageFile.findMany({ where: { bucket: 'attachmen
 | `UploadOptions` | `name`（省略時は File の名前）/ `contentType`（省略時は Blob の type）/ `workspaceId` / `visibility` / `onProgress`（`UploadProgress` = `loaded` / `total`） |
 | 可視性 | `private`（本人）/ `workspace`（Workspace のメンバー）/ `public`（`public: true` のバケットだけ） |
 | `StorageFileMeta` | `id` / `bucket` / `ownerId` / `workspaceId` / `visibility` / `status` / `originalName` / `contentType` / `sizeBytes` / `createdAt`（ISO 文字列） |
-| 上限 | 1 ファイル 100 MiB まで（バケットの `maxBytes` と `contentTypes` も Gateway が見る） |
+| 上限 | 1 ファイル 5 GiB まで（100 MiB を超えると SDK が自動で Multipart。バケットの `maxBytes` と `contentTypes` も Gateway が見る） |
 | 権限 | upload は capability の `write`、読むのは `StorageFile` のポリシー、一覧は `models.storageFile: [read]` が要る |
 
 本体は R2 へ直接 PUT し、Gateway を通らない（トークンを付けない。署名 URL が権限）。URL は保存しない（毎回 `getDownloadUrl`）。
@@ -383,7 +440,7 @@ export default async function seed(db: ClientContract<SchemaType>) {
 | リクエストの本体 | 1 MiB |
 | `createMany` | 500 行 |
 | `include` の入れ子 | 深さ 3 |
-| ファイル | 1 つ 100 MiB |
+| ファイル | 1 つ 5 GiB（100 MiB 超は Multipart） |
 | バケット | 10 個 |
 | 冪等キー | 10 分 |
 | 署名 URL（ダウンロード） | 60〜300 秒 |
@@ -402,7 +459,9 @@ export default async function seed(db: ClientContract<SchemaType>) {
 
 | 禁止 | 代わりに |
 |---|---|
-| Gateway 以外への `fetch` / `XMLHttpRequest` / `WebSocket` / `EventSource` | データは `client.db`、ファイルは `client.storage`。外部サービスはまだ使えない |
+| ブラウザ（web App）から Gateway と `network.browser` 以外への `fetch` / `XMLHttpRequest` / `WebSocket` / `EventSource` | データは `client.db`、ファイルは `client.storage`。秘密が要る外部サービスは api / jobs から `network.egress` と `secrets` を宣言して呼ぶ（§2・`$fdpocket-app-integrations`） |
+| 秘密の値をコード・manifest・`.kit/dev.vars` 以外のファイルに書く・web に渡す | 名前を `secrets` に宣言し、api / jobs の `env.<名前>` で読む。値は作者がアプリ管理画面で入れる |
+| サーバーの資格情報（`env.PLATFORM_SERVICE_CREDENTIAL`）をブラウザへ返す・利用者の認可を迂回して `db` を使う | 利用者の操作は `asUser(request)` で、サーバー自身の処理だけをサービスの client で行う |
 | `localStorage` / `sessionStorage` / `indexedDB` / Cookie にトークン・個人情報を置く | トークンは SDK がメモリに持つ。画面の好み（並び順など）だけは置いてよい |
 | 外部 CDN の `<script>` / フォント / 画像の URL | npm の依存か、`apps/<slug>/public/` に同梱する |
 | `eval` / `new Function` | 素直に書く |
@@ -418,6 +477,11 @@ export default async function seed(db: ClientContract<SchemaType>) {
 `category` は次から 1 つ: `business` / `productivity` / `education` / `kids` / `community` / `tools` / `lifestyle` / `finance` /
 `health` / `medical` / `entertainment` / `games` / `news` / `books` / `reference` / `music` / `photo_video` / `graphics_design` /
 `food_drink` / `shopping` / `travel` / `navigation` / `sports` / `weather` / `developer_tools` / `other`。書き方は `$fdpocket-app-listing`。
+
+`screenshots` はアプリ詳細のギャラリーに撮るページの宣言（`mobile` / `desktop` 各 5 枚まで。`{ app, path, as, caption, requested }`）。
+画像は Platform が検証で公開物から撮る。利用者が指定したページ（`requested: true`）と作者のアップロードは Platform が残す。
+
+`releaseNotes` は版の差分・実施した検証とその結果を記録する。未実施のテストや推測を確認済みと記載しない。作者メッセージはPlatformの別欄で扱う。
 
 ## 11. `build-report.json`
 

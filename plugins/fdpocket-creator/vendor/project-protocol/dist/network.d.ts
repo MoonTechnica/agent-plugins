@@ -21,7 +21,7 @@ export type EgressDecision = {
 export interface EgressPolicy {
     /** `network.egress` の宣言 */
     egress: readonly string[];
-    /** Project Gateway の URL（`{SUPABASE_URL}/functions/v1/project-gateway`）。このパスの下だけは常に通す */
+    /** Platform管理のCloudflare Gateway URL。このURL配下だけは常に通す */
     gatewayUrl?: string;
 }
 export type NetworkDeclarationIssue = 'invalid_host' | 'invalid_origin' | 'ip_literal' | 'internal_host' | 'platform_host';

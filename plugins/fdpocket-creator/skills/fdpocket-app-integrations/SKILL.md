@@ -28,7 +28,7 @@ const response = await client.fetch(apiPath('partner-api', '/example'))
 
 `client.fetch` が利用者のトークンを添えるので、api は `asUser(request)` で受け取れる。
 
-サーバーでは `@workspace/sdk/server` の `createServerClient({ env })` を使う。`env.GATEWAY_URL` と `env.PLATFORM_SERVICE_CREDENTIAL` は Platform が渡す。ブラウザに渡さない。ユーザー操作を扱うときは SDK の `asUser(request)` を使い、認可を迂回しない。
+サーバーでは `@workspace/miniapp-sdk/server` の `createServerClient<SchemaType>({ env })` を使う（`SchemaType` は `@workspace/sdk` から型だけ import する）。`env.GATEWAY_URL` と `env.PLATFORM_SERVICE_CREDENTIAL` は Platform が渡す。ブラウザに渡さない。ユーザー操作を扱うときは server client の `asUser(request)` を使い、認可を迂回しない。
 
 外部 API は `AbortSignal.timeout(5000)` などで期限を設ける。再試行は回数を制限し、429 / 一時的な 5xx だけをバックオフ付きで扱う。課金・送信などの操作には相手サービスの冪等キーを使う。Webhook はサービス公式の署名検証と時刻の検査を行い、検証前に DB の変更や通知をしない。受信本文をログに出さない。
 

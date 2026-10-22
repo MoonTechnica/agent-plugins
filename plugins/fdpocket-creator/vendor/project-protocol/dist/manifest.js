@@ -34,7 +34,13 @@ const CONTENT_TYPE_PATTERN = /^[a-z]+\/([a-z0-9.+-]+|\*)$/;
 export const APP_KINDS = ['web', 'api', 'jobs'];
 export const SERVER_APP_KINDS = ['api', 'jobs'];
 /** サーバーの App のサービストークンに付けられる権限（gateway.md §3.4。`notifications.send` は tasks/0476） */
-export const SERVICE_PERMISSIONS = ['notifications.send', 'jobs.schedule', 'jobs.consume'];
+export const SERVICE_PERMISSIONS = [
+    'notifications.send',
+    'jobs.schedule',
+    'jobs.consume',
+    /** 利用者として（`X-Act-As`）ミニアプリ内 AI を呼ぶ。api だけ（jobs には払う利用者がいない。project-ai.md §3.3） */
+    'ai.chat',
+];
 /** secret の名前（`env.<NAME>`）。Worker の binding の名前になる */
 export const SECRET_NAME_PATTERN = /^[A-Z][A-Z0-9_]{0,63}$/;
 /** Platform が Worker に付ける binding（Project の secret に使えない） */
@@ -93,6 +99,8 @@ const appSchema = z.strictObject({
         realtime: z
             .record(z.string(), uniqueList(z.enum(['broadcastReceive', 'broadcastSend', 'presenceRead', 'presenceTrack'])))
             .optional(),
+        /** ミニアプリ内 AI（project-ai.md §4）。費用は使った利用者本人 */
+        ai: z.strictObject({ chat: z.boolean() }).optional(),
     })
         .optional(),
     anonymous: z.strictObject({ allowed: z.boolean(), write: z.boolean() }).optional(),
@@ -205,6 +213,26 @@ const notificationsSchema = z.strictObject({
  */
 const SENSITIVE_NAME_PATTERN = /pass(?:word|code)?|secret|token|api_?key|credential|e?mail|phone|tel(?:ephone)?|address|birth|card|cvv|ssn|amount|price|salary|balance|bank|iban/i;
 const placeholdersOf = (text) => [...(text ?? '').matchAll(PLACEHOLDER_PATTERN)].map((m) => m[1]);
+/** 指示文（`ai/<key>.md`）・Schema（`ai/schemas/<key>.json`）の名前。DB の CHECK と同じ形 */
+export const AI_INSTRUCTIONS_KEY_PATTERN = /^[a-z0-9][a-z0-9_-]{0,31}$/;
+export const AI_SCHEMA_KEY_PATTERN = /^[A-Za-z0-9_-]{1,64}$/;
+export const AI_PROMPTS_PER_KIND_MAX = 8;
+export const AI_PROMPT_MAX_BYTES = 8192;
+export const AI_MAX_OUTPUT_TOKENS_DEFAULT = 400;
+/** 別名（auto / fast / quality）か、Platform が許可した OpenRouter のモデル ID（許可は DB が確かめる） */
+const aiModelSchema = z
+    .string()
+    .regex(/^(?:[a-z][a-z0-9-]{0,31}|~?[a-z0-9][a-z0-9._-]*\/[A-Za-z0-9][A-Za-z0-9._:-]{0,127})$/);
+const aiSchema = z.strictObject({
+    model: aiModelSchema.optional(),
+    maxOutputTokens: z.number().int().min(1).max(2000).optional(),
+    instructions: uniqueList(z.string().regex(AI_INSTRUCTIONS_KEY_PATTERN))
+        .max(AI_PROMPTS_PER_KIND_MAX)
+        .optional(),
+    schemas: uniqueList(z.string().regex(AI_SCHEMA_KEY_PATTERN))
+        .max(AI_PROMPTS_PER_KIND_MAX)
+        .optional(),
+});
 const baseSchema = z.strictObject({
     version: z.literal(PROJECT_MANIFEST_VERSION),
     sdkVersion: z.literal(PROJECT_SDK_VERSION),
@@ -215,6 +243,7 @@ const baseSchema = z.strictObject({
     ownerBootstrap: uniqueList(z.string()).optional(),
     notifications: notificationsSchema.optional(),
     realtime: realtimeManifestSchema.optional(),
+    ai: aiSchema.optional(),
 });
 function report(ctx, path, code, message) {
     ctx.addIssue({ code: 'custom', path, message, params: { code } });
@@ -249,6 +278,9 @@ function refineServerFields(ctx, slug, app) {
         if (app.access !== undefined && app.access !== 'public') {
             report(ctx, [...path, 'access'], 'not_allowed', `${app.kind} apps are not restricted`);
         }
+    }
+    if (app.kind === 'jobs' && app.servicePermissions?.includes('ai.chat')) {
+        report(ctx, [...path, 'servicePermissions'], 'not_allowed', 'jobs have no user to pay for ai.chat');
     }
     for (const key of ['secrets', 'servicePermissions']) {
         if (!server && app[key] !== undefined) {
@@ -287,6 +319,7 @@ function refineServerFields(ctx, slug, app) {
     }
 }
 function refineManifest(m, ctx) {
+    let aiUsed = false;
     if (Object.keys(m.apps).length === 0)
         report(ctx, ['apps'], 'required', 'at least one App is required');
     const buckets = m.buckets ?? {};
@@ -372,6 +405,8 @@ function refineManifest(m, ctx) {
             report(ctx, ['apps', slug], 'reserved_slug', 'api is reserved for the API namespace; use another web App slug');
         }
         refineServerFields(ctx, slug, app);
+        if (usesAi(app))
+            aiUsed = true;
         if (app.access === 'restricted' && !app.requiredPermission) {
             report(ctx, ['apps', slug, 'requiredPermission'], 'required', 'restricted apps need requiredPermission');
         }
@@ -400,6 +435,12 @@ function refineManifest(m, ctx) {
             }
         }
     }
+    if (m.ai && !aiUsed) {
+        report(ctx, ['ai'], 'not_allowed', 'no App uses ai.chat (capabilities.ai.chat or servicePermissions)');
+    }
+}
+function usesAi(app) {
+    return app.capabilities?.ai?.chat === true || (app.servicePermissions ?? []).includes('ai.chat');
 }
 export const projectManifestSchema = baseSchema.superRefine(refineManifest);
 export function parseProjectManifest(input) {
@@ -480,6 +521,7 @@ export function normalizeProjectManifest(manifest) {
                 ...(app.capabilities?.realtime
                     ? { realtime: sortedRecord(app.capabilities.realtime, sorted) }
                     : {}),
+                ...(app.capabilities?.ai ? { ai: { chat: app.capabilities.ai.chat } } : {}),
             },
             anonymous: app.anonymous ?? { allowed: false, write: false },
             network: {
@@ -529,6 +571,16 @@ export function normalizeProjectManifest(manifest) {
                             ...channel,
                             ...(channel.events ? { events: sorted(channel.events) } : {}),
                         })),
+                    },
+                }
+                : {}),
+            ...(Object.values(manifest.apps).some(usesAi)
+                ? {
+                    ai: {
+                        ...(manifest.ai?.model ? { model: manifest.ai.model } : {}),
+                        maxOutputTokens: manifest.ai?.maxOutputTokens ?? AI_MAX_OUTPUT_TOKENS_DEFAULT,
+                        instructions: sorted(manifest.ai?.instructions),
+                        schemas: sorted(manifest.ai?.schemas),
                     },
                 }
                 : {}),

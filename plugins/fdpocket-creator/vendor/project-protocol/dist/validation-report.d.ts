@@ -169,6 +169,9 @@ export declare const reportSchema: z.ZodObject<{
                     presenceRead: "presenceRead";
                     presenceTrack: "presenceTrack";
                 }>>>>;
+                ai: z.ZodOptional<z.ZodObject<{
+                    chat: z.ZodBoolean;
+                }, z.core.$strict>>;
             }, z.core.$strict>>;
             anonymous: z.ZodOptional<z.ZodObject<{
                 allowed: z.ZodBoolean;
@@ -190,6 +193,7 @@ export declare const reportSchema: z.ZodObject<{
                 "notifications.send": "notifications.send";
                 "jobs.schedule": "jobs.schedule";
                 "jobs.consume": "jobs.consume";
+                "ai.chat": "ai.chat";
             }>>>;
             schedules: z.ZodOptional<z.ZodArray<z.ZodObject<{
                 cron: z.ZodString;
@@ -261,6 +265,12 @@ export declare const reportSchema: z.ZodObject<{
                     presenceTrack: z.ZodString;
                 }, z.core.$strict>;
             }, z.core.$strict>>>;
+        }, z.core.$strict>>;
+        ai: z.ZodOptional<z.ZodObject<{
+            model: z.ZodOptional<z.ZodString>;
+            maxOutputTokens: z.ZodOptional<z.ZodNumber>;
+            instructions: z.ZodOptional<z.ZodArray<z.ZodString>>;
+            schemas: z.ZodOptional<z.ZodArray<z.ZodString>>;
         }, z.core.$strict>>;
     }, z.core.$strict>>;
     normalized: z.ZodNullable<z.ZodObject<{

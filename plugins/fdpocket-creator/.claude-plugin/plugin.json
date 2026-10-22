@@ -1,12 +1,12 @@
 {
   "name": "fdpocket-creator",
   "displayName": "FDPocket Developer Kit",
-  "version": "3.5.f8767000",
+  "version": "3.5.3b993fa0",
   "description": "ミニアプリ（web と admin の App・データ・ファイル）を手元の Coding Agent で作る Creator Kit（Skills・SDK・Kit の CLI・Platform MCP）",
   "author": {
     "name": "Moon Technica"
   },
-  "homepage": "https://app-sns.vercel.app",
+  "homepage": "https://fdpocket.dev",
   "repository": "https://github.com/MoonTechnica/agent-plugins",
   "license": "MIT-0",
   "keywords": [

@@ -10,9 +10,9 @@ export type JobScheduleRequest = z.infer<typeof jobScheduleRequestSchema>;
 export declare const jobScheduleResponseSchema: z.ZodObject<{
     id: z.ZodUUID;
     status: z.ZodEnum<{
+        done: "done";
         pending: "pending";
         running: "running";
-        done: "done";
         failed: "failed";
         cancelled: "cancelled";
     }>;

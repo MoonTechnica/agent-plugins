@@ -14,8 +14,14 @@ export const DB_CREATE_MANY_MAX = 500;
 export const REQUEST_BODY_MAX_BYTES = 1024 * 1024;
 /** 1 応答の本文 */
 export const RESPONSE_BODY_MAX_BYTES = 5 * 1024 * 1024;
-/** 1 ファイル（Multipart は P3） */
-export const STORAGE_FILE_MAX_BYTES = 100 * 1024 * 1024;
+/** 1 ファイル（storage.md §4.4。100 MiB を超えるものは Multipart） */
+export const STORAGE_FILE_MAX_BYTES = 5 * 1024 * 1024 * 1024;
+/** 1 回の署名 PUT。これを超えると Multipart */
+export const STORAGE_SINGLE_PUT_MAX_BYTES = 100 * 1024 * 1024;
+/** Multipart の part（R2 は最後以外の part が同じ大きさであることを要求する。5 GiB で 320 part） */
+export const STORAGE_MULTIPART_PART_BYTES = 16 * 1024 * 1024;
+/** 1 回の要求で署名する part 数 */
+export const STORAGE_MULTIPART_SIGN_MAX_PARTS = 100;
 /** 1 Project の論理バケット数 */
 export const PROJECT_BUCKETS_MAX = 10;
 /** Whole-monorepo bound, independent of App kinds or names. */

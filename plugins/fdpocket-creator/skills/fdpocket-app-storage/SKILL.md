@@ -11,7 +11,7 @@ description: ミニアプリでファイル（画像・添付・書類）を扱�
 buckets:
   attachments:
     public: false                 # 誰でも見られる CDN 配信が要るときだけ true
-    maxBytes: 10485760            # 1 ファイルの上限（100 MiB まで）。用途に合う最小にする
+    maxBytes: 10485760            # 1 ファイルの上限（5 GiB まで）。用途に合う最小にする
     contentTypes: [image/png, image/jpeg, image/webp, application/pdf]   # image/* のように書いてもよい
 apps:
   web:
@@ -66,7 +66,7 @@ await bucket.remove(file.id)
 
 ## 4. 上限と注意
 
-- 1 ファイル 100 MiB まで（バケットの `maxBytes` が小さければそれまで）。空のファイルと名前の無いファイルは SDK が断る。
+- 1 ファイル 5 GiB まで（バケットの `maxBytes` が小さければそれまで）。100 MiB を超えるものは SDK が自動で 16 MiB ずつに分けて送る（Multipart）。呼び方は同じで、`onProgress` も全体の量を知らせる。大きなファイルは時間がかかるので、進み具合と中断を画面に出す。空のファイルと名前の無いファイルは SDK が断る。
 - 送信は Gateway を通らず、署名 URL へ直接 PUT される。`upload` が返るまで（確定まで）は一覧に出ない。
 - 利用者が上げた画像・書類を他人に見せる機能は、見える範囲を Workspace に閉じる（`$fdpocket-app-design` §4）。
 - `kit dev` ではファイルは `.kit/objects/` に置かれる（本番と同じ形の署名 URL）。

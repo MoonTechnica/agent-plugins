@@ -1,6 +1,6 @@
 ---
 name: fdpocket-app-listing
-description: ミニアプリの掲載情報（名前・キャッチコピー・説明・カテゴリ・タグ・アイコン・カバー・この版で変わったこと）を listing/ に用意する。版を作るターンで毎回使う（企画のターンは除く）。初回は全部作り、2 回目以降は中身と合わなくなった項目だけ直す。利用者が手で直した項目（userEdited）は頼まれたときしか変えない。
+description: ミニアプリの掲載情報（名前・キャッチコピー・説明・カテゴリ・タグ・アイコン・カバー・スクリーンショットに撮るページ・この版で変わったこと）を listing/ に用意する。版を作るターンで毎回使う（企画のターンは除く）。初回は全部作り、2 回目以降は中身と合わなくなった項目だけ直す。利用者が手で直した項目（userEdited）は頼まれたときしか変えない。
 ---
 
 # 掲載情報
@@ -10,7 +10,7 @@ description: ミニアプリの掲載情報（名前・キャッチコピー・�
 
 ```text
 listing/
-├── listing.json   # 文字の項目
+├── listing.json   # 文字の項目と、スクリーンショットに撮るページ
 ├── icon.png       # アイコン（正方形。.webp も可）
 └── cover.png      # カバー画像（横長。.webp も可）
 ```
@@ -24,6 +24,7 @@ listing/
 |---|---|
 | `title` `tagline` `description` `category` `tags` | 今の値（空なら未作成） |
 | `hasIcon` / `hasCover` | 今の版にアイコン / カバーがあるか |
+| `screenshots` | 今のギャラリー（§4.1）。`origin` が `requested`（利用者の指定）・`upload`（作者のアップロード）の枠は消さない |
 | `userEdited` | **利用者が手で直した項目** |
 | `missing` | **公開に足りない項目**（`icon` `cover` を含む）。このターンで必ず埋める |
 
@@ -39,10 +40,13 @@ listing/
 | 見た目が大きく変わった | `icon` と `cover` を作り直す |
 | 名前を変えた | `cover` のタイトルも新しい名前で作り直す |
 | 利用者が名前・説明などの変更を頼んだ | 頼まれた項目を直す（`userEdited` にあっても。§5） |
+| 主な画面が増えた・変わった | `screenshots` を見直す（§4.1） |
+| 利用者が「この画面もスクショに」と頼んだ | そのページを `requested: true` で `screenshots` に足す（§4.1） |
 | 細かい修正（色・文言・不具合） | **何も変えない** |
 
 - **`userEdited` の項目は、頼まれたとき以外は変えない**。合わなくなったら `build-report.json` の `notes` に 1 行書く。
 - 直したら、何を直したかを `notes` に 1 行書く。
+- `releaseNotes` はこの版の差分と実際に実行した検証結果に基づく固定記録。作者の意図・背景やメッセージは別の編集欄へ書く。実行したコマンド・結果だけを確認済みとし、未実施・失敗・確認不能はそのまま明示する。推測、予定、ビルド成功だけを動作確認済みと記載しない。
 - **`releaseNotes` だけは版を作るターンで毎回書く**。先頭に `## タスクに期限を設定できるように` のような**変更内容の短い見出し**
   （15〜40 文字、最大 100 文字。作業履歴と提案の題名に自動で使われる）。空行のあと、使う人に向けて何が変わったかと理由を 1〜3 行。
   依頼文をそのまま写さない。前の版の文を残さない。実行していない確認を「確かめた」と書かない。
@@ -94,18 +98,49 @@ listing/
 **`generate_image` で作る**。アイコンは `size="square"`、カバーは `size="landscape"` で作り、`download_url` から取って
 `source/listing/` に置く（届いた形式に合わせて拡張子を `.webp` にする）。
 
+### 4.1 スクリーンショット（`screenshots`）
+
+アプリの詳細画面のギャラリーに出る。**画像は自分で作らない**。撮るページを宣言すると、Platform が検証で
+**公開される成果物そのもの**を `seed.ts` のデータで開いて撮る（モバイル 390×844 / デスクトップ 1440×900）。
+
+```json
+"screenshots": {
+  "mobile": [
+    { "app": "web", "path": "/", "caption": "今日のタスクをひと目で" },
+    { "app": "web", "path": "/settings", "caption": "通知の設定", "requested": true }
+  ],
+  "desktop": [
+    { "app": "web", "path": "/board", "caption": "チームのかんばん" }
+  ]
+}
+```
+
+| キー | 書き方 |
+|---|---|
+| `app` | Web の App の slug |
+| `path` | 開くページ（`/` から。クエリも可。200 文字まで） |
+| `as` | 開く人: `member`（既定）/ `admin` / `anonymous` |
+| `caption` | 何の画面か（80 文字まで。代替テキストにも使う） |
+| `requested` | **利用者が依頼文でそのページを指定したときだけ `true`** |
+
+- 各 **5 枚まで**。モバイルは主要な画面から順に。デスクトップは、広い画面で使う App（管理画面・表・ダッシュボード）があるときだけ。
+- `seed.ts` のデータで中身が見える画面を選ぶ（空の一覧・ログイン前の画面を並べない）。足りなければ `seed.ts` に見本のデータを足す。
+- `input/listing.json` の `requested` / `upload` の枠は宣言から消しても Platform が残す。消さずにそのまま書く。
+- `userEdited` に `screenshots` があるときは、利用者が頼んだときだけ変え、`listingRequested` に `screenshots` を挙げる（§5）。
+
 **生成後は最終画像を開いて確かめる**: カバーのタイトルの誤字・欠け・不要な文字・読みにくさ、アイコンを 48px / 96px と丸角で見ても判別できるか。
 整わなければ作り直し、それでも駄目なら完成扱いにせず `notes` に理由を書く。
 
 ## 5. `listingRequested`
 
 `userEdited` の項目を、**利用者が依頼文で頼んだので**変えたときだけ `build-report.json` の `listingRequested` に挙げる
-（`title` / `tagline` / `description` / `category` / `tags`）。挙げない限り、Platform は前の値のまま残す。
+（`title` / `tagline` / `description` / `category` / `tags` / `screenshots`）。挙げない限り、Platform は前の値のまま残す。
 
 ## 6. チェック
 
 - [ ] `input/listing.json` の値から始め、`missing` をすべて埋めた
 - [ ] 文字数の上限を守り、`category` は一覧の id、`tags` は 5 個まで
 - [ ] `icon` は正方形、`cover` は横長（比 1.4〜1.9）。最終画像を開いて確かめた
+- [ ] `screenshots` は主要な画面を各 5 枚まで。利用者の指定は `requested: true`、`requested` / `upload` の枠は残した
 - [ ] `userEdited` は頼まれたときだけ変え、変えたなら `listingRequested` に挙げた
 - [ ] `releaseNotes` の先頭に短い見出しを付け、このターンの変更だけを書いた

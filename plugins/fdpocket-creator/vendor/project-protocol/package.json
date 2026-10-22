@@ -9,6 +9,10 @@
       "types": "./dist/index.d.ts",
       "default": "./dist/index.js"
     },
+    "./apple-app-site-association": {
+      "types": "./dist/apple-app-site-association.d.ts",
+      "default": "./dist/apple-app-site-association.js"
+    },
     "./gateway-url": {
       "types": "./dist/gateway-url.d.ts",
       "default": "./dist/gateway-url.js"

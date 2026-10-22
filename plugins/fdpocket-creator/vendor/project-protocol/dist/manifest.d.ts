@@ -26,7 +26,7 @@ export declare const APP_KINDS: readonly ["web", "api", "jobs"];
 export type AppKind = (typeof APP_KINDS)[number];
 export declare const SERVER_APP_KINDS: readonly AppKind[];
 /** サーバーの App のサービストークンに付けられる権限（gateway.md §3.4。`notifications.send` は tasks/0476） */
-export declare const SERVICE_PERMISSIONS: readonly ["notifications.send", "jobs.schedule", "jobs.consume"];
+export declare const SERVICE_PERMISSIONS: readonly ["notifications.send", "jobs.schedule", "jobs.consume", "ai.chat"];
 export type ServicePermission = (typeof SERVICE_PERMISSIONS)[number];
 /** secret の名前（`env.<NAME>`）。Worker の binding の名前になる */
 export declare const SECRET_NAME_PATTERN: RegExp;
@@ -78,6 +78,12 @@ export declare const NOTIFICATION_TRIGGER_OPS: readonly ["create", "update", "de
 export type NotificationTriggerOp = (typeof NOTIFICATION_TRIGGER_OPS)[number];
 /** パラメータの値の参照（`$row.<列>` / `$actor.id` / `$actor.displayName`）。`$` で始まらなければ固定の文字列 */
 export declare const TRIGGER_VALUE_PATTERN: RegExp;
+/** 指示文（`ai/<key>.md`）・Schema（`ai/schemas/<key>.json`）の名前。DB の CHECK と同じ形 */
+export declare const AI_INSTRUCTIONS_KEY_PATTERN: RegExp;
+export declare const AI_SCHEMA_KEY_PATTERN: RegExp;
+export declare const AI_PROMPTS_PER_KIND_MAX = 8;
+export declare const AI_PROMPT_MAX_BYTES = 8192;
+export declare const AI_MAX_OUTPUT_TOKENS_DEFAULT = 400;
 declare const baseSchema: z.ZodObject<{
     version: z.ZodLiteral<1>;
     sdkVersion: z.ZodLiteral<3>;
@@ -114,6 +120,9 @@ declare const baseSchema: z.ZodObject<{
                 presenceRead: "presenceRead";
                 presenceTrack: "presenceTrack";
             }>>>>;
+            ai: z.ZodOptional<z.ZodObject<{
+                chat: z.ZodBoolean;
+            }, z.core.$strict>>;
         }, z.core.$strict>>;
         anonymous: z.ZodOptional<z.ZodObject<{
             allowed: z.ZodBoolean;
@@ -135,6 +144,7 @@ declare const baseSchema: z.ZodObject<{
             "notifications.send": "notifications.send";
             "jobs.schedule": "jobs.schedule";
             "jobs.consume": "jobs.consume";
+            "ai.chat": "ai.chat";
         }>>>;
         schedules: z.ZodOptional<z.ZodArray<z.ZodObject<{
             cron: z.ZodString;
@@ -206,6 +216,12 @@ declare const baseSchema: z.ZodObject<{
                 presenceTrack: z.ZodString;
             }, z.core.$strict>;
         }, z.core.$strict>>>;
+    }, z.core.$strict>>;
+    ai: z.ZodOptional<z.ZodObject<{
+        model: z.ZodOptional<z.ZodString>;
+        maxOutputTokens: z.ZodOptional<z.ZodNumber>;
+        instructions: z.ZodOptional<z.ZodArray<z.ZodString>>;
+        schemas: z.ZodOptional<z.ZodArray<z.ZodString>>;
     }, z.core.$strict>>;
 }, z.core.$strict>;
 export type ProjectManifestInput = z.input<typeof baseSchema>;
@@ -246,6 +262,9 @@ export declare const projectManifestSchema: z.ZodObject<{
                 presenceRead: "presenceRead";
                 presenceTrack: "presenceTrack";
             }>>>>;
+            ai: z.ZodOptional<z.ZodObject<{
+                chat: z.ZodBoolean;
+            }, z.core.$strict>>;
         }, z.core.$strict>>;
         anonymous: z.ZodOptional<z.ZodObject<{
             allowed: z.ZodBoolean;
@@ -267,6 +286,7 @@ export declare const projectManifestSchema: z.ZodObject<{
             "notifications.send": "notifications.send";
             "jobs.schedule": "jobs.schedule";
             "jobs.consume": "jobs.consume";
+            "ai.chat": "ai.chat";
         }>>>;
         schedules: z.ZodOptional<z.ZodArray<z.ZodObject<{
             cron: z.ZodString;
@@ -339,6 +359,12 @@ export declare const projectManifestSchema: z.ZodObject<{
             }, z.core.$strict>;
         }, z.core.$strict>>>;
     }, z.core.$strict>>;
+    ai: z.ZodOptional<z.ZodObject<{
+        model: z.ZodOptional<z.ZodString>;
+        maxOutputTokens: z.ZodOptional<z.ZodNumber>;
+        instructions: z.ZodOptional<z.ZodArray<z.ZodString>>;
+        schemas: z.ZodOptional<z.ZodArray<z.ZodString>>;
+    }, z.core.$strict>>;
 }, z.core.$strict>;
 export interface ProjectManifestIssue {
     /** `apps.admin.requiredPermission` のようなドット区切り */
@@ -361,9 +387,19 @@ export type ParseProjectManifestResult = {
     errors: ProjectManifestIssue[];
 };
 export declare function parseProjectManifest(input: unknown): ParseProjectManifestResult;
+/** 検証済み Artifact から写す指示文・Schema の本文（版に固定。project-ai.md §3.1） */
+export interface AiPrompt {
+    kind: 'instructions' | 'schema';
+    key: string;
+    content: string;
+    sha256: string;
+}
 export interface NormalizedAppCapabilities {
     models: Record<string, ModelOperation[]>;
     buckets: Record<string, BucketOperation[]>;
+    ai?: {
+        chat: boolean;
+    };
     realtime?: Record<string, ('broadcastReceive' | 'broadcastSend' | 'presenceRead' | 'presenceTrack')[]>;
 }
 export interface NormalizedSecret {
@@ -450,6 +486,18 @@ export interface NormalizedProjectManifest {
     roles: Record<string, string[]>;
     defaultRoles: string[];
     ownerBootstrap: string[];
+    /**
+     * AI を使う App があるときだけ持つ（project-ai.md §4）。`model` は省略で Jev Router（別名 auto）。
+     * 初回の同意（21_project_consents.sql）は AI への送信とクレジットの消費をこの有無で示し、同意の版にも入る。
+     * 検証器は指示文・Schema の本文を `prompts` に足し、`apply_validated_manifest` が `project_ai_prompts` に写す
+     */
+    ai?: {
+        model?: string;
+        maxOutputTokens: number;
+        instructions: string[];
+        schemas: string[];
+        prompts?: AiPrompt[];
+    };
     /**
      * 宣言したときだけ持つ。初回の同意（21_project_consents.sql）は「通知を送ることがあります」を
      * この有無で決め、同意の版（ハッシュ）にも入る。テンプレートの中身は入らない。

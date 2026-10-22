@@ -165,7 +165,7 @@ Any agent that supports Skills and remote MCP servers can use the Kit.
    ```
    The Kit root is `~/fdpocket-creator-kit/plugins/fdpocket-creator`.
 2. **Install the Skills.** Link `plugins/fdpocket-creator/skills/*` into your agent's Skills folder (for example `.agents/skills/`).
-3. **Register the MCP server.** Transport: Streamable HTTP with OAuth. URL: `https://app-sns.vercel.app/mcp/creator`.
+3. **Register the MCP server.** Transport: Streamable HTTP with OAuth. URL: `https://fdpocket.dev/mcp/creator`.
    If your client lets you pin the OAuth callback port, use `43125`.
 4. **Sign in** from your agent's MCP screen.
 
