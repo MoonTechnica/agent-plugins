@@ -30471,18 +30471,30 @@ function blenderVersion(binary) {
     });
   });
 }
-var IMPORT_MODEL = [
-  "import os, bpy",
+var IMPORT_MODELS = [
+  "import json, os, bpy",
   "bpy.ops.wm.read_factory_settings(use_empty=True)",
-  "bpy.ops.import_scene.gltf(filepath=os.environ['TOKOYO_MODEL'])"
+  "[bpy.ops.import_scene.gltf(filepath=path) for path in json.loads(os.environ['TOKOYO_MODELS'])]"
 ].join("; ");
-function blenderOpenArgs(target, out) {
-  if ("script" in target)
-    return { args: ["--factory-startup", "-P", target.script], env: { OUT: out } };
+function blenderScriptArgs(script) {
+  return ["-b", "--factory-startup", "-Y", "--python-exit-code", "1", "-P", script];
+}
+function blenderViewArgs(models) {
   return {
-    args: ["--factory-startup", "--python-expr", IMPORT_MODEL],
-    env: { TOKOYO_MODEL: target.model }
+    args: ["--factory-startup", "--python-expr", IMPORT_MODELS],
+    env: { TOKOYO_MODELS: JSON.stringify(models) }
   };
+}
+function runBlender(binary, args, env) {
+  return new Promise((resolve, reject) => {
+    execFile2(binary, args, { env: { ...process.env, ...env }, timeout: 10 * 60000, maxBuffer: 16 * 1024 * 1024 }, (error, stdout, stderr) => {
+      if (error && typeof error.code !== "number") {
+        reject(new BlenderError(`cannot run ${binary}: ${error.message}`));
+        return;
+      }
+      resolve({ code: error ? error.code : 0, output: `${stdout}${stderr}` });
+    });
+  });
 }
 var HAND_FINISHED = /^#\s*tokoyo:\s*hand-finished\s+(\S+)\s*$/;
 function handFinishedTarget(script) {
@@ -31792,7 +31804,7 @@ function defaultContext(cwd, kitRoot) {
     kitRoot,
     env: process.env,
     godot: { version: godotVersion, launchEditor },
-    blender: { version: blenderVersion, launch: launchBlender },
+    blender: { version: blenderVersion, run: runBlender, launch: launchBlender },
     serveLsp: serveLspOverStdio,
     download: (url) => download(url),
     fetch: (url, init) => globalThis.fetch(url, init),
@@ -32377,15 +32389,32 @@ async function openBlender(context, flags) {
   }
   const binary = resolveBlenderBinary(context.env, process.platform, existsSync7);
   assertBlenderVersion(await context.blender.version(binary));
-  const out = await mkdtemp2(join11(tmpdir2(), "tokoyo-blender-view-"));
-  const { args, env } = blenderOpenArgs(script ? { script: script.path } : { model: model.path }, out);
+  let models;
+  let viewed = null;
+  if (script) {
+    const out = await mkdtemp2(join11(tmpdir2(), "tokoyo-blender-view-"));
+    const ran = await context.blender.run(binary, blenderScriptArgs(script.path), { OUT: out });
+    if (ran.code !== 0)
+      throw new CommandError(`${script.within} failed in Blender (exit ${ran.code}):
+${ran.output.trim().split(`
+`).slice(-20).join(`
+`)}`);
+    const written = (await readdir4(out, { recursive: true })).filter((name) => /\.(glb|gltf)$/i.test(name)).map((name) => name.split("\\").join("/")).sort();
+    if (written.length === 0)
+      throw new CommandError(`${script.within} wrote no GLB to $OUT (${out}); nothing to open`);
+    models = written.map((name) => join11(out, name));
+    viewed = { view_output: out, models: written };
+  } else {
+    models = [model.path];
+  }
+  const { args, env } = blenderViewArgs(models);
   await context.blender.launch(binary, args, env);
   print(context, {
     opened: true,
     binary,
-    ...script ? { script: script.within, view_output: out } : { model: model?.within },
+    ...script && viewed ? { script: script.within, ...viewed } : { model: model?.within },
     ...handFinishedBy ? { hand_finished_by: handFinishedBy } : {},
-    next: "Edits in the Blender window are not saved to the game. To keep them, export GLB (game-3d-studio §5); do not save a .blend into source/."
+    next: "Edits in the Blender window are not saved to the game. To keep them, export GLB (game-3d-studio §6); do not save a .blend into source/."
   });
 }
 async function lspTarget(context) {

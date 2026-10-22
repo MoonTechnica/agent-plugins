@@ -127,8 +127,9 @@ UV を展開（`smart_project`）→ 画像テクスチャのノードを作っ�
 
 ## 6. 画面の Blender（手元）
 
-**見せる**（「Blender で開いて」）: `node <kit>/scripts/kit.mjs blender --script art/3d/<name>.py` でスクリプトの結果のシーンを、
+**見せる**（「Blender で開いて」）: `node <kit>/scripts/kit.mjs blender --script art/3d/<name>.py` でスクリプトを画面なしで実行して書き出した GLB を、
 `--model source/godot/<path>.glb` で GLB を、利用者の Blender の画面に開く。スクリプトの書き出しは一時ディレクトリに向くので、ゲームのファイルは変わらない。
+スクリプトが失敗したら画面は開かず、Blender の出力の末尾が返るので直してやり直す。
 画面での変更はそのままではゲームに残らないこと、`.blend` を `source/` に保存しないこと（Kit は git に入れず、`pack` が断る。§1）を伝える。
 
 **手直しを残す**: 利用者に、手直しした結果を glTF Binary で `art/3d/out/<name>.edited.glb` に書き出してもらい、スクリプトの GLB と比べる。
