@@ -740,7 +740,7 @@ func _paint(args: Array) -> bool:
 		for s in tile_set.get_terrain_sets_count():
 			for t in tile_set.get_terrains_count(s):
 				terrain_ref[tile_set.get_terrain_name(s, t)] = Vector2i(s, t)
-	var report := {"layers": {}, "unmatched": [], "cleared": {}}
+	var report := {"layers": {}, "unmatched": [], "cleared": {}, "rests_on": {}}
 	var origin := _vec2i(spec.get("origin"), Vector2i.ZERO)
 	var layers: Array = spec.get("layers", [])
 	var painted := []
@@ -749,7 +749,7 @@ func _paint(args: Array) -> bool:
 		var node_name: String = layer_def.get("node", "Ground")
 		if layer_def.has("mesh_library"):
 			var grid_map := _paint_gridmap(root, node_name, layer_def, origin, report)
-			if grid_map != null: grid_maps.append(grid_map)
+			if grid_map != null and not grid_map in grid_maps: grid_maps.append(grid_map)
 			continue
 		var layer := root.get_node_or_null(node_name) as TileMapLayer
 		if layer == null:
@@ -795,6 +795,8 @@ func _paint(args: Array) -> bool:
 	await process_frame
 	for layer in painted:
 		report.unmatched.append_array(_mismatches(layer))
+	report.unmatched.append_array(_tile_overlaps(painted))
+	if not grid_maps.is_empty(): report.unmatched.append_array(_grounding(grid_maps, report.rests_on))
 	DirAccess.make_dir_recursive_absolute(ProjectSettings.globalize_path(scene_path.get_base_dir()))
 	var packed := PackedScene.new()
 	var err := packed.pack(root)
@@ -807,10 +809,17 @@ func _paint(args: Array) -> bool:
 	if picture != null:
 		png = spec_path.get_basename() + ".png"
 		picture.save_png(png)
+	var angle := ""
+	if not grid_maps.is_empty():
+		var side := _top_view(grid_maps, report.unmatched, _angle_view())
+		if side != null:
+			angle = spec_path.get_basename() + ".angle.png"
+			side.save_png(angle)
 	root.queue_free()
 	report.erase("cleared")
+	report.erase("rests_on")
 	_write(spec_path.get_basename() + ".report.json", JSON.stringify(report, "  "))
-	print("TILES_PAINT=", JSON.stringify({"scene": scene_path, "picture": png, "unmatched": report.unmatched.size()}))
+	print("TILES_PAINT=", JSON.stringify({"scene": scene_path, "picture": png, "angle": angle, "unmatched": report.unmatched.size()}))
 	return true
 
 ## 3D: the same character grid fills a GridMap floor. A legend entry names one MeshLibrary item
@@ -836,6 +845,7 @@ func _paint_gridmap(root: Node, node_name: String, def: Dictionary, origin: Vect
 	if def.get("clear", true) and not report.cleared.has(node_name):
 		grid_map.clear()
 	report.cleared[node_name] = true
+	report.rests_on[node_name] = str(def.get("rests_on", "pieces"))
 	var counts := {}
 	var legend: Dictionary = def.get("legend", {})
 	var rows: Array = def.get("grid", [])
@@ -965,27 +975,31 @@ func _holes(rows: Array, node_name: String, origin: Vector2i) -> Array:
 
 const NO_HEIGHT := -1.0e9
 
-## GridMaps seen from above: each piece's faces coloured by material and texture, shaded by how
-## much they face up, with outlines where the height drops. Problem cells are framed in red.
-func _top_view(maps: Array, marks: Array) -> Image:
-	var lo := Vector2i(1 << 30, 1 << 30)
-	var hi := Vector2i(-(1 << 30), -(1 << 30))
+## GridMaps seen from above (or, with `view`, from an angle): each piece's faces coloured by
+## material and texture, shaded by how much they face the viewer, with outlines where the depth
+## drops. Problem cells are framed in red.
+func _top_view(maps: Array, marks: Array, view_basis: Basis = Basis.IDENTITY) -> Image:
+	var first := maps[0] as GridMap
+	var cs: Vector3 = first.cell_size
+	var lo := Vector2(INF, INF)
+	var hi := Vector2(-INF, -INF)
 	for gm in maps:
 		for c in gm.get_used_cells():
-			lo = Vector2i(mini(lo.x, c.x), mini(lo.y, c.z))
-			hi = Vector2i(maxi(hi.x, c.x), maxi(hi.y, c.z))
+			var p: Vector3 = view_basis * gm.map_to_local(c)
+			lo = Vector2(minf(lo.x, p.x), minf(lo.y, p.z))
+			hi = Vector2(maxf(hi.x, p.x), maxf(hi.y, p.z))
 	if lo.x > hi.x: return null
-	var span := hi - lo + Vector2i(3, 3)
-	var cell_px := clampi(4096 / maxi(span.x, span.y), 4, 48)
-	var size := span * cell_px
+	var span := (hi - lo) / Vector2(cs.x, cs.z) + Vector2(7, 7)
+	var cell_px := clampi(int(4096 / maxf(span.x, span.y)), 4, 48)
+	var ppm := float(cell_px) / cs.x
+	var size := Vector2i(ceili(span.x * cell_px), ceili(span.y * cell_px))
+	var origin := lo - Vector2(3.5 * cs.x, 3.5 * cs.z)
 	var view := {"image": Image.create(size.x, size.y, false, Image.FORMAT_RGBA8), "heights": PackedFloat32Array(), "size": size}
 	view.image.fill(Color(0.1, 0.11, 0.14))
 	view.heights.resize(size.x * size.y)
 	view.heights.fill(NO_HEIGHT)
 	var sprites := {}
 	for gm in maps:
-		var cs: Vector3 = gm.cell_size
-		var ppm := float(cell_px) / cs.x
 		var lib: MeshLibrary = gm.mesh_library
 		for c in gm.get_used_cells():
 			var item: int = gm.get_cell_item(c)
@@ -993,17 +1007,114 @@ func _top_view(maps: Array, marks: Array) -> Image:
 			var key := "%d/%d/%d" % [lib.get_instance_id(), item, orient]
 			if not sprites.has(key):
 				var mesh := lib.get_item_mesh(item)
-				sprites[key] = null if mesh == null else _sprite(mesh, Transform3D(gm.get_basis_with_orthogonal_index(orient), Vector3.ZERO) * lib.get_item_mesh_transform(item), ppm)
+				sprites[key] = null if mesh == null else _sprite(mesh, Transform3D(view_basis * gm.get_basis_with_orthogonal_index(orient), Vector3.ZERO) * lib.get_item_mesh_transform(item), ppm)
 			if sprites[key] == null: continue
-			var centre: Vector3 = gm.map_to_local(c)
-			var at := Vector2i(roundi((centre.x / cs.x - lo.x + 1) * cell_px), roundi((centre.z / cs.z - lo.y + 1) * cell_px))
-			_stamp(view, sprites[key], at, centre.y)
-	_outline(view, 0.25 * (maps[0] as GridMap).cell_size.y)
+			var p: Vector3 = view_basis * gm.map_to_local(c)
+			_stamp(view, sprites[key], Vector2i(roundi((p.x - origin.x) * ppm), roundi((p.z - origin.y) * ppm)), p.y)
+	_outline(view, 0.25 * cs.y)
 	for m in marks:
 		if not m.has("cell"): continue
-		var at := (Vector2i(m.cell[0], m.cell[1]) - lo + Vector2i.ONE) * cell_px
-		_frame(view.image, Rect2i(at, Vector2i(cell_px, cell_px)), Color(1, 0.2, 0.2))
+		var p: Vector3 = view_basis * first.map_to_local(Vector3i(m.cell[0], int(m.get("floor", 0)), m.cell[1]))
+		var at := Vector2i(roundi((p.x - origin.x) * ppm), roundi((p.z - origin.y) * ppm))
+		_frame(view.image, Rect2i(at - Vector2i(cell_px, cell_px) / 2, Vector2i(cell_px, cell_px)), Color(1, 0.2, 0.2))
 	return view.image
+
+## From the south-east and above, so heights show: floating, sunk or doubled pieces are visible.
+func _angle_view() -> Basis:
+	return Basis(Vector3.RIGHT, -0.75) * Basis(Vector3.UP, -0.5)
+
+# ---------------------------------------------------------------------------------------------
+# Checks a picture from above cannot show: pieces must stand on something, and layers must not
+# put two solid pieces in the same place.
+
+## Every placed piece as a world box: {layer, cell, floor, item, box}.
+func _piece_boxes(maps: Array) -> Array:
+	var boxes := []
+	for gm in maps:
+		var lib: MeshLibrary = gm.mesh_library
+		for c in gm.get_used_cells():
+			var item: int = gm.get_cell_item(c)
+			var mesh := lib.get_item_mesh(item)
+			if mesh == null: continue
+			var xf: Transform3D = gm.transform * Transform3D(gm.get_basis_with_orthogonal_index(gm.get_cell_item_orientation(c)), gm.map_to_local(c)) * lib.get_item_mesh_transform(item)
+			boxes.append({"layer": String(gm.name), "cell": Vector2i(c.x, c.z), "floor": c.y, "item": lib.get_item_name(item), "box": xf * mesh.get_aabb()})
+	return boxes
+
+## A piece is held when its bottom is at the lowest level of the map (the ground), or on the top
+## of a piece below it. Layers with "rests_on": "terrain" (placed on a height map) or "nothing"
+## (hanging or flying decoration) are not checked for support.
+func _grounding(maps: Array, rests_on: Dictionary) -> Array:
+	var boxes := _piece_boxes(maps)
+	if boxes.is_empty(): return []
+	var tol := maxf(0.02, 0.05 * (maps[0] as GridMap).cell_size.y)
+	var base := INF
+	var by_cell := {}
+	for i in boxes.size():
+		var b: AABB = boxes[i].box
+		base = minf(base, b.position.y)
+		var key: Vector2i = boxes[i].cell
+		if not by_cell.has(key): by_cell[key] = []
+		by_cell[key].append(i)
+	var found := []
+	for i in boxes.size():
+		var me: Dictionary = boxes[i]
+		var b: AABB = me.box
+		var near := []
+		for dz in range(-1, 2):
+			for dx in range(-1, 2):
+				near.append_array(by_cell.get(me.cell + Vector2i(dx, dz), []))
+		for j in near:
+			if j > i and _overlap_share(b, boxes[j].box) > 0.25:
+				found.append({"layer": me.layer, "cell": [me.cell.x, me.cell.y], "floor": me.floor, "problem": "overlap: %s fills the same space as %s of layer %s" % [me.item, boxes[j].item, boxes[j].layer]})
+		if rests_on.get(me.layer, "pieces") != "pieces" or b.position.y <= base + tol: continue
+		var below := base
+		var sunk := ""
+		for j in near:
+			if j == i: continue
+			var o: AABB = boxes[j].box
+			if not _overlaps_flat(b, o): continue
+			if absf(o.end.y - b.position.y) <= tol:
+				below = b.position.y
+				break
+			if o.end.y < b.position.y: below = maxf(below, o.end.y)
+			elif o.position.y < b.position.y - tol: sunk = "sunk: %s starts %.2f m inside %s of layer %s (cell height %.2f m; the piece is %.2f m tall)" % [me.item, o.end.y - b.position.y, boxes[j].item, boxes[j].layer, (maps[0] as GridMap).cell_size.y, o.size.y]
+		if sunk != "" and below < b.position.y:
+			found.append({"layer": me.layer, "cell": [me.cell.x, me.cell.y], "floor": me.floor, "problem": sunk})
+		elif b.position.y - below > tol:
+			found.append({"layer": me.layer, "cell": [me.cell.x, me.cell.y], "floor": me.floor, "problem": "floating: %s stands %.2f m above what is under it" % [me.item, b.position.y - below]})
+	return found
+
+func _thick(box: AABB) -> AABB:
+	if box.size.y >= 0.05: return box
+	return AABB(box.position - Vector3(0, 0.05 - box.size.y, 0), Vector3(box.size.x, 0.05, box.size.z))
+
+func _overlaps_flat(a: AABB, b: AABB) -> bool:
+	return a.position.x < b.end.x - 0.01 and b.position.x < a.end.x - 0.01 and a.position.z < b.end.z - 0.01 and b.position.z < a.end.z - 0.01
+
+## Shared volume over the smaller piece's volume. Flat pieces count as 5 cm thick, grown
+## downwards, so what stands on a floor does not share its space.
+func _overlap_share(a: AABB, b: AABB) -> float:
+	var ta := _thick(a)
+	var tb := _thick(b)
+	var common := ta.intersection(tb)
+	if not common.has_volume(): return 0.0
+	return common.get_volume() / maxf(minf(ta.get_volume(), tb.get_volume()), 1e-6)
+
+## 2D: two layers that both collide in the same cell (a wall drawn twice, a platform inside the
+## ground).
+func _tile_overlaps(layers: Array) -> Array:
+	var found := []
+	var solid := {}
+	for layer in layers:
+		if not layer.collision_enabled: continue
+		for cell in layer.get_used_cells():
+			var data: TileData = layer.get_cell_tile_data(cell)
+			if data == null or layer.tile_set.get_physics_layers_count() == 0 or data.get_collision_polygons_count(0) == 0: continue
+			if solid.has(cell) and solid[cell] != String(layer.name):
+				found.append({"layer": String(layer.name), "cell": [cell.x, cell.y], "problem": "overlap: solid in layers %s and %s" % [solid[cell], layer.name]})
+			else:
+				solid[cell] = String(layer.name)
+	return found
 
 ## One piece rasterised from above at `ppm` pixels per metre: colours, heights and the pixel
 ## offset of its top-left corner from the cell centre.
@@ -1076,7 +1187,7 @@ func _fill_triangle(sprite: Dictionary, p: Array, ppm: float, colour: Color) -> 
 			var w0 := (c - b).cross(q - b) / area
 			var w1 := (a - c).cross(q - c) / area
 			var w2 := 1.0 - w0 - w1
-			if w0 < -0.001 or w1 < -0.001 or w2 < -0.001: continue
+			if w0 < -0.02 or w1 < -0.02 or w2 < -0.02: continue
 			var h: float = w0 * p[0].y + w1 * p[1].y + w2 * p[2].y
 			var i := y * size.x + x
 			if h <= sprite.heights[i]: continue
