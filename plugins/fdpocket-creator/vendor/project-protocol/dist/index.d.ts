@@ -26,6 +26,7 @@ export * from './paths.ts';
 export * from './platform-dispatch.ts';
 export * from './profile.ts';
 export * from './python.ts';
+export * from './python-control.ts';
 export * from './realtime.ts';
 export * from './resolve.ts';
 export * from './safety.ts';
