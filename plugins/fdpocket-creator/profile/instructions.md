@@ -223,6 +223,7 @@ main の参照権限がある場合は、同じ `session_id` の `get_git_bundle
 | エラー | すること |
 |---|---|
 | `SDK_VERSION_DEPRECATED`（`kit_outdated`） | Kit が古い。利用者に Kit の更新（Claude Code: `/plugin marketplace update`、Codex: プラグインの更新）を頼み、更新後に `kit.mjs link` で作業ディレクトリを新しい Kit へ向けてから `kit.mjs generate` |
+| `INVALID_ACTION`（`kit_sdk_unknown`） | Kit が同梱する SDK が Platform に無い（Kit が古すぎる・未公開の Kit）。`SDK_VERSION_DEPRECATED` と同じく Kit を更新し、`kit.mjs link` → `kit.mjs generate` → commit してから送り直す |
 | `BUNDLE_REJECTED`（`author_mismatch`） | 本人以外の作者の commit がある。`git rebase --exec 'git commit --amend --no-edit --reset-author' <base_commit_oid>` で直して 3. から |
 | `BUNDLE_REJECTED`（ほか） | `pull` で取り込み直してから 3. から |
 | `LFS_OBJECT_MISSING` | `kit.mjs login` してから `kit.mjs push` をやり直す |
