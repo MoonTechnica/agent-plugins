@@ -20,10 +20,10 @@ import httpx
 from fdpocket._transport import UNREACHABLE, Transport, read
 from fdpocket.errors import (
     GATEWAY_UNAVAILABLE,
-    PAYLOAD_TOO_LARGE,
     UNAUTHENTICATED,
     FdpocketError,
 )
+from fdpocket.storage import Storage
 
 ACT_AS_HEADER = "x-act-as"
 RUN_CONTEXT_HEADER = "x-fdpocket-run"
@@ -43,7 +43,6 @@ READS = (
 )
 DELETES = ("delete", "deleteMany")
 UPDATES = ("update", "updateMany", "updateManyAndReturn")
-MULTIPART_UNSUPPORTED = "files over 100 MiB need the multipart upload"
 BINDINGS_MISSING = "GATEWAY_URL and PLATFORM_SERVICE_CREDENTIAL are not set"
 
 
@@ -129,35 +128,6 @@ def clamp_take(take: object) -> int:
     """既定 50・最大 200 (Gateway も同じくクランプする)."""
     value = take if isinstance(take, int) else DB_TAKE_DEFAULT
     return max(-DB_TAKE_MAX, min(value, DB_TAKE_MAX))
-
-
-class Storage:
-    """`client.storage`. ダウンロードの URL と、1 回の PUT のアップロード."""
-
-    def __init__(self, transport: Transport, http: httpx.Client) -> None:
-        self._transport = transport
-        self._http = http
-
-    def download_url(self, file_id: str) -> str:
-        path = f"/v1/storage/files/{quote(file_id)}/download"
-        url = str(self._transport.send("GET", path)["url"])
-        return f"{self._transport.base}{url}" if url.startswith("/") else url
-
-    def download(self, file_id: str) -> bytes:
-        response = self._http.get(self.download_url(file_id))
-        return response.raise_for_status().content
-
-    def upload(self, bucket: str, name: str, data: bytes, content_type: str) -> Any:  # noqa: ANN401 - 保存したファイルの情報
-        begun = self._transport.send(
-            "POST",
-            f"/v1/storage/{quote(bucket)}/uploads",
-            body={"name": name, "contentType": content_type, "expectedSize": len(data)},
-        )
-        if "multipart" in begun:
-            raise FdpocketError(PAYLOAD_TOO_LARGE, MULTIPART_UNSUPPORTED)
-        self._http.put(str(begun["url"]), content=data, headers=begun["headers"])
-        path = f"/v1/storage/uploads/{quote(str(begun['uploadId']))}/complete"
-        return self._transport.send("POST", path, body={})["file"]
 
 
 class Notifications:

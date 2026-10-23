@@ -59,6 +59,34 @@ def caption(ctx, input):
 - GPU のタスクは Modal が途中で止めることがあり、そのときは Platform が**最初から**やり直す（全部で 3 回まで。止められた回は利用者に請求されない）。同じ入力で 2 回動いても困らないように書く（外部への送信・DB への追加は最後に 1 回、`ctx.run_id` を冪等キーにする）。数十分を超える学習は `ctx.cache_dir` にチェックポイントを書き、起動時に続きから始める。3 回とも止められると `error.code` が `preempted` になるので、画面は再依頼を案内する。
 - 画面は `client.python.run(...).wait({ onProgress })` で待ち、進み具合と失敗（`error`）を必ず出す。
 
+### 大きなデータ（教師データ）と学習
+
+- **受け取り**: 利用者は画面から Storage に上げる（`client.storage.from('datasets').upload(file)`。1 ファイル 5 GiB まで、
+  100 MiB を超えれば SDK が自動で分割して送る）。大きなデータセットは **数百 MB〜数 GB のファイルに分けて**持つ
+  （Parquet・WebDataset・JSONL のシャード。並列に読め、失敗してもファイル単位でやり直せる）。
+- **渡し方**: タスクの入力は 256 KiB までなので、データは `fileId` の一覧で渡す（多ければ DB にデータセットの行を作り、
+  その id を渡して python から `ctx.client.db` でファイルの一覧を読む）。
+- **読み方**: 大きなファイルに `storage.download()` を使わない（全部をメモリに読む）。ディスクへ流し込む:
+
+  ```python
+  def train(ctx, input):
+      svc = ctx.client
+      data = ctx.cache_dir / "datasets" / input["datasetId"]      # cache: true なら 2 回目は落とさない
+      files = svc.storage.download_all(input["fileIds"], data)     # {fileId: Path}。同時 4 本
+      ...
+      ckpt = ctx.cache_dir / "checkpoints" / ctx.run_id             # 途中停止からの再開用
+      weights = save_model(ckpt)                                    # 重みのファイルのパス
+      file = svc.storage.upload("models", "model.safetensors", weights, "application/octet-stream")
+      return {"modelFileId": file["id"]}                            # 結果は fileId で返す
+  ```
+
+  1 ファイルなら `svc.storage.download_to(fileId, path)`。`/cache` に置くのは作り直せるものだけで、合わせて 50 GiB まで
+  （超えるデータは `/tmp` に落とす。Sandbox のディスクは 512 GiB で、実行が終わると消える）。
+- **保存**: `storage.upload(bucket, name, data, content_type)` の `data` はファイルのパスでもよい（100 MiB を超えれば
+  分割して送り、全体をメモリに載せない）。重みのような大きな結果は必ずパスで渡す。
+- GPU・時間の目安: 学習は `A100-80GB` / `H100`、`timeoutSeconds` は最大 86,400（24 時間）。より長い学習は
+  チェックポイントで区切り、`onFinish` の jobs から続きのタスクを依頼する。
+
 ## 4. server
 
 `server: { handler: "vision.server:app" }` の ASGI の app（FastAPI など）を `/api/vision/*` で受ける。
