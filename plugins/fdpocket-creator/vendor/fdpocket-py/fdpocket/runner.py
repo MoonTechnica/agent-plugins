@@ -53,13 +53,20 @@ def call(handler: Callable[..., Any], ctx: RunContext, payload: object) -> objec
     return asyncio.run(result) if inspect.iscoroutine(result) else result
 
 
+def failure_of(error: Exception) -> tuple[str, str]:
+    """SDK のエラーは理由のコードと文のまま (画面が分岐して見せる)、ほかは型の名前."""
+    if isinstance(error, FdpocketError):
+        return error.code, error.message
+    return type(error).__name__, str(error)
+
+
 def execute(api: RunnerApi, ctx: RunContext, handler: str, payload: object) -> None:
     try:
         output = call(load(handler), ctx, payload)
         json.dumps(output)
     except Exception as error:
         logger.exception("The task failed")
-        api.fail(type(error).__name__, str(error))
+        api.fail(*failure_of(error))
         return
     api.succeed(output)
 

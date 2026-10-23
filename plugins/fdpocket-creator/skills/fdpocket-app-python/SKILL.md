@@ -67,10 +67,14 @@ def caption(ctx, input):
     return {"text": text}                   # JSON にできる値だけ
 ```
 
-- 例外はそのまま投げる（Platform が `failed` と型名・メッセージを記録する）。握りつぶして成功を返さない。
+- 例外はそのまま投げる（Platform が `failed` と型名・メッセージを記録する。SDK の `FdpocketError` は型名ではなくその理由のコードになる）。握りつぶして成功を返さない。
 - 入力・出力は 256 KiB まで。大きい結果は Storage に置き、`fileId` を返す。
 - GPU のタスクは Modal が途中で止めることがあり、そのときは Platform が**最初から**やり直す（全部で 3 回まで。止められた回は利用者に請求されない）。同じ入力で 2 回動いても困らないように書く（外部への送信・DB への追加は最後に 1 回、`ctx.run_id` を冪等キーにする）。数十分を超える学習は `ctx.cache_dir` にチェックポイントを書き、起動時に続きから始める。3 回とも止められると `error.code` が `preempted` になるので、画面は再依頼を案内する。
 - 画面は `const run = await client.python.run(...)` のあと `await run.wait({ onProgress })` で待ち（`run()` は Promise。`await` せずに `.wait` を続けると `wait is not a function`）、進み具合と失敗（`error`）を必ず出す。
+  失敗は作り手・利用者が**次に何をすればよいか分かる言葉**で出す（`FdpocketError` のような型名やコードだけを出さない）。
+  `error.code` で分岐して App の辞書の文を出し、知らないコードは「処理に失敗しました。もう一度試してください」に `error.message` を添える。
+  `NOT_AVAILABLE_IN_DEVELOPMENT`（プレビューで python から DB・Storage を使った）は `error.message` をそのまま出す
+  （「プレビューでは、python の処理から保存したデータやファイルは使えません。『この変更を採用』で取り込んでから試してください」の日英の文）。
 
 ### 大きなデータ（教師データ）と学習
 

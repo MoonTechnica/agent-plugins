@@ -45,9 +45,12 @@ READS = (
 DELETES = ("delete", "deleteMany")
 UPDATES = ("update", "updateMany", "updateManyAndReturn")
 BINDINGS_MISSING = "GATEWAY_URL and PLATFORM_SERVICE_CREDENTIAL are not set"
+#: 作り手 (エンジニアでなくてよい) がそのまま読む文. 画面が理由として表示する
 DEVELOPMENT_RUN = (
-    "DB, Storage, notifications and jobs are not available in development runs on a"
-    " real GPU (live preview / kit dev --python modal); merge to main and try there"
+    "プレビューでは、python の処理から保存したデータやファイルは使えません。"
+    "「この変更を採用」で取り込んでから試してください。"
+    " / In the preview, python tasks can't use saved data or files."
+    " Merge the change, then try it again."
 )
 
 
