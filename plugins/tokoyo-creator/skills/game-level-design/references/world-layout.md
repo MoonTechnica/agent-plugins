@@ -19,7 +19,8 @@ godot --headless --path <source>/godot -s $TOOL -- overview <source> --concept  
 
 `<source>` は `design/` と `godot/` を持つゲームのソースのディレクトリ（`$game-playtest` のルール検査と同じ固定版の Godot）。
 
-- `build`（`kind: "open_world"` だけ）: `godot/terrain/height.bin`・`vegetation.bin`・`features.bin` を書く（§4）。1024² で数秒。
+- `build`（`kind: "open_world"` だけ）: `godot/terrain/height.bin`・`vegetation.bin`・`features.bin` と `design/world-build.json`（橋と、守れなかった道の勾配）を書く（§4）。
+  データは世界の大きさによらず 1024²（1 サンプル = `size / 1024` m。2 km なら 2 m、8 km なら 8 m）で、数秒で終わる。全体図も 1 サンプル 1 画素。
 - `overview`: `design/overview.png`（検査の印つき）と `design/world-report.json`（数値と `warnings`）を書く。
   `--concept` を付けると利用者に見せる `design/concept/map.png`（印なし）も書く。GPU は使わない（データから描く）。
 - 図の記号: ●＝主な場所（番号つき。大きい●は major）・▲＝目印・白い●＝開始地点・青＝川・黄土＝道・暗い線＝地域の境界・1 km（または指定）の格子。
@@ -63,7 +64,7 @@ godot --headless --path <source>/godot -s $TOOL -- overview <source> --concept  
 | 美術・光 | 変換表に合わせて Blender スクリプトの部品か CC0 キット（色はコンセプトへ寄せる）で置き換え、CSG はメッシュに変える。壁・柵・道は部品のつながり方から向きを選ぶ。光・霧・空も変換表から | 当たり判定が仮組みと同じ範囲か、真上の絵の赤枠、コンセプトと同じ視点の実画面の差（`look.gd compare`） |
 | 仕上げ | `world-map.json` を実際に合わせて `overview` | 報酬・敵の偏り、使われない部屋 |
 
-### 3.3 3D 広い世界（〜8 km）
+### 3.3 3D 広い世界（数百 m〜8 km）
 
 | 段階 | 作るもの | 確かめること |
 |---|---|---|
@@ -105,9 +106,14 @@ godot --headless --path <source>/godot -s $TOOL -- overview <source> --concept  
 
 - `regions`: 多角形で塗り分け。`base_height`（m）・`roughness`（0〜1。起伏）・`vegetation`（0〜1。木の密度）は境界でなめらかにつながる。
 - `landmarks.shape`: `cone`（三角形の山。BotW の大きい三角）・`dome`（丘）・`plateau`（台地）・`spire`（尖塔岩）。
-- `rivers` は**水源から河口の順**に点を並べる。川床は下流へ下がり続けるよう掘られる。`roads` は勾配が `max_grade` を超えないよう均される。
+  `plateau` の縁は崖になるので、一番近い道（無ければ開始地点）へ向けて歩ける坂（`ramp_grade` 既定 0.3・`ramp_width` 既定 20 m）が自動で付く。
+  向きは `ramp_toward: [x, z]` で指定でき、`ramp: false` で付けない（登れない台地にしたいとき）。
+- `rivers` は**水源から河口の順**に点を並べる。川床は下流へ下がり続けるよう掘られる。
+- `roads` は地形に沿いつつ勾配が `max_grade`（既定 0.12）を超えないよう均される。先に作った道との合流点と、場所の平らな地面には同じ高さでつながる。
+  その間が `max_grade` では上り切れない高さなら、勾配を均等にして `world-build.json` の `notes`（と `warnings`）に区間を書く。点を足して九十九折りにするか、場所を動かす。
+  川を渡る所は川床を残して橋になる（`bridges`。全体図の茶色の板。歩ける場所として数える）。川に沿って長く重なる道は橋にせず岸へ移す（`notes` に出る）。
 - `pois.kind`: `town` / `camp` / `ruin` / `shrine` / `boss` は色分けされる（ほかの名前も使える）。周り `radius` が平らになり木が生えない。
-- `build` の流れ: 地域の高さと起伏 → 目印の盛り上げ → 川を掘る → 道を均す → 場所を平らに → 軽い侵食（道・川・町は除く）→ 植生の密度
+- `build` の流れ: 地域の高さと起伏 → 目印の盛り上げ（台地には坂）→ 川を掘る → 場所を平らに（川床は埋めない）→ 道を均す（合流点と場所の高さにつなぎ、川には橋）→ 軽い侵食（道・川・町は除く）→ 植生の密度
   （傾き・雪線・道/川/町からの除外）。`erosion_passes`（既定 4）と `targets.snow_line` で調整できる。
 
 部屋・エリア型（`kind: "areas"`）:

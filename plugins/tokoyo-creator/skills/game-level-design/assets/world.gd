@@ -6,10 +6,12 @@ extends SceneTree
 ##   godot --headless --path <source>/godot -s <kit>/skills/game-level-design/assets/world.gd -- overview <source> [--concept]
 ##
 ## `design/world-map.json` is the single source of the layout. `build` shapes the open-world terrain
-## from it (regions → landmark stamps → rivers → roads → POI plateaus → light erosion → vegetation
-## mask) and writes `godot/terrain/height.bin` and `godot/terrain/vegetation.bin`. `overview` draws the
-## layout from data (no GPU needed) to `design/overview.png` and writes `design/world-report.json`;
-## with `--concept` it also writes `design/concept/map.png` for the planning card.
+## from it (regions → landmark stamps (plateaus get a ramp) → rivers → POI plateaus → roads graded to
+## max_grade, joined at junctions and bridged over rivers → light erosion → vegetation mask) and writes
+## `godot/terrain/height.bin`, `vegetation.bin`, `features.bin` and `design/world-build.json` (bridges
+## and grades the terrain could not keep). `overview` draws the layout from data (no GPU needed) to
+## `design/overview.png` and writes `design/world-report.json`; with `--concept` it also writes
+## `design/concept/map.png` for the planning card.
 ## Deterministic for the same file and seed.
 
 const SAMPLES := 1024
@@ -24,6 +26,9 @@ var heights := PackedFloat32Array()
 ## 0 = free, 1 = river, 2 = road, 3 = plateau (protected from erosion and vegetation)
 var mask := PackedByteArray()
 var region_of := PackedInt32Array()
+## What build decided beyond the height map: bridges (roads over rivers) and road grades it could not
+## keep. Saved to design/world-build.json; overview draws the bridges and repeats the notes.
+var built := {"bridges": [], "notes": []}
 
 func _initialize() -> void:
 	var args := OS.get_cmdline_user_args()
@@ -40,7 +45,8 @@ func _initialize() -> void:
 		var started := Time.get_ticks_msec()
 		_build_terrain()
 		_save_terrain()
-		print("WORLD_BUILD=", JSON.stringify({"ms": Time.get_ticks_msec() - started, "samples": SAMPLES}))
+		_write(source.path_join("design/world-build.json"), JSON.stringify(built, "  "))
+		print("WORLD_BUILD=", JSON.stringify({"ms": Time.get_ticks_msec() - started, "samples": SAMPLES, "metres_per_sample": snappedf(cell, 0.01), "bridges": built.bridges.size(), "notes": built.notes}))
 	else:
 		var report := {}
 		var image: Image
@@ -134,6 +140,18 @@ func _h(p: Vector2) -> float:
 	var g := _index_at(p)
 	return heights[g.y * SAMPLES + g.x]
 
+## Bilinear height, for measuring slopes finer than one sample.
+func _h_smooth(p: Vector2) -> float:
+	var fx := clampf((p.x + size.x / 2) / cell - 0.5, 0.0, SAMPLES - 1.001)
+	var fz := clampf((p.y + size.y / 2) / (size.y / SAMPLES) - 0.5, 0.0, SAMPLES - 1.001)
+	var i := int(fx)
+	var j := int(fz)
+	var tx := fx - i
+	var tz := fz - j
+	var top := lerpf(heights[j * SAMPLES + i], heights[j * SAMPLES + i + 1], tx)
+	var bottom := lerpf(heights[(j + 1) * SAMPLES + i], heights[(j + 1) * SAMPLES + i + 1], tx)
+	return lerpf(top, bottom, tz)
+
 # ---------------------------------------------------------------------------------------------
 # build: shape the terrain on purpose
 
@@ -166,11 +184,13 @@ func _build_terrain() -> void:
 	# 2. Landmarks: shapes you can see and steer by.
 	for landmark in world.landmarks:
 		_stamp(_vec(landmark.at), float(landmark.get("radius", 300.0)), float(landmark.get("height", 150.0)), str(landmark.get("shape", "cone")))
-	# 3. Rivers run downhill along their line; 4. roads follow a graded centreline.
+		if str(landmark.get("shape", "cone")) == "plateau" and landmark.get("ramp", true) != false: _ramp(landmark)
+	# 3. Rivers run downhill along their line.
 	for river in world.rivers: _carve(river, 1)
-	for road in world.roads: _carve(road, 2)
-	# 5. Flat ground for towns, camps and ruins.
+	# 4. Flat ground for towns, camps and ruins (before the roads, so roads arrive at their level).
 	for poi in world.pois: _plateau(_vec(poi.at), float(poi.get("radius", 60.0)))
+	# 5. Roads follow a graded centreline that meets earlier roads and places at their height.
+	for road in world.roads: _carve(road, 2)
 	# 6. Light thermal erosion outside the protected lines and plateaus.
 	_erode(int(world.get("erosion_passes", 4)))
 
@@ -227,12 +247,57 @@ func _stamp(center: Vector2, radius: float, height: float, shape: String) -> voi
 				"spire": heights[k] += height * pow(maxf(0.0, 1.0 - d), 2.2)
 				_: heights[k] += height * maxf(0.0, 1.0 - d)
 
+## A plateau's edge is a cliff; this cuts a walkable ramp down from it toward `ramp_toward` (or the
+## nearest road point, or the start), at `ramp_grade` (default 0.3) and `ramp_width` (default 20 m).
+func _ramp(landmark: Dictionary) -> void:
+	var center := _vec(landmark.at)
+	var radius := float(landmark.get("radius", 300.0))
+	var height := float(landmark.get("height", 150.0))
+	var toward := _vec(landmark.get("ramp_toward"))
+	if not toward.is_finite():
+		toward = _vec(world.get("start", [0, 0]))
+		var best := INF
+		for road in world.roads:
+			var road_points: Array = road.points
+			for s in road_points.size() - 1:
+				var q := Geometry2D.get_closest_point_to_segment(center, _vec(road_points[s]), _vec(road_points[s + 1]))
+				if q.distance_to(center) > radius * 0.9 and q.distance_to(center) < best:
+					best = q.distance_to(center)
+					toward = q
+	if toward.distance_to(center) < 1.0: return
+	var dir := (toward - center).normalized()
+	var top := _h(center)
+	var grade := float(landmark.get("ramp_grade", 0.3))
+	var half := float(landmark.get("ramp_width", 20.0)) / 2.0
+	var length := maxf(height / grade, radius * 0.3)
+	var edge := radius * 0.85
+	var foot := center + dir * (edge + length)
+	var ground := _h(foot)
+	var from := _index_at(center + dir * edge - Vector2(half * 3, half * 3) + Vector2(minf(dir.x, 0.0), minf(dir.y, 0.0)) * length)
+	var to := _index_at(center + dir * edge + Vector2(half * 3, half * 3) + Vector2(maxf(dir.x, 0.0), maxf(dir.y, 0.0)) * length)
+	for j in range(from.y, to.y + 1):
+		for i in range(from.x, to.x + 1):
+			var p := _world_at(i, j) - center
+			var along_axis := p.dot(dir) - edge
+			if along_axis < -radius * 0.1 or along_axis > length: continue
+			var lateral := absf(p.cross(dir))
+			if lateral > half * 3.0: continue
+			var target := lerpf(top, ground, clampf(along_axis / length, 0.0, 1.0))
+			var weight := 1.0 if lateral <= half else 1.0 - smoothstep(half, half * 3.0, lateral)
+			var k := j * SAMPLES + i
+			heights[k] = lerpf(heights[k], target, weight)
+
 ## Carves a river (kind 1) or grades a road (kind 2) along a polyline.
+## A road is held at the height of anything it reaches that is already fixed: an earlier road (a
+## junction) or a place's flat ground. Between those anchors it follows the terrain, smoothed, and
+## never climbs faster than `max_grade`; when two anchors are too steep apart for that, the grade is
+## spread evenly between them and a note says so. Where a road crosses a river the riverbed is kept
+## and the road becomes a bridge at the height of the banks.
 func _carve(line: Dictionary, kind: int) -> void:
 	var points := PackedVector2Array()
 	for p in line.points: points.append(_vec(p))
 	var half := float(line.get("width", 16.0 if kind == 2 else 30.0)) / 2.0
-	# Centreline heights every cell along the line.
+	# Centreline samples every cell along the line.
 	var along := PackedVector2Array()
 	var lengths := PackedFloat32Array()
 	var total := 0.0
@@ -249,20 +314,17 @@ func _carve(line: Dictionary, kind: int) -> void:
 	lengths.append(total + along[along.size() - 2].distance_to(points[points.size() - 1]))
 	var centre := PackedFloat32Array()
 	for p in along: centre.append(_h(p))
+	var over_river := PackedByteArray()
+	over_river.resize(along.size())
 	if kind == 1:
 		# The bed only ever descends from the source, then sits `depth` below the banks.
 		var depth := float(line.get("depth", 6.0))
 		for t in range(1, centre.size()): centre[t] = minf(centre[t], centre[t - 1] - 0.05)
 		for t in centre.size(): centre[t] -= depth
 	else:
-		centre = _smooth_line(centre, 12)
-		var grade := float(line.get("max_grade", 0.12))
-		for t in range(1, centre.size()):
-			var limit := grade * (lengths[t] - lengths[t - 1])
-			centre[t] = clampf(centre[t], centre[t - 1] - limit, centre[t - 1] + limit)
-		for t in range(centre.size() - 2, -1, -1):
-			var limit := grade * (lengths[t + 1] - lengths[t])
-			centre[t] = clampf(centre[t], centre[t + 1] - limit, centre[t + 1] + limit)
+		for t in along.size(): over_river[t] = 1 if _on_river(along[t]) else 0
+		centre = _grade_road(line, along, lengths, centre, over_river)
+		_record_bridges(line, along, over_river, centre, half)
 	var shoulder := half * 3.0
 	for t in along.size():
 		var p := along[t]
@@ -273,11 +335,78 @@ func _carve(line: Dictionary, kind: int) -> void:
 				var k := j * SAMPLES + i
 				var d := _world_at(i, j).distance_to(p)
 				if d > shoulder: continue
+				if kind == 2 and (mask[k] == 1 or (mask[k] == 2 and d > half)): continue  # keep riverbeds and other roads' surfaces
 				var weight := 1.0 if d <= half else 1.0 - smoothstep(half, shoulder, d)
 				var target := lerpf(heights[k], centre[t], weight)
 				heights[k] = minf(heights[k], target) if kind == 1 else target
 				# Mark half a sample wider so the feature survives texture filtering at this resolution.
 				if d <= half + cell * 0.5: mask[k] = kind
+
+## The road's centreline heights: anchored, smoothed and held to `max_grade`.
+func _grade_road(line: Dictionary, along: PackedVector2Array, lengths: PackedFloat32Array, terrain: PackedFloat32Array, over_river: PackedByteArray) -> PackedFloat32Array:
+	var n := along.size()
+	var anchored := PackedByteArray()
+	anchored.resize(n)
+	var centre := terrain.duplicate()
+	for t in n:
+		var g := _index_at(along[t])
+		var m := mask[g.y * SAMPLES + g.x]
+		if m == 2 or m == 3: anchored[t] = 1  # an earlier road (junction) or a place's flat ground
+	# Across a river the deck spans bank to bank: interpolate over the gap instead of dipping into it.
+	_bridge_heights(centre, over_river)
+	# Smooth the free stretches; anchors keep their height.
+	var smooth := _smooth_line(centre, 12)
+	for t in n:
+		if anchored[t] == 0: centre[t] = smooth[t]
+	var grade := float(line.get("max_grade", 0.12))
+	for t in range(1, n):
+		if anchored[t] == 1: continue
+		var limit := grade * (lengths[t] - lengths[t - 1])
+		centre[t] = clampf(centre[t], centre[t - 1] - limit, centre[t - 1] + limit)
+	for t in range(n - 2, -1, -1):
+		if anchored[t] == 1: continue
+		var limit := grade * (lengths[t + 1] - lengths[t])
+		centre[t] = clampf(centre[t], centre[t + 1] - limit, centre[t + 1] + limit)
+	# Two anchors too steep apart: spread the climb evenly and say which stretch could not keep it.
+	var last := -1
+	for t in n:
+		if anchored[t] == 0 and t != n - 1: continue
+		if last >= 0 and t - last > 1:
+			var run := lengths[t] - lengths[last]
+			var need := absf(centre[t] - centre[last]) / maxf(run, 0.001)
+			if need > grade * 1.01:
+				for u in range(last + 1, t): centre[u] = lerpf(centre[last], centre[t], (lengths[u] - lengths[last]) / run)
+				built.notes.append("road %s needs %.0f%% between (%d, %d) and (%d, %d) (max_grade %.0f%%): add points so it winds, or move the places" % [line.id, need * 100, along[last].x, along[last].y, along[t].x, along[t].y, grade * 100])
+		last = t
+	return centre
+
+func _bridge_heights(centre: PackedFloat32Array, over_river: PackedByteArray) -> void:
+	var t := 0
+	var n := centre.size()
+	while t < n:
+		if over_river[t] == 0:
+			t += 1
+			continue
+		var start := t
+		while t < n and over_river[t] == 1: t += 1
+		var before := centre[start - 1] if start > 0 else (centre[t] if t < n else centre[start])
+		var after := centre[t] if t < n else before
+		for u in range(start, t): centre[u] = lerpf(before, after, float(u - start + 1) / (t - start + 1))
+
+func _record_bridges(line: Dictionary, along: PackedVector2Array, over_river: PackedByteArray, centre: PackedFloat32Array, half: float) -> void:
+	var t := 0
+	while t < along.size():
+		if over_river[t] == 0:
+			t += 1
+			continue
+		var start := t
+		# One bridge per crossing: short dry stretches inside it (a bank sample) do not split it.
+		while t < along.size() and (over_river[t] == 1 or (t + 3 < along.size() and over_river[t + 1] + over_river[t + 2] + over_river[t + 3] > 0)): t += 1
+		var a := along[start]
+		var b := along[t - 1]
+		built.bridges.append({"road": line.id, "from": [roundi(a.x), roundi(a.y)], "to": [roundi(b.x), roundi(b.y)], "width": half * 2.0, "deck_height": snappedf(centre[start], 0.1)})
+		if a.distance_to(b) > 80.0:
+			built.notes.append("road %s runs along a river for %d m from (%d, %d): move it onto a bank, a bridge should only cross" % [line.id, roundi(a.distance_to(b)), a.x, a.y])
 
 func _smooth_line(values: PackedFloat32Array, radius: int) -> PackedFloat32Array:
 	var out := PackedFloat32Array()
@@ -300,7 +429,7 @@ func _plateau(center: Vector2, radius: float) -> void:
 		for i in range(from.x, to.x + 1):
 			var k := j * SAMPLES + i
 			var d := _world_at(i, j).distance_to(center)
-			if d > reach: continue
+			if d > reach or mask[k] == 1: continue  # never fill a riverbed
 			heights[k] = lerpf(heights[k], level, 1.0 - smoothstep(radius, reach, d))
 			if d <= radius and mask[k] == 0: mask[k] = 3
 
@@ -365,6 +494,8 @@ func _load_terrain() -> bool:
 	if mask.size() != SAMPLES * SAMPLES:
 		mask = PackedByteArray()
 		mask.resize(SAMPLES * SAMPLES)
+	var saved = JSON.parse_string(FileAccess.get_file_as_string(source.path_join("design/world-build.json")))
+	if saved is Dictionary: built = saved
 	_assign_regions()
 	return true
 
@@ -430,6 +561,17 @@ func _check_open_world() -> Dictionary:
 			var ok := _slope(i, j) <= max_slope and mask[j * SAMPLES + i] != 1
 			walkable[j * SAMPLES + i] = 1 if ok else 0
 			if ok: walk_count += 1
+	# Bridges carry the roads over rivers.
+	for bridge in built.get("bridges", []):
+		var a := _vec(bridge.from)
+		var b := _vec(bridge.to)
+		var reach := float(bridge.get("width", 10.0)) / 2.0 + cell
+		var from := _index_at(Vector2(minf(a.x, b.x), minf(a.y, b.y)) - Vector2(reach, reach))
+		var to := _index_at(Vector2(maxf(a.x, b.x), maxf(a.y, b.y)) + Vector2(reach, reach))
+		for j in range(from.y, to.y + 1):
+			for i in range(from.x, to.x + 1):
+				var p := _world_at(i, j)
+				if p.distance_to(Geometry2D.get_closest_point_to_segment(p, a, b)) <= reach: walkable[j * SAMPLES + i] = 1
 	report.walkable_ratio = snappedf(float(walk_count) / (SAMPLES * SAMPLES), 0.001)
 	var reached := _flood(walkable, _index_at(_vec(world.get("start", [0, 0]))))
 	var unreachable := []
@@ -451,6 +593,8 @@ func _check_open_world() -> Dictionary:
 		rivers.append({"id": river.id, "uphill_m": snappedf(rise, 0.1)})
 		if rise > 1.0: report.warnings.append("river %s flows uphill by %.1f m" % [river.id, rise])
 	report.rivers = rivers
+	report.bridges = built.get("bridges", [])
+	for note in built.get("notes", []): report.warnings.append(note)
 	report.regularity = _regularity(world.pois, report)
 	report.summary = {"warnings": report.warnings.size(), "empty_cells": empty.size(), "walkable_ratio": report.walkable_ratio, "pois_unreachable": unreachable.size()}
 	return report
@@ -503,8 +647,21 @@ func _worst_grade(road: Dictionary) -> float:
 		for t in steps:
 			var p := a.lerp(b, float(t) / steps)
 			var q := a.lerp(b, float(t + 1) / steps)
-			worst = maxf(worst, absf(_h(q) - _h(p)) / maxf(p.distance_to(q), 0.001))
+			if _touches_river(p) or _touches_river(q): continue  # a bridge deck, not the ground under it
+			worst = maxf(worst, absf(_h_smooth(q) - _h_smooth(p)) / maxf(p.distance_to(q), 0.001))
 	return worst
+
+func _on_river(p: Vector2) -> bool:
+	var g := _index_at(p)
+	return mask[g.y * SAMPLES + g.x] == 1
+
+## Any of the samples a bilinear read at `p` uses is riverbed.
+func _touches_river(p: Vector2) -> bool:
+	var g := _index_at(p)
+	for dj in range(-1, 2):
+		for di in range(-1, 2):
+			if mask[clampi(g.y + dj, 0, SAMPLES - 1) * SAMPLES + clampi(g.x + di, 0, SAMPLES - 1)] == 1: return true
+	return false
 
 func _river_rise(river: Dictionary) -> float:
 	var rise := 0.0
@@ -627,6 +784,13 @@ func _draw_open_world(report: Dictionary, marks: bool) -> Image:
 	for road in world.roads:
 		_polyline(image, road.points, Color(0.15, 0.12, 0.1), 5)
 		_polyline(image, road.points, Color(0.95, 0.85, 0.6), 3)
+	# Bridges: a dark deck with light rails across the river.
+	for bridge in built.get("bridges", []):
+		var a := _pixel(_vec(bridge.from))
+		var b := _pixel(_vec(bridge.to))
+		var stretch := (b - a).normalized() * 3.0 if a.distance_to(b) > 0.5 else Vector2(3, 0)
+		_line(image, a - stretch, b + stretch, Color(0.95, 0.95, 0.9), 7)
+		_line(image, a - stretch, b + stretch, Color(0.35, 0.22, 0.12), 4)
 	var unseen := {}
 	for entry in report.landmark_visibility:
 		if entry.seen_from == 0: unseen[entry.id] = true

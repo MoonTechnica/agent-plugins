@@ -1,4 +1,4 @@
-# 広い地形（8 km級）の実装例
+# 広い地形（〜8 km）の実装例
 
 `$game-open-world` §1.5 の方式を、そのまま動く形にした例。2026-10-23 に Godot 4.5.1 の Web 書き出しを
 本物の Shell と Chrome（Apple Silicon の Mac）で動かし、140 m/s で 3.6 km を移動して p50/p95/p99 とも 16.7 ms、
@@ -11,7 +11,13 @@
   `res://terrain/height.bin`（1024² の 32 bit float、0〜1 を `height_scale` 倍）、`vegetation.bin`（木の密度 0〜255）、
   `features.bin`（1 川・2 道・3 町などの台地）。ノイズだけの地形にしない。
   `.bin` は資源ではないので、`export_presets.cfg` の Web / Native の `include_filter` に `terrain/*.bin` を足す。
-  `HEIGHT` は `world-map.json` の `height_scale`、`WORLD` は `size` と同じ値にする。起動のたびに生成しない。
+  `HEIGHT` は `world-map.json` の `height_scale`、`WORLD`（シェーダの `world_size`）は `size` と同じ値にする。起動のたびに生成しない。
+- **世界の大きさ**: 下の例の数値（`WORLD := 8192.0`・`LEVELS := 7`）は 8 km の場合。`.bin` は大きさによらず 1024² なので、
+  1 サンプルは `size / 1024` m（2 km なら 2 m、8 km なら 8 m）。小さい世界ほど地形は細かくなる。
+  リングは一番外側が見える距離を覆えばよいので、小さい世界では `LEVELS` を減らす（目安: `BASE_CELL × CELLS × 2^(LEVELS-1)` が見える距離の 2 倍程度。
+  2 km の世界なら `LEVELS := 5` で約 2 km）。`BASE_CELL` は 1 サンプルより細かくしても形は増えない。
+- **橋**: 道が川を渡る所は川床が残る（地形に道は描かれない）。`design/world-build.json` の `bridges`（`from`・`to`・`width`・`deck_height`）ごとに
+  橋の板と当たり判定を置く（`res://` で読むなら `world-build.json` を `godot/` 側へ写して `include_filter` に足す）。置かないと道が川で途切れる。
 - 段の境目は、細かい段のリングの外周付近で頂点の高さを粗い段の高さへ寄せて（geomorph）隙間をなくしている。
   リングの段数や格子の数を変えたら、シェーダの `cell_size` / `ring_half` も合わせる（`clipmap_terrain.gd` が設定する）。
 
