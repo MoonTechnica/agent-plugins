@@ -18,7 +18,7 @@ description: ゲームを作る工程の正本。依頼を受けたら最初に�
 |---|---|---|---|
 | 1 | 企画 | `design/brief.md` の全見出しが埋まり、ジャンルの下限（[references/genres-minimum.md](references/genres-minimum.md)）が列挙されている。核の動詞・看板の仕掛け・テーマの規則・山と休みを [references/fun.md](references/fun.md) §1 で決め、該当ジャンルの [references/exemplars.md](references/exemplars.md) を読んだ | この Skill §2 |
 | 2 | 絵で合意 | コンセプト画像（`key-art` / `hero`）とスタイルガイドがある。**新しいゲームの最初のターンと、見た目・遊びの核を変えるときは方向を見せて止まる**（hosted は企画のターンとして終え、手元は会話で見せる。利用者が「確認なしで」「おまかせで」と言ったときは見せずに作り進める。条件は `$game-art-direction` §2） | `$game-art-direction` |
-| 3 | 素材の設計 | `design/asset-manifest.md` の全行に経路・理由・枠があり、合計が予算内 | `$game-art-direction` |
+| 3 | 素材の設計 | `design/asset-manifest.md` の全行に経路・理由・枠があり、合計が予算内。**新しいゲームと見た目・遊びの核を変えるときは**、代表場面に出る要素の作り方を調べて `design/research.md` に書いた（`instructions.md` §7.1） | `$game-art-direction` |
 | 4 | 核を遊べる形に | 開始 → 核の行為 → 結果/進行 → 次の区切りが回る。進行型は保存 → 再開も核として検査する（`rules.gd` の無い前の版を続けるときは下の「2 回目以降」） | この Skill §3、`$game-playtest` |
 | 5 | 素材の差し替え | manifest の全行が済み、`design/game-assets.json`の名前と実装参照が一致する（コードで作るモデル/音も含む） | `$game-asset-tools` |
 | 6 | 遊んで直す | 確認済みと未確認が明確。確認できた重大な失敗は修正済み。新規制作と核の変更では [references/fun.md](references/fun.md) §4 の点検表を当て、効くものから直した。公開前検証/作者プレビュー待ちへ ✓ を付けない | `$game-playtest` |

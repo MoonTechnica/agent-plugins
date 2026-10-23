@@ -346,6 +346,22 @@ IDは変更後も維持し、削除後も他の対象に再利用しない。leg
 ### 7.1 調べる（Web 検索）
 
 Skill はすべての手法を持っていない。足りないときは推測で作らず、調べてから作る。
+「自分の知識で作れる」と思っても、次のときは**必ず調べる**（それ以外のターンは足りないと気づいたときだけ）:
+
+- 新しいゲームと、見た目・遊びの核を変えるとき（`$game-design` の段階 3）: 代表場面に出る要素
+  （地面・水・空と光・植物・主役と敵の動き・攻撃や拾うときのエフェクト・カメラ・操作の手触りなど、作品に出る物）ごとに、
+  Godot 4.5 での定番の作り方と Compatibility での注意を調べる。
+- 2 回目以降のターンで、`design/research.md` に無い種類の物を足すとき（初めての水・天候・新しいエフェクトなど）。
+
+調べた結果は `design/research.md` に要素ごとに 1 行で残し、作るときと次のターンはこれを読む（同じことを調べ直さない）:
+
+```markdown
+| 要素 | 読んだ資料（manual のパス / URL） | 採用した作り方 | 注意（Compatibility・重さ） |
+|---|---|---|---|
+| 草 | `$game-art-direction` references/nature.md、manual `tutorials/performance/using_multimesh.rst` | nature の grass.gdshader + nature_scatter.gd、8 m 区画 | 影を落とさない。描画 40 m |
+```
+
+Skill の reference に作り方と落とし穴がある要素は、その reference を出典にして Web 検索を省いてよい。
 
 1. まず手元の正本: `<kit>/sdk/*/spec.md`、Skill、Godot 4.5 の公式マニュアルの章（`${GODOT_TOOLCHAIN_DIR:-/opt/godot}/manual/`。読む章は `$game-godot` references/official-engine.md）と API（`/opt/godot/api/`）。
 2. それで足りなければ Web 検索。**公式を優先する**: `docs.godotengine.org/en/4.5`・`github.com/godotengine/godot-demo-projects`・Godot のソース（タグ `4.5.1-stable`）、
