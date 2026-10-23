@@ -20,6 +20,9 @@ description: ステージ・マップ・コース・ダンジョン・アリー�
 配置の大きな変更は、[references/world-layout.md](references/world-layout.md) の順で作る**: `design/world-map.json` を正本にし、
 全体図（`design/concept/map.png`）を企画のターンで見せて合意し、広い世界は地形をツールで作り、仮組みと仕上げの後に全体図で確かめる。
 2D・3D の小〜中規模・広い世界で作る物と確かめる事が違う（同 §3）。
+**地面・壁・床が格子に乗る作品は、マップをタイル（2D は `TileMapLayer`、3D は `GridMap`）で作る**:
+[references/tilemaps.md](references/tilemaps.md) の道具で、素材のシートを確かめ、タイルセット（当たり判定・地形のつながり方）を作り、
+文字の格子から塗って、結果の絵とつながりの合わない場所を見る。1 枚絵や図形の並べ書きで地面を作らない。
 地域/部屋を移動するゲームやプレイヤー用の地図を作る・変える時は
 [references/transitions-and-map.md](references/transitions-and-map.md) を読む。
 場所の切替、部屋単位/連続/混合の読み込み、能力による再探索、実世界と地図の対応を扱う。

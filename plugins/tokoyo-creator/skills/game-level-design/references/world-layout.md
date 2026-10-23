@@ -45,8 +45,8 @@ godot --headless --path <source>/godot -s $TOOL -- overview <source> --concept  
 | 段階 | 作るもの | 確かめること |
 |---|---|---|
 | 企画 | `world-map.json`（`kind: "areas"`。部屋の矩形・地域・つながり・能力のゲート・開始・主な道筋）と全体図 | 能力を得る順で全部屋に行けるか、主な道筋が実際のつながりを通るか（`overview`） |
-| 仮組み | 部屋ごとのシーンに灰色タイルの `TileMapLayer`（TileSet の terrain set で自動接続。コードからは `set_cells_terrain_connect` / `set_cells_terrain_path`） | ジャンプ・落下の到達（`rules.gd`、[checks.md](checks.md) §4）、部屋の出入口が `world-map.json` のつながりと一致するか |
-| 美術 | タイルの差し替え・背景・飾り | 差し替え前後で当たり判定のタイルが同じか |
+| 仮組み | 部屋ごとのシーンに色の板のタイル（[tilemaps.md](tilemaps.md) の `greybox` → `paint`。地形が自動でつながる） | ジャンプ・落下の到達（`rules.gd`、[checks.md](checks.md) §4）、部屋の出入口が `world-map.json` のつながりと一致するか |
+| 美術 | 素材のタイルセットを作り、同じ文字の格子で塗り直す・背景・飾り（[tilemaps.md](tilemaps.md)） | `report.json` のつながりの合わない場所、差し替え前後で当たり判定が同じか |
 | 仕上げ | `world-map.json` を実際の部屋に合わせて更新し `overview` をもう一度 | 行き止まり・使われない部屋・セーブ地点の間隔 |
 
 - 1 ステージ 1 仕掛けで「学ぶ → 応用 → ひねり → 習熟」（任天堂の起承転結）。メトロイドヴァニアは能力の順序と中心の地域から決め、
@@ -59,7 +59,7 @@ godot --headless --path <source>/godot -s $TOOL -- overview <source> --concept  
 |---|---|---|
 | 企画 | `world-map.json`（`kind: "areas"`。エリアの矩形・高さの違いは名前とメモ・つながり・目印・主な道筋）と全体図。`level-design.md` に寸法（体の大きさ・ジャンプ・通路幅） | つながりと主な道筋（`overview`）。対戦は線対称か・1 点から全部の要所を守れないか |
 | 寸法見本 | 段差・隙間・通路幅を並べた小さなシーン | 操作で登れる・跳べる値（`rules.gd`） |
-| 仮組み | CSG か GridMap。部品は互いの倍数の大きさ、スナップは大きく、ピボットは床の中心（Skyrim のキットの規則） | コードで navmesh を焼いて歩ける範囲と孤立した床、出入口の幅 |
+| 仮組み | CSG か GridMap（[tilemaps.md](tilemaps.md) の `meshlib` → `paint`）。部品は互いの倍数の大きさ、スナップは大きく、ピボットは床の中心（Skyrim のキットの規則） | コードで navmesh を焼いて歩ける範囲と孤立した床、出入口の幅 |
 | 美術・光 | Blender スクリプトの部品か CC0 キットで置き換え、CSG はメッシュに変える | 当たり判定が仮組みと同じ範囲か |
 | 仕上げ | `world-map.json` を実際に合わせて `overview` | 報酬・敵の偏り、使われない部屋 |
 

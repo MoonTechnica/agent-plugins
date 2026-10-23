@@ -159,6 +159,11 @@ Smart Topologyや複数視点等を公式サイトで見つけても、現行ツ
   アニメーション（8〜12 fps）に並べ、`AnimatedSprite2D` で再生する（エディタで作った `.tres` か、`load()` した `Texture2D` を
   `SpriteFrames.add_frame()` で足す）。
 
+- **タイル（マップチップ）はフォルダで 1 回**: `stock_id` のファイル名を除いたフォルダ（末尾 `/`。例 `kenney:2d/Pixel Platformer/Tiles/`）を
+  渡すと、直下の同じ大きさのタイルを名前順に 1 枚のシートにして取り込み、`tileset`（タイルの大きさ・列数・ファイル名ごとの [列, 行]）を返す。
+  `stock` 枠は 1 回。Kenney の元のシートと同じ並びにしたいときは `columns` を指定する（Pixel Platformer は 20）。
+  タイルを 1 枚ずつ取り込まない。取り込んだシートは `$game-level-design` references/tilemaps.md の `sheet` → `tileset` → `paint` で使う。
+
 - **3Dは結果の`animations`**をGodotのAnimationPlayer/AnimationTreeで再生する。
   GLBをimportしてシーンへ配置し、実際のクリップ名を確認する。終了時はシーンと保持したResource参照を解放する。
   Web/nativeの本編でループ・変形・接地を確認する（`$game-3d-and-bundles`）。
