@@ -69174,16 +69174,18 @@ async function generateProject(options2) {
     warnings
   };
 }
-async function readManifest(root) {
+async function readManifestSource(root) {
   const path = join13(root, PROJECT_PATHS.manifest);
   if (!existsSync10(path))
     throw new GenerateError(`${PROJECT_PATHS.manifest} is missing`);
-  let raw;
   try {
-    raw = $parse(await readFile7(path, "utf8"));
+    return $parse(await readFile7(path, "utf8"));
   } catch (error51) {
     throw new GenerateError(`${PROJECT_PATHS.manifest} is not valid YAML: ${error51 instanceof Error ? error51.message : String(error51)}`);
   }
+}
+async function readManifest(root) {
+  const raw = await readManifestSource(root);
   const parsed = parseProjectManifest(raw);
   if (!parsed.success) {
     const lines = parsed.errors.map((e) => `  ${e.path || "(root)"}: ${e.code} — ${e.message}`);
@@ -79355,7 +79357,7 @@ async function createDevRuntime(options2) {
     python: options2.python?.remote ? createRemotePython({
       root,
       manifest: manifest2,
-      readManifest: async () => (await readManifest(root)).manifest,
+      readManifest: () => readManifestSource(root),
       proxy: options2.python.remote,
       onFinish: onPythonFinish
     }) : python2.port,
