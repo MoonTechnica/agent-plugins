@@ -162,6 +162,10 @@ export const pythonRunRequestSchema = z.strictObject({
         .regex(/^[A-Za-z0-9_.:-]{1,128}$/)
         .optional(),
 });
+/** 依頼の受付（`POST /v1/python/runs` の 202） */
+export const pythonRunAcceptedSchema = z.object({ runId: z.uuid(), status: z.string() });
+/** 実行の id（`python.get(runId)` の引数） */
+export const pythonRunIdSchema = z.uuid();
 export const pythonRunSchema = z.strictObject({
     runId: z.uuid(),
     app: z.string(),

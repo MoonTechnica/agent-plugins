@@ -1,7 +1,5 @@
-import { PYTHON_RUN_FINAL_STATUSES, pythonRunRequestSchema, pythonRunSchema, } from '@workspace/project-protocol';
-import { z } from 'zod';
+import { PYTHON_RUN_FINAL_STATUSES, pythonRunAcceptedSchema, pythonRunIdSchema, pythonRunRequestSchema, pythonRunSchema, } from '@workspace/project-protocol';
 import { SdkError } from "../errors.js";
-const acceptedSchema = z.object({ runId: z.uuid(), status: z.string() });
 const WAIT_DEFAULT_MS = 60 * 60 * 1000;
 const INTERVAL_DEFAULT_MS = 2000;
 export function createPython(transport, sleep = (ms) => new Promise((r) => setTimeout(r, ms))) {
@@ -30,7 +28,7 @@ export function createPython(transport, sleep = (ms) => new Promise((r) => setTi
     }
     return {
         async get(runId) {
-            if (!z.uuid().safeParse(runId).success)
+            if (!pythonRunIdSchema.safeParse(runId).success)
                 throw new SdkError('VALIDATION_FAILED', 'invalid python run id');
             return read(`/v1/python/runs/${runId}`);
         },
@@ -43,11 +41,12 @@ export function createPython(transport, sleep = (ms) => new Promise((r) => setTi
             });
             if (!body.success)
                 throw new SdkError('VALIDATION_FAILED', 'invalid python run request');
-            const accepted = parse(acceptedSchema, await transport.send('/v1/python/runs', { method: 'POST', body: body.data }));
+            const accepted = parse(pythonRunAcceptedSchema, await transport.send('/v1/python/runs', { method: 'POST', body: body.data }));
             return handle(accepted.runId);
         },
     };
 }
+// zod は SDK の依存に無い（生成した Project で解決できない）ので、schema の形だけを受ける
 function parse(schema, value) {
     const result = schema.safeParse(value);
     if (!result.success)

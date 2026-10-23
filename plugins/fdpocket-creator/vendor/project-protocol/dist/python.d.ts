@@ -131,6 +131,13 @@ export declare const pythonRunRequestSchema: z.ZodObject<{
     idempotencyKey: z.ZodOptional<z.ZodString>;
 }, z.core.$strict>;
 export type PythonRunRequest = z.infer<typeof pythonRunRequestSchema>;
+/** 依頼の受付（`POST /v1/python/runs` の 202） */
+export declare const pythonRunAcceptedSchema: z.ZodObject<{
+    runId: z.ZodUUID;
+    status: z.ZodString;
+}, z.core.$strip>;
+/** 実行の id（`python.get(runId)` の引数） */
+export declare const pythonRunIdSchema: z.ZodUUID;
 export declare const pythonRunSchema: z.ZodObject<{
     runId: z.ZodUUID;
     app: z.ZodString;

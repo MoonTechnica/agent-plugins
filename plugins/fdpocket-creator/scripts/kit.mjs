@@ -63407,6 +63407,8 @@ var pythonRunRequestSchema = exports_external.strictObject({
   input: exports_external.unknown(),
   idempotencyKey: exports_external.string().regex(/^[A-Za-z0-9_.:-]{1,128}$/).optional()
 });
+var pythonRunAcceptedSchema = exports_external.object({ runId: exports_external.uuid(), status: exports_external.string() });
+var pythonRunIdSchema = exports_external.uuid();
 var pythonRunSchema = exports_external.strictObject({
   runId: exports_external.uuid(),
   app: exports_external.string(),
