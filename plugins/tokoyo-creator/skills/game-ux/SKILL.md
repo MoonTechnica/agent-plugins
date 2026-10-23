@@ -60,6 +60,15 @@ description: ゲームを遊べる体験にする規則。新しく作るとき�
 `default_font_size` で 1 か所に決め、Label ごとに上書きしない。**日本語のフォントを同梱する**（Web は端末のフォントを使えない。
 `$game-godot` references/best-practices.md）。大きさは実端末の表示倍率で確認する（`$game-screen-layout` §4）。
 
+この Skill に OFL の日本語フォントが 2 つある（`<kit>/skills/game-ux/assets/fonts/`。hosted でも手元でも同じ。ネットから取らない）。
+作品の画風に合う方を 1 つ選び、`.ttf` と同じフォルダの `OFL.txt` をそのまま `godot/assets/fonts/<フォルダ名>/` へ写して Theme の既定のフォントにする。
+| フォルダ | 書体 | 合う作品 |
+|---|---|---|
+| `mplus-rounded-1c/` | M PLUS Rounded 1c Bold（丸ゴシック。約 3.5 MB） | 多くの作品の UI・本文。読みやすく、どの画風にもなじむ |
+| `dotgothic16/` | DotGothic16（ドット絵のゴシック。約 2 MB） | ドット絵の作品 |
+
+どちらも合わない画風（明朝のホラーなど）だけ、ほかの OFL フォントを使う（取り方は best-practices.md）。使ったフォントは `design/asset-manifest.md` に書き、掲載のクレジットに入れる。
+
 ## 4. 色だけ・音だけに頼らない
 
 - 色で分ける物（敵 / 味方・成功 / 失敗・レア度・チーム）は**形・記号・文字も変える**。**赤と緑だけで分けない**。
