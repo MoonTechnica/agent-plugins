@@ -275,6 +275,11 @@ function checkPermission(ctx, path, permission) {
         report(ctx, path, 'reserved_permission', `"${RESERVED_PERMISSION_PREFIX}*" is reserved`);
     }
 }
+/** python の App の capabilities は DB のモデルとバケットだけ（realtime・ai・python は画面の App のもの） */
+function pythonDataOnly(app) {
+    const keys = Object.keys(app.capabilities ?? {});
+    return app.kind === 'python' && keys.every((key) => key === 'models' || key === 'buckets');
+}
 function refineServerFields(ctx, slug, app) {
     const server = SERVER_APP_KINDS.includes(app.kind);
     const path = ['apps', slug];
@@ -292,9 +297,11 @@ function refineServerFields(ctx, slug, app) {
         }
     }
     else {
-        // サーバーの App は利用者の代わりに呼ぶだけ（自分の capability・匿名・restricted を持たない）
+        // サーバーの App は利用者の代わりに呼ぶだけ（自分の capability・匿名・restricted を持たない）。
+        // python のタスクは依頼した利用者として DB・Storage を使うので、python だけ models・buckets を宣言する
+        // （利用者の権限と ZenStack のポリシーに、この宣言を重ねる。python-backend.md §5）
         for (const key of ['capabilities', 'anonymous', 'requiredPermission', 'displayName']) {
-            if (app[key] !== undefined) {
+            if (app[key] !== undefined && !(key === 'capabilities' && pythonDataOnly(app))) {
                 report(ctx, [...path, key], 'not_allowed', `${app.kind} apps cannot declare ${key}`);
             }
         }

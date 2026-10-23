@@ -3,15 +3,19 @@
 from dataclasses import dataclass, field
 from pathlib import Path
 
-from fdpocket.client import Ai, Client, Jobs, Python
+from fdpocket.client import Ai, Client, Db, Jobs, Python
 from fdpocket.runner_api import RunnerApi
+from fdpocket.storage import Storage
 
 
 @dataclass
 class RunContext:
     """`def caption(ctx: RunContext, input: dict) -> dict` の `ctx`.
 
-    - `client`: python の App のサービスとして DB・Storage・通知を呼ぶ
+    - `db` / `storage`: この実行を依頼した利用者として読み書きする
+      (cron から始まった実行は Project の持ち主。その人の権限と、python の App の
+      `capabilities` の両方が要る)
+    - `client`: python の App のサービスとして通知を送る
     - `ai` / `python`: この実行の払う人として Platform の AI・別のタスクを呼ぶ
     - `jobs`: 続きを jobs の App に渡す (そのジョブもこの実行の払う人が払う)
     - `cache_dir`: `/cache` (project.yaml の `cache: true`)。
@@ -22,6 +26,14 @@ class RunContext:
     client: Client
     _runner: RunnerApi = field(repr=False)
     cache_dir: Path | None = None
+
+    @property
+    def db(self) -> Db:
+        return self.client.for_run(self.run_id).db
+
+    @property
+    def storage(self) -> Storage:
+        return self.client.for_run(self.run_id).storage
 
     @property
     def ai(self) -> Ai:

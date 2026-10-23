@@ -310,15 +310,19 @@ class UserClient:
 class RunClient:
     """`client.for_run(run_id)`. 動いているタスクとして呼ぶ.
 
-    払うのはその実行の払う人。
+    払うのはその実行の払う人。DB・Storage はその実行を依頼した利用者として読み書きする
+    (その利用者の権限・ポリシーと、python の App の capabilities の範囲)。
     """
 
     def __init__(
         self,
         transport: Transport,
+        http: httpx.Client,
         wire: httpx.BaseTransport | None,
         sleep: Callable[[float], None],
     ) -> None:
+        self.db = Db(transport)
+        self.storage = Storage(transport, http)
         self.ai = Ai(transport, wire)
         self.python = Python(transport, sleep)
         self.jobs = Jobs(transport)
@@ -363,4 +367,5 @@ class Client:
 
     def for_run(self, run_id: str) -> RunClient:
         header = {RUN_CONTEXT_HEADER: f"python:{run_id}"}
-        return RunClient(self._transport.with_headers(header), self._wire, self._sleep)
+        transport = self._transport.with_headers(header)
+        return RunClient(transport, self._http, self._wire, self._sleep)

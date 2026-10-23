@@ -20,7 +20,21 @@ description: GPU が要る AI の処理（深層学習の推論・学習・埋�
 
 api / jobs（TypeScript の Worker）と python は 1 つの Project に一緒に置け、DB・Storage を共有する。**呼べる向きは決まっている**:
 画面・api・jobs → python（`python.run`）、python → jobs（`onFinish`・`ctx.jobs`）。python から api の App は呼べない
-（要るデータは python から `ctx.client.db` / `storage` で直接読み書きする）。
+（要るデータは python から `ctx.db` / `ctx.storage` で直接読み書きする）。
+
+**DB・Storage は依頼した利用者として**読み書きする（cron から始まった実行は Project の持ち主）。その人の権限と ZenStack の
+ポリシーに加え、python の App にも使うモデル・バケットを宣言する（宣言できるのは `models` と `buckets` だけ）:
+
+```yaml
+  vision:
+    kind: python
+    capabilities:
+      models: { caption: [read, create], dataset: [read] }
+      buckets: { datasets: [read], models: [write] }
+```
+
+宣言に無い操作・利用者が見られない行やファイルは `FORBIDDEN` / 見つからない扱い。他の利用者のデータをまとめて処理したいときも
+ポリシーを緩めない（その人自身に依頼してもらうか、admin の利用者が依頼する）。
 
 ## 2. 宣言と GPU の選び方
 
@@ -48,8 +62,7 @@ def model(cache_dir):                       # 同じ Sandbox の中では 1 回�
 
 def caption(ctx, input):
     ctx.progress(0.1, "loading")
-    svc = ctx.client                        # python の App のサービスとしての Gateway
-    image = svc.storage.download(input["fileId"])
+    image = ctx.storage.download(input["fileId"])   # 依頼した利用者として読む（小さなファイルだけ）
     text = model(ctx.cache_dir)(to_image(image))[0]["generated_text"]
     return {"text": text}                   # JSON にできる値だけ
 ```
@@ -65,22 +78,21 @@ def caption(ctx, input):
   100 MiB を超えれば SDK が自動で分割して送る）。大きなデータセットは **数百 MB〜数 GB のファイルに分けて**持つ
   （Parquet・WebDataset・JSONL のシャード。並列に読め、失敗してもファイル単位でやり直せる）。
 - **渡し方**: タスクの入力は 256 KiB までなので、データは `fileId` の一覧で渡す（多ければ DB にデータセットの行を作り、
-  その id を渡して python から `ctx.client.db` でファイルの一覧を読む）。
+  その id を渡して python から `ctx.db` でファイルの一覧を読む）。
 - **読み方**: 大きなファイルに `storage.download()` を使わない（全部をメモリに読む）。ディスクへ流し込む:
 
   ```python
   def train(ctx, input):
-      svc = ctx.client
       data = ctx.cache_dir / "datasets" / input["datasetId"]      # cache: true なら 2 回目は落とさない
-      files = svc.storage.download_all(input["fileIds"], data)     # {fileId: Path}。同時 4 本
+      files = ctx.storage.download_all(input["fileIds"], data)     # {fileId: Path}。同時 4 本
       ...
       ckpt = ctx.cache_dir / "checkpoints" / ctx.run_id             # 途中停止からの再開用
       weights = save_model(ckpt)                                    # 重みのファイルのパス
-      file = svc.storage.upload("models", "model.safetensors", weights, "application/octet-stream")
+      file = ctx.storage.upload("models", "model.safetensors", weights, "application/octet-stream")
       return {"modelFileId": file["id"]}                            # 結果は fileId で返す
   ```
 
-  1 ファイルなら `svc.storage.download_to(fileId, path)`。`/cache` に置くのは作り直せるものだけで、合わせて 50 GiB まで
+  1 ファイルなら `ctx.storage.download_to(fileId, path)`。`/cache` に置くのは作り直せるものだけで、合わせて 50 GiB まで
   （超えるデータは `/tmp` に落とす。Sandbox のディスクは 512 GiB で、実行が終わると消える）。
 - **保存**: `storage.upload(bucket, name, data, content_type)` の `data` はファイルのパスでもよい（100 MiB を超えれば
   分割して送り、全体をメモリに載せない）。重みのような大きな結果は必ずパスで渡す。
@@ -161,7 +173,7 @@ export default {
 - **途中から続きを渡す**ときは `ctx.jobs.schedule("batch", "progressed", {...}, idempotency_key=f"progressed:{ctx.run_id}")`。
   失敗では呼ばれないので、終わりの通知の代わりにしない。payload は JSON で 64 KiB まで（大きいものは DB か Storage に置き id を渡す）。
 - 配備した環境で届くのは main / prod だけ（branch / preview では jobs が動かない）。`kit dev` は手元の CPU でも、ライブプレビューの
-  本物の GPU でも、終わりを手元の jobs に渡す。本物の GPU の開発中のタスクの中では `ctx.jobs` は `ctx.client` と同じく使えない。
+  本物の GPU でも、終わりを手元の jobs に渡す。本物の GPU の開発中のタスクの中では `ctx.jobs` は `ctx.db` / `ctx.storage` と同じく使えない。
 - 受け手の書き方は `$fdpocket-app-integrations` の「登録されたジョブ」（`queue(job, env, ctx)` と `job.handler`）。
 
 ## 6. 依存と確かめ方
@@ -170,7 +182,7 @@ export default {
   `kit check` が pyproject・uv.lock・handler・依存・宣言していない secret と宛先を確かめる。
 - `kit dev` の既定: 手元は CPU で `uv run` がタスクとサーバーを動かす（費用は引かない。uv が要る）。
   ライブプレビューと `--python modal` は**タスクを Platform の本物の GPU で動かす**（チャットの持ち主のクレジット）。
-  本物の GPU のタスクの中では `ctx.client`（DB・Storage・通知）は使えない（手元の DB は Platform に無い）ので、
+  本物の GPU のタスクの中では `ctx.db` / `ctx.storage` / `ctx.client` は使えない（手元の DB は Platform に無い）ので、
   入力（`input`）と結果（戻り値）だけで確かめる。サーバーは手元の CPU のまま。
 - 自己テストの繰り返しは CPU（小さなモデル。GPU の有無を torch で確かめて device を切り替える）で、
   GPU でしか確かめられないこと（速度・メモリ・大きなモデル）だけを本物で試す。

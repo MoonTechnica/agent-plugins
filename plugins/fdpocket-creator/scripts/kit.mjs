@@ -64520,6 +64520,10 @@ function checkPermission(ctx, path, permission) {
     report(ctx, path, "reserved_permission", `"${RESERVED_PERMISSION_PREFIX}*" is reserved`);
   }
 }
+function pythonDataOnly(app) {
+  const keys = Object.keys(app.capabilities ?? {});
+  return app.kind === "python" && keys.every((key) => key === "models" || key === "buckets");
+}
 function refineServerFields(ctx, slug, app) {
   const server = SERVER_APP_KINDS.includes(app.kind);
   const path = ["apps", slug];
@@ -64537,7 +64541,7 @@ function refineServerFields(ctx, slug, app) {
     }
   } else {
     for (const key of ["capabilities", "anonymous", "requiredPermission", "displayName"]) {
-      if (app[key] !== undefined) {
+      if (app[key] !== undefined && !(key === "capabilities" && pythonDataOnly(app))) {
         report(ctx, [...path, key], "not_allowed", `${app.kind} apps cannot declare ${key}`);
       }
     }
@@ -71499,6 +71503,251 @@ async function eraseProjectUser(db, input, removeObject) {
 // frontend/packages/project-gateway/src/ai/dev-routes.ts
 init_zod();
 
+// frontend/packages/project-gateway/src/internal/role-grants.ts
+var NO_BOOTSTRAP = { eligible: false, roles: [], legacyRoles: [] };
+var definitions = [
+  'CREATE TABLE IF NOT EXISTS "_platform_bootstrap_catalog" (name TEXT PRIMARY KEY)',
+  `CREATE TABLE IF NOT EXISTS "_platform_role_provenance" ("userId" TEXT,"roleId" TEXT,source TEXT NOT NULL CHECK(source IN ('manual','default')),PRIMARY KEY("userId","roleId"))`,
+  'CREATE TABLE IF NOT EXISTS "_platform_bootstrap_grants" ("userId" TEXT,"roleId" TEXT,PRIMARY KEY("userId","roleId"))',
+  'CREATE TABLE IF NOT EXISTS "_platform_legacy_role_grants" ("userId" TEXT,"roleId" TEXT,source TEXT NOT NULL,"quarantinedAt" TEXT NOT NULL,PRIMARY KEY("userId","roleId"))'
+];
+var metadataReady = new WeakSet;
+var cataloguedRoles = new WeakMap;
+async function prepareRoleAuthorization(db, userId, bootstrap) {
+  try {
+    await ensureRoleGrantMetadata(db, bootstrap.legacyRoles);
+    await syncBootstrapRelations(db, userId, bootstrap);
+  } catch (error51) {
+    const code = typeof error51 === "object" && error51 !== null && "code" in error51 ? String(error51.code) : "";
+    if (/^SQLITE_(BUSY|LOCKED)/.test(code))
+      throw new GatewayError("CONFLICT", "database is busy", { cause: error51 });
+    throw error51;
+  }
+}
+async function ensureRoleGrantMetadata(db, roles) {
+  if (!metadataReady.has(db)) {
+    const present = await db.execute("SELECT name FROM sqlite_master WHERE type='table' AND name IN ('_platform_bootstrap_catalog','_platform_role_provenance','_platform_bootstrap_grants','_platform_legacy_role_grants')");
+    if (present.rows.length !== 4)
+      await db.batch(definitions, "write");
+    metadataReady.add(db);
+  }
+  const known = cataloguedRoles.get(db) ?? new Set;
+  const unseen = roles.filter((role) => !known.has(role));
+  if (unseen.length === 0)
+    return;
+  const existing = await db.execute({
+    sql: 'SELECT name FROM "_platform_bootstrap_catalog" WHERE name IN (SELECT value FROM json_each(?))',
+    args: [JSON.stringify(unseen)]
+  });
+  const names = new Set(existing.rows.map((r) => String(r.name)));
+  const missing = [...new Set(unseen)].filter((name3) => !names.has(name3));
+  if (missing.length)
+    await db.batch(missing.map((name3) => ({
+      sql: 'INSERT OR IGNORE INTO "_platform_bootstrap_catalog" VALUES(?)',
+      args: [name3]
+    })), "write");
+  for (const role of unseen)
+    known.add(role);
+  cataloguedRoles.set(db, known);
+}
+async function syncBootstrapRelations(db, userId, bootstrap) {
+  const roles = JSON.stringify(bootstrap.roles);
+  const eligible = bootstrap.eligible ? 1 : 0;
+  const proof = 'NOT EXISTS(SELECT 1 FROM "_platform_role_provenance" p WHERE p."userId"=ur."userId" AND p."roleId"=ur."roleId")';
+  const inherited = 'NOT EXISTS(SELECT 1 FROM "_platform_bootstrap_grants" b WHERE b."userId"=ur."userId" AND b."roleId"=ur."roleId")';
+  const stale = `(${inherited} OR ?=0 OR r.name NOT IN (SELECT value FROM json_each(?)))`;
+  const candidates = `SELECT ur."userId",ur."roleId" FROM "UserProjectRole" ur JOIN "ProjectRole" r ON r.id=ur."roleId" WHERE ur."userId"=? AND ${proof} AND (EXISTS(SELECT 1 FROM "_platform_bootstrap_catalog" c WHERE c.name=r.name) OR NOT (${inherited}) OR EXISTS(SELECT 1 FROM "_platform_legacy_role_grants" l WHERE l."userId"=ur."userId" AND l."roleId"=ur."roleId"))`;
+  const changes = await db.execute({
+    sql: `${candidates} AND ${stale} UNION SELECT ?,r.id FROM "ProjectRole" r WHERE ?=1 AND r.name IN (SELECT value FROM json_each(?)) AND NOT EXISTS(SELECT 1 FROM "UserProjectRole" ur WHERE ur."userId"=? AND ur."roleId"=r.id) LIMIT 1`,
+    args: [userId, eligible, roles, userId, eligible, roles, userId]
+  });
+  if (changes.rows.length === 0)
+    return;
+  await db.batch([
+    {
+      sql: `INSERT OR IGNORE INTO "_platform_legacy_role_grants" SELECT "userId","roleId",'legacy',strftime('%Y-%m-%dT%H:%M:%fZ','now') FROM (${candidates} AND ${inherited})`,
+      args: [userId]
+    },
+    {
+      sql: `DELETE FROM "UserProjectRole" WHERE "userId"=? AND "roleId" IN (SELECT "roleId" FROM (${candidates} AND ${stale}))`,
+      args: [userId, userId, eligible, roles]
+    },
+    {
+      sql: 'INSERT OR IGNORE INTO "UserProjectRole" SELECT u.id,r.id FROM "User" u CROSS JOIN "ProjectRole" r WHERE u.id=? AND ?=1 AND r.name IN (SELECT value FROM json_each(?))',
+      args: [userId, eligible, roles]
+    },
+    {
+      sql: `INSERT OR IGNORE INTO "_platform_bootstrap_grants" SELECT ur."userId",ur."roleId" FROM "UserProjectRole" ur JOIN "ProjectRole" r ON r.id=ur."roleId" WHERE ur."userId"=? AND ?=1 AND r.name IN (SELECT value FROM json_each(?)) AND ${proof}`,
+      args: [userId, eligible, roles]
+    }
+  ], "write");
+}
+function manualRoleProvenancePlugin(actorId, permissions, activeTransaction) {
+  return {
+    id: "trusted-role-provenance",
+    onEntityMutation: {
+      runAfterMutationWithinTransaction: true,
+      async beforeEntityMutation(args) {
+        if (args.model === "UserProjectRole" && args.action === "delete")
+          await args.loadBeforeMutationEntities();
+      },
+      async afterEntityMutation(args) {
+        if (args.model !== "UserProjectRole")
+          return;
+        if (!permissions.includes("users.manage"))
+          throw new Error("manual role grants require users.manage");
+        const rows = args.action === "delete" ? args.beforeMutationEntities : await args.loadAfterMutationEntities();
+        if (!rows)
+          throw new Error("role mutation provenance unavailable");
+        const internal = activeTransaction();
+        if (!internal)
+          throw new Error("role provenance requires the mutation transaction");
+        for (const row of rows) {
+          if (typeof row.userId !== "string" || typeof row.roleId !== "string")
+            throw new Error("invalid role grant identity");
+          if (args.action === "delete") {
+            await internal.execute({
+              sql: 'DELETE FROM "_platform_role_provenance" WHERE "userId"=? AND "roleId"=?',
+              args: [row.userId, row.roleId]
+            });
+          } else {
+            await internal.execute({
+              sql: `INSERT INTO "_platform_role_provenance" VALUES(?,?,'manual') ON CONFLICT("userId","roleId") DO UPDATE SET source='manual'`,
+              args: [row.userId, row.roleId]
+            });
+          }
+          await internal.execute({
+            sql: `INSERT INTO "AuditEvent" (id,at,"requestId","appSlug","actorId",action,resource,decision) VALUES(?,?,?,'platform',?,'role.provenance',?,'allow')`,
+            args: [
+              crypto.randomUUID(),
+              new Date().toISOString(),
+              crypto.randomUUID(),
+              actorId,
+              JSON.stringify({
+                userId: row.userId,
+                roleId: row.roleId,
+                source: args.action === "delete" ? "removed" : "manual"
+              })
+            ]
+          });
+        }
+      }
+    }
+  };
+}
+
+// frontend/packages/project-gateway/src/internal/project-users.ts
+async function bootstrapProjectUser(db, input) {
+  await ensureRoleGrantMetadata(db, []);
+  const newId = crypto.randomUUID();
+  const at = input.now.toISOString();
+  const roles = [...new Set(input.defaultRoles)];
+  const rolePlaceholders = roles.map(() => "?").join(", ");
+  const statements = [
+    {
+      sql: `INSERT INTO "User" ("id", "globalUserId", "displayName", "createdAt", "updatedAt")
+            VALUES (?, ?, ?, ?, ?) ON CONFLICT ("globalUserId") DO NOTHING`,
+      args: [newId, input.globalUserId, input.displayName, at, at]
+    },
+    ...roles.length === 0 ? [] : [
+      {
+        sql: `INSERT OR IGNORE INTO "UserProjectRole" ("userId", "roleId")
+                  SELECT u."id", r."id" FROM "User" u JOIN "ProjectRole" r ON r."name" IN (${rolePlaceholders})
+                  WHERE u."id" = ?`,
+        args: [...roles, newId]
+      },
+      {
+        sql: `INSERT OR IGNORE INTO "_platform_role_provenance" ("userId","roleId",source)
+                  SELECT ur."userId",ur."roleId",'default' FROM "UserProjectRole" ur
+                  WHERE ur."userId"=?`,
+        args: [newId]
+      }
+    ],
+    {
+      sql: `INSERT INTO "AuditEvent" ("id", "at", "requestId", "appSlug", "actorId", "action", "decision")
+            SELECT ?, ?, ?, ?, u."id", 'user.bootstrap', 'allow' FROM "User" u WHERE u."id" = ?`,
+      args: [crypto.randomUUID(), at, input.requestId, input.appSlug, newId]
+    },
+    {
+      sql: `UPDATE "User" SET "displayName" = ?, "updatedAt" = ?
+            WHERE "globalUserId" = ? AND "displayName" IS NULL AND ? IS NOT NULL`,
+      args: [input.displayName, at, input.globalUserId, input.displayName]
+    },
+    {
+      sql: `SELECT "id", "displayName" FROM "User" WHERE "globalUserId" = ?`,
+      args: [input.globalUserId]
+    }
+  ];
+  const results = await db.batch(statements, "write");
+  const row = results.at(-1)?.rows[0];
+  if (!row)
+    throw new Error("project user bootstrap returned no row");
+  const id = String(row.id);
+  return {
+    id,
+    displayName: row.displayName === null ? null : String(row.displayName),
+    created: id === newId
+  };
+}
+function blockedGlobalUserIds(gid, platformUserIds) {
+  const issuer = gid.slice(0, gid.lastIndexOf(":") + 1);
+  return platformUserIds.map((id) => `${issuer}${id}`);
+}
+async function loadProjectActor(db, userId, blockedGlobalIds = [], bootstrap = NO_BOOTSTRAP) {
+  await prepareRoleAuthorization(db, userId, bootstrap);
+  const [users, permissions, blocked] = await db.batch([
+    {
+      sql: `SELECT "id", "globalUserId", "displayName" FROM "User" WHERE "id" = ?`,
+      args: [userId]
+    },
+    {
+      sql: `SELECT DISTINCT rp."permission" FROM "UserProjectRole" upr
+              JOIN "RolePermission" rp ON rp."roleId" = upr."roleId"
+              JOIN "ProjectRole" r ON r.id=upr."roleId"
+              WHERE upr."userId" = ? AND (
+                (NOT EXISTS(SELECT 1 FROM "_platform_bootstrap_catalog" legacy WHERE legacy.name=r.name)
+                 AND NOT EXISTS(SELECT 1 FROM "_platform_bootstrap_grants" b WHERE b."userId"=upr."userId" AND b."roleId"=upr."roleId")
+                 AND NOT EXISTS(SELECT 1 FROM "_platform_legacy_role_grants" l WHERE l."userId"=upr."userId" AND l."roleId"=upr."roleId"))
+                OR EXISTS(SELECT 1 FROM "_platform_role_provenance" proof
+                  WHERE proof."userId"=upr."userId" AND proof."roleId"=upr."roleId"))
+              UNION SELECT rp.permission FROM "ProjectRole" r JOIN "RolePermission" rp ON rp."roleId"=r.id
+                WHERE ?=1 AND r.name IN (SELECT value FROM json_each(?)) ORDER BY permission`,
+      args: [userId, bootstrap.eligible ? 1 : 0, JSON.stringify(bootstrap.roles)]
+    },
+    {
+      sql: `SELECT "id" FROM "User" WHERE "globalUserId" IN (SELECT value FROM json_each(?)) ORDER BY "id"`,
+      args: [JSON.stringify(blockedGlobalIds)]
+    }
+  ], "read");
+  const user = users?.rows[0];
+  if (!user)
+    return null;
+  return {
+    id: String(user.id),
+    globalUserId: String(user.globalUserId),
+    displayName: user.displayName === null ? null : String(user.displayName),
+    permissions: (permissions?.rows ?? []).map((row) => String(row.permission)),
+    blockedUserIds: (blocked?.rows ?? []).map((row) => String(row.id))
+  };
+}
+async function findProjectUser(db, userId) {
+  const result = await db.execute({
+    sql: `SELECT "id", "globalUserId" FROM "User" WHERE "id" = ?`,
+    args: [userId]
+  });
+  const row = result.rows[0];
+  return row ? { id: String(row.id), globalUserId: String(row.globalUserId) } : null;
+}
+async function findProjectUsers(db, userIds) {
+  if (userIds.length === 0)
+    return [];
+  const result = await db.execute({
+    sql: `SELECT "id", "globalUserId" FROM "User" WHERE "id" IN (SELECT value FROM json_each(?)) ORDER BY "id"`,
+    args: [JSON.stringify([...new Set(userIds)])]
+  });
+  return result.rows.map((row) => ({ id: String(row.id), globalUserId: String(row.globalUserId) }));
+}
+
 // frontend/packages/project-gateway/src/realtime/scope.ts
 async function realtimeDigest(value) {
   const bytes = await crypto.subtle.digest("SHA-256", new TextEncoder().encode(JSON.stringify(value)));
@@ -71542,8 +71791,51 @@ function activeOrThrow(result) {
   throw new GatewayError(code ?? "FORBIDDEN", "project not available");
 }
 async function verifyProjectToken(c, adapters, config2, cost, options2 = {}) {
+  const run = c.req.header(RUN_CONTEXT_HEADER);
+  if (run !== undefined && c.req.header(ACT_AS_HEADER) === undefined) {
+    if (!(options2.actAs ?? true))
+      throw new GatewayError("FORBIDDEN", "act-as is not allowed here");
+    const claims2 = await runClaimsOf(c, adapters, run);
+    return resolveProjectClaims(c, adapters, config2, cost, claims2, { ...options2, launch: false });
+  }
   const claims = await userClaimsOf(c, adapters, options2.actAs ?? true);
   return resolveProjectClaims(c, adapters, config2, cost, claims, options2);
+}
+var PYTHON_RUN = /^python:([0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12})$/;
+async function runClaimsOf(c, adapters, run) {
+  const runId = PYTHON_RUN.exec(run)?.[1];
+  if (!runId)
+    throw new GatewayError("VALIDATION_FAILED", `${RUN_CONTEXT_HEADER} must be python:<id>`);
+  if (!adapters.python)
+    throw new GatewayError("FORBIDDEN", "python is not available");
+  const service = await adapters.signer.verifyService(bearerOf(c));
+  const current = await currentServiceOf(adapters, service);
+  const principal = await adapters.python.runPrincipal(service.cid, runId);
+  const user = await findProjectUser(await adapters.turso.connect(current.db), principal.projectUserId);
+  if (!user || platformUserIdOf(user.globalUserId) !== principal.userId) {
+    throw new GatewayError("UNAUTHENTICATED", "run user does not match the project user");
+  }
+  return {
+    iss: service.iss,
+    sub: user.id,
+    gid: user.globalUserId,
+    aud: service.aud,
+    app: service.app,
+    env: service.env,
+    ...service.br ? { br: service.br } : {},
+    ...service.pv ? { pv: service.pv } : {},
+    anon: false,
+    jti: service.jti,
+    iat: service.iat,
+    exp: service.exp
+  };
+}
+async function currentServiceOf(adapters, service) {
+  const current = await adapters.services.current(service.cid);
+  if (!current || current.credentialId !== service.cid || current.projectId !== service.aud || current.appSlug !== service.app || current.environment !== service.env || current.sessionId !== (service.br ?? null) || current.previewSessionId !== (service.pv ?? null) || service.permissions.some((permission) => !current.servicePermissions.includes(permission))) {
+    throw new GatewayError("UNAUTHENTICATED", "service credential is no longer authorized");
+  }
+  return current;
 }
 async function resolveProjectClaims(c, adapters, config2, cost, claims, options2 = {}) {
   const target = {
@@ -71554,7 +71846,11 @@ async function resolveProjectClaims(c, adapters, config2, cost, claims, options2
     sessionId: claims.br ?? null,
     previewSessionId: claims.pv ?? null
   };
-  const resolved = activeOrThrow(await adapters.registry.resolve({ ...target, jti: claims.jti, cost }));
+  const resolved = activeOrThrow(await adapters.registry.resolve({
+    ...target,
+    jti: options2.launch === false ? null : claims.jti,
+    cost
+  }));
   if (!options2.hostOrigin) {
     allowProjectOrigin(c, config2, resolved.app.originHost, resolved.app.providerOrigin);
   }
@@ -71569,10 +71865,7 @@ async function userClaimsOf(c, adapters, allowActAs) {
   if (!allowActAs)
     throw new GatewayError("FORBIDDEN", "act-as is not allowed here");
   const service = await adapters.signer.verifyService(bearerOf(c));
-  const current = await adapters.services.current(service.cid);
-  if (!current || current.credentialId !== service.cid || current.projectId !== service.aud || current.appSlug !== service.app || current.environment !== service.env || current.sessionId !== (service.br ?? null) || current.previewSessionId !== (service.pv ?? null) || service.permissions.some((permission) => !current.servicePermissions.includes(permission))) {
-    throw new GatewayError("UNAUTHENTICATED", "service credential is no longer authorized");
-  }
+  await currentServiceOf(adapters, service);
   return verifyActAs(adapters, service, actAs);
 }
 async function verifyCurrentService(c, adapters, permission) {
@@ -71865,251 +72158,6 @@ function registerAiDevRoutes(app, adapters, logger) {
 
 // frontend/packages/project-gateway/src/ai/openai-routes.ts
 init_zod();
-
-// frontend/packages/project-gateway/src/internal/role-grants.ts
-var NO_BOOTSTRAP = { eligible: false, roles: [], legacyRoles: [] };
-var definitions = [
-  'CREATE TABLE IF NOT EXISTS "_platform_bootstrap_catalog" (name TEXT PRIMARY KEY)',
-  `CREATE TABLE IF NOT EXISTS "_platform_role_provenance" ("userId" TEXT,"roleId" TEXT,source TEXT NOT NULL CHECK(source IN ('manual','default')),PRIMARY KEY("userId","roleId"))`,
-  'CREATE TABLE IF NOT EXISTS "_platform_bootstrap_grants" ("userId" TEXT,"roleId" TEXT,PRIMARY KEY("userId","roleId"))',
-  'CREATE TABLE IF NOT EXISTS "_platform_legacy_role_grants" ("userId" TEXT,"roleId" TEXT,source TEXT NOT NULL,"quarantinedAt" TEXT NOT NULL,PRIMARY KEY("userId","roleId"))'
-];
-var metadataReady = new WeakSet;
-var cataloguedRoles = new WeakMap;
-async function prepareRoleAuthorization(db, userId, bootstrap) {
-  try {
-    await ensureRoleGrantMetadata(db, bootstrap.legacyRoles);
-    await syncBootstrapRelations(db, userId, bootstrap);
-  } catch (error51) {
-    const code = typeof error51 === "object" && error51 !== null && "code" in error51 ? String(error51.code) : "";
-    if (/^SQLITE_(BUSY|LOCKED)/.test(code))
-      throw new GatewayError("CONFLICT", "database is busy", { cause: error51 });
-    throw error51;
-  }
-}
-async function ensureRoleGrantMetadata(db, roles) {
-  if (!metadataReady.has(db)) {
-    const present = await db.execute("SELECT name FROM sqlite_master WHERE type='table' AND name IN ('_platform_bootstrap_catalog','_platform_role_provenance','_platform_bootstrap_grants','_platform_legacy_role_grants')");
-    if (present.rows.length !== 4)
-      await db.batch(definitions, "write");
-    metadataReady.add(db);
-  }
-  const known = cataloguedRoles.get(db) ?? new Set;
-  const unseen = roles.filter((role) => !known.has(role));
-  if (unseen.length === 0)
-    return;
-  const existing = await db.execute({
-    sql: 'SELECT name FROM "_platform_bootstrap_catalog" WHERE name IN (SELECT value FROM json_each(?))',
-    args: [JSON.stringify(unseen)]
-  });
-  const names = new Set(existing.rows.map((r) => String(r.name)));
-  const missing = [...new Set(unseen)].filter((name3) => !names.has(name3));
-  if (missing.length)
-    await db.batch(missing.map((name3) => ({
-      sql: 'INSERT OR IGNORE INTO "_platform_bootstrap_catalog" VALUES(?)',
-      args: [name3]
-    })), "write");
-  for (const role of unseen)
-    known.add(role);
-  cataloguedRoles.set(db, known);
-}
-async function syncBootstrapRelations(db, userId, bootstrap) {
-  const roles = JSON.stringify(bootstrap.roles);
-  const eligible = bootstrap.eligible ? 1 : 0;
-  const proof = 'NOT EXISTS(SELECT 1 FROM "_platform_role_provenance" p WHERE p."userId"=ur."userId" AND p."roleId"=ur."roleId")';
-  const inherited = 'NOT EXISTS(SELECT 1 FROM "_platform_bootstrap_grants" b WHERE b."userId"=ur."userId" AND b."roleId"=ur."roleId")';
-  const stale = `(${inherited} OR ?=0 OR r.name NOT IN (SELECT value FROM json_each(?)))`;
-  const candidates = `SELECT ur."userId",ur."roleId" FROM "UserProjectRole" ur JOIN "ProjectRole" r ON r.id=ur."roleId" WHERE ur."userId"=? AND ${proof} AND (EXISTS(SELECT 1 FROM "_platform_bootstrap_catalog" c WHERE c.name=r.name) OR NOT (${inherited}) OR EXISTS(SELECT 1 FROM "_platform_legacy_role_grants" l WHERE l."userId"=ur."userId" AND l."roleId"=ur."roleId"))`;
-  const changes = await db.execute({
-    sql: `${candidates} AND ${stale} UNION SELECT ?,r.id FROM "ProjectRole" r WHERE ?=1 AND r.name IN (SELECT value FROM json_each(?)) AND NOT EXISTS(SELECT 1 FROM "UserProjectRole" ur WHERE ur."userId"=? AND ur."roleId"=r.id) LIMIT 1`,
-    args: [userId, eligible, roles, userId, eligible, roles, userId]
-  });
-  if (changes.rows.length === 0)
-    return;
-  await db.batch([
-    {
-      sql: `INSERT OR IGNORE INTO "_platform_legacy_role_grants" SELECT "userId","roleId",'legacy',strftime('%Y-%m-%dT%H:%M:%fZ','now') FROM (${candidates} AND ${inherited})`,
-      args: [userId]
-    },
-    {
-      sql: `DELETE FROM "UserProjectRole" WHERE "userId"=? AND "roleId" IN (SELECT "roleId" FROM (${candidates} AND ${stale}))`,
-      args: [userId, userId, eligible, roles]
-    },
-    {
-      sql: 'INSERT OR IGNORE INTO "UserProjectRole" SELECT u.id,r.id FROM "User" u CROSS JOIN "ProjectRole" r WHERE u.id=? AND ?=1 AND r.name IN (SELECT value FROM json_each(?))',
-      args: [userId, eligible, roles]
-    },
-    {
-      sql: `INSERT OR IGNORE INTO "_platform_bootstrap_grants" SELECT ur."userId",ur."roleId" FROM "UserProjectRole" ur JOIN "ProjectRole" r ON r.id=ur."roleId" WHERE ur."userId"=? AND ?=1 AND r.name IN (SELECT value FROM json_each(?)) AND ${proof}`,
-      args: [userId, eligible, roles]
-    }
-  ], "write");
-}
-function manualRoleProvenancePlugin(actorId, permissions, activeTransaction) {
-  return {
-    id: "trusted-role-provenance",
-    onEntityMutation: {
-      runAfterMutationWithinTransaction: true,
-      async beforeEntityMutation(args) {
-        if (args.model === "UserProjectRole" && args.action === "delete")
-          await args.loadBeforeMutationEntities();
-      },
-      async afterEntityMutation(args) {
-        if (args.model !== "UserProjectRole")
-          return;
-        if (!permissions.includes("users.manage"))
-          throw new Error("manual role grants require users.manage");
-        const rows = args.action === "delete" ? args.beforeMutationEntities : await args.loadAfterMutationEntities();
-        if (!rows)
-          throw new Error("role mutation provenance unavailable");
-        const internal = activeTransaction();
-        if (!internal)
-          throw new Error("role provenance requires the mutation transaction");
-        for (const row of rows) {
-          if (typeof row.userId !== "string" || typeof row.roleId !== "string")
-            throw new Error("invalid role grant identity");
-          if (args.action === "delete") {
-            await internal.execute({
-              sql: 'DELETE FROM "_platform_role_provenance" WHERE "userId"=? AND "roleId"=?',
-              args: [row.userId, row.roleId]
-            });
-          } else {
-            await internal.execute({
-              sql: `INSERT INTO "_platform_role_provenance" VALUES(?,?,'manual') ON CONFLICT("userId","roleId") DO UPDATE SET source='manual'`,
-              args: [row.userId, row.roleId]
-            });
-          }
-          await internal.execute({
-            sql: `INSERT INTO "AuditEvent" (id,at,"requestId","appSlug","actorId",action,resource,decision) VALUES(?,?,?,'platform',?,'role.provenance',?,'allow')`,
-            args: [
-              crypto.randomUUID(),
-              new Date().toISOString(),
-              crypto.randomUUID(),
-              actorId,
-              JSON.stringify({
-                userId: row.userId,
-                roleId: row.roleId,
-                source: args.action === "delete" ? "removed" : "manual"
-              })
-            ]
-          });
-        }
-      }
-    }
-  };
-}
-
-// frontend/packages/project-gateway/src/internal/project-users.ts
-async function bootstrapProjectUser(db, input) {
-  await ensureRoleGrantMetadata(db, []);
-  const newId = crypto.randomUUID();
-  const at = input.now.toISOString();
-  const roles = [...new Set(input.defaultRoles)];
-  const rolePlaceholders = roles.map(() => "?").join(", ");
-  const statements = [
-    {
-      sql: `INSERT INTO "User" ("id", "globalUserId", "displayName", "createdAt", "updatedAt")
-            VALUES (?, ?, ?, ?, ?) ON CONFLICT ("globalUserId") DO NOTHING`,
-      args: [newId, input.globalUserId, input.displayName, at, at]
-    },
-    ...roles.length === 0 ? [] : [
-      {
-        sql: `INSERT OR IGNORE INTO "UserProjectRole" ("userId", "roleId")
-                  SELECT u."id", r."id" FROM "User" u JOIN "ProjectRole" r ON r."name" IN (${rolePlaceholders})
-                  WHERE u."id" = ?`,
-        args: [...roles, newId]
-      },
-      {
-        sql: `INSERT OR IGNORE INTO "_platform_role_provenance" ("userId","roleId",source)
-                  SELECT ur."userId",ur."roleId",'default' FROM "UserProjectRole" ur
-                  WHERE ur."userId"=?`,
-        args: [newId]
-      }
-    ],
-    {
-      sql: `INSERT INTO "AuditEvent" ("id", "at", "requestId", "appSlug", "actorId", "action", "decision")
-            SELECT ?, ?, ?, ?, u."id", 'user.bootstrap', 'allow' FROM "User" u WHERE u."id" = ?`,
-      args: [crypto.randomUUID(), at, input.requestId, input.appSlug, newId]
-    },
-    {
-      sql: `UPDATE "User" SET "displayName" = ?, "updatedAt" = ?
-            WHERE "globalUserId" = ? AND "displayName" IS NULL AND ? IS NOT NULL`,
-      args: [input.displayName, at, input.globalUserId, input.displayName]
-    },
-    {
-      sql: `SELECT "id", "displayName" FROM "User" WHERE "globalUserId" = ?`,
-      args: [input.globalUserId]
-    }
-  ];
-  const results = await db.batch(statements, "write");
-  const row = results.at(-1)?.rows[0];
-  if (!row)
-    throw new Error("project user bootstrap returned no row");
-  const id = String(row.id);
-  return {
-    id,
-    displayName: row.displayName === null ? null : String(row.displayName),
-    created: id === newId
-  };
-}
-function blockedGlobalUserIds(gid, platformUserIds) {
-  const issuer = gid.slice(0, gid.lastIndexOf(":") + 1);
-  return platformUserIds.map((id) => `${issuer}${id}`);
-}
-async function loadProjectActor(db, userId, blockedGlobalIds = [], bootstrap = NO_BOOTSTRAP) {
-  await prepareRoleAuthorization(db, userId, bootstrap);
-  const [users, permissions, blocked] = await db.batch([
-    {
-      sql: `SELECT "id", "globalUserId", "displayName" FROM "User" WHERE "id" = ?`,
-      args: [userId]
-    },
-    {
-      sql: `SELECT DISTINCT rp."permission" FROM "UserProjectRole" upr
-              JOIN "RolePermission" rp ON rp."roleId" = upr."roleId"
-              JOIN "ProjectRole" r ON r.id=upr."roleId"
-              WHERE upr."userId" = ? AND (
-                (NOT EXISTS(SELECT 1 FROM "_platform_bootstrap_catalog" legacy WHERE legacy.name=r.name)
-                 AND NOT EXISTS(SELECT 1 FROM "_platform_bootstrap_grants" b WHERE b."userId"=upr."userId" AND b."roleId"=upr."roleId")
-                 AND NOT EXISTS(SELECT 1 FROM "_platform_legacy_role_grants" l WHERE l."userId"=upr."userId" AND l."roleId"=upr."roleId"))
-                OR EXISTS(SELECT 1 FROM "_platform_role_provenance" proof
-                  WHERE proof."userId"=upr."userId" AND proof."roleId"=upr."roleId"))
-              UNION SELECT rp.permission FROM "ProjectRole" r JOIN "RolePermission" rp ON rp."roleId"=r.id
-                WHERE ?=1 AND r.name IN (SELECT value FROM json_each(?)) ORDER BY permission`,
-      args: [userId, bootstrap.eligible ? 1 : 0, JSON.stringify(bootstrap.roles)]
-    },
-    {
-      sql: `SELECT "id" FROM "User" WHERE "globalUserId" IN (SELECT value FROM json_each(?)) ORDER BY "id"`,
-      args: [JSON.stringify(blockedGlobalIds)]
-    }
-  ], "read");
-  const user = users?.rows[0];
-  if (!user)
-    return null;
-  return {
-    id: String(user.id),
-    globalUserId: String(user.globalUserId),
-    displayName: user.displayName === null ? null : String(user.displayName),
-    permissions: (permissions?.rows ?? []).map((row) => String(row.permission)),
-    blockedUserIds: (blocked?.rows ?? []).map((row) => String(row.id))
-  };
-}
-async function findProjectUser(db, userId) {
-  const result = await db.execute({
-    sql: `SELECT "id", "globalUserId" FROM "User" WHERE "id" = ?`,
-    args: [userId]
-  });
-  const row = result.rows[0];
-  return row ? { id: String(row.id), globalUserId: String(row.globalUserId) } : null;
-}
-async function findProjectUsers(db, userIds) {
-  if (userIds.length === 0)
-    return [];
-  const result = await db.execute({
-    sql: `SELECT "id", "globalUserId" FROM "User" WHERE "id" IN (SELECT value FROM json_each(?)) ORDER BY "id"`,
-    args: [JSON.stringify([...new Set(userIds)])]
-  });
-  return result.rows.map((row) => ({ id: String(row.id), globalUserId: String(row.globalUserId) }));
-}
 
 // frontend/packages/project-gateway/src/internal/audit.ts
 function auditPolicyVersionOf(schema, policyVersion) {
@@ -72584,7 +72632,7 @@ function registerAiOpenAiRoutes(app, adapters, config2, runtime, logger) {
     if (run !== undefined) {
       const job = await openJob(c);
       const request2 = await parseRequest(c);
-      if (!/^(queue|schedule):[0-9a-f-]{36}$/i.test(run)) {
+      if (!/^(queue|schedule|python):[0-9a-f-]{36}$/i.test(run)) {
         throw new GatewayError("VALIDATION_FAILED", "invalid run");
       }
       if (request2.messages.some((message2) => fileRefsOf(message2).length > 0)) {
@@ -78947,6 +78995,15 @@ function createDevPython(options2) {
           error: { code: result.error.code, message: result.error.message ?? null }
         });
     },
+    async runPrincipal(credentialId, runId) {
+      const run2 = runs.get(runId);
+      if (!run2 || run2.view.status !== "running" || options2.credentialApp(credentialId) !== run2.view.app || !("userId" in run2.owner))
+        throw new GatewayError("FORBIDDEN", "run is not active for this user");
+      const projectUserId = await options2.projectUserOf(run2.owner.userId);
+      if (!projectUserId)
+        throw new GatewayError("FORBIDDEN", "project user not found");
+      return { userId: run2.owner.userId, projectUserId };
+    },
     async runnerInterrupted(runId, tokenHash) {
       runner(runId, tokenHash);
     }
@@ -79112,7 +79169,8 @@ function createRemotePython(options2) {
     runnerInput: notHere,
     runnerProgress: notHere,
     runnerFinish: notHere,
-    runnerInterrupted: notHere
+    runnerInterrupted: notHere,
+    runPrincipal: notHere
   };
 }
 
@@ -79321,7 +79379,16 @@ async function createDevRuntime(options2) {
     gatewayUrl: () => pythonGateway,
     vars: options2.python?.vars ?? {},
     launch: options2.python?.launch ?? spawnPython,
-    onFinish: onPythonFinish
+    onFinish: onPythonFinish,
+    credentialApp: (id) => [...credentials.values()].find((c2) => c2.context.credentialId === id)?.context.appSlug ?? null,
+    projectUserOf: async (userId) => {
+      const result = await db.execute({
+        sql: `SELECT "id" FROM "User" WHERE "globalUserId" = ?`,
+        args: [`${DEV_ISSUER}:${userId}`]
+      });
+      const id = result.rows[0]?.id;
+      return id === undefined ? null : String(id);
+    }
   });
   const adapters = {
     profiles: {

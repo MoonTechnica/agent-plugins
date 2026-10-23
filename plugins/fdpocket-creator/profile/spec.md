@@ -492,14 +492,18 @@ python の App の中（`apps/<slug>/src/`）は Platform の Python の SDK（`
 def caption(ctx, input):
     ctx.progress(0.1, "モデルを読み込み中")
     model = load_model(ctx.cache_dir)           # /cache（重みなど作り直せるもの）。無ければ取得して置く
-    svc = ctx.client                            # python の App のサービスとして Gateway を呼ぶ（Client）
-    image = svc.storage.download(input["fileId"])
+    image = ctx.storage.download(input["fileId"])   # 依頼した利用者として読む（小さなファイル。大きなものは download_to）
     text = model(image)
-    svc.db.create("Caption", data={"fileId": input["fileId"], "text": text})
+    ctx.db.create("Caption", data={"fileId": input["fileId"], "text": text})
     return {"text": text}
 ```
 
-- `ctx.client` は python の App のサービスとしての `db` / `storage` / `notifications`。`ctx.ai.openai` は Platform の AI
+- **`ctx.db` / `ctx.storage` はこの実行を依頼した利用者として読み書きする**（cron から始まった実行は Project の持ち主）。
+  使えるのは、その利用者の権限（ZenStack のポリシー・バケットの規則）が許し、**かつ python の App の `capabilities` に
+  宣言した**モデル・バケットの操作だけ（`capabilities: { models: { caption: [read, create] }, buckets: { datasets: [read] } }`。
+  python の App が宣言できるのは `models` と `buckets` だけ）。匿名の利用者・その Project を一度も開いていない人の実行では
+  `FORBIDDEN`。実行が終わると使えない。
+- `ctx.client` は python の App のサービスとしての `notifications`（利用者のデータは読めない）。`ctx.ai.openai` は Platform の AI
   （`OpenAI(**ctx.ai.openai())`・LangChain の `ChatOpenAI` に渡す）、`ctx.python` は別のタスクの依頼で、どちらも払うのはこのタスクの払う人。
 - **終わりを TypeScript で受ける**: タスクに `onFinish` を宣言する（§2）。成功も失敗も、タスクのコードが落ちても届く。
   api / jobs で `wait()` し続けない（GPU の処理は数分〜数時間かかり、Worker の時間を使い切る）。
