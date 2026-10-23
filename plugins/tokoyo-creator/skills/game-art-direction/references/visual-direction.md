@@ -89,6 +89,10 @@ tint・パレット変換・全画面の color grading は形や描き方の違�
 - glTF の base color / emissive RGB は sRGB、metallic-roughness は linear。roughness は G、metallic は B。
   normal / occlusion 等のデータを色として補正しない。GLB の正しい loader 設定を不用意に上書きしない。
 - KTX2 変換でも color / data の性質を維持する。Godotの固定版importで読み込み、Web/native双方の実描画を確認する。
+- 自作シェーダーの色の uniform と色のテクスチャには必ず `source_color` を付ける（例 `uniform vec4 grass : source_color = vec4(0.36, 0.62, 0.3, 1.0);`）。
+  Godot は linear で描くので、付けないと Forward+ / Mobile で色が白っぽく抜ける。Web の Compatibility では省略しても同じに見えるため、
+  片方の描画だけでは気づけない。色をシェーダーのコードに数値で直書きせず、`source_color` の uniform にして engine に変換させる。
+  確かめるのは Web の実描画（Compatibility）と、組み込み native・Editor・手元の実行の両方。
 
 ### 影・露出・空気感
 
@@ -134,3 +138,4 @@ tint・パレット変換・全画面の color grading は形や描き方の違�
 - [Khronos glTF 2.0 specification](https://raw.githubusercontent.com/KhronosGroup/glTF/main/specification/2.0/Specification.adoc): 材質と色空間。
 
 - [Godot 4.5 performance](https://docs.godotengine.org/en/4.5/tutorials/performance/index.html): 固定版の描画・CPU最適化。
+- [Godot 4.5 shading language: `source_color`](https://docs.godotengine.org/en/4.5/tutorials/shaders/shader_reference/shading_language.html): sRGB の色・テクスチャの変換（Forward+ / Mobile は必須、Compatibility は任意）。

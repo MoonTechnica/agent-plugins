@@ -21,10 +21,18 @@
 
 ## 2. 同じターンで撮る
 
-手元の環境に本物のShellと目的付き試遊ツールがある時は同じ入力/画像/版の記録を使う。
-本リポジトリでは `build-observation-shell` 後、`observe-game --archive <試遊用tar.gz> --plan <JSON> --out <記録先> --shell-dir <built Shell>`。
-配布Creator Kitにこのツールがあるとは仮定しない。使えるブラウザ/作者プレビューで確認し、無い時は未確認を残す。
-追加のPlatform生成/繰り返しpushで撮影を代用しない。通常の提出/公開の手順は `instructions.md`。
+Creator Kitに本物のShellと上の試遊ツール（`observe.js`）は入っていない。手元では同じ目的・同じ場面を、GPUのある環境の
+Godot 4.5.1で撮る（Platformの機能は動かないので、Shellとの結合や保存は制作画面で確かめる）。
+
+1. 目的の場面へ進む入力は、開発テストのカタログ（`debug/catalog.json`。`<kit>/sdk/app-sdk/spec.md` §10）の開始条件か、
+   `source/godot/` の外に置く撮影用の小さなスクリプトで行う。teleportで遊べる証明にしない。
+2. `"$GODOT_BIN" --path source/godot --resolution 1280x720 --write-movie <記録先>/frame.png --fixed-fps 30 --quit-after <フレーム数>`。
+   `.png` を指定すると連番のPNGが書かれる。縦画面は `--resolution 390x660` などで別に撮る。
+   窓が背面に回るとポーズする作品（`$game-screen-layout`）は、撮影中は前面に置くか撮影用スクリプトで再開する。
+3. 書かれた画像を実際に読み、問題の場所/基準との差/原因/変更を記録して直し、同じ入力で撮り直す。
+
+撮れない環境（GPU無し・画面無し）では未確認と記録する。追加のPlatform生成/繰り返しpushで撮影を代用しない。
+通常の提出/公開の手順は `instructions.md`。
 
 ```json
 {

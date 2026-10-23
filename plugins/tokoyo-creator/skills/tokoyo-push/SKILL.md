@@ -24,3 +24,5 @@ description: 手元で作った TOKOYO.games のゲームを Platform に送る�
    開けない環境では `opened: false` になるだけ。`open` がエラーで終わっても止まらない）。開けたかどうかに関わらず、**`editor_url` を返事の最後に目立つ形で毎回示す**
    （正式な試遊は制作画面。手元の Godot Editor の実行は確認用で、Platform の機能は動かない。instructions §8.7）。そのあと `$tokoyo-pull` で取り込み直す（次の push の base になる）。
    `STALE_BASE` は `kit.mjs pull`（= `git pull --rebase`）してから 2. から（§8.4）、ほかのエラーは §8.5。公開・投稿は制作画面で利用者が行う。
+   `QUOTA_EXCEEDED`（`generation_already_running`）は、同じ利用者の生成・送信がどれか 1 本動いている合図。返った `running_job_id` を
+   `get_build` で終わるまで待ち、同じ `request_key` で 5. からやり直す。ほかのゲーム・会話の送信は止めない（§8.5）。

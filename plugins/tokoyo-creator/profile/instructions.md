@@ -28,8 +28,7 @@
 依頼と差分を再確認し、抵触したら理由を説明して送信を拒否する。元作者・チーム編集者から規約の設定・編集を依頼されたときは
 `set_contribution_policy` を使う。貢献者の依頼では呼ばない。
 1. `<kit>/profile/spec.md` を読む（何がどこにあるか）
-2. `<kit>/sdk/app-sdk/spec.md` を読む（**App の API 契約。正本**）
-3. Godotは`<kit>/sdk/sample-godot/`、オンライン対戦は`<kit>/sdk/sample-godot-multiplayer/`を読む。Godotの画面・入力はGDScript、対戦の権威あるルールは`server/main.ts`のdefineSpaceで書き、共有TokoyoSpaceで接続する。
+2. `<kit>/sdk/app-sdk/spec.md` を読む（**App の API 契約。正本**）。手元では `kit.mjs setup` が SDK を展開した後にできる（`$tokoyo-new` 1.）3. Godotは`<kit>/sdk/sample-godot/`、オンライン対戦は`<kit>/sdk/sample-godot-multiplayer/`を読む。Godotの画面・入力はGDScript、対戦の権威あるルールは`server/main.ts`のdefineSpaceで書き、共有TokoyoSpaceで接続する。
 4. **依頼に必要な Skill だけを使う**（`<kit>/skills/`。下の表）。依頼の意図と変更範囲から自分で選び、
    関係しない Skill は読まない。数値や文言の小さな修正なら Skill を読まずに直してよい。
    ただし**新しいゲーム・遊びの核や見た目の方向を変えるときは `$game-design` と `$game-art-direction` を必ず読む**。
@@ -166,7 +165,7 @@ ai/<key>.md          # ゲーム内 AI の指示文（`ai.chat` のときだけ�
 - **素材はすべて `godot/` に置き、Godot の import と export で PCK に入れる。** ゲームのコードは `preload()` / `load()` / `ResourceLoader` で
   `res://` から読む。URL・台帳から参照する素材の経路は無い。広い世界は `godot/regions/<地域>/` に分けて地域ごとの
   追加 pack にし、近づいたら `TokoyoApp.regions.load(name)` で重ねる（`$game-open-world`、`spec.md` §8.6）。
-- **PCK は 1 つ 64 MiB まで**（iOS の組み込み runtime の上限）。Web では起動前に全部届くので、10 MiB を超えると警告になる
+- **PCK は 1 つ 64 MiB まで**（iOS の組み込み runtime の上限）。Web では起動前に全部届くので、ゲーム自身の初期ファイル（Godot の Web エンジン `game.wasm`・`game.js` を除く）が 10 MiB を超えると警告になる
   （スマートフォンの回線で起動を待たせる）。テクスチャの圧縮 import・音の圧縮・解像度で収める（`$game-3d-and-bundles`）。
 - 絶対パス・`..`・シンボリックリンク・同じパスの重複は取り込みで落とされる。
 - ファイル名は英数字と `.` `_` `-` と `/` だけを使う。
@@ -230,8 +229,9 @@ ai/<key>.md          # ゲーム内 AI の指示文（`ai.chat` のときだけ�
 
 **`$game-godot` と必要な公式参照を先に読む。** 新しいゲームはすべて Godot で作る（§4.2）。
 
-0. `$game-design` の段階 1〜3（企画・見た目の合意・素材の設計）を先に済ませる（新しいゲームの最初のターンは企画のターンで終える。§0）。
-1. `<kit>/sdk/sample-godot/`（オンライン対戦は `<kit>/sdk/sample-godot-multiplayer/`）を土台にして、**同じ構成**
+0. `$game-design` の段階 1〜3（企画・見た目の合意・素材の設計）を先に済ませる。見た目と遊びの方向を見せて止まるかは `$game-art-direction` §2 の表で決める
+   （新しいゲームは原則見せる。利用者が「確認なしで」「おまかせで最後まで」と言ったときは見せずに作り進める。コンセプトはどちらでも作る）。
+   手元に企画のターンは無いので、見せるときは会話でコンセプト画像と企画を示し、承認されたら同じ会話で作り続ける（§2）。1. `<kit>/sdk/sample-godot/`（オンライン対戦は `<kit>/sdk/sample-godot-multiplayer/`）を土台にして、**同じ構成**
    （`godot/` / `manifest.json` / `package.json` / `debug/` / `.gitattributes`、対戦は `server/main.ts`）でプロジェクトを作る。
    `.gitattributes` は画像・音・3D・フォントを Git LFS に置く規則なので必ず写す。
    土台のキューブの場面は依頼のゲームに置き換え、`godot/tokoyo_*.gd`（Platform との接続・移動スティック）はそのまま残す。
@@ -412,6 +412,7 @@ LFS の実体を上げ下ろしするので、最初に一度 `node <kit>/script
 | `get_build` が `failed`・`error_code: SDK_VERSION_MISMATCH` | `manifest.json` の `sdkVersion` が今の SDK（この Kit の SDK。`spec.md` の値）と違う。直してから 3. からやり直す |
 | `get_build` が `failed`・`error_code` が取り込みの検査のコード（`MANIFEST_MISSING` / `MANIFEST_UNREADABLE` / `UNREADABLE_ARCHIVE` / `PATH_TRAVERSAL` / `ARTIFACT_TOO_LARGE` / `TOO_MANY_FILES` など） | `outputs/dist.tar.gz` の形が Platform の取り込みを通らない（検証まで進んでいないので report は無い）。`kit.mjs check` で同じ検査を手元で回して直し、3. からやり直す |
 | `QUOTA_EXCEEDED` / `RATE_LIMITED` | 送信や素材の上限（素材の予算は App ごと・UTC の 1 日。結果の `budget.resets_at`）。少し待つよう利用者に伝える。何度も送り直さない |
+| `QUOTA_EXCEEDED`（`generation_already_running`） | 同じ利用者の生成か送信（どのゲームでも）が 1 本動いている。結果の `running_job_id` / `running_app_id` の終わり（`get_build`）を待ち、**同じ `request_key`** で `begin_build` からやり直す。別のゲームや他の会話の送信を `cancel_build` で止めない（自分が始めて捨てた送信だけを取り消す）。並行して複数のゲームを送らない |
 | `FORBIDDEN` | この App を編集できない（別のアカウントの App）。利用者に確認する |
 | `INVALID_ACTION` | マージ中・生成中など、今は送れない状態。`get_app` の `running_job` / `merge_in_progress` を見て待つ |
 

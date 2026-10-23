@@ -9406,7 +9406,7 @@ function splitFlag(flag) {
 // frontend/packages/creator-kit/src/commands.ts
 import { createHash as createHash5 } from "node:crypto";
 import { existsSync as existsSync7 } from "node:fs";
-import { cp as cp2, mkdir as mkdir5, mkdtemp as mkdtemp2, readdir as readdir4, readFile as readFile8, realpath as realpath3, rm as rm4, writeFile as writeFile5 } from "node:fs/promises";
+import { cp as cp2, mkdir as mkdir5, mkdtemp as mkdtemp2, readdir as readdir4, readFile as readFile8, realpath as realpath3, rm as rm5, writeFile as writeFile5 } from "node:fs/promises";
 import { homedir, tmpdir as tmpdir2 } from "node:os";
 import { dirname as dirname4, isAbsolute as isAbsolute3, join as join11, relative as relative4, resolve } from "node:path";
 
@@ -14662,14 +14662,18 @@ function planBundles(manifest, files) {
       severity: "error",
       message: `the files outside bundles/ total ${initial.size} bytes (max ${ARTIFACT_INITIAL_MAX_BYTES}); make the Godot pack smaller`
     });
-  } else if (initial.size > ARTIFACT_INITIAL_WARN_BYTES) {
+  } else if (ownInitialSize(initial.files, manifest.godot) > ARTIFACT_INITIAL_WARN_BYTES) {
     findings.push({
       code: "INITIAL_BUNDLE_LARGE",
       severity: "warning",
-      message: `the files outside bundles/ total ${initial.size} bytes; above ${ARTIFACT_INITIAL_WARN_BYTES} the game takes long to start on mobile`
+      message: `the game's own files outside bundles/ (not counting the Godot engine) total ${ownInitialSize(initial.files, manifest.godot)} bytes; above ${ARTIFACT_INITIAL_WARN_BYTES} the game takes long to start on mobile`
     });
   }
   return { plan: { initial, bundles }, findings };
+}
+function ownInitialSize(files, godot) {
+  const engine = new Set(godot ? [godot.web.glue, godot.web.wasm] : []);
+  return files.reduce((sum, file) => engine.has(file.path) ? sum : sum + file.size, 0);
 }
 // frontend/packages/app-protocol/src/commerce.ts
 var coins = string2().regex(/^[0-9]{1,14}(\.[0-9]{1,6})?$/);
@@ -30989,7 +30993,7 @@ var PLUGIN_DOTFILES = new Set([".mcp.json", ".lsp.json"]);
 // frontend/packages/creator-kit/src/login.ts
 import { createHash as createHash2, randomBytes } from "node:crypto";
 import { existsSync as existsSync4 } from "node:fs";
-import { chmod, mkdir as mkdir2, readFile as readFile4, rename, writeFile as writeFile2 } from "node:fs/promises";
+import { chmod, mkdir as mkdir2, open, readFile as readFile4, rename, rm as rm2, stat, writeFile as writeFile2 } from "node:fs/promises";
 import { createServer } from "node:http";
 import { join as join7 } from "node:path";
 var DEFAULT_MCP_URL = "https://tokoyo.games/mcp/creator";
@@ -30997,6 +31001,9 @@ var REDIRECT_URI = "http://127.0.0.1:43126/callback";
 var REFRESH_MARGIN_MS = 60000;
 var LOGIN_TIMEOUT_MS = 5 * 60000;
 var CREDENTIALS_FILE = "credentials.json";
+var REFRESH_LOCK_FILE = "credentials.lock";
+var REFRESH_LOCK_STALE_MS = 30000;
+var REFRESH_LOCK_WAIT_MS = 20000;
 
 class LoginError extends Error {
   name = "LoginError";
@@ -31122,13 +31129,53 @@ async function login(mcpUrl, deps) {
   return stored;
 }
 async function accessToken(mcpUrl, deps) {
+  const valid = await storedToken(mcpUrl, deps);
+  if (valid !== undefined)
+    return valid;
+  return await withRefreshLock(deps.configDir, async () => {
+    const refreshed = await storedToken(mcpUrl, deps);
+    return refreshed !== undefined ? refreshed : await refresh(mcpUrl, deps);
+  });
+}
+async function storedToken(mcpUrl, deps) {
   const stored = (await readLogins(deps.configDir))[mcpUrl];
   if (!stored)
     return null;
   if (stored.access_token !== null && stored.expires_at - deps.now() > REFRESH_MARGIN_MS) {
     return stored.access_token;
   }
-  if (stored.refresh_token === null)
+  return stored.refresh_token === null ? null : undefined;
+}
+async function withRefreshLock(configDir, run) {
+  await mkdir2(configDir, { recursive: true, mode: 448 });
+  const path = join7(configDir, REFRESH_LOCK_FILE);
+  const deadline = Date.now() + REFRESH_LOCK_WAIT_MS;
+  for (;; ) {
+    try {
+      const handle = await open(path, "wx", 384);
+      await handle.close();
+      break;
+    } catch (error) {
+      if (error.code !== "EEXIST")
+        throw error;
+      const age = Date.now() - (await stat(path).catch(() => ({ mtimeMs: Date.now() }))).mtimeMs;
+      if (age > REFRESH_LOCK_STALE_MS)
+        await rm2(path, { force: true });
+      else if (Date.now() > deadline)
+        throw new LoginError(`${path} is held by another kit.mjs`);
+      else
+        await new Promise((resolve) => setTimeout(resolve, 25));
+    }
+  }
+  try {
+    return await run();
+  } finally {
+    await rm2(path, { force: true });
+  }
+}
+async function refresh(mcpUrl, deps) {
+  const stored = (await readLogins(deps.configDir))[mcpUrl];
+  if (!stored || stored.refresh_token === null)
     return null;
   let tokens;
   try {
@@ -31641,7 +31688,7 @@ var REMOTE_REFS = "refs/remotes/tokoyo";
 
 // frontend/packages/creator-kit/src/repo.ts
 import { existsSync as existsSync5 } from "node:fs";
-import { appendFile, mkdir as mkdir3, readFile as readFile6, rm as rm2, writeFile as writeFile3 } from "node:fs/promises";
+import { appendFile, mkdir as mkdir3, readFile as readFile6, rm as rm3, writeFile as writeFile3 } from "node:fs/promises";
 import { join as join9 } from "node:path";
 class RepoError extends Error {
   name = "RepoError";
@@ -31654,7 +31701,18 @@ function kitCommand(kitRoot, ...args) {
     ...args
   ].join(" ");
 }
-var EXCLUDES = ["node_modules/", "/dist/", ".DS_Store", "*.blend", "*.blend[0-9]*"];
+var EXCLUDES = [
+  "node_modules/",
+  "/dist/",
+  "/debug-dist/",
+  ".godot/",
+  "/package-lock.json",
+  "/bun.lock",
+  "/bun.lockb",
+  ".DS_Store",
+  "*.blend",
+  "*.blend[0-9]*"
+];
 async function set(git, source, key, value) {
   await gitOk(git, source, ["config", key, value]);
 }
@@ -31741,7 +31799,7 @@ async function fetchBundles(git, source, pulled, already, download) {
         `+refs/*:${REMOTE_REFS}/*`
       ]);
     } finally {
-      await rm2(file, { force: true });
+      await rm3(file, { force: true });
     }
     fetched.push(bundle.sha256);
   }
@@ -31786,7 +31844,7 @@ async function integrate(git, source, threadRef) {
 import { spawnSync } from "node:child_process";
 import { createHash as createHash4 } from "node:crypto";
 import { existsSync as existsSync6 } from "node:fs";
-import { mkdir as mkdir4, mkdtemp, readdir as readdir3, readFile as readFile7, rm as rm3, writeFile as writeFile4 } from "node:fs/promises";
+import { mkdir as mkdir4, mkdtemp, readdir as readdir3, readFile as readFile7, rm as rm4, writeFile as writeFile4 } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join as join10 } from "node:path";
 var SDK_DIR = "sdk";
@@ -31813,7 +31871,7 @@ async function setupSdk(options) {
   try {
     const path = join10(scratch, "sdk.tgz");
     await writeFile4(path, archive);
-    await rm3(sdk, { recursive: true, force: true });
+    await rm4(sdk, { recursive: true, force: true });
     await mkdir4(sdk, { recursive: true });
     untar(path, sdk);
     for (const required of ["app-sdk/spec.md", "package.json", KIT_LOCKFILE]) {
@@ -31824,7 +31882,7 @@ async function setupSdk(options) {
     await writeFile4(join10(sdk, SDK_SHA_FILE), `${expected}
 `);
   } finally {
-    await rm3(scratch, { recursive: true, force: true });
+    await rm4(scratch, { recursive: true, force: true });
   }
   return "installed";
 }
@@ -32066,8 +32124,8 @@ var PLAYTEST_REPORT = "playtest-report.json";
 var PLAYTEST_DIR = "playtest";
 async function replacePlaytest(context, workdir, playtest) {
   const input = join11(workdir, WORKDIR_DIRS.input);
-  await rm4(join11(input, PLAYTEST_REPORT), { force: true });
-  await rm4(join11(input, PLAYTEST_DIR), { recursive: true, force: true });
+  await rm5(join11(input, PLAYTEST_REPORT), { force: true });
+  await rm5(join11(input, PLAYTEST_DIR), { recursive: true, force: true });
   if (playtest === null)
     return;
   const report = JSON.parse(new TextDecoder().decode(await context.download(playtest.url)));
@@ -32273,7 +32331,7 @@ async function pack(context) {
     await writeFile5(join11(outputs, "debug-dist.tar.gz"), archive);
     developmentFiles = { "debug-dist.tar.gz": describeFile(archive) };
   } else
-    await rm4(join11(outputs, "debug-dist.tar.gz"), { force: true });
+    await rm5(join11(outputs, "debug-dist.tar.gz"), { force: true });
   print(context, {
     files: {
       ...developmentFiles,

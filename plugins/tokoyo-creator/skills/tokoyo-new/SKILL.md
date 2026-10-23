@@ -24,5 +24,8 @@ description: TOKOYO.games のミニゲームを手元の Coding Agent で新し�
    対戦には`<kit>/sdk/sample-godot-multiplayer/`を参照し、既存Spaceサーバーへ接続する。
 5. **画像や音を使うなら一度だけ** `node <kit>/scripts/kit.mjs login`（ブラウザで許可する。Git LFS の資格情報）。
 6. **作る**: `<kit>/profile/instructions.md` を読み、その約束（§4.1 と §8）どおりに `source/` で作り、`git commit` する。
+   `<kit>/sdk/app-sdk/spec.md`（API 契約）は 1. の `setup` の後にできる。`kit.mjs build` の前に `source/` で一度
+   `npm install`（または `bun install`）する。できる lockfile・`node_modules/`・`dist/`・`debug-dist/`・`.godot/` は
+   Kit が git の除外に入れてあるので commit しない（`pack` は未 commit の変更があると断る）。
    利用者が手元の Godot Editor で見たい・F5 で試したいときは `node <kit>/scripts/kit.mjs editor`（確認用。§8.7）。
 7. **送る**: `$tokoyo-push`。送った版は制作画面（`editor_url`）で試遊できる。

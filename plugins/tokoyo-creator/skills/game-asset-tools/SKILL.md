@@ -88,6 +88,9 @@ CLIは参照検索と決定的なローカル加工だけで、有料生成・�
   制作資料の画像はその画像を表示し、3Dモデルの実プレビューをコンセプト画像で代用しない。
 
 以下は§1で生成・自作を選んだ場合の手順。ライブラリ取得は§3.5、モデリングは `$game-3d-studio` に従う。
+手元に ImageMagick（`convert`）が無ければ、同じ縮小・切り抜きは同梱の Godot スクリプトで行う（GPU も import も要らない）:
+`godot --headless -s <kit>/skills/game-asset-tools/assets/image.gd -- fit <元.png> <先.jpg|.png|.webp> --max 1024 [--quality 85]`
+（長辺を max 以下に縮める）/ `-- cover <元> <先> --size 1600x1000`（覆うように縮めて中央を切り抜く）。成功すると `IMAGE_RESULT=` を出す。
 
 | 作りたいもの | 手順 | 置き方 |
 |---|---|---|
@@ -139,6 +142,16 @@ Smart Topologyや複数視点等を公式サイトで見つけても、現行ツ
    （URL は 10 分で失効する。切れたら `get_asset(asset_id)` で取り直す）。
 5. 縮小して置く: `convert /tmp/hero.png -resize 512x512 godot/assets/hero.png`
 
+### 3.1 連番アニメを作る（素材に無い主役の歩き・攻撃など）
+
+1. 1 回の生成で **1 列に並んだ N コマ（4〜8）** を作る。指示に「同じ大きさの枠が横に N 個、各枠に同じキャラクター、
+   足元は同じ高さ、枠の間は無地、単色の背景、影なし」と、主役の設定画（`hero.png`）に合わせる特徴を書く。
+   画像の参照入力が要るときは `generate_image` ではなく、登録済みの設定画の素材に `edit_image` を使う（`generate_image` は参照画像を受け取らない）。
+2. §3 の 2.〜4. で背景を抜いて取得する。
+3. コマの境目を確かめる: `$game-level-design` の `tiles.gd sheet <画像> --tile <幅>x<高さ> --separation 0,0`（コマの大きさを
+   指定する）で拡大図を作り、足元の高さ・大きさ・向きがそろっているかを見る。ずれているコマは作り直すか、そのコマだけ位置を直す。
+4. 上の「連番フレーム」と同じく `AtlasTexture` の `region` で切り出して `SpriteFrames` に並べる。
+
 ## 3.5 フリー素材（CC0）を探して取り込む
 
 `search_stock_assets(kind, query)` で探し、合うものを `import_stock_asset(name, stock_id)` で取り込む。
@@ -147,17 +160,18 @@ Smart Topologyや複数視点等を公式サイトで見つけても、現行ツ
 | kind | 何がある | 探す語の例 |
 |---|---|---|
 | `image` | 2D のキャラ・敵・アイテム・タイル・背景の部品・UI・アイコン。**歩き・ジャンプ・攻撃の連番フレーム** | `platformer player walk` / `enemy walking` / `coin` / `tile grass` / `button` |
-| `audio` | 効果音（打撃・足音・UI・レトロ・カジノ・RPG）、ジングル、ボイス、Superpowers / Ninja Adventure の BGM | `jump` / `footstep` / `click` / `coin` / `jingle win` / `laser` / `music` |
+| `audio` | 効果音（打撃・足音・UI・レトロ・カジノ・RPG）、ジングル、ボイス、Superpowers / Ninja Adventure の BGM | `jump` / `footstep` / `click` / `coin` / `jingles` / `laser` / `music` |
 | `model_3d` | 低ポリの 3D キット（建物・乗り物・武器・自然）、**アニメ付きのキャラクター**（idle / walk / sprint / jump / attack…）、人型のアニメ集 | `character` / `blocky character` / `car` / `tree` / `animation library` |
 
 - **語は英語で短く**（素材の名前が英語）。1 つ目で見つからなければ語を変えて 2〜3 回まで。
+  索引にあるのはファイル名・パック名・分類の語だけで、曲調・テンポ・用途（「勝利」「落ち着いた」）は無い。`win` や `calm` ではなく `jingles` / `music` / パック名で探し、候補の `pack` と `name` から選ぶ。
 - **PBR テクスチャも `image`**。Poly Haven / ambientCG を `wood color` / `stone roughness` / `brick normal` 等で探す。同じ `pack` の map を揃える。3Dで使う画像は §8 の `convert_texture` へ渡す。法線は `mode: "normal"`。一部の大きい原本は512pxへ縮小されるので、取り込み結果の寸法を使う。
 - 供給元は Kenney、既存固定版 Quaternius UAL、Superpowers、KayKit Prototype Bits、Poly Haven、ambientCG。検索は索引だけを読み、素材原本は取り込み時に取得する。HDRI・字体・SVG・CC BY の素材はこの経路にはまだ含まれない。
 - 結果は良く合う順。`pack`（パック名）が同じものは絵柄がそろっている。続きは `next_cursor` を渡す。
-- **連番フレーム**（`playerBlue_walk1` … `playerBlue_walk5`）は `name` の末尾の数字順に 1 枚ずつ取り込む
-  （1 枚で `stock` 枠を 1 回）。`name` は `hero-walk-1` のように付け、`godot/assets/` に置いて `SpriteFrames` の
-  アニメーション（8〜12 fps）に並べ、`AnimatedSprite2D` で再生する（エディタで作った `.tres` か、`load()` した `Texture2D` を
-  `SpriteFrames.add_frame()` で足す）。
+- **連番フレーム**（`playerBlue_walk1` … `playerBlue_walk5`）は、同じ大きさのフレームが並ぶフォルダなら下のタイルと同じく
+  **フォルダで 1 回**取り込む（返る `tileset.files` がファイル名ごとのシート上の [列, 行]）。1 枚ずつ取り込むと 1 枚で `stock` 枠を 1 回使う。
+  `godot/assets/` に置いて `SpriteFrames` のアニメーション（8〜12 fps）に並べ、`AnimatedSprite2D` で再生する
+  （フレームごとに `AtlasTexture` の `region` でシートを切り出し、`SpriteFrames.add_frame()` で足す。エディタで作った `.tres` でもよい）。
 
 - **タイル（マップチップ）はフォルダで 1 回**: `stock_id` のファイル名を除いたフォルダ（末尾 `/`。例 `kenney:2d/Pixel Platformer/Tiles/`）を
   渡すと、直下の同じ大きさのタイルを名前順に 1 枚のシートにして取り込み、`tileset`（タイルの大きさ・列数・ファイル名ごとの [列, 行]）を返す。
