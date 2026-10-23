@@ -131,6 +131,11 @@ export const projectConsentSchema = z.strictObject({
      * クレジットを消費する。project-ai.md §1）。使わない版には無い（既存の同意を取り直させない）
      */
     ai: z.literal(true).optional(),
+    /**
+     * python の App（GPU の計算）がある版だけ true（タスクを Platform の Modal で動かし、依頼した利用者の
+     * クレジットを消費する。python-backend.md §5）。無い版には無い
+     */
+    compute: z.literal(true).optional(),
     /** 審査 Agent のデータの扱いの要約（{ ja, en }。審査の前・要約が使えなかった版は null。tasks/0464） */
     privacySummary: localizedNameSchema.nullable(),
 });

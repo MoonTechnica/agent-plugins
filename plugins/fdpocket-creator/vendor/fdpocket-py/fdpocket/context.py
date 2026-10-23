@@ -1,0 +1,40 @@
+"""タスクの handler が受ける文脈 (python-backend.md §6)."""
+
+from dataclasses import dataclass, field
+from pathlib import Path
+
+from fdpocket.client import Ai, Client, Jobs, Python
+from fdpocket.runner_api import RunnerApi
+
+
+@dataclass
+class RunContext:
+    """`def caption(ctx: RunContext, input: dict) -> dict` の `ctx`.
+
+    - `client`: python の App のサービスとして DB・Storage・通知を呼ぶ
+    - `ai` / `python`: この実行の払う人として Platform の AI・別のタスクを呼ぶ
+    - `jobs`: 続きを jobs の App に渡す (そのジョブもこの実行の払う人が払う)
+    - `cache_dir`: `/cache` (project.yaml の `cache: true`)。
+      作り直せるキャッシュだけを置く
+    """
+
+    run_id: str
+    client: Client
+    _runner: RunnerApi = field(repr=False)
+    cache_dir: Path | None = None
+
+    @property
+    def ai(self) -> Ai:
+        return self.client.for_run(self.run_id).ai
+
+    @property
+    def python(self) -> Python:
+        return self.client.for_run(self.run_id).python
+
+    @property
+    def jobs(self) -> Jobs:
+        return self.client.for_run(self.run_id).jobs
+
+    def progress(self, fraction: float | None, message: str | None = None) -> None:
+        """進み具合 (0〜1) を知らせる. 依頼した側の `get()` に最新の 1 件が出る."""
+        self._runner.progress(fraction, message)

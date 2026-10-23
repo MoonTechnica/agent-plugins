@@ -23374,10 +23374,10 @@ var init_query_node = __esm(() => {
         where: node.where ? WhereNode.cloneWithOperation(node.where, "And", operation) : WhereNode.create(operation)
       });
     },
-    cloneWithJoin(node, join15) {
+    cloneWithJoin(node, join16) {
       return freeze({
         ...node,
-        joins: node.joins ? freeze([...node.joins, join15]) : freeze([join15])
+        joins: node.joins ? freeze([...node.joins, join16]) : freeze([join16])
       });
     },
     cloneWithReturning(node, selections) {
@@ -26136,8 +26136,8 @@ var init_with_schema_transformer = __esm(() => {
         this.#collectSchemableIdsFromTableExpr(node.table, schemableIds);
       }
       if ("joins" in node && node.joins) {
-        for (const join15 of node.joins) {
-          this.#collectSchemableIdsFromTableExpr(join15.table, schemableIds);
+        for (const join16 of node.joins) {
+          this.#collectSchemableIdsFromTableExpr(join16.table, schemableIds);
         }
       }
       if ("using" in node && node.using) {
@@ -35010,7 +35010,7 @@ class MssqlIntrospector {
     return await this.#db.selectFrom("sys.schemas").select("name").execute();
   }
   async getTables(options2 = { withInternalKyselyTables: false }) {
-    const rawColumns = await this.#db.selectFrom("sys.tables as tables").leftJoin("sys.schemas as table_schemas", "table_schemas.schema_id", "tables.schema_id").innerJoin("sys.columns as columns", "columns.object_id", "tables.object_id").innerJoin("sys.types as types", "types.user_type_id", "columns.user_type_id").leftJoin("sys.schemas as type_schemas", "type_schemas.schema_id", "types.schema_id").leftJoin("sys.extended_properties as comments", (join15) => join15.onRef("comments.major_id", "=", "tables.object_id").onRef("comments.minor_id", "=", "columns.column_id").on("comments.name", "=", "MS_Description")).$if(!options2.withInternalKyselyTables, (qb) => qb.where("tables.name", "!=", DEFAULT_MIGRATION_TABLE).where("tables.name", "!=", DEFAULT_MIGRATION_LOCK_TABLE)).select([
+    const rawColumns = await this.#db.selectFrom("sys.tables as tables").leftJoin("sys.schemas as table_schemas", "table_schemas.schema_id", "tables.schema_id").innerJoin("sys.columns as columns", "columns.object_id", "tables.object_id").innerJoin("sys.types as types", "types.user_type_id", "columns.user_type_id").leftJoin("sys.schemas as type_schemas", "type_schemas.schema_id", "types.schema_id").leftJoin("sys.extended_properties as comments", (join16) => join16.onRef("comments.major_id", "=", "tables.object_id").onRef("comments.minor_id", "=", "columns.column_id").on("comments.name", "=", "MS_Description")).$if(!options2.withInternalKyselyTables, (qb) => qb.where("tables.name", "!=", DEFAULT_MIGRATION_TABLE).where("tables.name", "!=", DEFAULT_MIGRATION_LOCK_TABLE)).select([
       "tables.name as table_name",
       (eb) => eb.ref("tables.type").$castTo().as("table_type"),
       "table_schemas.name as table_schema_name",
@@ -35025,7 +35025,7 @@ class MssqlIntrospector {
       "types.name as type_name",
       "type_schemas.name as type_schema_name",
       "comments.value as column_comment"
-    ]).unionAll(this.#db.selectFrom("sys.views as views").leftJoin("sys.schemas as view_schemas", "view_schemas.schema_id", "views.schema_id").innerJoin("sys.columns as columns", "columns.object_id", "views.object_id").innerJoin("sys.types as types", "types.user_type_id", "columns.user_type_id").leftJoin("sys.schemas as type_schemas", "type_schemas.schema_id", "types.schema_id").leftJoin("sys.extended_properties as comments", (join15) => join15.onRef("comments.major_id", "=", "views.object_id").onRef("comments.minor_id", "=", "columns.column_id").on("comments.name", "=", "MS_Description")).select([
+    ]).unionAll(this.#db.selectFrom("sys.views as views").leftJoin("sys.schemas as view_schemas", "view_schemas.schema_id", "views.schema_id").innerJoin("sys.columns as columns", "columns.object_id", "views.object_id").innerJoin("sys.types as types", "types.user_type_id", "columns.user_type_id").leftJoin("sys.schemas as type_schemas", "type_schemas.schema_id", "types.schema_id").leftJoin("sys.extended_properties as comments", (join16) => join16.onRef("comments.major_id", "=", "views.object_id").onRef("comments.minor_id", "=", "columns.column_id").on("comments.name", "=", "MS_Description")).select([
       "views.name as table_name",
       "views.type as table_type",
       "view_schemas.name as table_schema_name",
@@ -36033,7 +36033,7 @@ function checkInt32(i, min, max) {
     throw Error(invalidArgument + i);
   }
 }
-function checkRoundingDigits(d, i, rm5, repeating) {
+function checkRoundingDigits(d, i, rm6, repeating) {
   var di, k2, r, rd;
   for (k2 = d[0];k2 >= 10; k2 /= 10)
     --i;
@@ -36052,9 +36052,9 @@ function checkRoundingDigits(d, i, rm5, repeating) {
         rd = rd / 100 | 0;
       else if (i == 1)
         rd = rd / 10 | 0;
-      r = rm5 < 4 && rd == 99999 || rm5 > 3 && rd == 49999 || rd == 50000 || rd == 0;
+      r = rm6 < 4 && rd == 99999 || rm6 > 3 && rd == 49999 || rd == 50000 || rd == 0;
     } else {
-      r = (rm5 < 4 && rd + 1 == k2 || rm5 > 3 && rd + 1 == k2 / 2) && (d[di + 1] / k2 / 100 | 0) == mathpow(10, i - 2) - 1 || (rd == k2 / 2 || rd == 0) && (d[di + 1] / k2 / 100 | 0) == 0;
+      r = (rm6 < 4 && rd + 1 == k2 || rm6 > 3 && rd + 1 == k2 / 2) && (d[di + 1] / k2 / 100 | 0) == mathpow(10, i - 2) - 1 || (rd == k2 / 2 || rd == 0) && (d[di + 1] / k2 / 100 | 0) == 0;
     }
   } else {
     if (i < 4) {
@@ -36064,9 +36064,9 @@ function checkRoundingDigits(d, i, rm5, repeating) {
         rd = rd / 100 | 0;
       else if (i == 2)
         rd = rd / 10 | 0;
-      r = (repeating || rm5 < 4) && rd == 9999 || !repeating && rm5 > 3 && rd == 4999;
+      r = (repeating || rm6 < 4) && rd == 9999 || !repeating && rm6 > 3 && rd == 4999;
     } else {
-      r = ((repeating || rm5 < 4) && rd + 1 == k2 || !repeating && rm5 > 3 && rd + 1 == k2 / 2) && (d[di + 1] / k2 / 1000 | 0) == mathpow(10, i - 3) - 1;
+      r = ((repeating || rm6 < 4) && rd + 1 == k2 || !repeating && rm6 > 3 && rd + 1 == k2 / 2) && (d[di + 1] / k2 / 1000 | 0) == mathpow(10, i - 3) - 1;
     }
   }
   return r;
@@ -36109,7 +36109,7 @@ function cosine(Ctor, x2) {
   Ctor.precision -= k2;
   return x2;
 }
-function finalise(x2, sd, rm5, isTruncated) {
+function finalise(x2, sd, rm6, isTruncated) {
   var digits, i, j, k2, rd, roundUp, w2, xd, xdi, Ctor = x2.constructor;
   out:
     if (sd != null) {
@@ -36148,7 +36148,7 @@ function finalise(x2, sd, rm5, isTruncated) {
         }
       }
       isTruncated = isTruncated || sd < 0 || xd[xdi + 1] !== undefined || (j < 0 ? w2 : w2 % mathpow(10, digits - j - 1));
-      roundUp = rm5 < 4 ? (rd || isTruncated) && (rm5 == 0 || rm5 == (x2.s < 0 ? 3 : 2)) : rd > 5 || rd == 5 && (rm5 == 4 || isTruncated || rm5 == 6 && (i > 0 ? j > 0 ? w2 / mathpow(10, digits - j) : 0 : xd[xdi - 1]) % 10 & 1 || rm5 == (x2.s < 0 ? 8 : 7));
+      roundUp = rm6 < 4 ? (rd || isTruncated) && (rm6 == 0 || rm6 == (x2.s < 0 ? 3 : 2)) : rd > 5 || rd == 5 && (rm6 == 4 || isTruncated || rm6 == 6 && (i > 0 ? j > 0 ? w2 / mathpow(10, digits - j) : 0 : xd[xdi - 1]) % 10 & 1 || rm6 == (x2.s < 0 ? 8 : 7));
       if (sd < 1 || !xd[0]) {
         xd.length = 0;
         if (roundUp) {
@@ -36251,10 +36251,10 @@ function getLn10(Ctor, sd, pr) {
   }
   return finalise(new Ctor(LN10), sd, 1, true);
 }
-function getPi(Ctor, sd, rm5) {
+function getPi(Ctor, sd, rm6) {
   if (sd > PI_PRECISION)
     throw Error(precisionLimitExceeded);
-  return finalise(new Ctor(PI), sd, rm5, true);
+  return finalise(new Ctor(PI), sd, rm6, true);
 }
 function getPrecision(digits) {
   var w2 = digits.length - 1, len = w2 * LOG_BASE + 1;
@@ -36314,7 +36314,7 @@ function maxOrMin(Ctor, args, n) {
   return x2;
 }
 function naturalExponential(x2, sd) {
-  var denominator, guard, j, pow, sum, t, wpr, rep = 0, i = 0, k2 = 0, Ctor = x2.constructor, rm5 = Ctor.rounding, pr = Ctor.precision;
+  var denominator, guard, j, pow, sum, t, wpr, rep = 0, i = 0, k2 = 0, Ctor = x2.constructor, rm6 = Ctor.rounding, pr = Ctor.precision;
   if (!x2.d || !x2.d[0] || x2.e > 17) {
     return new Ctor(x2.d ? !x2.d[0] ? 1 : x2.s < 0 ? 0 : 1 / 0 : x2.s ? x2.s < 0 ? 0 : x2 : 0 / 0);
   }
@@ -36342,13 +36342,13 @@ function naturalExponential(x2, sd) {
       while (j--)
         sum = finalise(sum.times(sum), wpr, 1);
       if (sd == null) {
-        if (rep < 3 && checkRoundingDigits(sum.d, wpr - guard, rm5, rep)) {
+        if (rep < 3 && checkRoundingDigits(sum.d, wpr - guard, rm6, rep)) {
           Ctor.precision = wpr += 10;
           denominator = pow = t = new Ctor(1);
           i = 0;
           rep++;
         } else {
-          return finalise(sum, Ctor.precision = pr, rm5, external2 = true);
+          return finalise(sum, Ctor.precision = pr, rm6, external2 = true);
         }
       } else {
         Ctor.precision = pr;
@@ -36359,7 +36359,7 @@ function naturalExponential(x2, sd) {
   }
 }
 function naturalLogarithm(y, sd) {
-  var c, c0, denominator, e, numerator, rep, sum, t, wpr, x1, x2, n = 1, guard = 10, x3 = y, xd = x3.d, Ctor = x3.constructor, rm5 = Ctor.rounding, pr = Ctor.precision;
+  var c, c0, denominator, e, numerator, rep, sum, t, wpr, x1, x2, n = 1, guard = 10, x3 = y, xd = x3.d, Ctor = x3.constructor, rm6 = Ctor.rounding, pr = Ctor.precision;
   if (x3.s < 0 || !xd || !xd[0] || !x3.e && xd[0] == 1 && xd.length == 1) {
     return new Ctor(xd && !xd[0] ? -1 / 0 : x3.s != 1 ? NaN : xd ? 0 : x3);
   }
@@ -36390,7 +36390,7 @@ function naturalLogarithm(y, sd) {
     t = getLn10(Ctor, wpr + 2, pr).times(e + "");
     x3 = naturalLogarithm(new Ctor(c0 + "." + c.slice(1)), wpr - guard).plus(t);
     Ctor.precision = pr;
-    return sd == null ? finalise(x3, pr, rm5, external2 = true) : x3;
+    return sd == null ? finalise(x3, pr, rm6, external2 = true) : x3;
   }
   x1 = x3;
   sum = numerator = x3 = divide(x3.minus(1), x3.plus(1), wpr, 1);
@@ -36405,13 +36405,13 @@ function naturalLogarithm(y, sd) {
         sum = sum.plus(getLn10(Ctor, wpr + 2, pr).times(e + ""));
       sum = divide(sum, new Ctor(n), wpr, 1);
       if (sd == null) {
-        if (checkRoundingDigits(sum.d, wpr - guard, rm5, rep)) {
+        if (checkRoundingDigits(sum.d, wpr - guard, rm6, rep)) {
           Ctor.precision = wpr += guard;
           t = numerator = x3 = divide(x1.minus(1), x1.plus(1), wpr, 1);
           x2 = finalise(x3.times(x3), wpr, 1);
           denominator = rep = 1;
         } else {
-          return finalise(sum, Ctor.precision = pr, rm5, external2 = true);
+          return finalise(sum, Ctor.precision = pr, rm6, external2 = true);
         }
       } else {
         Ctor.precision = pr;
@@ -36600,17 +36600,17 @@ function toLessThanHalfPi(Ctor, x2) {
   }
   return x2.minus(pi).abs();
 }
-function toStringBinary(x2, baseOut, sd, rm5) {
+function toStringBinary(x2, baseOut, sd, rm6) {
   var base, e, i, k2, len, roundUp, str, xd, y, Ctor = x2.constructor, isExp = sd !== undefined;
   if (isExp) {
     checkInt32(sd, 1, MAX_DIGITS);
-    if (rm5 === undefined)
-      rm5 = Ctor.rounding;
+    if (rm6 === undefined)
+      rm6 = Ctor.rounding;
     else
-      checkInt32(rm5, 0, 8);
+      checkInt32(rm6, 0, 8);
   } else {
     sd = Ctor.precision;
-    rm5 = Ctor.rounding;
+    rm6 = Ctor.rounding;
   }
   if (!x2.isFinite()) {
     str = nonFiniteToString(x2);
@@ -36647,7 +36647,7 @@ function toStringBinary(x2, baseOut, sd, rm5) {
         x2 = new Ctor(x2);
         x2.d = xd;
         x2.e = e;
-        x2 = divide(x2, y, sd, rm5, 0, base);
+        x2 = divide(x2, y, sd, rm6, 0, base);
         xd = x2.d;
         e = x2.e;
         roundUp = inexact;
@@ -36655,7 +36655,7 @@ function toStringBinary(x2, baseOut, sd, rm5) {
       i = xd[sd];
       k2 = base / 2;
       roundUp = roundUp || xd[sd + 1] !== undefined;
-      roundUp = rm5 < 4 ? (i !== undefined || roundUp) && (rm5 === 0 || rm5 === (x2.s < 0 ? 3 : 2)) : i > k2 || i === k2 && (rm5 === 4 || roundUp || rm5 === 6 && xd[sd - 1] & 1 || rm5 === (x2.s < 0 ? 8 : 7));
+      roundUp = rm6 < 4 ? (i !== undefined || roundUp) && (rm6 === 0 || rm6 === (x2.s < 0 ? 3 : 2)) : i > k2 || i === k2 && (rm6 === 4 || roundUp || rm6 === 6 && xd[sd - 1] & 1 || rm6 === (x2.s < 0 ? 8 : 7));
       xd.length = sd;
       if (roundUp) {
         for (;++xd[--sd] > base - 1; ) {
@@ -36735,14 +36735,14 @@ function atanh(x2) {
 function atan2(y, x2) {
   y = new this(y);
   x2 = new this(x2);
-  var r, pr = this.precision, rm5 = this.rounding, wpr = pr + 4;
+  var r, pr = this.precision, rm6 = this.rounding, wpr = pr + 4;
   if (!y.s || !x2.s) {
     r = new this(NaN);
   } else if (!y.d && !x2.d) {
     r = getPi(this, wpr, 1).times(x2.s > 0 ? 0.25 : 0.75);
     r.s = y.s;
   } else if (!x2.d || y.isZero()) {
-    r = x2.s < 0 ? getPi(this, pr, rm5) : new this(0);
+    r = x2.s < 0 ? getPi(this, pr, rm6) : new this(0);
     r.s = y.s;
   } else if (!y.d || x2.isZero()) {
     r = getPi(this, wpr, 1).times(0.5);
@@ -36753,7 +36753,7 @@ function atan2(y, x2) {
     r = this.atan(divide(y, x2, wpr, 1));
     x2 = getPi(this, wpr, 1);
     this.precision = pr;
-    this.rounding = rm5;
+    this.rounding = rm6;
     r = y.s < 0 ? r.minus(x2) : r.plus(x2);
   } else {
     r = this.atan(divide(y, x2, wpr, 1));
@@ -37209,19 +37209,19 @@ var init_decimal = __esm(() => {
     return xdL === ydL ? 0 : xdL > ydL ^ xs < 0 ? 1 : -1;
   };
   P2.cosine = P2.cos = function() {
-    var pr, rm5, x2 = this, Ctor = x2.constructor;
+    var pr, rm6, x2 = this, Ctor = x2.constructor;
     if (!x2.d)
       return new Ctor(NaN);
     if (!x2.d[0])
       return new Ctor(1);
     pr = Ctor.precision;
-    rm5 = Ctor.rounding;
+    rm6 = Ctor.rounding;
     Ctor.precision = pr + Math.max(x2.e, x2.sd()) + LOG_BASE;
     Ctor.rounding = 1;
     x2 = cosine(Ctor, toLessThanHalfPi(Ctor, x2));
     Ctor.precision = pr;
-    Ctor.rounding = rm5;
-    return finalise(quadrant == 2 || quadrant == 3 ? x2.neg() : x2, pr, rm5, true);
+    Ctor.rounding = rm6;
+    return finalise(quadrant == 2 || quadrant == 3 ? x2.neg() : x2, pr, rm6, true);
   };
   P2.cubeRoot = P2.cbrt = function() {
     var e, m2, n, r, rep, s2, sd, t, t3, t3plusx, x2 = this, Ctor = x2.constructor;
@@ -37312,13 +37312,13 @@ var init_decimal = __esm(() => {
     return k2 == 1 || k2 === 0;
   };
   P2.hyperbolicCosine = P2.cosh = function() {
-    var k2, n, pr, rm5, len, x2 = this, Ctor = x2.constructor, one = new Ctor(1);
+    var k2, n, pr, rm6, len, x2 = this, Ctor = x2.constructor, one = new Ctor(1);
     if (!x2.isFinite())
       return new Ctor(x2.s ? 1 / 0 : NaN);
     if (x2.isZero())
       return one;
     pr = Ctor.precision;
-    rm5 = Ctor.rounding;
+    rm6 = Ctor.rounding;
     Ctor.precision = pr + Math.max(x2.e, x2.sd()) + 4;
     Ctor.rounding = 1;
     len = x2.d.length;
@@ -37335,14 +37335,14 @@ var init_decimal = __esm(() => {
       cosh2_x = x2.times(x2);
       x2 = one.minus(cosh2_x.times(d8.minus(cosh2_x.times(d8))));
     }
-    return finalise(x2, Ctor.precision = pr, Ctor.rounding = rm5, true);
+    return finalise(x2, Ctor.precision = pr, Ctor.rounding = rm6, true);
   };
   P2.hyperbolicSine = P2.sinh = function() {
-    var k2, pr, rm5, len, x2 = this, Ctor = x2.constructor;
+    var k2, pr, rm6, len, x2 = this, Ctor = x2.constructor;
     if (!x2.isFinite() || x2.isZero())
       return new Ctor(x2);
     pr = Ctor.precision;
-    rm5 = Ctor.rounding;
+    rm6 = Ctor.rounding;
     Ctor.precision = pr + Math.max(x2.e, x2.sd()) + 4;
     Ctor.rounding = 1;
     len = x2.d.length;
@@ -37360,97 +37360,97 @@ var init_decimal = __esm(() => {
       }
     }
     Ctor.precision = pr;
-    Ctor.rounding = rm5;
-    return finalise(x2, pr, rm5, true);
+    Ctor.rounding = rm6;
+    return finalise(x2, pr, rm6, true);
   };
   P2.hyperbolicTangent = P2.tanh = function() {
-    var pr, rm5, x2 = this, Ctor = x2.constructor;
+    var pr, rm6, x2 = this, Ctor = x2.constructor;
     if (!x2.isFinite())
       return new Ctor(x2.s);
     if (x2.isZero())
       return new Ctor(x2);
     pr = Ctor.precision;
-    rm5 = Ctor.rounding;
+    rm6 = Ctor.rounding;
     Ctor.precision = pr + 7;
     Ctor.rounding = 1;
-    return divide(x2.sinh(), x2.cosh(), Ctor.precision = pr, Ctor.rounding = rm5);
+    return divide(x2.sinh(), x2.cosh(), Ctor.precision = pr, Ctor.rounding = rm6);
   };
   P2.inverseCosine = P2.acos = function() {
-    var x2 = this, Ctor = x2.constructor, k2 = x2.abs().cmp(1), pr = Ctor.precision, rm5 = Ctor.rounding;
+    var x2 = this, Ctor = x2.constructor, k2 = x2.abs().cmp(1), pr = Ctor.precision, rm6 = Ctor.rounding;
     if (k2 !== -1) {
-      return k2 === 0 ? x2.isNeg() ? getPi(Ctor, pr, rm5) : new Ctor(0) : new Ctor(NaN);
+      return k2 === 0 ? x2.isNeg() ? getPi(Ctor, pr, rm6) : new Ctor(0) : new Ctor(NaN);
     }
     if (x2.isZero())
-      return getPi(Ctor, pr + 4, rm5).times(0.5);
+      return getPi(Ctor, pr + 4, rm6).times(0.5);
     Ctor.precision = pr + 6;
     Ctor.rounding = 1;
     x2 = new Ctor(1).minus(x2).div(x2.plus(1)).sqrt().atan();
     Ctor.precision = pr;
-    Ctor.rounding = rm5;
+    Ctor.rounding = rm6;
     return x2.times(2);
   };
   P2.inverseHyperbolicCosine = P2.acosh = function() {
-    var pr, rm5, x2 = this, Ctor = x2.constructor;
+    var pr, rm6, x2 = this, Ctor = x2.constructor;
     if (x2.lte(1))
       return new Ctor(x2.eq(1) ? 0 : NaN);
     if (!x2.isFinite())
       return new Ctor(x2);
     pr = Ctor.precision;
-    rm5 = Ctor.rounding;
+    rm6 = Ctor.rounding;
     Ctor.precision = pr + Math.max(Math.abs(x2.e), x2.sd()) + 4;
     Ctor.rounding = 1;
     external2 = false;
     x2 = x2.times(x2).minus(1).sqrt().plus(x2);
     external2 = true;
     Ctor.precision = pr;
-    Ctor.rounding = rm5;
+    Ctor.rounding = rm6;
     return x2.ln();
   };
   P2.inverseHyperbolicSine = P2.asinh = function() {
-    var pr, rm5, x2 = this, Ctor = x2.constructor;
+    var pr, rm6, x2 = this, Ctor = x2.constructor;
     if (!x2.isFinite() || x2.isZero())
       return new Ctor(x2);
     pr = Ctor.precision;
-    rm5 = Ctor.rounding;
+    rm6 = Ctor.rounding;
     Ctor.precision = pr + 2 * Math.max(Math.abs(x2.e), x2.sd()) + 6;
     Ctor.rounding = 1;
     external2 = false;
     x2 = x2.times(x2).plus(1).sqrt().plus(x2);
     external2 = true;
     Ctor.precision = pr;
-    Ctor.rounding = rm5;
+    Ctor.rounding = rm6;
     return x2.ln();
   };
   P2.inverseHyperbolicTangent = P2.atanh = function() {
-    var pr, rm5, wpr, xsd, x2 = this, Ctor = x2.constructor;
+    var pr, rm6, wpr, xsd, x2 = this, Ctor = x2.constructor;
     if (!x2.isFinite())
       return new Ctor(NaN);
     if (x2.e >= 0)
       return new Ctor(x2.abs().eq(1) ? x2.s / 0 : x2.isZero() ? x2 : NaN);
     pr = Ctor.precision;
-    rm5 = Ctor.rounding;
+    rm6 = Ctor.rounding;
     xsd = x2.sd();
     if (Math.max(xsd, pr) < 2 * -x2.e - 1)
-      return finalise(new Ctor(x2), pr, rm5, true);
+      return finalise(new Ctor(x2), pr, rm6, true);
     Ctor.precision = wpr = xsd - x2.e;
     x2 = divide(x2.plus(1), new Ctor(1).minus(x2), wpr + pr, 1);
     Ctor.precision = pr + 4;
     Ctor.rounding = 1;
     x2 = x2.ln();
     Ctor.precision = pr;
-    Ctor.rounding = rm5;
+    Ctor.rounding = rm6;
     return x2.times(0.5);
   };
   P2.inverseSine = P2.asin = function() {
-    var halfPi, k2, pr, rm5, x2 = this, Ctor = x2.constructor;
+    var halfPi, k2, pr, rm6, x2 = this, Ctor = x2.constructor;
     if (x2.isZero())
       return new Ctor(x2);
     k2 = x2.abs().cmp(1);
     pr = Ctor.precision;
-    rm5 = Ctor.rounding;
+    rm6 = Ctor.rounding;
     if (k2 !== -1) {
       if (k2 === 0) {
-        halfPi = getPi(Ctor, pr + 4, rm5).times(0.5);
+        halfPi = getPi(Ctor, pr + 4, rm6).times(0.5);
         halfPi.s = x2.s;
         return halfPi;
       }
@@ -37460,23 +37460,23 @@ var init_decimal = __esm(() => {
     Ctor.rounding = 1;
     x2 = x2.div(new Ctor(1).minus(x2.times(x2)).sqrt().plus(1)).atan();
     Ctor.precision = pr;
-    Ctor.rounding = rm5;
+    Ctor.rounding = rm6;
     return x2.times(2);
   };
   P2.inverseTangent = P2.atan = function() {
-    var i, j, k2, n, px, t, r, wpr, x2, x3 = this, Ctor = x3.constructor, pr = Ctor.precision, rm5 = Ctor.rounding;
+    var i, j, k2, n, px, t, r, wpr, x2, x3 = this, Ctor = x3.constructor, pr = Ctor.precision, rm6 = Ctor.rounding;
     if (!x3.isFinite()) {
       if (!x3.s)
         return new Ctor(NaN);
       if (pr + 4 <= PI_PRECISION) {
-        r = getPi(Ctor, pr + 4, rm5).times(0.5);
+        r = getPi(Ctor, pr + 4, rm6).times(0.5);
         r.s = x3.s;
         return r;
       }
     } else if (x3.isZero()) {
       return new Ctor(x3);
     } else if (x3.abs().eq(1) && pr + 4 <= PI_PRECISION) {
-      r = getPi(Ctor, pr + 4, rm5).times(0.25);
+      r = getPi(Ctor, pr + 4, rm6).times(0.25);
       r.s = x3.s;
       return r;
     }
@@ -37503,7 +37503,7 @@ var init_decimal = __esm(() => {
     if (k2)
       r = r.times(2 << k2 - 1);
     external2 = true;
-    return finalise(r, Ctor.precision = pr, Ctor.rounding = rm5, true);
+    return finalise(r, Ctor.precision = pr, Ctor.rounding = rm6, true);
   };
   P2.isFinite = function() {
     return !!this.d;
@@ -37530,7 +37530,7 @@ var init_decimal = __esm(() => {
     return this.cmp(y) < 1;
   };
   P2.logarithm = P2.log = function(base) {
-    var isBase10, d, denominator, k2, inf, num, sd, r, arg = this, Ctor = arg.constructor, pr = Ctor.precision, rm5 = Ctor.rounding, guard = 5;
+    var isBase10, d, denominator, k2, inf, num, sd, r, arg = this, Ctor = arg.constructor, pr = Ctor.precision, rm6 = Ctor.rounding, guard = 5;
     if (base == null) {
       base = new Ctor(10);
       isBase10 = true;
@@ -37559,7 +37559,7 @@ var init_decimal = __esm(() => {
     num = naturalLogarithm(arg, sd);
     denominator = isBase10 ? getLn10(Ctor, sd + 10) : naturalLogarithm(base, sd);
     r = divide(num, denominator, sd, 1);
-    if (checkRoundingDigits(r.d, k2 = pr, rm5)) {
+    if (checkRoundingDigits(r.d, k2 = pr, rm6)) {
       do {
         sd += 10;
         num = naturalLogarithm(arg, sd);
@@ -37571,13 +37571,13 @@ var init_decimal = __esm(() => {
           }
           break;
         }
-      } while (checkRoundingDigits(r.d, k2 += 10, rm5));
+      } while (checkRoundingDigits(r.d, k2 += 10, rm6));
     }
     external2 = true;
-    return finalise(r, pr, rm5);
+    return finalise(r, pr, rm6);
   };
   P2.minus = P2.sub = function(y) {
-    var d, e, i, j, k2, len, pr, rm5, xd, xe, xLTy, yd, x2 = this, Ctor = x2.constructor;
+    var d, e, i, j, k2, len, pr, rm6, xd, xe, xLTy, yd, x2 = this, Ctor = x2.constructor;
     y = new Ctor(y);
     if (!x2.d || !y.d) {
       if (!x2.s || !y.s)
@@ -37595,15 +37595,15 @@ var init_decimal = __esm(() => {
     xd = x2.d;
     yd = y.d;
     pr = Ctor.precision;
-    rm5 = Ctor.rounding;
+    rm6 = Ctor.rounding;
     if (!xd[0] || !yd[0]) {
       if (yd[0])
         y.s = -y.s;
       else if (xd[0])
         y = new Ctor(x2);
       else
-        return new Ctor(rm5 === 3 ? -0 : 0);
-      return external2 ? finalise(y, pr, rm5) : y;
+        return new Ctor(rm6 === 3 ? -0 : 0);
+      return external2 ? finalise(y, pr, rm6) : y;
     }
     e = mathfloor(y.e / LOG_BASE);
     xe = mathfloor(x2.e / LOG_BASE);
@@ -37666,10 +37666,10 @@ var init_decimal = __esm(() => {
     for (;xd[0] === 0; xd.shift())
       --e;
     if (!xd[0])
-      return new Ctor(rm5 === 3 ? -0 : 0);
+      return new Ctor(rm6 === 3 ? -0 : 0);
     y.d = xd;
     y.e = getBase10Exponent(xd, e);
-    return external2 ? finalise(y, pr, rm5) : y;
+    return external2 ? finalise(y, pr, rm6) : y;
   };
   P2.modulo = P2.mod = function(y) {
     var q, x2 = this, Ctor = x2.constructor;
@@ -37702,7 +37702,7 @@ var init_decimal = __esm(() => {
     return finalise(x2);
   };
   P2.plus = P2.add = function(y) {
-    var carry, d, e, i, k2, len, pr, rm5, xd, yd, x2 = this, Ctor = x2.constructor;
+    var carry, d, e, i, k2, len, pr, rm6, xd, yd, x2 = this, Ctor = x2.constructor;
     y = new Ctor(y);
     if (!x2.d || !y.d) {
       if (!x2.s || !y.s)
@@ -37718,11 +37718,11 @@ var init_decimal = __esm(() => {
     xd = x2.d;
     yd = y.d;
     pr = Ctor.precision;
-    rm5 = Ctor.rounding;
+    rm6 = Ctor.rounding;
     if (!xd[0] || !yd[0]) {
       if (!yd[0])
         y = new Ctor(x2);
-      return external2 ? finalise(y, pr, rm5) : y;
+      return external2 ? finalise(y, pr, rm6) : y;
     }
     k2 = mathfloor(x2.e / LOG_BASE);
     e = mathfloor(y.e / LOG_BASE);
@@ -37769,7 +37769,7 @@ var init_decimal = __esm(() => {
       xd.pop();
     y.d = xd;
     y.e = getBase10Exponent(xd, e);
-    return external2 ? finalise(y, pr, rm5) : y;
+    return external2 ? finalise(y, pr, rm6) : y;
   };
   P2.precision = P2.sd = function(z2) {
     var k2, x2 = this;
@@ -37789,19 +37789,19 @@ var init_decimal = __esm(() => {
     return finalise(new Ctor(x2), x2.e + 1, Ctor.rounding);
   };
   P2.sine = P2.sin = function() {
-    var pr, rm5, x2 = this, Ctor = x2.constructor;
+    var pr, rm6, x2 = this, Ctor = x2.constructor;
     if (!x2.isFinite())
       return new Ctor(NaN);
     if (x2.isZero())
       return new Ctor(x2);
     pr = Ctor.precision;
-    rm5 = Ctor.rounding;
+    rm6 = Ctor.rounding;
     Ctor.precision = pr + Math.max(x2.e, x2.sd()) + LOG_BASE;
     Ctor.rounding = 1;
     x2 = sine(Ctor, toLessThanHalfPi(Ctor, x2));
     Ctor.precision = pr;
-    Ctor.rounding = rm5;
-    return finalise(quadrant > 2 ? x2.neg() : x2, pr, rm5, true);
+    Ctor.rounding = rm6;
+    return finalise(quadrant > 2 ? x2.neg() : x2, pr, rm6, true);
   };
   P2.squareRoot = P2.sqrt = function() {
     var m2, n, sd, r, rep, t, x2 = this, d = x2.d, e = x2.e, s2 = x2.s, Ctor = x2.constructor;
@@ -37855,21 +37855,21 @@ var init_decimal = __esm(() => {
     return finalise(r, e, Ctor.rounding, m2);
   };
   P2.tangent = P2.tan = function() {
-    var pr, rm5, x2 = this, Ctor = x2.constructor;
+    var pr, rm6, x2 = this, Ctor = x2.constructor;
     if (!x2.isFinite())
       return new Ctor(NaN);
     if (x2.isZero())
       return new Ctor(x2);
     pr = Ctor.precision;
-    rm5 = Ctor.rounding;
+    rm6 = Ctor.rounding;
     Ctor.precision = pr + 10;
     Ctor.rounding = 1;
     x2 = x2.sin();
     x2.s = 1;
     x2 = divide(x2, new Ctor(1).minus(x2.times(x2)).sqrt(), pr + 10, 0);
     Ctor.precision = pr;
-    Ctor.rounding = rm5;
-    return finalise(quadrant == 2 || quadrant == 4 ? x2.neg() : x2, pr, rm5, true);
+    Ctor.rounding = rm6;
+    return finalise(quadrant == 2 || quadrant == 4 ? x2.neg() : x2, pr, rm6, true);
   };
   P2.times = P2.mul = function(y) {
     var carry, e, i, k2, r, rL, t, xdL, ydL, x2 = this, Ctor = x2.constructor, xd = x2.d, yd = (y = new Ctor(y)).d;
@@ -37911,47 +37911,47 @@ var init_decimal = __esm(() => {
     y.e = getBase10Exponent(r, e);
     return external2 ? finalise(y, Ctor.precision, Ctor.rounding) : y;
   };
-  P2.toBinary = function(sd, rm5) {
-    return toStringBinary(this, 2, sd, rm5);
+  P2.toBinary = function(sd, rm6) {
+    return toStringBinary(this, 2, sd, rm6);
   };
-  P2.toDecimalPlaces = P2.toDP = function(dp, rm5) {
+  P2.toDecimalPlaces = P2.toDP = function(dp, rm6) {
     var x2 = this, Ctor = x2.constructor;
     x2 = new Ctor(x2);
     if (dp === undefined)
       return x2;
     checkInt32(dp, 0, MAX_DIGITS);
-    if (rm5 === undefined)
-      rm5 = Ctor.rounding;
+    if (rm6 === undefined)
+      rm6 = Ctor.rounding;
     else
-      checkInt32(rm5, 0, 8);
-    return finalise(x2, dp + x2.e + 1, rm5);
+      checkInt32(rm6, 0, 8);
+    return finalise(x2, dp + x2.e + 1, rm6);
   };
-  P2.toExponential = function(dp, rm5) {
+  P2.toExponential = function(dp, rm6) {
     var str, x2 = this, Ctor = x2.constructor;
     if (dp === undefined) {
       str = finiteToString(x2, true);
     } else {
       checkInt32(dp, 0, MAX_DIGITS);
-      if (rm5 === undefined)
-        rm5 = Ctor.rounding;
+      if (rm6 === undefined)
+        rm6 = Ctor.rounding;
       else
-        checkInt32(rm5, 0, 8);
-      x2 = finalise(new Ctor(x2), dp + 1, rm5);
+        checkInt32(rm6, 0, 8);
+      x2 = finalise(new Ctor(x2), dp + 1, rm6);
       str = finiteToString(x2, true, dp + 1);
     }
     return x2.isNeg() && !x2.isZero() ? "-" + str : str;
   };
-  P2.toFixed = function(dp, rm5) {
+  P2.toFixed = function(dp, rm6) {
     var str, y, x2 = this, Ctor = x2.constructor;
     if (dp === undefined) {
       str = finiteToString(x2);
     } else {
       checkInt32(dp, 0, MAX_DIGITS);
-      if (rm5 === undefined)
-        rm5 = Ctor.rounding;
+      if (rm6 === undefined)
+        rm6 = Ctor.rounding;
       else
-        checkInt32(rm5, 0, 8);
-      y = finalise(new Ctor(x2), dp + x2.e + 1, rm5);
+        checkInt32(rm6, 0, 8);
+      y = finalise(new Ctor(x2), dp + x2.e + 1, rm6);
       str = finiteToString(y, false, dp + y.e + 1);
     }
     return x2.isNeg() && !x2.isZero() ? "-" + str : str;
@@ -38001,23 +38001,23 @@ var init_decimal = __esm(() => {
     external2 = true;
     return r;
   };
-  P2.toHexadecimal = P2.toHex = function(sd, rm5) {
-    return toStringBinary(this, 16, sd, rm5);
+  P2.toHexadecimal = P2.toHex = function(sd, rm6) {
+    return toStringBinary(this, 16, sd, rm6);
   };
-  P2.toNearest = function(y, rm5) {
+  P2.toNearest = function(y, rm6) {
     var x2 = this, Ctor = x2.constructor;
     x2 = new Ctor(x2);
     if (y == null) {
       if (!x2.d)
         return x2;
       y = new Ctor(1);
-      rm5 = Ctor.rounding;
+      rm6 = Ctor.rounding;
     } else {
       y = new Ctor(y);
-      if (rm5 === undefined) {
-        rm5 = Ctor.rounding;
+      if (rm6 === undefined) {
+        rm6 = Ctor.rounding;
       } else {
-        checkInt32(rm5, 0, 8);
+        checkInt32(rm6, 0, 8);
       }
       if (!x2.d)
         return y.s ? x2 : y;
@@ -38029,7 +38029,7 @@ var init_decimal = __esm(() => {
     }
     if (y.d[0]) {
       external2 = false;
-      x2 = divide(x2, y, 0, rm5, 1).times(y);
+      x2 = divide(x2, y, 0, rm6, 1).times(y);
       external2 = true;
       finalise(x2);
     } else {
@@ -38041,24 +38041,24 @@ var init_decimal = __esm(() => {
   P2.toNumber = function() {
     return +this;
   };
-  P2.toOctal = function(sd, rm5) {
-    return toStringBinary(this, 8, sd, rm5);
+  P2.toOctal = function(sd, rm6) {
+    return toStringBinary(this, 8, sd, rm6);
   };
   P2.toPower = P2.pow = function(y) {
-    var e, k2, pr, r, rm5, s2, x2 = this, Ctor = x2.constructor, yn = +(y = new Ctor(y));
+    var e, k2, pr, r, rm6, s2, x2 = this, Ctor = x2.constructor, yn = +(y = new Ctor(y));
     if (!x2.d || !y.d || !x2.d[0] || !y.d[0])
       return new Ctor(mathpow(+x2, yn));
     x2 = new Ctor(x2);
     if (x2.eq(1))
       return x2;
     pr = Ctor.precision;
-    rm5 = Ctor.rounding;
+    rm6 = Ctor.rounding;
     if (y.eq(1))
-      return finalise(x2, pr, rm5);
+      return finalise(x2, pr, rm6);
     e = mathfloor(y.e / LOG_BASE);
     if (e >= y.d.length - 1 && (k2 = yn < 0 ? -yn : yn) <= MAX_SAFE_INTEGER) {
       r = intPow(Ctor, x2, k2, pr);
-      return y.s < 0 ? new Ctor(1).div(r) : finalise(r, pr, rm5);
+      return y.s < 0 ? new Ctor(1).div(r) : finalise(r, pr, rm6);
     }
     s2 = x2.s;
     if (s2 < 0) {
@@ -38081,7 +38081,7 @@ var init_decimal = __esm(() => {
     r = naturalExponential(y.times(naturalLogarithm(x2, pr + k2)), pr);
     if (r.d) {
       r = finalise(r, pr + 5, 1);
-      if (checkRoundingDigits(r.d, pr, rm5)) {
+      if (checkRoundingDigits(r.d, pr, rm6)) {
         e = pr + 10;
         r = finalise(naturalExponential(y.times(naturalLogarithm(x2, e + k2)), e), e + 5, 1);
         if (+digitsToString(r.d).slice(pr + 1, pr + 15) + 1 == 100000000000000) {
@@ -38091,37 +38091,37 @@ var init_decimal = __esm(() => {
     }
     r.s = s2;
     external2 = true;
-    Ctor.rounding = rm5;
-    return finalise(r, pr, rm5);
+    Ctor.rounding = rm6;
+    return finalise(r, pr, rm6);
   };
-  P2.toPrecision = function(sd, rm5) {
+  P2.toPrecision = function(sd, rm6) {
     var str, x2 = this, Ctor = x2.constructor;
     if (sd === undefined) {
       str = finiteToString(x2, x2.e <= Ctor.toExpNeg || x2.e >= Ctor.toExpPos);
     } else {
       checkInt32(sd, 1, MAX_DIGITS);
-      if (rm5 === undefined)
-        rm5 = Ctor.rounding;
+      if (rm6 === undefined)
+        rm6 = Ctor.rounding;
       else
-        checkInt32(rm5, 0, 8);
-      x2 = finalise(new Ctor(x2), sd, rm5);
+        checkInt32(rm6, 0, 8);
+      x2 = finalise(new Ctor(x2), sd, rm6);
       str = finiteToString(x2, sd <= x2.e || x2.e <= Ctor.toExpNeg, sd);
     }
     return x2.isNeg() && !x2.isZero() ? "-" + str : str;
   };
-  P2.toSignificantDigits = P2.toSD = function(sd, rm5) {
+  P2.toSignificantDigits = P2.toSD = function(sd, rm6) {
     var x2 = this, Ctor = x2.constructor;
     if (sd === undefined) {
       sd = Ctor.precision;
-      rm5 = Ctor.rounding;
+      rm6 = Ctor.rounding;
     } else {
       checkInt32(sd, 1, MAX_DIGITS);
-      if (rm5 === undefined)
-        rm5 = Ctor.rounding;
+      if (rm6 === undefined)
+        rm6 = Ctor.rounding;
       else
-        checkInt32(rm5, 0, 8);
+        checkInt32(rm6, 0, 8);
     }
-    return finalise(new Ctor(x2), sd, rm5);
+    return finalise(new Ctor(x2), sd, rm6);
   };
   P2.toString = function() {
     var x2 = this, Ctor = x2.constructor, str = finiteToString(x2, x2.e <= Ctor.toExpNeg || x2.e >= Ctor.toExpPos);
@@ -38170,7 +38170,7 @@ var init_decimal = __esm(() => {
       for (;!a[0] && a.length > 1; )
         a.shift();
     }
-    return function(x2, y, pr, rm5, dp, base) {
+    return function(x2, y, pr, rm6, dp, base) {
       var cmp, e, i, k2, logBase, more, prod, prodL, q, qd, rem, remL, rem0, sd, t, xi, xL, yd0, yL, yz, Ctor = x2.constructor, sign = x2.s == y.s ? 1 : -1, xd = x2.d, yd = y.d;
       if (!xd || !xd[0] || !yd || !yd[0]) {
         return new Ctor(!x2.s || !y.s || (xd ? yd && xd[0] == yd[0] : !yd) ? NaN : xd && xd[0] == 0 || !yd ? sign * 0 : sign / 0);
@@ -38193,7 +38193,7 @@ var init_decimal = __esm(() => {
         e--;
       if (pr == null) {
         sd = pr = Ctor.precision;
-        rm5 = Ctor.rounding;
+        rm6 = Ctor.rounding;
       } else if (dp) {
         sd = pr + (x2.e - y.e) + 1;
       } else {
@@ -38294,7 +38294,7 @@ var init_decimal = __esm(() => {
         for (i = 1, k2 = qd[0];k2 >= 10; k2 /= 10)
           i++;
         q.e = i + e * logBase - 1;
-        finalise(q, dp ? pr + q.e + 1 : pr, rm5, more);
+        finalise(q, dp ? pr + q.e + 1 : pr, rm6, more);
       }
       return q;
     };
@@ -44299,9 +44299,9 @@ var import_cuid, import_json_stable_stringify, import_toposort, ORMErrorReason, 
       return query;
     }
     const joinAlias = tmpAlias(`${modelAlias}$ob$${index2}`);
-    const joined = query.leftJoin(`${relationModel} as ${joinAlias}`, (join15) => {
+    const joined = query.leftJoin(`${relationModel} as ${joinAlias}`, (join16) => {
       const joinPairs = buildJoinPairs(this.schema, model, modelAlias, field3, joinAlias);
-      return join15.on((eb) => this.and(...joinPairs.map(([left, right]) => eb(this.eb.ref(left), "=", this.eb.ref(right)))));
+      return join16.on((eb) => this.and(...joinPairs.map(([left, right]) => eb(this.eb.ref(left), "=", this.eb.ref(right)))));
     });
     return this.buildOrderBy(joined, relationModel, joinAlias, value, negated, take);
   }
@@ -44436,7 +44436,7 @@ var import_cuid, import_json_stable_stringify, import_toposort, ORMErrorReason, 
       const subQueryAlias = tmpAlias(`${parentAlias}$_${field3}$count`);
       const m2m = getManyToManyRelation(this.schema, model, field3);
       if (m2m)
-        fieldCountQuery = this.buildModelSelect(fieldModel, subQueryAlias, value, false).innerJoin(m2m.joinTable, (join15) => join15.onRef(`${m2m.joinTable}.${m2m.otherFkName}`, "=", `${subQueryAlias}.${m2m.otherPKName}`).onRef(`${m2m.joinTable}.${m2m.parentFkName}`, "=", `${parentAlias}.${m2m.parentPKName}`)).select(eb.fn.countAll().as(`_count$${field3}`));
+        fieldCountQuery = this.buildModelSelect(fieldModel, subQueryAlias, value, false).innerJoin(m2m.joinTable, (join16) => join16.onRef(`${m2m.joinTable}.${m2m.otherFkName}`, "=", `${subQueryAlias}.${m2m.otherPKName}`).onRef(`${m2m.joinTable}.${m2m.parentFkName}`, "=", `${parentAlias}.${m2m.parentPKName}`)).select(eb.fn.countAll().as(`_count$${field3}`));
       else {
         fieldCountQuery = this.buildModelSelect(fieldModel, subQueryAlias, value, false).select(eb.fn.countAll().as(`_count$${field3}`));
         const joinPairs = buildJoinPairs(this.schema, model, parentAlias, field3, subQueryAlias);
@@ -48473,7 +48473,7 @@ var init_dist7 = __esm(() => {
         tbl = this.buildRelationObjectSelect(relationModel, relationSelectName, relationFieldDef, tbl, payload, resultName);
         tbl = this.buildRelationJoins(tbl, relationModel, relationSelectName, payload, resultName);
         return tbl.as(resultName);
-      }, (join15) => join15.onTrue());
+      }, (join16) => join16.onTrue());
     }
     buildRelationJoinFilter(query, model, relationField, relationModel, relationModelAlias, parentAlias) {
       const m2m = getManyToManyRelation(this.schema, model, relationField);
@@ -50513,16 +50513,16 @@ var init_dist7 = __esm(() => {
       const processedFroms = node.from.froms.map((from) => this.processSelectTable(from));
       const processedJoins = [];
       const cumulativeScopes = [...processedFroms.map(({ scope }) => scope)];
-      for (const join15 of node.joins ?? []) {
-        const processedJoin = this.withScopes(cumulativeScopes, () => this.processSelectTable(join15.table));
+      for (const join16 of node.joins ?? []) {
+        const processedJoin = this.withScopes(cumulativeScopes, () => this.processSelectTable(join16.table));
         processedJoins.push(processedJoin);
         cumulativeScopes.push(processedJoin.scope);
       }
       return this.withScopes(cumulativeScopes, () => {
-        const joins = node.joins ? node.joins.map((join15, i2) => ({
-          ...join15,
+        const joins = node.joins ? node.joins.map((join16, i2) => ({
+          ...join16,
           table: processedJoins[i2].node,
-          on: this.transformNode(join15.on)
+          on: this.transformNode(join16.on)
         })) : undefined;
         const selections = this.processSelectQuerySelections(node);
         return {
@@ -52562,7 +52562,7 @@ var ColumnCollector, ExpressionEvaluator = class {
   transformManyToManyRelationAccess(m2m, context, relationAlias) {
     const eb = expressionBuilder();
     const joinTableAlias = `${relationAlias}$join`;
-    return eb.selectFrom(`${m2m.otherModel} as ${relationAlias}`).innerJoin(`${m2m.joinTable} as ${joinTableAlias}`, (join15) => join15.onRef(`${relationAlias}.${m2m.otherPKName}`, "=", `${joinTableAlias}.${m2m.otherFkName}`).onRef(`${joinTableAlias}.${m2m.parentFkName}`, "=", `${context.alias ?? context.modelOrType}.${m2m.parentPKName}`)).toOperationNode();
+    return eb.selectFrom(`${m2m.otherModel} as ${relationAlias}`).innerJoin(`${m2m.joinTable} as ${joinTableAlias}`, (join16) => join16.onRef(`${relationAlias}.${m2m.otherPKName}`, "=", `${joinTableAlias}.${m2m.otherFkName}`).onRef(`${joinTableAlias}.${m2m.parentFkName}`, "=", `${context.alias ?? context.modelOrType}.${m2m.parentPKName}`)).toOperationNode();
   }
   createColumnRef(column, context) {
     const tableName = context.alias ?? context.modelOrType;
@@ -52932,8 +52932,8 @@ var init_dist8 = __esm(() => {
         const rows = beforeUpdateInfo.rows.map((r2) => beforeUpdateInfo.fields.map((f3) => r2[f3]));
         beforeUpdateTable = this.dialect.buildValuesTableSelect(fieldDefs, rows).toOperationNode();
       }
-      if (!(await proceed(eb.selectFrom(model).select(() => [eb(eb.fn("COUNT", [eb.lit(1)]), "=", Number(updateResult.numAffectedRows ?? 0)).as("$condition")]).where(() => new ExpressionWrapper(conjunction(this.dialect, [idConditions, postUpdateFilter]))).$if(needsBeforeUpdateJoin, (qb) => qb.leftJoin(() => new ExpressionWrapper(beforeUpdateTable).as("$before"), (join15) => {
-        return query_utils_exports.requireIdFields(this.client.$schema, model).reduce((acc, f3) => acc.onRef(`${model}.${f3}`, "=", `$before.${f3}`), join15);
+      if (!(await proceed(eb.selectFrom(model).select(() => [eb(eb.fn("COUNT", [eb.lit(1)]), "=", Number(updateResult.numAffectedRows ?? 0)).as("$condition")]).where(() => new ExpressionWrapper(conjunction(this.dialect, [idConditions, postUpdateFilter]))).$if(needsBeforeUpdateJoin, (qb) => qb.leftJoin(() => new ExpressionWrapper(beforeUpdateTable).as("$before"), (join16) => {
+        return query_utils_exports.requireIdFields(this.client.$schema, model).reduce((acc, f3) => acc.onRef(`${model}.${f3}`, "=", `$before.${f3}`), join16);
       })).toOperationNode())).rows[0]?.$condition)
         throw createRejectedByPolicyError2(model, RejectedByPolicyReason.NO_ACCESS, "some or all updated rows failed to pass post-update policy check");
     }
@@ -63291,6 +63291,166 @@ function checkEgress(input, policy) {
   return { allowed: true, host };
 }
 
+// frontend/packages/project-protocol/src/python.ts
+init_zod();
+var PYTHON_VERSIONS = ["3.11", "3.12", "3.13"];
+var PYTHON_GPU_TYPES = [
+  "T4",
+  "L4",
+  "A10",
+  "L40S",
+  "A100-40GB",
+  "A100-80GB",
+  "RTX-PRO-6000",
+  "H100",
+  "H200",
+  "B200"
+];
+var PYTHON_GPU_COUNT_MAX = {
+  T4: 8,
+  L4: 8,
+  A10: 4,
+  L40S: 8,
+  "A100-40GB": 8,
+  "A100-80GB": 8,
+  "RTX-PRO-6000": 8,
+  H100: 8,
+  H200: 8,
+  B200: 8
+};
+var PYTHON_COMPUTE_DEFAULTS = { cpu: 1, memoryMiB: 4096 };
+var PYTHON_CPU_MIN = 0.25;
+var PYTHON_CPU_MAX = 16;
+var PYTHON_MEMORY_MIB_MIN = 512;
+var PYTHON_MEMORY_MIB_MAX = 131072;
+var PYTHON_TASK_TIMEOUT_DEFAULT = 600;
+var PYTHON_TASK_TIMEOUT_MIN = 10;
+var PYTHON_TASK_TIMEOUT_MAX = 86400;
+var PYTHON_SERVER_IDLE_DEFAULT = 300;
+var PYTHON_SERVER_IDLE_MIN = 60;
+var PYTHON_SERVER_IDLE_MAX = 3600;
+var PYTHON_SERVER_INSTANCES_DEFAULT = 1;
+var PYTHON_SERVER_INSTANCES_MAX = 10;
+var PYTHON_SERVER_TARGET_CONCURRENCY_DEFAULT = 4;
+var PYTHON_SERVER_TARGET_CONCURRENCY_MAX = 1000;
+var PYTHON_TASKS_MAX = 32;
+var PYTHON_RUN_INPUT_MAX_BYTES = 256 * 1024;
+var PYTHON_RUN_OUTPUT_MAX_BYTES = 1024 * 1024;
+var PYTHON_RESERVED_SECRET_PREFIX = "MODAL_";
+var PYTHON_TASK_NAME_PATTERN = /^[a-z][a-z0-9_]{0,31}$/;
+var PYTHON_HANDLER_PATTERN = /^[A-Za-z_][A-Za-z0-9_]*(?:\.[A-Za-z_][A-Za-z0-9_]*)*:[A-Za-z_][A-Za-z0-9_]*$/;
+var GPU_PATTERN = /^([A-Z0-9-]+)(?::([1-9][0-9]*))?$/;
+function parsePythonGpu(value) {
+  const match = GPU_PATTERN.exec(value);
+  if (!match)
+    return null;
+  const type = match[1];
+  if (!PYTHON_GPU_TYPES.includes(type))
+    return null;
+  const count = match[2] ? Number(match[2]) : 1;
+  return count <= PYTHON_GPU_COUNT_MAX[type] ? { type, count } : null;
+}
+var pythonComputeSchema = exports_external.strictObject({
+  gpu: exports_external.string().refine((value) => parsePythonGpu(value) !== null, {
+    message: `gpu is one of ${PYTHON_GPU_TYPES.join(", ")} with an optional :count`
+  }).optional(),
+  cpu: exports_external.number().min(PYTHON_CPU_MIN).max(PYTHON_CPU_MAX).optional(),
+  memoryMiB: exports_external.number().int().min(PYTHON_MEMORY_MIB_MIN).max(PYTHON_MEMORY_MIB_MAX).optional()
+});
+var handlerSchema = exports_external.string().regex(PYTHON_HANDLER_PATTERN);
+var pythonTaskFinishSchema = exports_external.strictObject({
+  app: exports_external.string(),
+  handler: exports_external.string().regex(/^[A-Za-z_$][A-Za-z0-9_$]{0,63}$/)
+});
+var pythonTaskSchema = exports_external.strictObject({
+  handler: handlerSchema,
+  onFinish: pythonTaskFinishSchema.optional(),
+  timeoutSeconds: exports_external.number().int().min(PYTHON_TASK_TIMEOUT_MIN).max(PYTHON_TASK_TIMEOUT_MAX).optional(),
+  compute: pythonComputeSchema.optional()
+});
+var pythonServerSchema = exports_external.strictObject({
+  handler: handlerSchema,
+  idleTimeoutSeconds: exports_external.number().int().min(PYTHON_SERVER_IDLE_MIN).max(PYTHON_SERVER_IDLE_MAX).optional(),
+  maxInstances: exports_external.number().int().min(1).max(PYTHON_SERVER_INSTANCES_MAX).optional(),
+  targetConcurrency: exports_external.number().int().min(1).max(PYTHON_SERVER_TARGET_CONCURRENCY_MAX).optional(),
+  compute: pythonComputeSchema.optional()
+});
+function resolvePythonCompute(app, own) {
+  const gpu = own?.gpu ?? app?.gpu;
+  return {
+    gpu: gpu === undefined ? null : parsePythonGpu(gpu),
+    cpu: own?.cpu ?? app?.cpu ?? PYTHON_COMPUTE_DEFAULTS.cpu,
+    memoryMiB: own?.memoryMiB ?? app?.memoryMiB ?? PYTHON_COMPUTE_DEFAULTS.memoryMiB
+  };
+}
+var PYTHON_RUN_STATUSES = [
+  "queued",
+  "starting",
+  "running",
+  "succeeded",
+  "failed",
+  "cancelled",
+  "timed_out",
+  "stopped"
+];
+var PYTHON_RUN_FINAL_STATUSES = [
+  "succeeded",
+  "failed",
+  "cancelled",
+  "timed_out",
+  "stopped"
+];
+var APP_SLUG = /^[a-z][a-z0-9-]{1,31}$/;
+var pythonRunRequestSchema = exports_external.strictObject({
+  app: exports_external.string().regex(APP_SLUG),
+  task: exports_external.string().regex(PYTHON_TASK_NAME_PATTERN),
+  input: exports_external.unknown(),
+  idempotencyKey: exports_external.string().regex(/^[A-Za-z0-9_.:-]{1,128}$/).optional()
+});
+var pythonRunSchema = exports_external.strictObject({
+  runId: exports_external.uuid(),
+  app: exports_external.string(),
+  task: exports_external.string(),
+  status: exports_external.enum(PYTHON_RUN_STATUSES),
+  progress: exports_external.number().min(0).max(1).nullable(),
+  progressMessage: exports_external.string().nullable(),
+  output: exports_external.unknown().optional(),
+  error: exports_external.strictObject({ code: exports_external.string(), message: exports_external.string().nullable() }).nullable().optional(),
+  createdAt: exports_external.string(),
+  startedAt: exports_external.string().nullable(),
+  finishedAt: exports_external.string().nullable()
+});
+var pythonRunFinishedSchema = exports_external.strictObject({
+  runId: exports_external.uuid(),
+  app: exports_external.string(),
+  task: exports_external.string(),
+  status: exports_external.enum(PYTHON_RUN_STATUSES).refine((status) => PYTHON_RUN_FINAL_STATUSES.includes(status)),
+  error: exports_external.strictObject({ code: exports_external.string(), message: exports_external.string().nullable() }).nullable()
+});
+var PYTHON_RUN_TOKEN_PATTERN = /^prt_[A-Za-z0-9_-]{43}$/;
+async function pythonRunTokenHash(token) {
+  const digest = await crypto.subtle.digest("SHA-256", new TextEncoder().encode(token));
+  return [...new Uint8Array(digest)].map((b) => b.toString(16).padStart(2, "0")).join("");
+}
+var pythonRunnerInputSchema = exports_external.strictObject({
+  runId: exports_external.uuid(),
+  app: exports_external.string(),
+  task: exports_external.string(),
+  handler: exports_external.string().regex(PYTHON_HANDLER_PATTERN),
+  input: exports_external.unknown()
+});
+var pythonRunnerProgressSchema = exports_external.strictObject({
+  progress: exports_external.number().min(0).max(1).nullable(),
+  message: exports_external.string().max(200).optional()
+});
+var pythonRunnerFinishSchema = exports_external.discriminatedUnion("succeeded", [
+  exports_external.strictObject({ succeeded: exports_external.literal(true), output: exports_external.unknown() }),
+  exports_external.strictObject({
+    succeeded: exports_external.literal(false),
+    error: exports_external.strictObject({ code: exports_external.string().max(64), message: exports_external.string().max(500).optional() })
+  })
+]);
+
 // frontend/packages/project-protocol/src/realtime.ts
 init_zod();
 var REALTIME_PLATFORM_MODELS = [
@@ -64195,13 +64355,15 @@ var RESERVED_PERMISSION_PREFIX = "platform.";
 var ROLE_NAME_PATTERN = /^[a-z][a-z0-9_-]{0,31}$/;
 var MODEL_KEY_PATTERN = /^[a-z][A-Za-z0-9]{0,63}$/;
 var CONTENT_TYPE_PATTERN = /^[a-z]+\/([a-z0-9.+-]+|\*)$/;
-var APP_KINDS = ["web", "api", "jobs"];
-var SERVER_APP_KINDS = ["api", "jobs"];
+var APP_KINDS = ["web", "api", "jobs", "python"];
+var SERVER_APP_KINDS = ["api", "jobs", "python"];
+var WORKER_APP_KINDS = ["api", "jobs"];
 var SERVICE_PERMISSIONS = [
   "notifications.send",
   "jobs.schedule",
   "jobs.consume",
-  "ai.chat"
+  "ai.chat",
+  "python.run"
 ];
 var SECRET_NAME_PATTERN = /^[A-Z][A-Z0-9_]{0,63}$/;
 var RESERVED_SECRET_NAMES = ["GATEWAY_URL"];
@@ -64239,7 +64401,8 @@ var appSchema = exports_external.strictObject({
     models: exports_external.record(exports_external.string(), uniqueList(exports_external.enum(MODEL_OPERATIONS))).optional(),
     buckets: exports_external.record(exports_external.string(), uniqueList(exports_external.enum(BUCKET_OPERATIONS))).optional(),
     realtime: exports_external.record(exports_external.string(), uniqueList(exports_external.enum(["broadcastReceive", "broadcastSend", "presenceRead", "presenceTrack"]))).optional(),
-    ai: exports_external.strictObject({ chat: exports_external.boolean() }).optional()
+    ai: exports_external.strictObject({ chat: exports_external.boolean() }).optional(),
+    python: exports_external.record(exports_external.string(), uniqueList(exports_external.string())).optional()
   }).optional(),
   anonymous: exports_external.strictObject({ allowed: exports_external.boolean(), write: exports_external.boolean() }).optional(),
   network: exports_external.strictObject({
@@ -64254,7 +64417,12 @@ var appSchema = exports_external.strictObject({
     }),
     handler: exports_external.string().regex(/^[A-Za-z_$][A-Za-z0-9_$]*$/)
   })).optional(),
-  routes: exports_external.array(exports_external.literal("/api/*")).length(1).optional()
+  routes: exports_external.array(exports_external.literal("/api/*")).length(1).optional(),
+  python: exports_external.enum(PYTHON_VERSIONS).optional(),
+  compute: pythonComputeSchema.optional(),
+  tasks: exports_external.record(exports_external.string(), pythonTaskSchema).optional(),
+  server: pythonServerSchema.optional(),
+  cache: exports_external.boolean().optional()
 });
 var bucketSchema = exports_external.strictObject({
   public: exports_external.boolean(),
@@ -64358,6 +64526,7 @@ function refineServerFields(ctx, slug, app) {
   if (app.routes !== undefined && app.kind !== "api") {
     report(ctx, [...path, "routes"], "not_allowed", "only api apps declare routes");
   }
+  refinePythonFields(ctx, slug, app);
   if (!server) {
     if (app.access === undefined)
       report(ctx, [...path, "access"], "required", "web apps need access");
@@ -64376,11 +64545,11 @@ function refineServerFields(ctx, slug, app) {
   }
   for (const key of ["secrets", "servicePermissions"]) {
     if (!server && app[key] !== undefined) {
-      report(ctx, [...path, key], "not_allowed", `only api / jobs apps take ${key}`);
+      report(ctx, [...path, key], "not_allowed", `only server apps take ${key}`);
     }
   }
   if (!server && app.network?.egress !== undefined) {
-    report(ctx, [...path, "network", "egress"], "not_allowed", "only api / jobs apps take egress");
+    report(ctx, [...path, "network", "egress"], "not_allowed", "only server apps take egress");
   }
   if (server && app.network?.browser !== undefined) {
     report(ctx, [...path, "network", "browser"], "not_allowed", "only web apps take browser");
@@ -64402,13 +64571,76 @@ function refineServerFields(ctx, slug, app) {
       report(ctx, at, "invalid_secret_name", "secret names are [A-Z][A-Z0-9_]{0,63}");
     } else if (RESERVED_SECRET_NAMES.includes(secret.name) || secret.name.startsWith(RESERVED_SECRET_PREFIX)) {
       report(ctx, at, "reserved_secret_name", `"${secret.name}" is reserved by the platform`);
+    } else if (app.kind === "python" && secret.name.startsWith(PYTHON_RESERVED_SECRET_PREFIX)) {
+      report(ctx, at, "reserved_secret_name", `"${secret.name}" is reserved for the GPU runtime`);
     }
     if (names.has(secret.name))
       report(ctx, at, "duplicate", `secret "${secret.name}" is declared twice`);
     names.add(secret.name);
   }
 }
+var PYTHON_ONLY_KEYS = ["python", "compute", "tasks", "server", "cache"];
+function refinePythonFields(ctx, slug, app) {
+  const path = ["apps", slug];
+  if (app.kind !== "python") {
+    for (const key of PYTHON_ONLY_KEYS) {
+      if (app[key] !== undefined) {
+        report(ctx, [...path, key], "not_allowed", `only python apps declare ${key}`);
+      }
+    }
+    return;
+  }
+  if (app.python === undefined) {
+    report(ctx, [...path, "python"], "required", "python apps need a python version");
+  }
+  if (app.tasks === undefined && app.server === undefined) {
+    report(ctx, [...path, "tasks"], "required", "python apps need tasks or a server");
+  }
+  const tasks = Object.keys(app.tasks ?? {});
+  if (tasks.length > PYTHON_TASKS_MAX) {
+    report(ctx, [...path, "tasks"], "not_allowed", `at most ${PYTHON_TASKS_MAX} tasks`);
+  }
+  for (const name2 of tasks) {
+    if (!PYTHON_TASK_NAME_PATTERN.test(name2)) {
+      report(ctx, [...path, "tasks", name2], "invalid_task_name", "task names are [a-z][a-z0-9_]{0,31}");
+    }
+  }
+}
+function refinePythonCallers(m2, ctx) {
+  const hasPython = Object.values(m2.apps).some((app) => app.kind === "python");
+  for (const [slug, app] of Object.entries(m2.apps)) {
+    for (const [target, tasks] of Object.entries(app.capabilities?.python ?? {})) {
+      const declared = m2.apps[target]?.kind === "python" ? m2.apps[target]?.tasks ?? {} : null;
+      if (!declared || tasks.some((task) => !(task in declared))) {
+        report(ctx, ["apps", slug, "capabilities", "python", target], "unknown_python_task", `"${target}" is not a python App with these tasks`);
+      }
+    }
+    if (!hasPython && (app.servicePermissions ?? []).includes("python.run")) {
+      report(ctx, ["apps", slug, "servicePermissions"], "not_allowed", "python.run needs a python App in the project");
+    }
+  }
+}
+function refinePythonFinish(m2, ctx) {
+  for (const [slug, app] of Object.entries(m2.apps)) {
+    if (app.kind !== "python")
+      continue;
+    for (const [name2, task] of Object.entries(app.tasks ?? {})) {
+      if (!task.onFinish)
+        continue;
+      const at = ["apps", slug, "tasks", name2, "onFinish"];
+      const target = m2.apps[task.onFinish.app];
+      if (target?.kind !== "jobs" || !(target.servicePermissions ?? []).includes("jobs.consume")) {
+        report(ctx, at, "unknown_finish_target", `"${task.onFinish.app}" is not a jobs App with jobs.consume`);
+      }
+      if (!(app.servicePermissions ?? []).includes("jobs.schedule")) {
+        report(ctx, at, "missing_permission", "onFinish needs jobs.schedule on the python App");
+      }
+    }
+  }
+}
 function refineManifest(m2, ctx) {
+  refinePythonCallers(m2, ctx);
+  refinePythonFinish(m2, ctx);
   let aiUsed = false;
   if (Object.keys(m2.apps).length === 0)
     report(ctx, ["apps"], "required", "at least one App is required");
@@ -64575,8 +64807,32 @@ function sortedRecord(record2, map2) {
   return Object.fromEntries(Object.keys(record2 ?? {}).sort(byKey).map((key) => [key, map2(record2[key])]));
 }
 var sorted = (list) => [...list ?? []].sort(byKey);
-function entryOf(slug, kind) {
-  return kind === "web" ? `dist/${slug}/index.html` : `dist/${slug}/index.js`;
+function appEntryOf(slug, kind) {
+  if (kind === "web")
+    return `${slug}/index.html`;
+  return kind === "python" ? `${slug}/pyproject.toml` : `${slug}/index.js`;
+}
+var entryOf = (slug, kind) => `dist/${appEntryOf(slug, kind)}`;
+function normalizePythonApp(app) {
+  return {
+    version: app.python,
+    cache: app.cache ?? false,
+    tasks: sortedRecord(app.tasks, (task) => ({
+      handler: task.handler,
+      timeoutSeconds: task.timeoutSeconds ?? PYTHON_TASK_TIMEOUT_DEFAULT,
+      compute: resolvePythonCompute(app.compute, task.compute),
+      ...task.onFinish ? { onFinish: { app: task.onFinish.app, handler: task.onFinish.handler } } : {}
+    })),
+    ...app.server ? {
+      server: {
+        handler: app.server.handler,
+        idleTimeoutSeconds: app.server.idleTimeoutSeconds ?? PYTHON_SERVER_IDLE_DEFAULT,
+        maxInstances: app.server.maxInstances ?? PYTHON_SERVER_INSTANCES_DEFAULT,
+        targetConcurrency: app.server.targetConcurrency ?? PYTHON_SERVER_TARGET_CONCURRENCY_DEFAULT,
+        compute: resolvePythonCompute(app.compute, app.server.compute)
+      }
+    } : {}
+  };
 }
 function normalizeProjectManifest(manifest) {
   const apps = Object.keys(manifest.apps).sort(byKey).map((slug) => {
@@ -64592,7 +64848,8 @@ function normalizeProjectManifest(manifest) {
         models: sortedRecord(app.capabilities?.models, sorted),
         buckets: sortedRecord(app.capabilities?.buckets, sorted),
         ...app.capabilities?.realtime ? { realtime: sortedRecord(app.capabilities.realtime, sorted) } : {},
-        ...app.capabilities?.ai ? { ai: { chat: app.capabilities.ai.chat } } : {}
+        ...app.capabilities?.ai ? { ai: { chat: app.capabilities.ai.chat } } : {},
+        ...app.capabilities?.python ? { python: sortedRecord(app.capabilities.python, sorted) } : {}
       },
       anonymous: app.anonymous ?? { allowed: false, write: false },
       network: {
@@ -64610,7 +64867,8 @@ function normalizeProjectManifest(manifest) {
           cron: s2.cron.trim().replace(/\s+/g, " "),
           handler: s2.handler
         }))
-      } : {}
+      } : {},
+      ...app.kind === "python" ? { python: normalizePythonApp(app) } : {}
     };
   });
   return {
@@ -64676,7 +64934,6 @@ function normalizeTrigger(trigger) {
 }
 
 // frontend/packages/project-protocol/src/ai.ts
-var AI_RUN_HEADER = "x-fdpocket-run";
 var AI_ATTACHMENTS_MAX = 4;
 var AI_ATTACHMENTS_MAX_BYTES = 20 * 1024 * 1024;
 var AI_MESSAGE_MAX_BYTES = 32 * 1024;
@@ -65287,6 +65544,7 @@ var jobScheduleResponseSchema = exports_external.strictObject({
 });
 var jobCancelRequestSchema = exports_external.strictObject({ id: exports_external.uuid() });
 var jobCancelResponseSchema = exports_external.strictObject({ cancelled: exports_external.boolean() });
+var RUN_CONTEXT_HEADER = "x-fdpocket-run";
 // frontend/packages/project-protocol/src/live-preview.ts
 var LIVE_TOKEN_PATTERN = /^[A-Za-z0-9_-]{32,128}$/;
 var LIVE_ACTIVITY_KINDS = ["pointerdown", "keydown", "wheel", "touchstart"];
@@ -65465,6 +65723,7 @@ var projectConsentSchema = exports_external.strictObject({
   network: exports_external.strictObject({ egress: exports_external.array(exports_external.string()), browser: exports_external.array(exports_external.string()) }),
   notifications: exports_external.boolean(),
   ai: exports_external.literal(true).optional(),
+  compute: exports_external.literal(true).optional(),
   privacySummary: localizedNameSchema.nullable()
 });
 var consentRequiredSchema = exports_external.strictObject({
@@ -66786,10 +67045,7 @@ class ImportError extends Error {
   }
 }
 function distAppsOf(manifest2) {
-  return Object.entries(manifest2.apps).filter(([, app]) => ["web", "api", "jobs"].includes(app.kind)).map(([slug, app]) => ({
-    slug,
-    entry: `${slug}/index.${app.kind === "web" ? "html" : "js"}`
-  })).sort((a, b2) => a.slug < b2.slug ? -1 : a.slug > b2.slug ? 1 : 0);
+  return Object.entries(manifest2.apps).filter(([, app]) => APP_KINDS.includes(app.kind)).map(([slug, app]) => ({ slug, entry: appEntryOf(slug, app.kind) })).sort((a, b2) => a.slug < b2.slug ? -1 : a.slug > b2.slug ? 1 : 0);
 }
 function normalizeEntryName(name3) {
   return name3.replace(/^\.\//, "").replace(/\/+$/, "");
@@ -67299,6 +67555,22 @@ var ALLOWED_EXTENSIONS = new Set([
   ".otf"
 ]);
 var TEXT_EXTENSIONS = new Set([".html", ".js", ".mjs", ".css"]);
+var PYTHON_EXTENSIONS = new Set([
+  ".py",
+  ".pyi",
+  ".toml",
+  ".lock",
+  ".json",
+  ".yaml",
+  ".yml",
+  ".txt",
+  ".md"
+]);
+var PYTHON_FILE_NAMES = new Set([".python-version", "py.typed"]);
+function isPythonAppFile(path) {
+  const name3 = path.slice(path.lastIndexOf("/") + 1);
+  return PYTHON_FILE_NAMES.has(name3) || PYTHON_EXTENSIONS.has(extensionOf2(path));
+}
 var REMOTE_LITERAL = String.raw`\s*['"\x60](?:https?|wss?):\/\/`;
 var SERVER_WARNING_RULES = new Set(["EVAL", "EXTERNAL_REQUEST"]);
 var SERVER_WHY = {
@@ -67352,6 +67624,16 @@ function checkDist(files, manifest2) {
   const decoder2 = new TextDecoder;
   for (const file2 of files) {
     const extension = extensionOf2(file2.path);
+    if (manifest2?.apps[file2.path.split("/")[0] ?? ""]?.kind === "python") {
+      if (!isPythonAppFile(file2.path)) {
+        errors5.push({
+          code: "UNSUPPORTED_ASSET",
+          message: `"${extension || "no extension"}" is not a python app file (source, settings and small data only; put model weights in /cache)`,
+          path: file2.path
+        });
+      }
+      continue;
+    }
     if (!ALLOWED_EXTENSIONS.has(extension)) {
       errors5.push({
         code: "UNSUPPORTED_ASSET",
@@ -68065,6 +68347,7 @@ async function checkZModel(root, load) {
 
 // frontend/packages/project-validator/src/static/source.ts
 var KIT_LAYOUT = { platform: "platform/platform.zmodel", vendor: "vendor" };
+var OPTIONAL_VENDOR_DIRS = new Set(["fdpocket-py"]);
 async function readTree2(dir) {
   const files = new Map;
   if (!existsSync7(dir))
@@ -68096,6 +68379,8 @@ async function modifiedVendoredPackages(root, kitRoot) {
   const dirs = existsSync7(vendor) ? (await readdir4(vendor, { withFileTypes: true })).filter((entry) => entry.isDirectory()).map((entry) => entry.name).sort() : [];
   const modified = [];
   for (const dir of dirs) {
+    if (OPTIONAL_VENDOR_DIRS.has(dir) && !existsSync7(join9(root, "packages", dir)))
+      continue;
     if (!sameTree(await readTree2(join9(vendor, dir)), await readTree2(join9(root, "packages", dir)))) {
       modified.push(dir);
     }
@@ -68212,6 +68497,102 @@ async function checkLockfile(root, options2, errors5, warnings) {
     warnings.push(...result.warnings);
   }
 }
+// frontend/packages/project-validator/src/static/python.ts
+var PLATFORM_ENV = new Set([
+  "GATEWAY_URL",
+  "PLATFORM_SERVICE_CREDENTIAL",
+  "PLATFORM_CACHE_DIR",
+  "PLATFORM_RUN_ID",
+  "PLATFORM_RUN_TOKEN",
+  "PYTHONUNBUFFERED",
+  "HF_HOME",
+  "TORCH_HOME"
+]);
+var ENV_READ = /os\.(?:environ(?:\.get)?\s*[[(]|getenv\s*\()\s*['"]([A-Z][A-Z0-9_]*)['"]/g;
+var ABSOLUTE_URL2 = /https?:\/\/[A-Za-z0-9.-]+(?::\d+)?[^\s'"]*/g;
+function checkPythonApps(files, manifest2) {
+  const result = { errors: [], warnings: [] };
+  const decoder2 = new TextDecoder;
+  for (const [slug, app] of Object.entries(manifest2.apps)) {
+    if (app?.kind !== "python")
+      continue;
+    const texts = new Map(files.filter((f2) => f2.path.startsWith(`${slug}/`)).map((f2) => [f2.path.slice(slug.length + 1), decoder2.decode(f2.bytes)]));
+    checkFiles(slug, texts, result);
+    checkDependencies(slug, app, texts, result);
+    checkHandlers(slug, app, texts, result);
+    checkSources(slug, app, texts, result);
+  }
+  return result;
+}
+function checkFiles(slug, texts, result) {
+  for (const name3 of ["pyproject.toml", "uv.lock"]) {
+    if (!texts.has(name3))
+      result.errors.push({
+        code: "PYTHON_FILE_MISSING",
+        message: `${name3} is missing (commit pyproject.toml and the uv.lock from \`uv lock\`)`,
+        path: `${slug}/${name3}`
+      });
+  }
+}
+function checkDependencies(slug, app, texts, result) {
+  const pyproject = texts.get("pyproject.toml");
+  if (pyproject === undefined)
+    return;
+  const needed = ["httpx", ...app.server ? ["uvicorn"] : []];
+  for (const name3 of needed) {
+    if (!new RegExp(`["']${name3}(?![A-Za-z0-9_-])`).test(pyproject))
+      result.errors.push({
+        code: "PYTHON_DEPENDENCY_MISSING",
+        message: `add ${name3} to [project].dependencies (${name3 === "httpx" ? "the Platform SDK uses it" : "the server runs on uvicorn"})`,
+        path: `${slug}/pyproject.toml`
+      });
+  }
+}
+function handlersOf(app) {
+  return [
+    ...Object.entries(app.tasks ?? {}).map(([name3, task]) => ({
+      at: `tasks.${name3}`,
+      handler: task.handler
+    })),
+    ...app.server ? [{ at: "server", handler: app.server.handler }] : []
+  ];
+}
+function checkHandlers(slug, app, texts, result) {
+  for (const { at, handler } of handlersOf(app)) {
+    const [module = "", attribute = ""] = handler.split(":");
+    const base = `src/${module.replaceAll(".", "/")}`;
+    const source = texts.get(`${base}.py`) ?? texts.get(`${base}/__init__.py`);
+    const defined = new RegExp(`^(?:async\\s+def|def|class)\\s+${attribute}\\b|^${attribute}\\s*[:=]`, "m");
+    if (source === undefined || !defined.test(source))
+      result.errors.push({
+        code: "PYTHON_HANDLER_MISSING",
+        message: `${at}: ${handler} is not defined (${source === undefined ? `no ${base}.py` : `no ${attribute} in the module`})`,
+        path: `${slug}/${base}.py`
+      });
+  }
+}
+function checkSources(slug, app, texts, result) {
+  const declared = new Set((app.secrets ?? []).map((secret) => secret.name));
+  for (const [path, source] of texts) {
+    if (!path.endsWith(".py"))
+      continue;
+    const names = new Set([...source.matchAll(ENV_READ)].map((match) => match[1]).filter((name3) => !declared.has(name3) && !PLATFORM_ENV.has(name3)));
+    if (names.size > 0)
+      result.warnings.push({
+        code: "UNDECLARED_SECRET",
+        message: `${[...names].sort().join(", ")} are not declared in secrets (they are unset when the app runs)`,
+        path: `${slug}/${path}`
+      });
+    const hosts = new Set([...source.matchAll(ABSOLUTE_URL2)].map((match) => match[0]).filter((url2) => !/^https?:\/\/(?:localhost|127\.0\.0\.1|0\.0\.0\.0)\b/.test(url2)).filter((url2) => !checkEgress(url2, { egress: app.network?.egress ?? [] }).allowed).map((url2) => URL.canParse(url2) ? new URL(url2).host : url2));
+    if (hosts.size > 0)
+      result.warnings.push({
+        code: "EXTERNAL_URL",
+        message: `requests to ${[...hosts].sort().join(", ")} are blocked unless they are in network.egress`,
+        path: `${slug}/${path}`
+      });
+  }
+}
+
 // frontend/packages/project-validator/src/validate.ts
 function skippedDynamic(reason) {
   return startStage("dynamic").finish("skipped", {
@@ -68275,14 +68656,21 @@ async function validateProject(archive, source, options2 = {}) {
     return { report: buildReport({ index: null, manifest: checked.manifest, stages }) };
   }
   const dist = checkDist(files, checked.manifest);
+  const python2 = checkPythonApps(files, checked.manifest);
   const schema = options2.schema && checked.errors.length === 0 ? await checkSchema({ ...options2.schema, root: source.root, manifest: checked.manifest }) : null;
   if (options2.schema && schema === null) {
     notChecked.push({ code: "NOT_CHECKED", message: "schema: fix the source errors first" });
   }
-  const errors5 = [...checked.errors, ...dist.errors, ...schema?.errors ?? []];
+  const errors5 = [...checked.errors, ...dist.errors, ...python2.errors, ...schema?.errors ?? []];
   stages.push(staticStage.finish(errors5.length === 0 ? "passed" : "failed", {
     errors: errors5,
-    warnings: [...checked.warnings, ...dist.warnings, ...schema?.warnings ?? [], ...notChecked]
+    warnings: [
+      ...checked.warnings,
+      ...dist.warnings,
+      ...python2.warnings,
+      ...schema?.warnings ?? [],
+      ...notChecked
+    ]
   }));
   let screenshots = [];
   if (options2.dynamic) {
@@ -68493,11 +68881,11 @@ ${untracked.code === 0 ? untracked.stdout : ""}`.split(`
 }
 
 // frontend/packages/miniapp-kit/src/commands.ts
-import { createHash as createHash9, randomUUID as randomUUID2 } from "node:crypto";
-import { existsSync as existsSync23 } from "node:fs";
-import { mkdir as mkdir13, readdir as readdir12, readFile as readFile22, writeFile as writeFile15 } from "node:fs/promises";
+import { createHash as createHash10, randomUUID as randomUUID2 } from "node:crypto";
+import { existsSync as existsSync24 } from "node:fs";
+import { mkdir as mkdir14, readdir as readdir13, readFile as readFile23, writeFile as writeFile15 } from "node:fs/promises";
 import { homedir } from "node:os";
-import { dirname as dirname12, join as join35, resolve as resolve3 } from "node:path";
+import { dirname as dirname12, join as join37, resolve as resolve3 } from "node:path";
 import { createInterface } from "node:readline";
 
 // frontend/packages/miniapp-kit/src/approval.ts
@@ -68619,10 +69007,10 @@ function openInBrowser(url2) {
 
 // frontend/packages/miniapp-kit/src/build.ts
 import { spawn as spawn3 } from "node:child_process";
-import { existsSync as existsSync12, readFileSync as readFileSync3 } from "node:fs";
-import { readFile as readFile9, rm as rm5, writeFile as writeFile4 } from "node:fs/promises";
+import { existsSync as existsSync13, readFileSync as readFileSync3 } from "node:fs";
+import { readFile as readFile10, rm as rm6, writeFile as writeFile4 } from "node:fs/promises";
 import { createRequire as createRequire8 } from "node:module";
-import { dirname as dirname5, join as join17 } from "node:path";
+import { dirname as dirname5, join as join18 } from "node:path";
 
 // frontend/packages/miniapp-kit/src/generate.ts
 import { existsSync as existsSync10 } from "node:fs";
@@ -68647,7 +69035,7 @@ function renderServerEnvTypes(manifest2) {
     `  readonly ${SERVICE_CREDENTIAL_BINDING}: string`,
     "}"
   ];
-  const apps = Object.values(manifest2.apps).filter((app) => SERVER_APP_KINDS.includes(app.kind)).sort((a, b2) => a.slug < b2.slug ? -1 : 1);
+  const apps = Object.values(manifest2.apps).filter((app) => WORKER_APP_KINDS.includes(app.kind)).sort((a, b2) => a.slug < b2.slug ? -1 : 1);
   for (const app of apps) {
     lines.push("");
     if (app.secrets.length === 0) {
@@ -68676,6 +69064,7 @@ var VENDORED_PACKAGES = [
   { name: "@workspace/miniapp-sdk", dir: "miniapp-sdk" }
 ];
 var KIT_VENDOR_DIR = "vendor";
+var PYTHON_SDK_DIR = "fdpocket-py";
 
 class VendorError extends Error {
   name = "VendorError";
@@ -68713,22 +69102,29 @@ async function placeVendoredPackages(root, kitRoot) {
     if (!existsSync9(join12(source, "package.json"))) {
       throw new VendorError(`the Kit has no ${KIT_VENDOR_DIR}/${pkg.dir} (${pkg.name}); the Kit is incomplete, reinstall it`);
     }
-    const target = join12(root, "packages", pkg.dir);
-    if (sameTree2(await readTree3(source), await readTree3(target))) {
-      result[pkg.dir] = "unchanged";
-      continue;
-    }
-    const existed = existsSync9(target);
-    if (existed) {
-      for (const entry of await readdir6(target)) {
-        if (entry !== "node_modules")
-          await rm3(join12(target, entry), { recursive: true, force: true });
-      }
-    }
-    await cp(source, target, { recursive: true });
-    result[pkg.dir] = existed ? "restored" : "created";
+    result[pkg.dir] = await placeTree(source, join12(root, "packages", pkg.dir));
   }
   return result;
+}
+async function placePythonSdk(root, kitRoot) {
+  const source = join12(kitRoot, KIT_VENDOR_DIR, PYTHON_SDK_DIR);
+  if (!existsSync9(join12(source, "fdpocket/__init__.py"))) {
+    throw new VendorError(`the Kit has no ${KIT_VENDOR_DIR}/${PYTHON_SDK_DIR}; the Kit is incomplete, reinstall it`);
+  }
+  return placeTree(source, join12(root, "packages", PYTHON_SDK_DIR));
+}
+async function placeTree(source, target) {
+  if (sameTree2(await readTree3(source), await readTree3(target)))
+    return "unchanged";
+  const existed = existsSync9(target);
+  if (existed) {
+    for (const entry of await readdir6(target)) {
+      if (entry !== "node_modules")
+        await rm3(join12(target, entry), { recursive: true, force: true });
+    }
+  }
+  await cp(source, target, { recursive: true });
+  return existed ? "restored" : "created";
 }
 
 // frontend/packages/miniapp-kit/src/generate.ts
@@ -68742,6 +69138,8 @@ async function generateProject(options2) {
   const { manifest: manifest2, warnings } = await readManifest(root);
   const platform = await placePlatform(root, options2.kitRoot);
   const vendored = await placeVendoredPackages(root, options2.kitRoot);
+  if (Object.values(manifest2.apps).some((app) => app.kind === "python"))
+    vendored["fdpocket-py"] = await placePythonSdk(root, options2.kitRoot);
   const cli = cliOf(root, options2.resolveCli ?? resolveZenStackCli);
   const sdk = join13(root, PROJECT_PATHS.sdk);
   await rm4(sdk, { recursive: true, force: true });
@@ -68928,15 +69326,78 @@ function describeFile(bytes) {
   return { size: bytes.byteLength, sha256: createHash4("sha256").update(bytes).digest("hex") };
 }
 
+// frontend/packages/miniapp-kit/src/python-build.ts
+import { existsSync as existsSync11 } from "node:fs";
+import { cp as cp2, mkdir as mkdir4, readdir as readdir9, readFile as readFile9, rm as rm5 } from "node:fs/promises";
+import { basename, join as join15, relative } from "node:path";
+
+class PythonBuildError extends Error {
+  name = "PythonBuildError";
+}
+var ROOT_FILES = ["pyproject.toml", "uv.lock", ".python-version"];
+var REQUIRED = ["pyproject.toml", "uv.lock"];
+var SKIPPED = new Set(["__pycache__", ".venv", ".pytest_cache", ".mypy_cache", ".ruff_cache"]);
+async function copyPythonApp(input) {
+  const appDir = join15(input.root, "apps", input.slug);
+  for (const name3 of REQUIRED) {
+    if (!existsSync11(join15(appDir, name3))) {
+      throw new PythonBuildError(`apps/${input.slug}/${name3} is missing; python apps need pyproject.toml and a committed uv.lock (uv lock)`);
+    }
+  }
+  if (!existsSync11(join15(appDir, "src"))) {
+    throw new PythonBuildError(`apps/${input.slug}/src is missing; put the package under src/`);
+  }
+  const out = join15(input.root, "dist", input.slug);
+  await rm5(out, { recursive: true, force: true });
+  await mkdir4(out, { recursive: true });
+  for (const name3 of ROOT_FILES) {
+    if (existsSync11(join15(appDir, name3)))
+      await cp2(join15(appDir, name3), join15(out, name3));
+  }
+  await cp2(join15(appDir, "src"), join15(out, "src"), {
+    recursive: true,
+    filter: (path) => !SKIPPED.has(basename(path)) && !path.endsWith(".pyc")
+  });
+  return "";
+}
+async function listPythonAppFiles(input) {
+  const appDir = join15(input.root, "apps", input.slug);
+  for (const name3 of [...REQUIRED, "src"]) {
+    if (!existsSync11(join15(appDir, name3)))
+      throw new PythonBuildError(`apps/${input.slug}/${name3} is missing (uv lock writes uv.lock)`);
+  }
+  const files = [];
+  for (const name3 of ROOT_FILES) {
+    if (existsSync11(join15(appDir, name3)))
+      files.push({ path: name3, bytes: await readFile9(join15(appDir, name3)) });
+  }
+  const walk = async (dir) => {
+    for (const entry of await readdir9(dir, { withFileTypes: true })) {
+      if (SKIPPED.has(entry.name) || entry.name.endsWith(".pyc"))
+        continue;
+      const path = join15(dir, entry.name);
+      if (entry.isDirectory())
+        await walk(path);
+      else if (entry.isFile())
+        files.push({
+          path: relative(appDir, path).split("\\").join("/"),
+          bytes: await readFile9(path)
+        });
+    }
+  };
+  await walk(join15(appDir, "src"));
+  return files.sort((a, b2) => a.path < b2.path ? -1 : 1);
+}
+
 // frontend/packages/miniapp-kit/src/worker-build.ts
 import { builtinModules } from "node:module";
-import { join as join16 } from "node:path";
+import { join as join17 } from "node:path";
 import { pathToFileURL as pathToFileURL7 } from "node:url";
 
 // frontend/packages/miniapp-kit/src/dev/seed.ts
-import { existsSync as existsSync11, readFileSync as readFileSync2 } from "node:fs";
+import { existsSync as existsSync12, readFileSync as readFileSync2 } from "node:fs";
 import { createRequire as createRequire7 } from "node:module";
-import { dirname as dirname4, join as join15 } from "node:path";
+import { dirname as dirname4, join as join16 } from "node:path";
 import { pathToFileURL as pathToFileURL6 } from "node:url";
 // frontend/packages/logger/redact.ts
 var REDACTED = "[REDACTED]";
@@ -71110,6 +71571,16 @@ async function userClaimsOf(c, adapters, allowActAs) {
   }
   return verifyActAs(adapters, service, actAs);
 }
+async function verifyCurrentService(c, adapters, permission) {
+  const service = await adapters.signer.verifyService(bearerOf(c));
+  const current = await adapters.services.current(service.cid);
+  if (!current || current.credentialId !== service.cid || current.projectId !== service.aud || current.appSlug !== service.app || current.environment !== service.env || current.sessionId !== (service.br ?? null) || current.previewSessionId !== (service.pv ?? null)) {
+    throw new GatewayError("UNAUTHENTICATED", "service credential is no longer authorized");
+  }
+  if (!service.permissions.includes(permission) || !current.servicePermissions.includes(permission))
+    throw new GatewayError("FORBIDDEN", `${permission} is not granted to this service`);
+  return service;
+}
 async function verifyActAs(adapters, service, actAs) {
   if (!/^[A-Za-z0-9._-]+$/.test(actAs)) {
     throw new GatewayError("UNAUTHENTICATED", "malformed act-as token");
@@ -71132,6 +71603,17 @@ async function jsonBody(c) {
   } catch (cause) {
     throw new GatewayError("VALIDATION_FAILED", "request body must be JSON", { cause });
   }
+}
+var KIT_AI_KEY_HEADER = "x-kit-ai-key";
+async function verifyDevPrincipal(c, adapters) {
+  const liveKey = c.req.header(KIT_AI_KEY_HEADER);
+  if (liveKey) {
+    return { userId: null, liveKeyHash: await sha256Hex2(new TextEncoder().encode(liveKey)) };
+  }
+  const identity2 = await adapters.jwks.verifySupabaseToken(bearerOf(c));
+  if (identity2.isAnonymous)
+    throw new GatewayError("FORBIDDEN", "anonymous users cannot use dev");
+  return { userId: identity2.userId, liveKeyHash: null };
 }
 
 // frontend/packages/project-gateway/src/ai/completion.ts
@@ -71330,7 +71812,6 @@ function waitUntilOf(c) {
 }
 
 // frontend/packages/project-gateway/src/ai/dev-routes.ts
-var KIT_AI_KEY_HEADER = "x-kit-ai-key";
 var contentPartSchema = exports_external.looseObject({ type: exports_external.string().min(1).max(32) });
 var devChatSchema = exports_external.strictObject({
   sessionId: exports_external.uuid(),
@@ -71352,15 +71833,7 @@ function registerAiDevRoutes(app, adapters, logger) {
     const dev = ai2?.dev;
     if (!ai2 || !dev)
       throw new GatewayError("GATEWAY_UNAVAILABLE", "ai is not configured");
-    const liveKey = c.req.header(KIT_AI_KEY_HEADER);
-    let userId = null;
-    if (!liveKey) {
-      const token2 = bearerOf(c);
-      const identity2 = await adapters.jwks.verifySupabaseToken(token2);
-      if (identity2.isAnonymous)
-        throw new GatewayError("FORBIDDEN", "anonymous users cannot use ai");
-      userId = identity2.userId;
-    }
+    const principal = await verifyDevPrincipal(c, adapters);
     const parsed = devChatSchema.safeParse(await jsonBody(c));
     if (!parsed.success)
       throw new GatewayError("VALIDATION_FAILED", "invalid dev ai request");
@@ -71369,8 +71842,7 @@ function registerAiDevRoutes(app, adapters, logger) {
     const plan = await dev.begin({
       turnId,
       sessionId: request.sessionId,
-      userId,
-      liveKeyHash: liveKey ? await sha256Hex2(new TextEncoder().encode(liveKey)) : null,
+      ...principal,
       app: request.app,
       model: request.model ?? null
     });
@@ -72103,7 +72575,7 @@ var KIND_OF_PART = {
 function registerAiOpenAiRoutes(app, adapters, config2, runtime, logger) {
   const { open, loadAttachments } = createAiAccess(adapters, config2, runtime);
   app.post("/v1/ai/openai/chat/completions", async (c) => {
-    const run = c.req.header(AI_RUN_HEADER);
+    const run = c.req.header(RUN_CONTEXT_HEADER);
     const turnId = crypto.randomUUID();
     if (run !== undefined) {
       const job = await openJob(c);
@@ -72148,13 +72620,7 @@ function registerAiOpenAiRoutes(app, adapters, config2, runtime, logger) {
     return parsed.data;
   }
   async function openJob(c) {
-    const service = await adapters.signer.verifyService(bearerOf(c));
-    const current = await adapters.services.current(service.cid);
-    if (!current || current.credentialId !== service.cid || current.projectId !== service.aud || current.appSlug !== service.app || current.environment !== service.env) {
-      throw new GatewayError("UNAUTHENTICATED", "service credential is no longer authorized");
-    }
-    if (!service.permissions.includes("ai.chat") || !current.servicePermissions.includes("ai.chat"))
-      throw new GatewayError("FORBIDDEN", "ai.chat is not granted to this service");
+    const service = await verifyCurrentService(c, adapters, "ai.chat");
     if (!adapters.ai)
       throw new GatewayError("GATEWAY_UNAVAILABLE", "ai is not configured");
     return { ai: adapters.ai, credentialId: service.cid };
@@ -72301,7 +72767,7 @@ function registerApiAuthorizationRoutes(app, adapters, config2) {
       jti: null,
       cost: 1
     }));
-    if (destination.app.kind !== "api" || destination.versionId !== input.versionId || destination.app.originHost !== input.originHost || destination.db.name !== source.db.name || destination.db.group !== source.db.group)
+    if (!["api", "python"].includes(destination.app.kind) || destination.versionId !== input.versionId || destination.app.originHost !== input.originHost || destination.db.name !== source.db.name || destination.db.group !== source.db.group)
       throw new GatewayError("TOKEN_SCOPE_MISMATCH", "API deployment changed");
     if (claims.anon && !destination.app.anonymous.allowed)
       throw new GatewayError("FORBIDDEN", "sign-in required");
@@ -73858,6 +74324,7 @@ function registerEraseRoutes(app, adapters, options2) {
 
 // frontend/packages/project-gateway/src/jobs.ts
 init_zod();
+var PYTHON_RUN_CONTEXT_PATTERN = /^python:[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/;
 function registerJobRoutes(app, adapters) {
   for (const action2 of ["schedule", "cancel"]) {
     app.post(`/v1/jobs/${action2}`, bodyLimit({
@@ -73880,10 +74347,13 @@ function registerJobRoutes(app, adapters) {
       if (!parsed.success)
         throw new GatewayError("VALIDATION_FAILED", "invalid job request");
       const actAs = c2.req.header(ACT_AS_HEADER);
+      const run = action2 === "schedule" ? c2.req.header(RUN_CONTEXT_HEADER) ?? null : null;
+      if (run !== null && (actAs !== undefined || !PYTHON_RUN_CONTEXT_PATTERN.test(run)))
+        throw new GatewayError("VALIDATION_FAILED", "a job is scheduled as a user or from a run");
       const userId = action2 === "schedule" && actAs !== undefined ? platformUserIdOf((await verifyActAs(adapters, claims, actAs)).gid) : null;
       if (!adapters.jobs)
         throw new GatewayError("GATEWAY_UNAVAILABLE", "jobs unavailable");
-      const raw2 = await adapters.jobs.call(action2, claims.cid, parsed.data, userId);
+      const raw2 = await adapters.jobs.call(action2, claims.cid, parsed.data, userId, run);
       const refusal = exports_external.object({ error: exports_external.enum(["FORBIDDEN", "VALIDATION_FAILED", "RATE_LIMITED"]) }).safeParse(raw2);
       if (refusal.success)
         throw new GatewayError(refusal.data.error, "job refused");
@@ -73967,6 +74437,237 @@ function registerProfileRoutes(app, adapters, config3) {
     c2.header("Cache-Control", "private, no-store");
     return c2.json(claims.anon ? null : await adapters.profiles.get(platformUserIdOf(claims.gid)));
   });
+}
+
+// frontend/packages/project-gateway/src/python/dev-routes.ts
+init_zod();
+var PYTHON_DEV_SOURCE_MAX_BYTES = 20 * 1024 * 1024;
+var RUN_ID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/;
+var SOURCE_PATH = /^(?!\/)(?!.*(?:^|\/)\.\.(?:\/|$))[\w.\-/]{1,300}$/;
+var sourceSchema = exports_external.strictObject({
+  sessionId: exports_external.uuid(),
+  app: exports_external.string().regex(APP_SLUG_PATTERN),
+  manifest: exports_external.unknown(),
+  files: exports_external.array(exports_external.strictObject({ path: exports_external.string().regex(SOURCE_PATH), content: exports_external.base64() })).min(1).max(2000)
+});
+var runSchema = exports_external.strictObject({
+  sessionId: exports_external.uuid(),
+  sourceId: exports_external.uuid(),
+  task: exports_external.string().regex(PYTHON_TASK_NAME_PATTERN),
+  input: exports_external.unknown()
+});
+var limit = (maxSize) => bodyLimit({
+  maxSize,
+  onError() {
+    throw new GatewayError("PAYLOAD_TOO_LARGE", "request too large");
+  }
+});
+function parse7(schema2, value) {
+  const result = schema2.safeParse(value);
+  if (!result.success)
+    throw new GatewayError("VALIDATION_FAILED", "invalid dev python request");
+  return result.data;
+}
+function declarationOf(manifest2, app) {
+  const parsed = parseProjectManifest(manifest2);
+  if (!parsed.success)
+    throw new GatewayError("VALIDATION_FAILED", "invalid project.yaml");
+  const declared = normalizeProjectManifest(parsed.manifest).apps.find((a2) => a2.slug === app);
+  if (declared?.kind !== "python" || !declared.python)
+    throw new GatewayError("VALIDATION_FAILED", `${app} is not a python app`);
+  return { python: declared.python, egress: declared.network.egress };
+}
+function registerPythonDevRoutes(app, adapters) {
+  const port = () => {
+    const dev = adapters.python?.dev;
+    if (!dev)
+      throw new GatewayError("GATEWAY_UNAVAILABLE", "dev python is not configured");
+    return dev;
+  };
+  app.post("/v1/python/dev/sources", limit(PYTHON_DEV_SOURCE_MAX_BYTES), async (c2) => {
+    const dev = port();
+    const principal = await verifyDevPrincipal(c2, adapters);
+    const request = parse7(sourceSchema, await jsonBody(c2));
+    const declaration = declarationOf(request.manifest, request.app);
+    const files = [...request.files].sort((a2, b3) => a2.path < b3.path ? -1 : 1);
+    const paths2 = new Set(files.map((f3) => f3.path));
+    if (paths2.size !== files.length || !paths2.has("pyproject.toml") || !paths2.has("uv.lock"))
+      throw new GatewayError("VALIDATION_FAILED", "the source needs pyproject.toml and uv.lock");
+    const body = new TextEncoder().encode(JSON.stringify({ files }));
+    const sha2562 = await sha256Hex2(body);
+    const begun = await dev.beginSource({
+      ...principal,
+      sessionId: request.sessionId,
+      app: request.app,
+      ...declaration,
+      sha256: sha2562
+    });
+    if (!begun.ready) {
+      await dev.putSource(begun.objectKey, body);
+      await dev.sourceReady(begun.sourceId, request.sessionId);
+    }
+    return c2.json({ sourceId: begun.sourceId }, 201);
+  });
+  app.post("/v1/python/dev/runs", limit(REQUEST_BODY_MAX_BYTES), async (c2) => {
+    const dev = port();
+    const principal = await verifyDevPrincipal(c2, adapters);
+    const request = parse7(runSchema, await jsonBody(c2));
+    const accepted = await dev.request({ ...principal, ...request });
+    return c2.json({ runId: accepted.runId, status: accepted.status }, 202);
+  });
+  const who = async (c2, sessionId) => ({
+    ...await verifyDevPrincipal(c2, adapters),
+    sessionId: parse7(exports_external.uuid(), sessionId)
+  });
+  const runIdOf = (runId) => {
+    if (!runId || !RUN_ID.test(runId))
+      throw new GatewayError("NOT_FOUND", "run not found");
+    return runId;
+  };
+  app.get("/v1/python/dev/runs/:runId", async (c2) => {
+    const runId = runIdOf(c2.req.param("runId"));
+    return c2.json(await port().get(runId, await who(c2, c2.req.query("sessionId"))));
+  });
+  app.post("/v1/python/dev/runs/:runId/cancel", limit(4096), async (c2) => {
+    const runId = runIdOf(c2.req.param("runId"));
+    const body = parse7(exports_external.strictObject({ sessionId: exports_external.uuid() }), await jsonBody(c2));
+    return c2.json(await port().cancel(runId, await who(c2, body.sessionId)));
+  });
+}
+
+// frontend/packages/project-gateway/src/python/routes.ts
+var PYTHON_COST = 1;
+var RUN_ID2 = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/;
+var FINISH_BODY_MAX_BYTES = PYTHON_RUN_OUTPUT_MAX_BYTES + 64 * 1024;
+var limit2 = (maxSize) => bodyLimit({
+  maxSize,
+  onError() {
+    throw new GatewayError("PAYLOAD_TOO_LARGE", "request too large");
+  }
+});
+function registerPythonRoutes(app, adapters, config3) {
+  const port = () => {
+    if (!adapters.python)
+      throw new GatewayError("GATEWAY_UNAVAILABLE", "python is not configured");
+    return adapters.python;
+  };
+  async function openUser(c2) {
+    if (c2.req.header(ACT_AS_HEADER) !== undefined) {
+      await verifyCurrentService(c2, adapters, "python.run");
+    }
+    const { claims, resolved } = await verifyProjectToken(c2, adapters, config3, PYTHON_COST);
+    if (claims.anon)
+      throw new GatewayError("FORBIDDEN", "anonymous_user");
+    if (resolved.app.access === "restricted") {
+      const db = await adapters.turso.connect(resolved.db);
+      const actor = await loadProjectActor(db, claims.sub, [], resolved.user.bootstrap);
+      assertAppAccess(resolved, actor?.permissions ?? []);
+    }
+    return { claims, resolved };
+  }
+  async function principalOf(c2) {
+    if (c2.req.header(ACT_AS_HEADER) === undefined && isServiceToken(bearerOf(c2))) {
+      return { credentialId: (await verifyCurrentService(c2, adapters, "python.run")).cid };
+    }
+    const { claims } = await openUser(c2);
+    return { userId: platformUserIdOf(claims.gid) };
+  }
+  const runIdOf = (c2) => {
+    const runId = c2.req.param("runId") ?? "";
+    if (!RUN_ID2.test(runId))
+      throw new GatewayError("NOT_FOUND", "run not found");
+    return runId;
+  };
+  app.post("/v1/python/runs", limit2(REQUEST_BODY_MAX_BYTES), async (c2) => {
+    const python2 = port();
+    const run = c2.req.header(RUN_CONTEXT_HEADER);
+    if (run !== undefined) {
+      const service = await verifyCurrentService(c2, adapters, "python.run");
+      const request2 = parse8(pythonRunRequestSchema, await jsonBody(c2));
+      const accepted2 = await python2.requestRun({
+        credentialId: service.cid,
+        run,
+        app: request2.app,
+        task: request2.task,
+        input: request2.input,
+        idempotencyKey: request2.idempotencyKey ?? null
+      });
+      return c2.json({ runId: accepted2.runId, status: accepted2.status }, 202);
+    }
+    const { claims, resolved } = await openUser(c2);
+    const request = parse8(pythonRunRequestSchema, await jsonBody(c2));
+    const accepted = await python2.requestUser({
+      projectId: claims.aud,
+      environment: claims.env,
+      sessionId: claims.br ?? null,
+      previewSessionId: claims.pv ?? null,
+      versionId: resolved.versionId,
+      callerApp: claims.app,
+      userId: platformUserIdOf(claims.gid),
+      app: request.app,
+      task: request.task,
+      input: request.input,
+      idempotencyKey: request.idempotencyKey ?? null,
+      viaService: c2.req.header(ACT_AS_HEADER) !== undefined
+    });
+    return c2.json({ runId: accepted.runId, status: accepted.status }, 202);
+  });
+  app.get("/v1/python/runs/:runId", async (c2) => {
+    const runId = runIdOf(c2);
+    return c2.json(await port().get(runId, await principalOf(c2)));
+  });
+  app.post("/v1/python/runs/:runId/cancel", async (c2) => {
+    const runId = runIdOf(c2);
+    return c2.json(await port().cancel(runId, await principalOf(c2)));
+  });
+  async function runnerOf(c2) {
+    if (c2.req.header("origin") !== undefined)
+      throw new GatewayError("FORBIDDEN", "server route only");
+    const runId = runIdOf(c2);
+    const token2 = bearerOf(c2);
+    if (!PYTHON_RUN_TOKEN_PATTERN.test(token2))
+      throw new GatewayError("UNAUTHENTICATED", "invalid run token");
+    return { python: port(), runId, tokenHash: await pythonRunTokenHash(token2) };
+  }
+  app.post("/v1/python/runner/:runId/input", async (c2) => {
+    const { python: python2, runId, tokenHash } = await runnerOf(c2);
+    return c2.json(await python2.runnerInput(runId, tokenHash));
+  });
+  app.post("/v1/python/runner/:runId/progress", limit2(4096), async (c2) => {
+    const { python: python2, runId, tokenHash } = await runnerOf(c2);
+    const progress = parse8(pythonRunnerProgressSchema, await jsonBody(c2));
+    await python2.runnerProgress(runId, tokenHash, progress.progress, progress.message ?? null);
+    return c2.body(null, 204);
+  });
+  app.post("/v1/python/runner/:runId/finish", limit2(FINISH_BODY_MAX_BYTES), async (c2) => {
+    const { python: python2, runId, tokenHash } = await runnerOf(c2);
+    await python2.runnerFinish(runId, tokenHash, parse8(pythonRunnerFinishSchema, await jsonBody(c2)));
+    return c2.body(null, 204);
+  });
+  app.post("/v1/python/runner/:runId/interrupted", async (c2) => {
+    const { python: python2, runId, tokenHash } = await runnerOf(c2);
+    await python2.runnerInterrupted(runId, tokenHash);
+    return c2.body(null, 204);
+  });
+}
+function parse8(schema2, input) {
+  const parsed = schema2.safeParse(input);
+  if (!parsed.success)
+    throw new GatewayError("VALIDATION_FAILED", "invalid python request");
+  return parsed.data;
+}
+function isServiceToken(token2) {
+  const payload = token2.split(".")[1];
+  if (!payload)
+    return false;
+  try {
+    const json2 = JSON.parse(atob(payload.replace(/-/g, "+").replace(/_/g, "/")));
+    return json2.typ === "service";
+  } catch (error51) {
+    if (error51 instanceof SyntaxError || error51 instanceof DOMException)
+      return false;
+    throw error51;
+  }
 }
 
 // frontend/packages/project-gateway/src/realtime/changes.ts
@@ -75442,6 +76143,8 @@ function createGateway(adapters, config3, logger = consoleLogger, realtimeTransp
   registerDirectAuthRoutes(app, adapters, config3);
   registerProfileRoutes(app, adapters, config3);
   registerApiAuthorizationRoutes(app, adapters, config3);
+  registerPythonRoutes(app, adapters, config3);
+  registerPythonDevRoutes(app, adapters);
   app.post("/v1/realtime/tickets", async (c2) => {
     if (!realtimeTransport)
       throw new GatewayError("REALTIME_DISABLED", "Realtime transport is not configured");
@@ -76064,16 +76767,16 @@ function viteImporter(viteEntry, root) {
   };
 }
 function resolveViteEntry(appDir) {
-  const manifestPath = createRequire7(join15(appDir, "package.json")).resolve("vite/package.json");
+  const manifestPath = createRequire7(join16(appDir, "package.json")).resolve("vite/package.json");
   const entry = JSON.parse(readFileSync2(manifestPath, "utf8")).exports?.["."];
   const file2 = typeof entry === "string" ? entry : entry?.import?.default ?? entry?.import;
   if (typeof file2 !== "string")
     throw new Error("vite has no ESM entry");
-  return join15(dirname4(manifestPath), file2);
+  return join16(dirname4(manifestPath), file2);
 }
 async function runSeed(input) {
-  const path = join15(input.root, PROJECT_PATHS.seed);
-  if (!existsSync11(path))
+  const path = join16(input.root, PROJECT_PATHS.seed);
+  if (!existsSync12(path))
     return false;
   let seed;
   try {
@@ -76153,7 +76856,7 @@ export default {
 var NODE_BUILTINS = [/^node:/, ...builtinModules];
 async function buildWorkerBundle(input) {
   const vite = await import(pathToFileURL7(resolveViteEntry(input.appDir)).href);
-  const scheduledEntry = join16(input.appDir, "__platform_scheduled__.ts");
+  const scheduledEntry = join17(input.appDir, "__platform_scheduled__.ts");
   const scheduledModule = "\x00platform-scheduled";
   await vite.build({
     root: input.appDir,
@@ -76168,19 +76871,19 @@ async function buildWorkerBundle(input) {
             return id === scheduledEntry ? scheduledModule : undefined;
           },
           load(id) {
-            return id === scheduledModule ? scheduledWorkerSource(join16(input.appDir, "src/index.ts")) : undefined;
+            return id === scheduledModule ? scheduledWorkerSource(join17(input.appDir, "src/index.ts")) : undefined;
           }
         }
       ] : []
     ],
     build: {
       target: "es2022",
-      outDir: join16(input.root, "dist", input.slug),
+      outDir: join17(input.root, "dist", input.slug),
       emptyOutDir: true,
       copyPublicDir: false,
       sourcemap: false,
       lib: {
-        entry: input.kind === "jobs" ? scheduledEntry : join16(input.appDir, "src/index.ts"),
+        entry: input.kind === "jobs" ? scheduledEntry : join17(input.appDir, "src/index.ts"),
         formats: ["es"],
         fileName: () => "index.js"
       },
@@ -76213,8 +76916,8 @@ async function buildProject(options2) {
     kitRoot,
     ...options2.install ? { install: options2.install } : {}
   });
-  const dist = join17(root, "dist");
-  await rm5(dist, { recursive: true, force: true });
+  const dist = join18(root, "dist");
+  await rm6(dist, { recursive: true, force: true });
   const apps = Object.values(manifest2.apps);
   const env = {
     [KIT_BUILD_ENV.projectId]: options2.projectId,
@@ -76224,22 +76927,22 @@ async function buildProject(options2) {
   for (const app of apps) {
     const input = {
       slug: app.slug,
-      appDir: join17(root, "apps", app.slug),
+      appDir: join18(root, "apps", app.slug),
       env
     };
-    const output = app.kind === "web" ? await (options2.runVite ?? viteBuild)(input) : await (options2.runWorker ?? buildWorkerBundle)({ ...input, root, kind: app.kind });
+    const output = app.kind === "web" ? await (options2.runVite ?? viteBuild)(input) : app.kind === "python" ? await copyPythonApp({ root, slug: app.slug }) : await (options2.runWorker ?? buildWorkerBundle)({ ...input, root, kind: app.kind });
     if (output.trim() !== "")
       viteWarnings[app.slug] = output.trim();
   }
   let index2;
   try {
-    index2 = await buildArtifactIndex(existsSync12(dist) ? await collectFiles(dist) : [], apps.map((app) => ({ slug: app.slug, entry: app.entry.replace(/^dist\//, "") })));
+    index2 = await buildArtifactIndex(existsSync13(dist) ? await collectFiles(dist) : [], apps.map((app) => ({ slug: app.slug, entry: app.entry.replace(/^dist\//, "") })));
   } catch (error51) {
     throw new BuildError(error51 instanceof Error ? error51.message : String(error51));
   }
-  await writeFile4(join17(dist, ARTIFACT_INDEX_PATH), `${JSON.stringify(index2, null, 1)}
+  await writeFile4(join18(dist, ARTIFACT_INDEX_PATH), `${JSON.stringify(index2, null, 1)}
 `);
-  const schemaVersion = schemaVersionOf(await readFile9(join17(root, PROJECT_PATHS.generated, "schema.json"), "utf8"));
+  const schemaVersion = schemaVersionOf(await readFile10(join18(root, PROJECT_PATHS.generated, "schema.json"), "utf8"));
   return {
     artifactHash: index2.artifactHash,
     apps: index2.apps,
@@ -76255,16 +76958,16 @@ async function prepareProject(options2) {
   await placeVendoredPackages(root, kitRoot);
   await (options2.install ?? bunInstall)(root);
   const generate = await generateProject({ root, kitRoot });
-  const manifest2 = JSON.parse(await readFile9(join17(root, PROJECT_PATHS.generated, "project.json"), "utf8"));
+  const manifest2 = JSON.parse(await readFile10(join18(root, PROJECT_PATHS.generated, "project.json"), "utf8"));
   return { generate, manifest: manifest2 };
 }
 async function checkLockfile2(root) {
-  const path = join17(root, "bun.lock");
-  if (!existsSync12(path)) {
+  const path = join18(root, "bun.lock");
+  if (!existsSync13(path)) {
     throw new BuildError("bun.lock is missing; run bun install in source/ and commit bun.lock");
   }
   try {
-    const violations = checkBunLockfile(await readFile9(path, "utf8"));
+    const violations = checkBunLockfile(await readFile10(path, "utf8"));
     if (violations.length > 0) {
       const lines = violations.map((v3) => `  ${v3.key}: ${v3.reason}`);
       throw new BuildError(`bun.lock may only contain npm registry packages (with sha512 integrity) and workspace packages (sdk.md §5.2):
@@ -76298,15 +77001,15 @@ ${text}`));
   });
 }
 async function ensureKitRuntimeDependencies(kitRoot) {
-  const manifest2 = join17(kitRoot, "package.json");
-  if (!existsSync12(manifest2))
+  const manifest2 = join18(kitRoot, "package.json");
+  if (!existsSync13(manifest2))
     return;
-  const authored = JSON.parse(await readFile9(manifest2, "utf8"));
+  const authored = JSON.parse(await readFile10(manifest2, "utf8"));
   if (authored.name !== "fdpocket-creator-runtime")
     return;
   const require2 = createRequire8(manifest2);
   try {
-    const installed = JSON.parse(await readFile9(require2.resolve("miniflare/package.json"), "utf8"));
+    const installed = JSON.parse(await readFile10(require2.resolve("miniflare/package.json"), "utf8"));
     if (installed.version === authored.dependencies?.miniflare)
       return;
   } catch (error51) {
@@ -76321,12 +77024,12 @@ async function bunInstall(root) {
 }
 function resolveViteBin(appDir) {
   try {
-    const manifestPath = createRequire8(join17(appDir, "package.json")).resolve("vite/package.json");
+    const manifestPath = createRequire8(join18(appDir, "package.json")).resolve("vite/package.json");
     const declared = JSON.parse(readFileSync3(manifestPath, "utf8")).bin;
-    const relative = typeof declared === "string" ? declared : declared?.vite;
-    if (typeof relative !== "string")
+    const relative2 = typeof declared === "string" ? declared : declared?.vite;
+    if (typeof relative2 !== "string")
       throw new Error('vite has no "vite" bin');
-    return join17(dirname5(manifestPath), relative);
+    return join18(dirname5(manifestPath), relative2);
   } catch (error51) {
     throw new BuildError(`vite is not installed for ${appDir}; run bun install (${error51 instanceof Error ? error51.message : String(error51)})`);
   }
@@ -76386,18 +77089,18 @@ function isLfsRequest(request, lfsUrl) {
 var CREDENTIAL_USERNAME = "fdpocket-kit";
 
 // frontend/packages/miniapp-kit/src/db/diff.ts
-import { existsSync as existsSync13 } from "node:fs";
-import { mkdir as mkdir4, readFile as readFile10, writeFile as writeFile5 } from "node:fs/promises";
-import { dirname as dirname6, join as join18 } from "node:path";
+import { existsSync as existsSync14 } from "node:fs";
+import { mkdir as mkdir5, readFile as readFile11, writeFile as writeFile5 } from "node:fs/promises";
+import { dirname as dirname6, join as join19 } from "node:path";
 var fail4 = (message2) => new DbError(message2);
 async function diffDatabase(options2) {
   const { root } = options2;
   await placePlatform(root, options2.kitRoot);
   const pending = await renderPendingSql(root);
-  const path = join18(root, PENDING_SQL_PATH);
-  const current = existsSync13(path) ? await readFile10(path, "utf8") : null;
+  const path = join19(root, PENDING_SQL_PATH);
+  const current = existsSync14(path) ? await readFile11(path, "utf8") : null;
   if (current !== pending.sql) {
-    await mkdir4(dirname6(path), { recursive: true });
+    await mkdir5(dirname6(path), { recursive: true });
     await writeFile5(path, pending.sql);
   }
   const changes = await classifyPending(pending, options2.createLibsqlClient ?? await loadProjectLibsql(root, fail4));
@@ -76412,9 +77115,9 @@ async function diffDatabase(options2) {
 
 // frontend/packages/miniapp-kit/src/db/finalize.ts
 import { createHash as createHash5 } from "node:crypto";
-import { existsSync as existsSync14 } from "node:fs";
-import { mkdir as mkdir5, readFile as readFile11, rm as rm6, writeFile as writeFile6 } from "node:fs/promises";
-import { dirname as dirname7, join as join19 } from "node:path";
+import { existsSync as existsSync15 } from "node:fs";
+import { mkdir as mkdir6, readFile as readFile12, rm as rm7, writeFile as writeFile6 } from "node:fs/promises";
+import { dirname as dirname7, join as join20 } from "node:path";
 
 // frontend/packages/miniapp-kit/src/db/migration-policy.ts
 var PENDING_POLICY_FILE = "migration-policy.json";
@@ -76487,28 +77190,28 @@ function migrationSlug(text) {
   return slug === "" ? "merge" : slug;
 }
 async function readIfPresent(path) {
-  return existsSync14(path) ? await readFile11(path, "utf8") : null;
+  return existsSync15(path) ? await readFile12(path, "utf8") : null;
 }
 async function clearPending(root) {
-  const generated = join19(root, PENDING_SQL_PATH);
-  await mkdir5(dirname7(generated), { recursive: true });
+  const generated = join20(root, PENDING_SQL_PATH);
+  await mkdir6(dirname7(generated), { recursive: true });
   await writeFile6(generated, PENDING_SQL_HEADER);
-  await rm6(join19(root, PENDING_DATA_PATH), { force: true });
-  await rm6(join19(root, PENDING_INTENT_PATH), { force: true });
-  await rm6(join19(root, PROJECT_PATHS.pending, PENDING_POLICY_FILE), { force: true });
+  await rm7(join20(root, PENDING_DATA_PATH), { force: true });
+  await rm7(join20(root, PENDING_INTENT_PATH), { force: true });
+  await rm7(join20(root, PROJECT_PATHS.pending, PENDING_POLICY_FILE), { force: true });
 }
 async function finalizeMigration(options2) {
   const { root } = options2;
   await placePlatform(root, options2.kitRoot);
   const pending = await renderPendingSql(root);
-  const data = (await readIfPresent(join19(root, PENDING_DATA_PATH)))?.trim() ?? "";
+  const data = (await readIfPresent(join20(root, PENDING_DATA_PATH)))?.trim() ?? "";
   if (pending.body === "" && data === "") {
     await clearPending(root);
     return { status: "empty", migration: null, changes: [] };
   }
   const createClient = options2.createLibsqlClient ?? await loadProjectLibsql(root, fail5);
   const changes = await classifyPending(pending, createClient);
-  const parsed = parseIntent(await readIfPresent(join19(root, PENDING_INTENT_PATH)));
+  const parsed = parseIntent(await readIfPresent(join20(root, PENDING_INTENT_PATH)));
   if (parsed.error !== null) {
     return {
       status: "blocked",
@@ -76538,7 +77241,7 @@ async function finalizeMigration(options2) {
   const sql3 = attachMigrationPolicy(data === "" ? body : `${body}
 -- pending/data.sql
 ${data}
-`, intent2, await readIfPresent(join19(root, PROJECT_PATHS.pending, PENDING_POLICY_FILE)), changes);
+`, intent2, await readIfPresent(join20(root, PROJECT_PATHS.pending, PENDING_POLICY_FILE)), changes);
   const shadow = await checkShadow({
     migrations: pending.migrations,
     prodMigrations: options2.prodMigrations ?? null,
@@ -76554,9 +77257,9 @@ ${data}
   const last = pending.migrations.at(-1)?.name.slice(0, 4);
   const number4 = String((last ? Number(last) : 0) + 1).padStart(4, "0");
   const name3 = `${number4}_${migrationSlug(options2.slug)}`;
-  const dir = join19(root, PROJECT_PATHS.migrations, name3);
-  await mkdir5(dir, { recursive: true });
-  await writeFile6(join19(dir, "migration.sql"), sql3);
+  const dir = join20(root, PROJECT_PATHS.migrations, name3);
+  await mkdir6(dir, { recursive: true });
+  await writeFile6(join20(dir, "migration.sql"), sql3);
   const meta3 = {
     author: options2.author,
     changes,
@@ -76565,17 +77268,17 @@ ${data}
     sha256: createHash5("sha256").update(sql3).digest("hex"),
     sourceBranch: options2.branch
   };
-  await writeFile6(join19(dir, "meta.json"), `${JSON.stringify(meta3, null, 2)}
+  await writeFile6(join20(dir, "meta.json"), `${JSON.stringify(meta3, null, 2)}
 `);
   await clearPending(root);
   return { status: "finalized", migration: name3, changes, warnings: shadow.warnings };
 }
 
 // frontend/packages/miniapp-kit/src/dev/runtime.ts
-import { createHash as createHash6, randomBytes } from "node:crypto";
-import { existsSync as existsSync16 } from "node:fs";
-import { mkdir as mkdir7, readFile as readFile14, rm as rm8, writeFile as writeFile8 } from "node:fs/promises";
-import { dirname as dirname9, join as join22 } from "node:path";
+import { createHash as createHash7, randomBytes as randomBytes2 } from "node:crypto";
+import { existsSync as existsSync17 } from "node:fs";
+import { mkdir as mkdir8, readFile as readFile15, rm as rm9, writeFile as writeFile8 } from "node:fs/promises";
+import { dirname as dirname9, join as join24 } from "node:path";
 
 // frontend/node_modules/@hono/node-server/dist/index.mjs
 import { Http2ServerRequest, constants } from "node:http2";
@@ -77485,8 +78188,8 @@ var upgradeWebSocket = defineWebSocketHelper(async (c2, events, options2) => {
 
 // frontend/packages/project-gateway/src/storage/local-store.ts
 import { createReadStream } from "node:fs";
-import { copyFile, mkdir as mkdir6, readdir as readdir9, readFile as readFile12, rm as rm7, stat, writeFile as writeFile7 } from "node:fs/promises";
-import { dirname as dirname8, join as join20, resolve as resolve2, sep } from "node:path";
+import { copyFile, mkdir as mkdir7, readdir as readdir10, readFile as readFile13, rm as rm8, stat, writeFile as writeFile7 } from "node:fs/promises";
+import { dirname as dirname8, join as join21, resolve as resolve2, sep } from "node:path";
 import { Readable as Readable2 } from "node:stream";
 var encoder6 = new TextEncoder;
 function createLocalObjectStore(options2) {
@@ -77534,7 +78237,7 @@ function createLocalObjectStore(options2) {
     }
     let meta3;
     try {
-      meta3 = JSON.parse(await readFile12(join20(dir, "meta.json"), "utf8"));
+      meta3 = JSON.parse(await readFile13(join21(dir, "meta.json"), "utf8"));
     } catch (error51) {
       if (error51.code === "ENOENT")
         return null;
@@ -77544,22 +78247,22 @@ function createLocalObjectStore(options2) {
     return same ? { dir, meta: meta3 } : null;
   }
   async function partsOf(dir) {
-    const names = (await readdir9(dir)).filter((name3) => /^\d+$/.test(name3));
+    const names = (await readdir10(dir)).filter((name3) => /^\d+$/.test(name3));
     const parts = await Promise.all(names.map(async (name3) => {
-      const size = (await stat(join20(dir, name3))).size;
+      const size = (await stat(join21(dir, name3))).size;
       return { partNumber: Number(name3), etag: `"local-${name3}-${size}"`, size };
     }));
     return parts.sort((a2, b3) => a2.partNumber - b3.partNumber);
   }
   async function writeObject(location, body, contentType2) {
     const path = pathOf(location);
-    await mkdir6(dirname8(path), { recursive: true });
+    await mkdir7(dirname8(path), { recursive: true });
     await writeFile7(path, body);
     await writeFile7(`${path}.meta.json`, JSON.stringify({ contentType: contentType2 }));
   }
   async function readMeta(path) {
     try {
-      return JSON.parse(await readFile12(`${path}.meta.json`, "utf8"));
+      return JSON.parse(await readFile13(`${path}.meta.json`, "utf8"));
     } catch (error51) {
       if (error51.code === "ENOENT")
         return null;
@@ -77615,32 +78318,32 @@ function createLocalObjectStore(options2) {
       if (!meta3)
         throw new Error("copy source not found");
       const target = pathOf(to);
-      await mkdir6(dirname8(target), { recursive: true });
+      await mkdir7(dirname8(target), { recursive: true });
       await copyFile(source, target);
       await writeFile7(`${target}.meta.json`, JSON.stringify(meta3));
     },
     async remove(location) {
       const path = pathOf(location);
-      await rm7(path, { force: true });
-      await rm7(`${path}.meta.json`, { force: true });
+      await rm8(path, { force: true });
+      await rm8(`${path}.meta.json`, { force: true });
     },
-    async list(prefix2, { limit, startAfter }) {
+    async list(prefix2, { limit: limit3, startAfter }) {
       const areaRoot = resolve2(root, areaDir(prefix2));
       let entries;
       try {
-        entries = await readdir9(areaRoot, { recursive: true });
+        entries = await readdir10(areaRoot, { recursive: true });
       } catch (error51) {
         if (error51.code === "ENOENT")
           return { objects: [], truncated: false };
         throw error51;
       }
       const keys = entries.filter((entry) => entry.endsWith(".meta.json")).map((entry) => entry.slice(0, -".meta.json".length).split(sep).join("/")).filter((key) => key.startsWith(prefix2.key) && (startAfter === undefined || key > startAfter)).sort();
-      const page = keys.slice(0, limit);
+      const page = keys.slice(0, limit3);
       const objects = await Promise.all(page.map(async (key) => ({
         key,
         lastModified: (await stat(resolve2(areaRoot, ...key.split("/")))).mtime
       })));
-      return { objects, truncated: keys.length > limit };
+      return { objects, truncated: keys.length > limit3 };
     },
     publicUrl(location) {
       if (location.area !== "public")
@@ -77651,9 +78354,9 @@ function createLocalObjectStore(options2) {
       pathOf(location);
       const uploadId = crypto.randomUUID();
       const dir = uploadDir(uploadId);
-      await mkdir6(dir, { recursive: true });
+      await mkdir7(dir, { recursive: true });
       const meta3 = { ...location, contentType: contentType2 };
-      await writeFile7(join20(dir, "meta.json"), JSON.stringify(meta3));
+      await writeFile7(join21(dir, "meta.json"), JSON.stringify(meta3));
       return uploadId;
     },
     signUploadPart(location, { uploadId, partNumber, contentLength, expiresIn }) {
@@ -77672,19 +78375,19 @@ function createLocalObjectStore(options2) {
       if (!upload)
         throw new Error("multipart upload not found");
       const ordered = [...parts].sort((a2, b3) => a2.partNumber - b3.partNumber);
-      const chunks = await Promise.all(ordered.map((part) => readFile12(join20(upload.dir, String(part.partNumber)))));
+      const chunks = await Promise.all(ordered.map((part) => readFile13(join21(upload.dir, String(part.partNumber)))));
       await writeObject(location, Buffer.concat(chunks), upload.meta.contentType);
-      await rm7(upload.dir, { recursive: true, force: true });
+      await rm8(upload.dir, { recursive: true, force: true });
     },
     async abortMultipart(location, uploadId) {
       const upload = await readUpload(location, uploadId);
       if (upload)
-        await rm7(upload.dir, { recursive: true, force: true });
+        await rm8(upload.dir, { recursive: true, force: true });
     },
     async listMultipartUploads(location) {
       let ids;
       try {
-        ids = await readdir9(multipartRoot);
+        ids = await readdir10(multipartRoot);
       } catch (error51) {
         if (error51.code === "ENOENT")
           return [];
@@ -77697,9 +78400,9 @@ function createLocalObjectStore(options2) {
       const upload = await readUpload(to, uploadId);
       if (!upload)
         throw new Error("multipart upload not found");
-      const source = await readFile12(pathOf(from));
+      const source = await readFile13(pathOf(from));
       const chunk = source.subarray(range.start, range.end + 1);
-      await writeFile7(join20(upload.dir, String(partNumber)), chunk);
+      await writeFile7(join21(upload.dir, String(partNumber)), chunk);
       return `"local-${partNumber}-${chunk.byteLength}"`;
     },
     async handle(request) {
@@ -77759,7 +78462,7 @@ function createLocalObjectStore(options2) {
         if (String(part.byteLength) !== url2.searchParams.get("cl")) {
           return new Response(null, { status: 403, headers: cors });
         }
-        await writeFile7(join20(upload.dir, url2.searchParams.get("partNumber") ?? ""), part);
+        await writeFile7(join21(upload.dir, url2.searchParams.get("partNumber") ?? ""), part);
         return new Response(null, { status: 200, headers: cors });
       }
       const body = new Uint8Array(await request.arrayBuffer());
@@ -77794,9 +78497,9 @@ async function createTestEs256Key(kid) {
 }
 
 // frontend/packages/miniapp-kit/src/dev/ai.ts
-import { existsSync as existsSync15 } from "node:fs";
-import { readFile as readFile13 } from "node:fs/promises";
-import { join as join21 } from "node:path";
+import { existsSync as existsSync16 } from "node:fs";
+import { readFile as readFile14 } from "node:fs/promises";
+import { join as join22 } from "node:path";
 var JEV_ROUTER = "typesafe/jev-router";
 var ALL_MODALITIES = ["text", "image", "file", "audio", "video"];
 function createDevAi(options2) {
@@ -77808,11 +78511,11 @@ function createDevAi(options2) {
     if (key === null)
       return null;
     const declared = kind === "instructions" ? options2.manifest.ai?.instructions : options2.manifest.ai?.schemas;
-    const path = kind === "instructions" ? join21(options2.root, "ai", `${key}.md`) : join21(options2.root, "ai", "schemas", `${key}.json`);
-    if (!declared?.includes(key) || !existsSync15(path)) {
+    const path = kind === "instructions" ? join22(options2.root, "ai", `${key}.md`) : join22(options2.root, "ai", "schemas", `${key}.json`);
+    if (!declared?.includes(key) || !existsSync16(path)) {
       throw new GatewayError("VALIDATION_FAILED", `${kind} "${key}" is not declared in project.yaml`);
     }
-    const content = await readFile13(path, "utf8");
+    const content = await readFile14(path, "utf8");
     return kind === "schema" ? JSON.parse(content) : content;
   }
   const modelOf2 = (requested) => {
@@ -77994,7 +78697,15 @@ function createDevJobs(input) {
           })
         }));
         row.status = response.ok ? "done" : response.status === 422 || row.attempt >= 5 ? "failed" : "pending";
-        await response.body?.cancel();
+        if (row.status === "failed")
+          console.error("kit job failed", {
+            app: row.app,
+            handler: row.handler,
+            status: response.status,
+            reason: (await response.text()).slice(0, 200)
+          });
+        else
+          await response.body?.cancel();
       } catch (error51) {
         console.error("kit queue delivery failed", {
           name: error51 instanceof Error ? error51.name : "unknown"
@@ -78060,6 +78771,344 @@ function createDevJobs(input) {
       for (const timer of timers)
         clearTimeout(timer);
     }
+  };
+}
+
+// frontend/packages/miniapp-kit/src/dev/python.ts
+import { spawn as spawn4 } from "node:child_process";
+import { randomBytes } from "node:crypto";
+import { createServer } from "node:net";
+import { join as join23 } from "node:path";
+function finishedOf(run2) {
+  return {
+    runId: run2.runId,
+    app: run2.app,
+    task: run2.task,
+    status: run2.status,
+    error: run2.status === "succeeded" ? null : run2.error ?? null
+  };
+}
+function pythonCommand(root, slug, mode) {
+  const appDir = join23(root, "apps", slug);
+  return {
+    command: "uv",
+    args: ["run", "--project", appDir, "--frozen", "python", "-m", "fdpocket.runner", ...mode],
+    pythonPath: `${join23(root, "packages", PYTHON_SDK_DIR)}:${join23(appDir, "src")}`
+  };
+}
+function pythonEnv(options2, slug) {
+  const app = options2.manifest.apps[slug];
+  const cache2 = join23(options2.root, ".kit", "python-cache", slug);
+  return {
+    ...process.env.PATH ? { PATH: process.env.PATH } : {},
+    ...process.env.HOME ? { HOME: process.env.HOME } : {},
+    ...Object.fromEntries((app?.secrets ?? []).flatMap((s3) => options2.vars[s3.name] === undefined ? [] : [[s3.name, options2.vars[s3.name]]])),
+    PYTHONPATH: pythonCommand(options2.root, slug, []).pythonPath,
+    PYTHONUNBUFFERED: "1",
+    GATEWAY_URL: options2.gatewayUrl(),
+    PLATFORM_SERVICE_CREDENTIAL: options2.credential(slug),
+    PLATFORM_CACHE_DIR: cache2,
+    HF_HOME: join23(cache2, "huggingface"),
+    TORCH_HOME: join23(cache2, "torch")
+  };
+}
+function createDevPython(options2) {
+  const runs = new Map;
+  const keys = new Map;
+  const taskOf = (app, task) => {
+    const declared = options2.manifest.apps[app];
+    const spec = declared?.kind === "python" ? declared.python?.tasks[task] : undefined;
+    if (!spec)
+      throw new GatewayError("NOT_FOUND", `${app} has no python task ${task}`);
+    return spec;
+  };
+  const ownerKey = (who) => ("userId" in who) ? `u:${who.userId}` : `c:${who.credentialId}`;
+  function finish(run2, status, patch = {}) {
+    if (PYTHON_RUN_FINAL_STATUSES.includes(run2.view.status))
+      return;
+    run2.view = { ...run2.view, ...patch, status, finishedAt: new Date().toISOString() };
+    const target = taskOf(run2.view.app, run2.view.task).onFinish;
+    if (target)
+      options2.onFinish?.(finishedOf(run2.view), target);
+  }
+  function stop(run2, status) {
+    finish(run2, status);
+    run2.process?.kill();
+    run2.process = null;
+  }
+  async function start(owner, app, task, input, key) {
+    const spec = taskOf(app, task);
+    const dedupe = key === null ? null : `${ownerKey(owner)}:${app}:${task}:${key}`;
+    const existing = dedupe === null ? undefined : runs.get(keys.get(dedupe) ?? "");
+    if (existing)
+      return { runId: existing.view.runId, status: existing.view.status, existing: true };
+    const runId = crypto.randomUUID();
+    const token2 = `prt_${randomBytes(32).toString("base64url")}`;
+    const run2 = {
+      owner,
+      input,
+      tokenHash: await pythonRunTokenHash(token2),
+      process: null,
+      view: {
+        runId,
+        app,
+        task,
+        status: "starting",
+        progress: null,
+        progressMessage: null,
+        error: null,
+        createdAt: new Date().toISOString(),
+        startedAt: null,
+        finishedAt: null
+      }
+    };
+    runs.set(runId, run2);
+    if (dedupe !== null)
+      keys.set(dedupe, runId);
+    const command = pythonCommand(options2.root, app, ["task"]);
+    const child = options2.launch({
+      command: command.command,
+      args: command.args,
+      cwd: options2.root,
+      env: { ...pythonEnv(options2, app), PLATFORM_RUN_ID: runId, PLATFORM_RUN_TOKEN: token2 },
+      label: `${app}.${task}`
+    });
+    run2.process = child;
+    const timer = setTimeout(() => stop(run2, "timed_out"), spec.timeoutSeconds * 1000);
+    timer.unref?.();
+    child.exited.then((code) => {
+      clearTimeout(timer);
+      run2.process = null;
+      finish(run2, "failed", {
+        error: {
+          code: "exit",
+          message: `the runner exited (${code ?? "signal"}) without a result`
+        }
+      });
+    });
+    return { runId, status: run2.view.status, existing: false };
+  }
+  function owned(runId, who) {
+    const run2 = runs.get(runId);
+    if (!run2 || "userId" in who && ownerKey(run2.owner) !== ownerKey(who))
+      throw new GatewayError("NOT_FOUND", "run not found");
+    return run2;
+  }
+  function runner(runId, tokenHash) {
+    const run2 = runs.get(runId);
+    if (!run2 || run2.tokenHash !== tokenHash || PYTHON_RUN_FINAL_STATUSES.includes(run2.view.status))
+      throw new GatewayError("UNAUTHENTICATED", "invalid run token");
+    return run2;
+  }
+  const port = {
+    async requestUser(input) {
+      const caller = options2.manifest.apps[input.callerApp];
+      const allowed = input.viaService || (caller?.capabilities.python?.[input.app] ?? []).includes(input.task);
+      if (!allowed)
+        throw new GatewayError("FORBIDDEN", "python task not in capabilities");
+      return start({ userId: input.userId }, input.app, input.task, input.input, input.idempotencyKey);
+    },
+    async requestRun(input) {
+      return start({ credentialId: input.credentialId }, input.app, input.task, input.input, input.idempotencyKey);
+    },
+    async get(runId, who) {
+      return owned(runId, who).view;
+    },
+    async cancel(runId, who) {
+      const run2 = owned(runId, who);
+      stop(run2, "cancelled");
+      return run2.view;
+    },
+    async runnerInput(runId, tokenHash) {
+      const run2 = runner(runId, tokenHash);
+      run2.view = { ...run2.view, status: "running", startedAt: new Date().toISOString() };
+      return {
+        runId,
+        app: run2.view.app,
+        task: run2.view.task,
+        handler: taskOf(run2.view.app, run2.view.task).handler,
+        input: run2.input
+      };
+    },
+    async runnerProgress(runId, tokenHash, progress, message2) {
+      const run2 = runner(runId, tokenHash);
+      run2.view = { ...run2.view, progress, progressMessage: message2 };
+    },
+    async runnerFinish(runId, tokenHash, result) {
+      const run2 = runner(runId, tokenHash);
+      if (result.succeeded)
+        finish(run2, "succeeded", { output: result.output, progress: 1 });
+      else
+        finish(run2, "failed", {
+          error: { code: result.error.code, message: result.error.message ?? null }
+        });
+    },
+    async runnerInterrupted(runId, tokenHash) {
+      runner(runId, tokenHash);
+    }
+  };
+  const servers = [];
+  return {
+    port,
+    serverApps() {
+      return Object.values(options2.manifest.apps).filter((app) => app.kind === "python" && app.python?.server).map((app) => app.slug);
+    },
+    startServer(slug, port2) {
+      const handler = options2.manifest.apps[slug]?.python?.server?.handler;
+      if (!handler)
+        throw new Error(`${slug} has no python server`);
+      const command = pythonCommand(options2.root, slug, ["server", handler]);
+      servers.push(options2.launch({
+        command: command.command,
+        args: command.args,
+        cwd: options2.root,
+        env: { ...pythonEnv(options2, slug), PLATFORM_SERVER_PORT: String(port2) },
+        label: `${slug} (server)`
+      }));
+    },
+    close() {
+      for (const run2 of runs.values())
+        stop(run2, "stopped");
+      for (const server of servers)
+        server.kill();
+    }
+  };
+}
+var spawnPython = (spec) => {
+  const child = spawn4(spec.command, spec.args, {
+    cwd: spec.cwd,
+    env: spec.env,
+    stdio: ["ignore", "inherit", "inherit"]
+  });
+  const exited = new Promise((resolve3) => {
+    child.once("error", (error51) => {
+      console.error(error51.code === "ENOENT" ? `kit dev: ${spec.label} needs uv (https://docs.astral.sh/uv/) to run python apps` : `kit dev: ${spec.label} could not start`, { code: error51.code });
+      resolve3(null);
+    });
+    child.once("exit", (code) => resolve3(code));
+  });
+  return { kill: () => child.kill("SIGTERM"), exited };
+};
+function freePort() {
+  return new Promise((resolve3, reject) => {
+    const server = createServer();
+    server.once("error", reject);
+    server.listen(0, "127.0.0.1", () => {
+      const address = server.address();
+      server.close(() => typeof address === "object" && address ? resolve3(address.port) : reject(new Error("no port")));
+    });
+  });
+}
+
+// frontend/packages/miniapp-kit/src/dev/python-remote.ts
+import { createHash as createHash6 } from "node:crypto";
+var WATCH_INTERVAL_MS = 5000;
+function createRemotePython(options2) {
+  const { proxy } = options2;
+  const send = proxy.fetch ?? globalThis.fetch;
+  const base = proxy.gatewayUrl.replace(/\/+$/, "");
+  const sleep = options2.sleep ?? ((ms) => new Promise((r2) => setTimeout(r2, ms)));
+  const sources = new Map;
+  const owners = new Map;
+  async function call(path, init2 = {}) {
+    const response = await send(`${base}${path}`, {
+      ...init2,
+      headers: { "content-type": "application/json", ...await proxy.headers() }
+    });
+    if (response.ok)
+      return response.json();
+    const parsed = errorResponseSchema.safeParse(await response.json().catch(() => null));
+    if (parsed.success)
+      throw new GatewayError(parsed.data.error.code, parsed.data.error.message);
+    throw new GatewayError("GATEWAY_UNAVAILABLE", `platform python failed (${response.status})`);
+  }
+  async function sourceOf(app) {
+    const files = (await listPythonAppFiles({ root: options2.root, slug: app })).map((f3) => ({
+      path: f3.path,
+      content: Buffer.from(f3.bytes).toString("base64")
+    }));
+    const hash3 = createHash6("sha256").update(JSON.stringify(files)).digest("hex");
+    const known = sources.get(app);
+    if (known?.hash === hash3)
+      return known.sourceId;
+    const uploaded = await call("/v1/python/dev/sources", {
+      method: "POST",
+      body: JSON.stringify({
+        sessionId: proxy.sessionId,
+        app,
+        manifest: await options2.readManifest(),
+        files
+      })
+    });
+    sources.set(app, { hash: hash3, sourceId: uploaded.sourceId });
+    return uploaded.sourceId;
+  }
+  const ownerKey = (who) => ("userId" in who) ? `u:${who.userId}` : `c:${who.credentialId}`;
+  const readRun = async (runId) => pythonRunSchema.parse(await call(`/v1/python/dev/runs/${runId}?sessionId=${proxy.sessionId}`));
+  async function watch(runId, target) {
+    for (;; ) {
+      await sleep(WATCH_INTERVAL_MS);
+      try {
+        const run2 = await readRun(runId);
+        if (PYTHON_RUN_FINAL_STATUSES.includes(run2.status)) {
+          options2.onFinish?.(finishedOf(run2), target);
+          return;
+        }
+      } catch (error51) {
+        console.error("kit could not read the python run", {
+          runId,
+          name: error51 instanceof Error ? error51.name : "unknown"
+        });
+      }
+    }
+  }
+  async function start(owner, app, task, input) {
+    const sourceId = await sourceOf(app);
+    const accepted = await call("/v1/python/dev/runs", {
+      method: "POST",
+      body: JSON.stringify({ sessionId: proxy.sessionId, sourceId, task, input })
+    });
+    owners.set(accepted.runId, ownerKey(owner));
+    const declared = options2.manifest.apps[app];
+    const target = declared?.kind === "python" ? declared.python?.tasks[task]?.onFinish : undefined;
+    if (target && options2.onFinish)
+      watch(accepted.runId, target);
+    return { runId: accepted.runId, status: accepted.status, existing: false };
+  }
+  function owned(runId, who) {
+    const owner = owners.get(runId);
+    if (owner === undefined || "userId" in who && owner !== ownerKey(who))
+      throw new GatewayError("NOT_FOUND", "run not found");
+  }
+  const notHere = async () => {
+    throw new GatewayError("NOT_FOUND", "the runner reports to FDPocket in --python modal");
+  };
+  return {
+    async requestUser(input) {
+      const caller = options2.manifest.apps[input.callerApp];
+      const allowed = input.viaService || (caller?.capabilities.python?.[input.app] ?? []).includes(input.task);
+      if (!allowed)
+        throw new GatewayError("FORBIDDEN", "python task not in capabilities");
+      return start({ userId: input.userId }, input.app, input.task, input.input);
+    },
+    async requestRun(input) {
+      return start({ credentialId: input.credentialId }, input.app, input.task, input.input);
+    },
+    async get(runId, who) {
+      owned(runId, who);
+      return readRun(runId);
+    },
+    async cancel(runId, who) {
+      owned(runId, who);
+      return pythonRunSchema.parse(await call(`/v1/python/dev/runs/${runId}/cancel`, {
+        method: "POST",
+        body: JSON.stringify({ sessionId: proxy.sessionId })
+      }));
+    },
+    runnerInput: notHere,
+    runnerProgress: notHere,
+    runnerFinish: notHere,
+    runnerInterrupted: notHere
   };
 }
 
@@ -78166,18 +79215,18 @@ function versionIdOf(hash3) {
   return `${hash3.slice(0, 8)}-${hash3.slice(8, 12)}-4${hash3.slice(13, 16)}-8${hash3.slice(17, 20)}-${hash3.slice(20, 32)}`;
 }
 async function readGenerated(root, file2) {
-  const path = join22(root, PROJECT_PATHS.generated, file2);
-  if (!existsSync16(path)) {
+  const path = join24(root, PROJECT_PATHS.generated, file2);
+  if (!existsSync17(path)) {
     throw new DevError(`${PROJECT_PATHS.generated}/${file2} is missing; run kit.mjs generate first`);
   }
-  return readFile14(path, "utf8");
+  return readFile15(path, "utf8");
 }
 async function createDevRuntime(options2) {
   const { root, projectId } = options2;
   const manifest2 = JSON.parse(await readGenerated(root, "project.json"));
   const schemaText = await readGenerated(root, "schema.json");
   const schema2 = JSON.parse(schemaText);
-  const schemaHash = createHash6("sha256").update(schemaText).digest("hex");
+  const schemaHash = createHash7("sha256").update(schemaText).digest("hex");
   const versionId = versionIdOf(schemaHash);
   const originHost = devOriginHost(options2.projectName, projectId);
   const { db, recreated, stamp } = await openDevDatabase(options2);
@@ -78191,7 +79240,7 @@ async function createDevRuntime(options2) {
         schema: schema2,
         importModule: options2.importModule ?? defaultImporter(root, manifest2)
       });
-      await writeFile8(join22(root, DEV_DB_STAMP), `${stamp}
+      await writeFile8(join24(root, DEV_DB_STAMP), `${stamp}
 `);
     }
   } catch (error51) {
@@ -78202,16 +79251,16 @@ async function createDevRuntime(options2) {
   }
   const key = await createTestEs256Key("kit-dev");
   const objects = createLocalObjectStore({
-    root: join22(root, DEV_OBJECTS_DIR),
+    root: join24(root, DEV_OBJECTS_DIR),
     baseUrl: options2.objectsBaseUrl,
     secret: crypto.randomUUID()
   });
   const identities = new Map;
   const logger = options2.quiet ? silentLogger : consoleLogger;
   const credentials = new Map;
-  for (const app of Object.values(manifest2.apps).filter((app2) => app2.kind === "api" || app2.kind === "jobs")) {
+  for (const app of Object.values(manifest2.apps).filter((app2) => app2.kind === "api" || app2.kind === "jobs" || app2.kind === "python")) {
     credentials.set(app.slug, {
-      secret: `psc_${randomBytes(32).toString("base64url")}`,
+      secret: `psc_${randomBytes2(32).toString("base64url")}`,
       context: {
         credentialId: crypto.randomUUID(),
         projectId,
@@ -78226,7 +79275,7 @@ async function createDevRuntime(options2) {
   }
   const services = {
     async resolve(hash3) {
-      return [...credentials.values()].find((c2) => createHash6("sha256").update(c2.secret).digest("hex") === hash3)?.context ?? null;
+      return [...credentials.values()].find((c2) => createHash7("sha256").update(c2.secret).digest("hex") === hash3)?.context ?? null;
     },
     async current(id) {
       return [...credentials.values()].find((c2) => c2.context.credentialId === id)?.context ?? null;
@@ -78235,6 +79284,40 @@ async function createDevRuntime(options2) {
   const jobs2 = createDevJobs({
     source: async (id) => (await services.current(id))?.appSlug ?? null,
     allowed: async (id, app) => Boolean((await services.current(id))?.servicePermissions.includes("jobs.schedule") && manifest2.apps[app]?.kind === "jobs" && manifest2.apps[app]?.servicePermissions.includes("jobs.consume"))
+  });
+  const onPythonFinish = (finished, target) => {
+    const source = credentials.get(finished.app)?.context.credentialId;
+    if (!source)
+      return;
+    jobs2.port.call("schedule", source, {
+      app: target.app,
+      handler: target.handler,
+      payload: finished,
+      idempotencyKey: `python-finish:${finished.runId}`
+    }).then((result) => {
+      if (result && typeof result === "object" && "error" in result)
+        logger.log("warn", "python onFinish was not scheduled", { ...result, app: target.app });
+    }).catch((error51) => {
+      logger.log("error", "python onFinish failed", {
+        app: target.app,
+        name: error51 instanceof Error ? error51.name : "unknown"
+      });
+    });
+  };
+  let pythonGateway = "";
+  const python2 = createDevPython({
+    root,
+    manifest: manifest2,
+    credential: (slug) => {
+      const credential = credentials.get(slug);
+      if (!credential)
+        throw new DevError(`unknown python app: ${slug}`);
+      return credential.secret;
+    },
+    gatewayUrl: () => pythonGateway,
+    vars: options2.python?.vars ?? {},
+    launch: options2.python?.launch ?? spawnPython,
+    onFinish: onPythonFinish
   });
   const adapters = {
     profiles: {
@@ -78267,6 +79350,13 @@ async function createDevRuntime(options2) {
     },
     services,
     jobs: jobs2.port,
+    python: options2.python?.remote ? createRemotePython({
+      root,
+      manifest: manifest2,
+      readManifest: async () => (await readManifest(root)).manifest,
+      proxy: options2.python.remote,
+      onFinish: onPythonFinish
+    }) : python2.port,
     ai: createDevAi({ root, manifest: manifest2, ...options2.aiProxy ? { proxy: options2.aiProxy } : {} }),
     jwks: {
       async verifySupabaseToken(token2) {
@@ -78309,8 +79399,16 @@ async function createDevRuntime(options2) {
       identities.set(token2, { userId, isAnonymous, issuer: DEV_ISSUER });
       return token2;
     },
+    python: {
+      attachGateway(url2) {
+        pythonGateway = url2;
+      },
+      serverApps: python2.serverApps,
+      startServer: python2.startServer
+    },
     async close() {
       jobs2.close();
+      python2.close();
       db.close();
     }
   };
@@ -78321,20 +79419,20 @@ var silentLogger = { log: () => {
 async function openDevDatabase(options2) {
   const { root } = options2;
   const sql3 = await devDatabaseSql(root);
-  const hash3 = createHash6("sha256");
+  const hash3 = createHash7("sha256");
   for (const part of sql3)
     hash3.update(`${part.what}\x00${part.sql}\x00`);
-  const seedPath = join22(root, PROJECT_PATHS.seed);
-  hash3.update(`seed\x00${existsSync16(seedPath) ? await readFile14(seedPath, "utf8") : ""}`);
+  const seedPath = join24(root, PROJECT_PATHS.seed);
+  hash3.update(`seed\x00${existsSync17(seedPath) ? await readFile15(seedPath, "utf8") : ""}`);
   const stamp = hash3.digest("hex");
-  const path = join22(root, DEV_DB_PATH);
-  const stampPath = join22(root, DEV_DB_STAMP);
-  const current = existsSync16(stampPath) ? (await readFile14(stampPath, "utf8")).trim() : null;
-  const recreated = current !== stamp || !existsSync16(path);
+  const path = join24(root, DEV_DB_PATH);
+  const stampPath = join24(root, DEV_DB_STAMP);
+  const current = existsSync17(stampPath) ? (await readFile15(stampPath, "utf8")).trim() : null;
+  const recreated = current !== stamp || !existsSync17(path);
   if (recreated) {
     for (const file2 of [stampPath, path, `${path}-wal`, `${path}-shm`, `${path}-journal`])
-      await rm8(file2, { force: true });
-    await mkdir7(dirname9(path), { recursive: true });
+      await rm9(file2, { force: true });
+    await mkdir8(dirname9(path), { recursive: true });
   }
   const db = options2.createLibsqlClient({ url: `file:${path}` });
   if (!recreated)
@@ -78358,15 +79456,15 @@ async function devDatabaseSql(root) {
       throw new DevError(error51.message);
     throw error51;
   }
-  const pending = join22(root, PENDING_SQL_PATH);
-  if (!existsSync16(pending)) {
+  const pending = join24(root, PENDING_SQL_PATH);
+  if (!existsSync17(pending)) {
     throw new DevError(`${PENDING_SQL_PATH} is missing; run kit.mjs db diff first`);
   }
-  const data = join22(root, PENDING_DATA_PATH);
+  const data = join24(root, PENDING_DATA_PATH);
   return [
     ...migrations.map((m3) => ({ what: `${PROJECT_PATHS.migrations}/${m3.name}`, sql: m3.sql })),
-    { what: PENDING_SQL_PATH, sql: await readFile14(pending, "utf8") },
-    ...existsSync16(data) ? [{ what: PENDING_DATA_PATH, sql: await readFile14(data, "utf8") }] : []
+    { what: PENDING_SQL_PATH, sql: await readFile15(pending, "utf8") },
+    ...existsSync17(data) ? [{ what: PENDING_DATA_PATH, sql: await readFile15(data, "utf8") }] : []
   ];
 }
 function defaultImporter(root, manifest2) {
@@ -78376,7 +79474,7 @@ function defaultImporter(root, manifest2) {
     for (const slug of slugs) {
       let entry;
       try {
-        entry = resolveViteEntry(join22(root, "apps", slug));
+        entry = resolveViteEntry(join24(root, "apps", slug));
       } catch (error51) {
         reasons.push(`apps/${slug}: ${error51 instanceof Error ? error51.message : String(error51)}`);
         continue;
@@ -78558,11 +79656,28 @@ var KIT_AI_ENV = "KIT_AI";
 async function resolveDevAi(input) {
   if (input.mode === "mock")
     return { mode: "mock" };
+  const resolved = await resolveDevProxy(input);
+  if ("proxy" in resolved)
+    return { mode: "platform", proxy: resolved.proxy };
+  if (input.mode === "platform") {
+    throw new DevError(resolved.reason === "not_logged_in" ? "real AI needs a login: run kit.mjs login (or use --ai mock)" : "real AI needs the Gateway URL: run kit.mjs pull (or use --ai mock)");
+  }
+  return { mode: "mock", reason: resolved.reason };
+}
+async function resolveDevPython(input) {
+  const mode = input.mode ?? (input.env[KIT_AI_ENV] ? "modal" : "local");
+  if (mode === "local")
+    return { mode };
+  const resolved = await resolveDevProxy(input);
+  if ("proxy" in resolved)
+    return { mode, proxy: resolved.proxy };
+  throw new DevError(resolved.reason === "not_logged_in" ? "the real GPU needs a login: run kit.mjs login (or use --python local)" : "the real GPU needs the Gateway URL: run kit.mjs pull (or use --python local)");
+}
+async function resolveDevProxy(input) {
   const live = input.env[KIT_AI_ENV];
   if (live) {
     const { gatewayUrl: gatewayUrl2, key } = parseKitAi(live);
     return {
-      mode: "platform",
       proxy: {
         gatewayUrl: gatewayUrl2,
         sessionId: input.config.session_id,
@@ -78570,19 +79685,12 @@ async function resolveDevAi(input) {
       }
     };
   }
-  const unavailable = (reason) => {
-    if (input.mode === "platform") {
-      throw new DevError(reason === "not_logged_in" ? "real AI needs a login: run kit.mjs login (or use --ai mock)" : "real AI needs the Gateway URL: run kit.mjs pull (or use --ai mock)");
-    }
-    return { mode: "mock", reason };
-  };
   const gatewayUrl = input.config.gateway_url;
   if (!gatewayUrl)
-    return unavailable("no_gateway_url");
+    return { reason: "no_gateway_url" };
   if (await input.accessToken() === null)
-    return unavailable("not_logged_in");
+    return { reason: "not_logged_in" };
   return {
-    mode: "platform",
     proxy: {
       gatewayUrl,
       sessionId: input.config.session_id,
@@ -78699,10 +79807,10 @@ async function errorCode(response) {
 }
 
 // frontend/packages/miniapp-kit/src/dev/server.ts
-import { spawn as spawn5 } from "node:child_process";
+import { spawn as spawn6 } from "node:child_process";
 import { readFileSync as readFileSync4 } from "node:fs";
-import { createServer } from "node:http";
-import { join as join25 } from "node:path";
+import { createServer as createServer2 } from "node:http";
+import { join as join27 } from "node:path";
 
 // frontend/packages/miniapp-kit/src/verify/dist-server.ts
 function createDistHandler(options2) {
@@ -79118,9 +80226,9 @@ void open()
 }
 
 // frontend/packages/miniapp-kit/src/dev/realtime.ts
-import { readFile as readFile15 } from "node:fs/promises";
+import { readFile as readFile16 } from "node:fs/promises";
 import { createRequire as createRequire9 } from "node:module";
-import { join as join23 } from "node:path";
+import { join as join25 } from "node:path";
 
 // infra/workers/gateway/src/realtime.ts
 var MAX_CONNECTIONS = REALTIME_LIMITS.connections;
@@ -79166,7 +80274,7 @@ async function wakeRealtime(scope, env) {
 // frontend/packages/miniapp-kit/src/dev/realtime.ts
 async function startRealtimeGateway(options2) {
   const { Miniflare, Response: WorkerResponse } = requireMiniflare(options2.kitRoot);
-  const source = await readFile15(join23(options2.kitRoot, "platform", "realtime-local.js"), "utf8");
+  const source = await readFile16(join25(options2.kitRoot, "platform", "realtime-local.js"), "utf8");
   const runtime = new Miniflare({
     modules: true,
     script: source,
@@ -79259,7 +80367,7 @@ function requireMiniflare(kitRoot) {
   const roots = [process.env.KIT_TOOL_ROOT, kitRoot, process.cwd()].filter((root) => Boolean(root));
   for (const root of roots) {
     try {
-      return createRequire9(join23(root, "package.json"))("miniflare");
+      return createRequire9(join25(root, "package.json"))("miniflare");
     } catch (error51) {
       if (!(error51 instanceof Error) || !("code" in error51) || error51.code !== "MODULE_NOT_FOUND") {
         throw error51;
@@ -79270,18 +80378,18 @@ function requireMiniflare(kitRoot) {
 }
 
 // frontend/packages/miniapp-kit/src/dev/vars.ts
-import { readFile as readFile16 } from "node:fs/promises";
-import { join as join24 } from "node:path";
+import { readFile as readFile17 } from "node:fs/promises";
+import { join as join26 } from "node:path";
 import { parseEnv } from "node:util";
 
 // frontend/packages/miniapp-kit/src/git.ts
-import { spawn as spawn4 } from "node:child_process";
+import { spawn as spawn5 } from "node:child_process";
 
 class GitError extends Error {
   name = "GitError";
 }
 var runGit = (args, options2) => new Promise((resolve3, reject) => {
-  const child = spawn4("git", [...args], {
+  const child = spawn5("git", [...args], {
     cwd: options2.cwd,
     env: { ...process.env, ...options2.env },
     stdio: [options2.input === undefined ? "ignore" : "pipe", "pipe", "pipe"]
@@ -79323,7 +80431,7 @@ async function readDevVars(root, hosted) {
   if (hosted)
     return {};
   try {
-    const values = parseEnv(await readFile16(join24(root, ".kit/dev.vars"), "utf8"));
+    const values = parseEnv(await readFile17(join26(root, ".kit/dev.vars"), "utf8"));
     const result = {};
     for (const [name3, value] of Object.entries(values)) {
       if (value !== undefined && name3 !== "GATEWAY_URL" && !name3.startsWith("PLATFORM_"))
@@ -79360,7 +80468,7 @@ async function startDev(options2) {
   });
   const createLibsqlClient = options2.createLibsqlClient ?? await loadProjectLibsql(root, (m3) => new DevError(m3));
   await diffDatabase({ root, kitRoot, createLibsqlClient });
-  const projectName = String(JSON.parse(readFileSync4(join25(root, "package.json"), "utf8")).name ?? "");
+  const projectName = String(JSON.parse(readFileSync4(join27(root, "package.json"), "utf8")).name ?? "");
   const ports = options2.ports ?? DEV_PORTS;
   const webApps = Object.values(manifest2.apps).filter((app) => app.kind === "web").map((app) => app.slug).sort();
   const appPorts = allocateAppPorts(webApps);
@@ -79419,9 +80527,14 @@ async function startDev(options2) {
       })
     }) : null;
     const apiApps = new Set(Object.values(manifest2.apps).filter((app) => app.kind === "api").map((app) => app.slug));
+    const pythonServers = new Map;
+    const hasPythonServers = Object.values(manifest2.apps).some((app) => app.kind === "python" && app.python?.server);
     const serveApi = async (request2) => {
       const url2 = new URL(request2.url);
       const route = parseApiPath(url2.pathname);
+      const pythonPort = route ? pythonServers.get(route.app) : undefined;
+      if (route && pythonPort !== undefined)
+        return forwardPython(request2, route.path, pythonPort);
       if (!route || !apiApps.has(route.app))
         return new Response("not found", { status: 404 });
       url2.pathname = route.path;
@@ -79433,7 +80546,9 @@ async function startDev(options2) {
       return distHandler ? distHandler(request2) : new Response("starting", { status: 503 });
     };
     let gatewayWorker;
+    const devVars = await readDevVars(root, Boolean(live || dist));
     runtime = await createDevRuntime({
+      python: { vars: devVars, ...options2.pythonProxy ? { remote: options2.pythonProxy } : {} },
       realtimeTransport: {
         issue: (session) => {
           if (!gatewayWorker)
@@ -79488,16 +80603,16 @@ async function startDev(options2) {
     const gatewayUrl = live ? `${live.origins.gateway}${prefix2.slice(0, -1)}` : gateway.url;
     const serverApps = Object.values(manifest2.apps).filter((app) => app.kind === "api" || app.kind === "jobs");
     if (serverApps.length) {
-      const vars = await readDevVars(root, Boolean(live || dist));
+      const vars = devVars;
       const specs = await Promise.all(serverApps.map(async (app) => {
         if (!dist)
           await buildWorkerBundle({
             root,
-            appDir: join25(root, "apps", app.slug),
+            appDir: join27(root, "apps", app.slug),
             slug: app.slug,
             kind: app.kind
           });
-        const bytes = dist ? dist.files.get(`${app.slug}/index.js`) : readFileSync4(join25(root, "dist", app.slug, "index.js"));
+        const bytes = dist ? dist.files.get(`${app.slug}/index.js`) : readFileSync4(join27(root, "dist", app.slug, "index.js"));
         if (!bytes)
           throw new DevError(`missing Worker bundle: ${app.slug}/index.js`);
         return {
@@ -79530,7 +80645,17 @@ async function startDev(options2) {
       started.attachJobDispatcher?.((app, request2) => startedWorkers.fetch(app, request2));
       closers.push(() => startedWorkers.close());
     }
-    const apiServer = apiApps.size > 0 && !dist && webApps.length > 0 ? await listen(0, "127.0.0.1", serveApi) : null;
+    if (Object.values(manifest2.apps).some((app) => app.kind === "python")) {
+      const runnerGateway = await listen(0, "127.0.0.1", async (request2) => gatewayApp.fetch(request2));
+      closers.push(runnerGateway.close);
+      started.python.attachGateway(runnerGateway.url);
+      for (const slug of started.python.serverApps()) {
+        const port = await freePort();
+        pythonServers.set(slug, port);
+        started.python.startServer(slug, port);
+      }
+    }
+    const apiServer = (apiApps.size > 0 || hasPythonServers) && !dist && webApps.length > 0 ? await listen(0, "127.0.0.1", serveApi) : null;
     if (apiServer)
       closers.push(apiServer.close);
     const appsOrigin = live && primaryApp ? live.origins.apps[primaryApp] ?? runtime.appsOrigin : runtime.appsOrigin;
@@ -79561,7 +80686,7 @@ async function startDev(options2) {
     for (const slug of dist ? [] : webApps) {
       const vite = await (options2.startVite ?? viteDev)({
         slug,
-        appDir: join25(root, "apps", slug),
+        appDir: join27(root, "apps", slug),
         port: appPorts[slug],
         env: live ? {
           ...env,
@@ -79634,8 +80759,35 @@ async function hostRoutes(request2, runtime, config3, liveGateway, workers) {
   }
   return new Response("not found", { status: 404 });
 }
+async function forwardPython(request2, path, port) {
+  const url2 = new URL(request2.url);
+  const target = new URL(`http://127.0.0.1:${port}${path}${url2.search}`);
+  const headers = new Headers(request2.headers);
+  headers.delete("x-fdpocket-authorization");
+  headers.delete("host");
+  const authorization = headers.get("authorization");
+  headers.delete("authorization");
+  if (authorization)
+    headers.set("x-fdpocket-authorization", authorization);
+  try {
+    return await fetch(target, {
+      method: request2.method,
+      headers,
+      body: ["GET", "HEAD"].includes(request2.method) ? null : await request2.arrayBuffer(),
+      redirect: "manual"
+    });
+  } catch (error51) {
+    console.error("kit dev: the python server is not ready", {
+      name: error51 instanceof Error ? error51.name : "unknown"
+    });
+    return new Response("python server is starting", {
+      status: 503,
+      headers: { "retry-after": "2" }
+    });
+  }
+}
 async function listen(port, hostname3, handle) {
-  const server = createServer((req, res) => {
+  const server = createServer2((req, res) => {
     respond(req, res, hostname3, handle);
   });
   await new Promise((resolve3, reject) => {
@@ -79673,7 +80825,7 @@ async function respond(req, res, hostname3, handle) {
   }
 }
 var viteDev = async ({ slug, appDir, port, env }) => {
-  const child = spawn5(process.execPath, [resolveViteBin(appDir), "--logLevel", "warn"], {
+  const child = spawn6(process.execPath, [resolveViteBin(appDir), "--logLevel", "warn"], {
     cwd: appDir,
     env: { ...process.env, ...env },
     stdio: ["ignore", "pipe", "pipe"]
@@ -79708,7 +80860,7 @@ var viteDev = async ({ slug, appDir, port, env }) => {
 };
 
 // frontend/packages/miniapp-kit/src/doctor.ts
-import { spawn as spawn6 } from "node:child_process";
+import { spawn as spawn7 } from "node:child_process";
 var NODE_MINIMUM = [22, 12];
 async function runDoctor(deps) {
   const checks3 = [
@@ -79787,7 +80939,7 @@ async function tryExec(deps, command, args) {
 var firstLine = (text) => text.trim().split(`
 `)[0] ?? "";
 var execCommand = (command, args) => new Promise((resolve3, reject) => {
-  const child = spawn6(command, [...args], { stdio: ["ignore", "pipe", "pipe"] });
+  const child = spawn7(command, [...args], { stdio: ["ignore", "pipe", "pipe"] });
   const stdout = [];
   const stderr = [];
   child.stdout.on("data", (chunk) => stdout.push(chunk));
@@ -79866,11 +81018,11 @@ async function checkKitUpdate(input) {
 }
 
 // frontend/packages/miniapp-kit/src/login.ts
-import { createHash as createHash7, randomBytes as randomBytes2 } from "node:crypto";
-import { existsSync as existsSync17 } from "node:fs";
-import { chmod, mkdir as mkdir8, readFile as readFile17, rename, writeFile as writeFile9 } from "node:fs/promises";
-import { createServer as createServer2 } from "node:http";
-import { join as join26 } from "node:path";
+import { createHash as createHash8, randomBytes as randomBytes3 } from "node:crypto";
+import { existsSync as existsSync18 } from "node:fs";
+import { chmod, mkdir as mkdir9, readFile as readFile18, rename, writeFile as writeFile9 } from "node:fs/promises";
+import { createServer as createServer3 } from "node:http";
+import { join as join28 } from "node:path";
 var DEFAULT_MCP_URL = "https://fdpocket.dev/mcp/creator";
 var REDIRECT_URI = "http://127.0.0.1:43126/callback";
 var REFRESH_MARGIN_MS = 60000;
@@ -79884,10 +81036,10 @@ class LoginError extends Error {
 class LoginInProgress extends LoginError {
 }
 async function readLogins(configDir) {
-  const path = join26(configDir, CREDENTIALS_FILE);
-  if (!existsSync17(path))
+  const path = join28(configDir, CREDENTIALS_FILE);
+  if (!existsSync18(path))
     return {};
-  const parsed = JSON.parse(await readFile17(path, "utf8"));
+  const parsed = JSON.parse(await readFile18(path, "utf8"));
   return parsed.logins ?? {};
 }
 async function writeLogin(configDir, mcpUrl, login) {
@@ -79896,8 +81048,8 @@ async function writeLogin(configDir, mcpUrl, login) {
     delete logins[mcpUrl];
   else
     logins[mcpUrl] = login;
-  await mkdir8(configDir, { recursive: true, mode: 448 });
-  const path = join26(configDir, CREDENTIALS_FILE);
+  await mkdir9(configDir, { recursive: true, mode: 448 });
+  const path = join28(configDir, CREDENTIALS_FILE);
   const temporary = `${path}.${process.pid}.tmp`;
   await writeFile9(temporary, `${JSON.stringify({ logins }, null, 2)}
 `, { mode: 384 });
@@ -79974,15 +81126,15 @@ async function login(mcpUrl, deps) {
   const server = await discover(deps.fetch, mcpUrl);
   const previous = (await readLogins(deps.configDir))[mcpUrl];
   const clientId = previous?.issuer === server.issuer && previous.redirect_uri === REDIRECT_URI ? previous.client_id : await register(deps.fetch, server.registration);
-  const verifier = base64url3(randomBytes2(32));
-  const state = base64url3(randomBytes2(16));
+  const verifier = base64url3(randomBytes3(32));
+  const state = base64url3(randomBytes3(16));
   const url2 = new URL(server.authorization);
   url2.search = new URLSearchParams({
     response_type: "code",
     client_id: clientId,
     redirect_uri: REDIRECT_URI,
     state,
-    code_challenge: base64url3(createHash7("sha256").update(verifier).digest()),
+    code_challenge: base64url3(createHash8("sha256").update(verifier).digest()),
     code_challenge_method: "S256"
   }).toString();
   const code = await deps.authorize(url2.toString(), REDIRECT_URI, state);
@@ -80077,7 +81229,7 @@ function loopbackAuthorize(openUrl) {
       else
         resolve3(code);
     };
-    const server = createServer2((request2, response) => {
+    const server = createServer3((request2, response) => {
       const received = new URL(request2.url ?? "/", redirect2);
       if (received.pathname !== redirect2.pathname) {
         response.writeHead(404).end();
@@ -80332,9 +81484,9 @@ async function serveMcpStdio(proxy, io) {
 }
 
 // frontend/packages/miniapp-kit/src/new.ts
-import { existsSync as existsSync18 } from "node:fs";
-import { mkdir as mkdir9, readdir as readdir10, readFile as readFile18, writeFile as writeFile10 } from "node:fs/promises";
-import { dirname as dirname10, join as join27, relative } from "node:path";
+import { existsSync as existsSync19 } from "node:fs";
+import { mkdir as mkdir10, readdir as readdir11, readFile as readFile19, writeFile as writeFile10 } from "node:fs/promises";
+import { dirname as dirname10, join as join29, relative as relative2 } from "node:path";
 var TEMPLATE_DIR = "templates/project";
 var DEFAULT_APP_SPECS = ["web", "admin"];
 var NAME_PATTERN = /^[a-z][a-z0-9-]{0,63}$/;
@@ -80359,40 +81511,45 @@ async function newProject(options2) {
   }
   const declarations = apps.map((spec) => {
     const [slug = "", kind = "web", extra] = spec.split(":");
-    if (!APP_SLUG_PATTERN.test(slug) || slug === "api" && kind === "web" || !["web", "api", "jobs"].includes(kind) || extra !== undefined)
-      throw new NewProjectError(`invalid App declaration: ${spec}; use slug[:web|api|jobs]`);
+    if (!APP_SLUG_PATTERN.test(slug) || slug === "api" && kind === "web" || !["web", "api", "jobs", "python"].includes(kind) || extra !== undefined)
+      throw new NewProjectError(`invalid App declaration: ${spec}; use slug[:web|api|jobs|python]`);
     return { slug, kind };
   });
   if (!declarations.length || declarations.length > PROJECT_APPS_MAX || new Set(declarations.map((a2) => a2.slug)).size !== declarations.length)
     throw new NewProjectError(`declare 1–${PROJECT_APPS_MAX} unique Apps`);
-  if (existsSync18(root) && (await readdir10(root)).some((entry) => entry !== ".git")) {
+  if (existsSync19(root) && (await readdir11(root)).some((entry) => entry !== ".git")) {
     throw new NewProjectError(`${root} is not empty; kit new only fills an empty Project`);
   }
-  const template = join27(options2.kitRoot, TEMPLATE_DIR);
+  const template = join29(options2.kitRoot, TEMPLATE_DIR);
   const files = [];
   const sources = await listFiles(template);
   const put = async (target, text) => {
-    await mkdir9(dirname10(join27(root, target)), { recursive: true });
-    await writeFile10(join27(root, target), text);
+    await mkdir10(dirname10(join29(root, target)), { recursive: true });
+    await writeFile10(join29(root, target), text);
     files.push(target);
   };
   for (const source of sources) {
     if (source.startsWith("apps/"))
       continue;
     const target = targetPath(source);
-    let text = fill(await readFile18(join27(template, source), "utf8"), { name: name3, title });
+    let text = fill(await readFile19(join29(template, source), "utf8"), { name: name3, title });
     if (target === PROJECT_PATHS.manifest) {
       const document2 = $parseDocument(text);
       const original = document2.toJS().apps;
       document2.set("apps", Object.fromEntries(declarations.map(({ slug, kind }) => [
         slug,
-        kind === "web" ? original[slug === "admin" ? "admin" : "web"] : { kind }
+        kind === "web" ? original[slug === "admin" ? "admin" : "web"] : kind === "python" ? pythonManifestEntry(slug) : { kind }
       ])));
       text = document2.toString();
     }
     await put(target, text);
   }
   for (const { slug, kind } of declarations) {
+    if (kind === "python") {
+      for (const [path, text] of Object.entries(pythonAppFiles(slug)))
+        await put(path, text);
+      continue;
+    }
     if (kind !== "web") {
       await put(`apps/${slug}/package.json`, JSON.stringify({
         name: slug,
@@ -80420,7 +81577,7 @@ async function newProject(options2) {
     const prefix2 = `apps/${templateSlug}/`;
     for (const source of sources.filter((path) => path.startsWith(prefix2))) {
       const target = `apps/${slug}/${source.slice(prefix2.length)}`;
-      let text = fill(await readFile18(join27(template, source), "utf8"), { name: name3, title });
+      let text = fill(await readFile19(join29(template, source), "utf8"), { name: name3, title });
       if (target.endsWith("/vite.config.ts"))
         text = text.replace(`createAppConfig("${templateSlug}"`, `createAppConfig("${slug}"`);
       if (target.endsWith("/package.json")) {
@@ -80432,7 +81589,48 @@ async function newProject(options2) {
       await put(target, text);
     }
   }
-  return { files: files.sort(), vendored: await placeVendoredPackages(root, options2.kitRoot) };
+  const vendored = await placeVendoredPackages(root, options2.kitRoot);
+  if (declarations.some((app) => app.kind === "python"))
+    vendored["fdpocket-py"] = await placePythonSdk(root, options2.kitRoot);
+  return { files: files.sort(), vendored };
+}
+var pythonPackageOf = (slug) => slug.replaceAll("-", "_");
+function pythonManifestEntry(slug) {
+  return {
+    kind: "python",
+    python: "3.12",
+    tasks: { hello: { handler: `${pythonPackageOf(slug)}.tasks:hello` } }
+  };
+}
+function pythonAppFiles(slug) {
+  const pkg = pythonPackageOf(slug);
+  return {
+    [`apps/${slug}/pyproject.toml`]: [
+      "[project]",
+      `name = "${slug}"`,
+      'version = "0.1.0"',
+      'requires-python = ">=3.12,<3.13"',
+      "# httpx は Platform の SDK（fdpocket）が使う。サーバーを置くなら uvicorn と fastapi も足す",
+      'dependencies = ["httpx>=0.28,<1"]',
+      "",
+      "[tool.uv]",
+      "# 配備は uv.lock から依存だけを入れ、src/ は Platform が PYTHONPATH に置く",
+      "package = false",
+      ""
+    ].join(`
+`),
+    [`apps/${slug}/src/${pkg}/__init__.py`]: "",
+    [`apps/${slug}/src/${pkg}/tasks.py`]: [
+      '"""タスク（python-backend.md §4.2）。ctx は fdpocket の TaskContext."""',
+      "",
+      "",
+      "def hello(ctx, input):",
+      '    ctx.progress(1.0, "done")',
+      `    return {"message": f"hello {input.get('name', 'world')}"}`,
+      ""
+    ].join(`
+`)
+  };
 }
 function targetPath(source) {
   const parts = source.split("/");
@@ -80446,12 +81644,12 @@ function fill(text, values) {
 async function listFiles(root) {
   const files = [];
   const walk = async (dir) => {
-    for (const entry of await readdir10(dir, { withFileTypes: true })) {
-      const path = join27(dir, entry.name);
+    for (const entry of await readdir11(dir, { withFileTypes: true })) {
+      const path = join29(dir, entry.name);
       if (entry.isDirectory())
         await walk(path);
       else if (entry.isFile())
-        files.push(relative(root, path).split("\\").join("/"));
+        files.push(relative2(root, path).split("\\").join("/"));
     }
   };
   await walk(root);
@@ -80697,16 +81895,16 @@ function nextStep(error51) {
 }
 
 // frontend/packages/miniapp-kit/src/repo.ts
-import { existsSync as existsSync19 } from "node:fs";
-import { appendFile, mkdir as mkdir10, readFile as readFile19, rm as rm9, writeFile as writeFile11 } from "node:fs/promises";
-import { join as join28 } from "node:path";
+import { existsSync as existsSync20 } from "node:fs";
+import { appendFile, mkdir as mkdir11, readFile as readFile20, rm as rm10, writeFile as writeFile11 } from "node:fs/promises";
+import { join as join30 } from "node:path";
 class RepoError extends Error {
   name = "RepoError";
 }
 function kitCommand(kitRoot, ...args) {
   return [
     shellQuote(process.execPath),
-    shellQuote(join28(kitRoot, "scripts", "kit.mjs")),
+    shellQuote(join30(kitRoot, "scripts", "kit.mjs")),
     ...args
   ].join(" ");
 }
@@ -80742,10 +81940,10 @@ async function configureRepo(git, source, config3, author) {
   await set2(git, source, `branch.${branch}.remote`, ".");
   await set2(git, source, `branch.${branch}.merge`, trackingRef(config3.thread_ref));
   await set2(git, source, `branch.${branch}.rebase`, "true");
-  const info = join28(source, ".git", "info");
-  await mkdir10(info, { recursive: true });
-  const excludePath = join28(info, "exclude");
-  const excluded = existsSync19(excludePath) ? (await readFile19(excludePath, "utf8")).split(`
+  const info = join30(source, ".git", "info");
+  await mkdir11(info, { recursive: true });
+  const excludePath = join30(info, "exclude");
+  const excluded = existsSync20(excludePath) ? (await readFile20(excludePath, "utf8")).split(`
 `) : [];
   const missing = EXCLUDES.filter((line) => !excluded.includes(line));
   if (missing.length > 0)
@@ -80759,12 +81957,12 @@ async function requireGitLfs(git, cwd) {
   }
 }
 function requireRepo(source) {
-  if (!existsSync19(join28(source, ".git"))) {
+  if (!existsSync20(join30(source, ".git"))) {
     throw new RepoError(`${source} is not a git repository; run kit.mjs clone in a new directory`);
   }
 }
 async function requireClean(git, source, what) {
-  if (existsSync19(join28(source, ".git", "rebase-merge")) || existsSync19(join28(source, ".git", "rebase-apply"))) {
+  if (existsSync20(join30(source, ".git", "rebase-merge")) || existsSync20(join30(source, ".git", "rebase-apply"))) {
     throw new RepoError("a git rebase is in progress in source/; finish it (git rebase --continue) first");
   }
   if (await gitOk(git, source, ["status", "--porcelain"]) !== "") {
@@ -80774,13 +81972,13 @@ async function requireClean(git, source, what) {
 async function fetchBundles(git, source, pulled, already, download2) {
   const listed = new Set(pulled.bundles.map((bundle2) => bundle2.sha256));
   const fetched = already.filter((sha) => listed.has(sha));
-  const dir = join28(source, ".git", "fdpocket-bundles");
-  await mkdir10(dir, { recursive: true });
+  const dir = join30(source, ".git", "fdpocket-bundles");
+  await mkdir11(dir, { recursive: true });
   for (const bundle2 of fetchOrder(pulled.bundles)) {
     if (fetched.includes(bundle2.sha256))
       continue;
     const bytes = await download2(`bundle ${bundle2.seq}`, bundle2.url, bundle2.sha256);
-    const file2 = join28(dir, `${bundle2.sha256}.bundle`);
+    const file2 = join30(dir, `${bundle2.sha256}.bundle`);
     await writeFile11(file2, bytes);
     try {
       await gitOk(git, source, [
@@ -80792,7 +81990,7 @@ async function fetchBundles(git, source, pulled, already, download2) {
         `+refs/*:${REMOTE_REFS}/*`
       ]);
     } finally {
-      await rm9(file2, { force: true });
+      await rm10(file2, { force: true });
     }
     fetched.push(bundle2.sha256);
   }
@@ -80834,17 +82032,17 @@ async function integrate(git, source, threadRef) {
 }
 
 // frontend/packages/miniapp-kit/src/sdk-fingerprint.ts
-import { createHash as createHash8 } from "node:crypto";
-import { readdir as readdir11, readFile as readFile20 } from "node:fs/promises";
-import { join as join29, relative as relative2, sep as sep2 } from "node:path";
+import { createHash as createHash9 } from "node:crypto";
+import { readdir as readdir12, readFile as readFile21 } from "node:fs/promises";
+import { join as join31, relative as relative3, sep as sep2 } from "node:path";
 async function sdkVendorHash(kitRoot) {
-  const root = join29(kitRoot, "vendor");
-  const entries = await readdir11(root, { recursive: true, withFileTypes: true });
-  const files = entries.filter((entry) => entry.isFile()).map((entry) => relative2(root, join29(entry.parentPath, entry.name)).split(sep2).join("/")).sort();
-  const digest2 = createHash8("sha256");
+  const root = join31(kitRoot, "vendor");
+  const entries = await readdir12(root, { recursive: true, withFileTypes: true });
+  const files = entries.filter((entry) => entry.isFile()).map((entry) => relative3(root, join31(entry.parentPath, entry.name)).split(sep2).join("/")).sort();
+  const digest2 = createHash9("sha256");
   for (const path of files) {
-    const content = await readFile20(join29(root, path));
-    digest2.update(`${path}\x00${createHash8("sha256").update(content).digest("hex")}
+    const content = await readFile21(join31(root, path));
+    digest2.update(`${path}\x00${createHash9("sha256").update(content).digest("hex")}
 `);
   }
   return digest2.digest("hex");
@@ -80900,17 +82098,17 @@ class ValidationFailed extends Error {
 }
 
 // frontend/packages/miniapp-kit/src/verify/validate.ts
-import { mkdir as mkdir12, writeFile as writeFile13 } from "node:fs/promises";
-import { join as join33 } from "node:path";
+import { mkdir as mkdir13, writeFile as writeFile13 } from "node:fs/promises";
+import { join as join35 } from "node:path";
 
 // frontend/packages/miniapp-kit/src/verify/dynamic.ts
-import { mkdir as mkdir11, writeFile as writeFile12 } from "node:fs/promises";
-import { join as join32 } from "node:path";
+import { mkdir as mkdir12, writeFile as writeFile12 } from "node:fs/promises";
+import { join as join34 } from "node:path";
 
 // frontend/packages/miniapp-kit/src/verify/browser.ts
-import { existsSync as existsSync20 } from "node:fs";
+import { existsSync as existsSync21 } from "node:fs";
 import { createRequire as createRequire10 } from "node:module";
-import { join as join30 } from "node:path";
+import { join as join32 } from "node:path";
 import { pathToFileURL as pathToFileURL8 } from "node:url";
 
 class BrowserUnavailableError extends Error {
@@ -80920,7 +82118,7 @@ function resolvePlaywright() {
   const bases = [process.env.KIT_PLAYWRIGHT_DIR, process.cwd()].filter((base) => Boolean(base));
   for (const base of bases) {
     try {
-      return createRequire10(join30(base, "noop.js")).resolve("playwright-core");
+      return createRequire10(join32(base, "noop.js")).resolve("playwright-core");
     } catch {}
   }
   try {
@@ -80933,7 +82131,7 @@ var launchChromium = async () => {
   const loaded = await import(pathToFileURL8(resolvePlaywright()).href);
   const module = loaded.default ?? loaded;
   const executablePath = process.env.KIT_CHROMIUM_PATH;
-  if (executablePath && !existsSync20(executablePath)) {
+  if (executablePath && !existsSync21(executablePath)) {
     throw new BrowserUnavailableError(`KIT_CHROMIUM_PATH does not exist: ${executablePath}`);
   }
   return module.chromium.launch({
@@ -80943,10 +82141,10 @@ var launchChromium = async () => {
 };
 
 // frontend/packages/miniapp-kit/src/verify/erase.ts
-import { existsSync as existsSync21 } from "node:fs";
-import { mkdtemp as mkdtemp2, rm as rm10 } from "node:fs/promises";
+import { existsSync as existsSync22 } from "node:fs";
+import { mkdtemp as mkdtemp2, rm as rm11 } from "node:fs/promises";
 import { tmpdir as tmpdir2 } from "node:os";
-import { join as join31 } from "node:path";
+import { join as join33 } from "node:path";
 var failed = (message2) => ({
   code: "ERASE_TEST_FAILED",
   path: PROJECT_PATHS.eraseTest,
@@ -80955,7 +82153,7 @@ var failed = (message2) => ({
 var describe4 = (error51) => error51 instanceof Error ? error51.message : String(error51);
 async function runEraseTest(options2) {
   const { root } = options2;
-  if (!existsSync21(join31(root, PROJECT_PATHS.eraseTest))) {
+  if (!existsSync22(join33(root, PROJECT_PATHS.eraseTest))) {
     return {
       errors: [],
       warnings: [
@@ -80970,8 +82168,8 @@ async function runEraseTest(options2) {
   const manifest2 = JSON.parse(await readGenerated(root, "project.json"));
   const schema2 = JSON.parse(await readGenerated(root, "schema.json"));
   const importModule = options2.importModule ?? defaultImporter(root, manifest2);
-  const dir = await mkdtemp2(join31(tmpdir2(), "kit-erase-"));
-  const db = options2.createLibsqlClient({ url: `file:${join31(dir, "erase.db")}` });
+  const dir = await mkdtemp2(join33(tmpdir2(), "kit-erase-"));
+  const db = options2.createLibsqlClient({ url: `file:${join33(dir, "erase.db")}` });
   try {
     for (const part of await devDatabaseSql(root))
       await applySql(db, part.sql);
@@ -80979,7 +82177,7 @@ async function runEraseTest(options2) {
     await runSeed({ root, db, schema: schema2, importModule });
     let test;
     try {
-      test = (await importModule(join31(root, PROJECT_PATHS.eraseTest))).default;
+      test = (await importModule(join33(root, PROJECT_PATHS.eraseTest))).default;
     } catch (error51) {
       return { errors: [failed(`could not be loaded: ${describe4(error51)}`)], warnings: [] };
     }
@@ -81022,7 +82220,7 @@ async function runEraseTest(options2) {
     return { errors: [], warnings: [] };
   } finally {
     db.close();
-    await rm10(dir, { recursive: true, force: true });
+    await rm11(dir, { recursive: true, force: true });
   }
 }
 
@@ -81207,7 +82405,7 @@ async function runDynamicChecks(options2) {
   });
   const browser = await (options2.launch ?? launchChromium)();
   try {
-    await mkdir11(join32(options2.outDir, "screenshots"), { recursive: true });
+    await mkdir12(join34(options2.outDir, "screenshots"), { recursive: true });
     const observations = [];
     const at = (app) => ({
       hostUrl: dev.hostUrl,
@@ -81243,7 +82441,7 @@ async function runDynamicChecks(options2) {
       gatewayUrl: dev.gatewayUrl,
       appsOrigin: dev.appsOrigin
     });
-    await writeFile12(join32(options2.outDir, "permission-matrix.json"), `${JSON.stringify(matrix, null, 1)}
+    await writeFile12(join34(options2.outDir, "permission-matrix.json"), `${JSON.stringify(matrix, null, 1)}
 `);
     const erase = await runEraseTest({
       root: options2.root,
@@ -81251,7 +82449,7 @@ async function runDynamicChecks(options2) {
     });
     const judged = judgeDynamic(options2.manifest, observations);
     const workerResults = await dev.checkWorkers();
-    await writeFile12(join32(options2.outDir, "worker-mocks.json"), `${JSON.stringify({ results: workerResults, events: dev.workerEvents() }, null, 1)}
+    await writeFile12(join34(options2.outDir, "worker-mocks.json"), `${JSON.stringify({ results: workerResults, events: dev.workerEvents() }, null, 1)}
 `);
     const workerErrors = workerResults.filter((result) => result.status >= (result.kind === "jobs" ? 400 : 500)).map((result) => ({
       code: "WORKER_RUNTIME_FAILED",
@@ -81329,7 +82527,7 @@ async function observe(context, visit2, at, shot) {
     if (shot)
       await page.waitForTimeout(shot.settleMs);
     const name3 = shot?.name ?? `screenshots/${visit2.app}-${visit2.principal}.png`;
-    await writeFile12(join32(at.outDir, name3), await page.locator("#frame").screenshot());
+    await writeFile12(join34(at.outDir, name3), await page.locator("#frame").screenshot());
     observation.screenshot = name3;
     return observation;
   } finally {
@@ -81403,19 +82601,19 @@ async function validateVersion(options2) {
     })
   });
   const report2 = reportSchema.parse(result.report);
-  await mkdir12(options2.outDir, { recursive: true });
-  await writeFile13(join33(options2.outDir, "report.json"), `${JSON.stringify(report2, null, 2)}
+  await mkdir13(options2.outDir, { recursive: true });
+  await writeFile13(join35(options2.outDir, "report.json"), `${JSON.stringify(report2, null, 2)}
 `);
   if (result.schemaJson !== undefined) {
-    await writeFile13(join33(options2.outDir, "schema.json"), result.schemaJson);
+    await writeFile13(join35(options2.outDir, "schema.json"), result.schemaJson);
   }
   return report2;
 }
 
 // frontend/packages/miniapp-kit/src/workdir.ts
-import { existsSync as existsSync22 } from "node:fs";
-import { readFile as readFile21, unlink, writeFile as writeFile14 } from "node:fs/promises";
-import { dirname as dirname11, join as join34 } from "node:path";
+import { existsSync as existsSync23 } from "node:fs";
+import { readFile as readFile22, unlink, writeFile as writeFile14 } from "node:fs/promises";
+import { dirname as dirname11, join as join36 } from "node:path";
 var CONFIG_FILE = ".fdpocket.json";
 var LEGACY_CONFIG_FILE = ".tokoyo.json";
 var WORKDIR_DIRS = {
@@ -81427,7 +82625,7 @@ var WORKDIR_DIRS = {
 class ConfigError extends Error {
   name = "ConfigError";
 }
-var REQUIRED = [
+var REQUIRED2 = [
   "project_id",
   "session_id",
   "kit_root",
@@ -81450,7 +82648,7 @@ function parseConfig(text) {
     throw new ConfigError(`${CONFIG_FILE} is not an object`);
   const record3 = raw2;
   const config3 = {};
-  for (const key of REQUIRED) {
+  for (const key of REQUIRED2) {
     const value = record3[key];
     if (typeof value !== "string" || value === "") {
       throw new ConfigError(`${CONFIG_FILE}: "${key}" must be a non-empty string (a working directory from before git: clone it again)`);
@@ -81481,7 +82679,7 @@ function parseConfig(text) {
   return config3;
 }
 function serializeConfig(config3) {
-  const ordered = Object.fromEntries([...REQUIRED, ...OPTIONAL, ...NULLABLE, ...LISTS].map((key) => [key, config3[key]]));
+  const ordered = Object.fromEntries([...REQUIRED2, ...OPTIONAL, ...NULLABLE, ...LISTS].map((key) => [key, config3[key]]));
   return `${JSON.stringify(ordered, null, 2)}
 `;
 }
@@ -81490,7 +82688,7 @@ function locateWorkdir(start) {
 }
 function locateFile(start, name3) {
   for (let current = start;; current = dirname11(current)) {
-    if (existsSync22(join34(current, name3)))
+    if (existsSync23(join36(current, name3)))
       return current;
     if (dirname11(current) === current)
       return null;
@@ -81502,9 +82700,9 @@ async function migrateLegacyWorkdir(start) {
   const found = locateFile(start, LEGACY_CONFIG_FILE);
   if (found === null)
     return null;
-  const { app_id, ...rest } = JSON.parse(await readFile21(join34(found, LEGACY_CONFIG_FILE), "utf8"));
-  await writeFile14(join34(found, CONFIG_FILE), serializeConfig(parseConfig(JSON.stringify({ project_id: app_id, ...rest }))));
-  await unlink(join34(found, LEGACY_CONFIG_FILE));
+  const { app_id, ...rest } = JSON.parse(await readFile22(join36(found, LEGACY_CONFIG_FILE), "utf8"));
+  await writeFile14(join36(found, CONFIG_FILE), serializeConfig(parseConfig(JSON.stringify({ project_id: app_id, ...rest }))));
+  await unlink(join36(found, LEGACY_CONFIG_FILE));
   return found;
 }
 async function findWorkdir(start) {
@@ -81564,11 +82762,11 @@ class CommandError extends Error {
 }
 function defaultConfigDir() {
   const xdg = process.env.XDG_CONFIG_HOME;
-  return join35(xdg && xdg !== "" ? xdg : join35(homedir(), ".config"), "fdpocket");
+  return join37(xdg && xdg !== "" ? xdg : join37(homedir(), ".config"), "fdpocket");
 }
 function defaultCodexHome() {
   const home = process.env.CODEX_HOME;
-  return home && home !== "" ? home : join35(homedir(), ".codex");
+  return home && home !== "" ? home : join37(homedir(), ".codex");
 }
 async function readStdin() {
   const chunks = [];
@@ -81657,35 +82855,35 @@ async function runCommand(args, context) {
 var print = (context, value) => context.stdout(JSON.stringify(value, null, 2));
 var mcpUrlOf = (flag) => flag ?? process.env.CREATOR_MCP_URL ?? DEFAULT_MCP_URL;
 async function kitVersion(kitRoot) {
-  const manifest2 = join35(kitRoot, ".claude-plugin", "plugin.json");
-  if (!existsSync23(manifest2))
+  const manifest2 = join37(kitRoot, ".claude-plugin", "plugin.json");
+  if (!existsSync24(manifest2))
     throw new CommandError(`${manifest2} is missing; reinstall the Kit`);
-  const version3 = JSON.parse(await readFile22(manifest2, "utf8")).version;
+  const version3 = JSON.parse(await readFile23(manifest2, "utf8")).version;
   if (typeof version3 !== "string")
     throw new CommandError(`${manifest2} has no version`);
   return version3;
 }
 async function readConfig(workdir) {
-  return parseConfig(await readFile22(join35(workdir, CONFIG_FILE), "utf8"));
+  return parseConfig(await readFile23(join37(workdir, CONFIG_FILE), "utf8"));
 }
 async function saveConfig(workdir, config3) {
-  await writeFile15(join35(workdir, CONFIG_FILE), serializeConfig(config3));
+  await writeFile15(join37(workdir, CONFIG_FILE), serializeConfig(config3));
 }
-var sourceOf = (workdir) => join35(workdir, WORKDIR_DIRS.source);
+var sourceOf = (workdir) => join37(workdir, WORKDIR_DIRS.source);
 var AGENTS_TITLE = agentsMd("").split(`
 `)[0];
 async function writeAgentFiles(workdir, kitRoot) {
-  const agents = join35(workdir, "AGENTS.md");
-  if (!existsSync23(agents) || (await readFile22(agents, "utf8")).startsWith(AGENTS_TITLE)) {
+  const agents = join37(workdir, "AGENTS.md");
+  if (!existsSync24(agents) || (await readFile23(agents, "utf8")).startsWith(AGENTS_TITLE)) {
     await writeFile15(agents, agentsMd(kitRoot));
   }
-  const claude = join35(workdir, "CLAUDE.md");
-  if (!existsSync23(claude))
+  const claude = join37(workdir, "CLAUDE.md");
+  if (!existsSync24(claude))
     await writeFile15(claude, CLAUDE_MD);
 }
 async function fetchVerified(context, name3, url3, sha2562) {
   const bytes = await context.download(url3);
-  const actual = createHash9("sha256").update(bytes).digest("hex");
+  const actual = createHash10("sha256").update(bytes).digest("hex");
   if (sha2562 !== undefined && actual !== sha2562.toLowerCase()) {
     throw new CommandError(`${name3}: sha256 is ${actual}, expected ${sha2562}; nothing was changed`);
   }
@@ -81706,8 +82904,8 @@ async function clone4(context, flags) {
   }
   const pulled = parsePulled(bundles);
   const workdir = context.cwd;
-  const path = join35(workdir, CONFIG_FILE);
-  if (existsSync23(path)) {
+  const path = join37(workdir, CONFIG_FILE);
+  if (existsSync24(path)) {
     const existing = await readConfig(workdir);
     if (existing.project_id !== pulled.project_id) {
       throw new CommandError(`${path} belongs to App ${existing.project_id}; use another directory for App ${pulled.project_id}`);
@@ -81715,12 +82913,12 @@ async function clone4(context, flags) {
     throw new CommandError(`${workdir} already has App ${pulled.project_id}; run kit.mjs pull instead`);
   }
   const source = sourceOf(workdir);
-  if (existsSync23(source) && (await readdir12(source)).length > 0) {
+  if (existsSync24(source) && (await readdir13(source)).length > 0) {
     throw new CommandError(`${source} is not empty; clone into a new directory`);
   }
   await requireGitLfs(context.git, workdir);
   for (const dir of Object.values(WORKDIR_DIRS))
-    await mkdir13(join35(workdir, dir), { recursive: true });
+    await mkdir14(join37(workdir, dir), { recursive: true });
   const branch = threadBranch(pulled.thread_ref);
   await gitOk(context.git, workdir, ["init", "-q", "-b", branch, source]);
   await gitOk(context.git, source, ["lfs", "install", "--local"]);
@@ -81863,17 +83061,17 @@ async function push(context, flags) {
   print(context, { ...result, ...update.status === "outdated" ? { kit_update: update } : {} });
 }
 async function writeBuildReport(workdir, built, policyRevision) {
-  const path = join35(workdir, WORKDIR_DIRS.outputs, "build-report.json");
-  const pending = join35(sourceOf(workdir), "packages", "db-schema", "pending");
+  const path = join37(workdir, WORKDIR_DIRS.outputs, "build-report.json");
+  const pending = join37(sourceOf(workdir), "packages", "db-schema", "pending");
   const report2 = completeBuildReport({
-    existing: existsSync23(path) ? JSON.parse(await readFile22(path, "utf8")) : null,
-    projectYaml: await readFile22(join35(sourceOf(workdir), "infra", "project.yaml"), "utf8"),
+    existing: existsSync24(path) ? JSON.parse(await readFile23(path, "utf8")) : null,
+    projectYaml: await readFile23(join37(sourceOf(workdir), "infra", "project.yaml"), "utf8"),
     apps: built.apps,
     schemaVersion: built.schema_version,
-    pendingFiles: existsSync23(pending) ? (await readdir12(pending)).filter((name3) => name3.endsWith(".sql")).sort() : [],
+    pendingFiles: existsSync24(pending) ? (await readdir13(pending)).filter((name3) => name3.endsWith(".sql")).sort() : [],
     ...policyRevision === undefined ? {} : { policyRevision }
   });
-  await mkdir13(dirname12(path), { recursive: true });
+  await mkdir14(dirname12(path), { recursive: true });
   await writeFile15(path, `${JSON.stringify(report2, null, 2)}
 `);
 }
@@ -81912,7 +83110,7 @@ async function doctor(context) {
     throw new CommandError('some checks failed; follow each "fix" above');
 }
 async function kitUpdate(context) {
-  const manifest2 = JSON.parse(await readFile22(join35(context.kitRoot, ".claude-plugin", "plugin.json"), "utf8"));
+  const manifest2 = JSON.parse(await readFile23(join37(context.kitRoot, ".claude-plugin", "plugin.json"), "utf8"));
   const current = typeof manifest2.version === "string" ? manifest2.version : "unknown";
   if (process.env.KIT_TOOL_ROOT)
     return { status: "unknown", current };
@@ -82002,7 +83200,7 @@ async function publishedFlags(flags) {
   }
   if (flags["published-schema"] !== undefined) {
     try {
-      out.publishedSchema = JSON.parse(await readFile22(flags["published-schema"], "utf8"));
+      out.publishedSchema = JSON.parse(await readFile23(flags["published-schema"], "utf8"));
     } catch (error51) {
       throw new CommandError(`--published-schema must be a readable JSON file: ${error51 instanceof Error ? error51.message : String(error51)}`);
     }
@@ -82057,13 +83255,13 @@ async function validate(context, flags) {
     root,
     kitRoot: context.kitRoot,
     git: context.git,
-    archive: new Uint8Array(await readFile22(resolve3(context.cwd, flags.archive))),
+    archive: new Uint8Array(await readFile23(resolve3(context.cwd, flags.archive))),
     outDir: resolve3(context.cwd, flags.out),
     projectId: flags["project-id"],
     gatewayUrl: flags["gateway-url"],
     base: flags.base === undefined ? undefined : flags.base === "none" ? null : flags.base,
     sdkUpdate: flags["sdk-update"] === "true",
-    ...flags.captures ? { captures: parseCaptures(await readFile22(resolve3(context.cwd, flags.captures), "utf8")) } : {}
+    ...flags.captures ? { captures: parseCaptures(await readFile23(resolve3(context.cwd, flags.captures), "utf8")) } : {}
   });
   print(context, {
     passed: report2.passed,
@@ -82093,6 +83291,15 @@ async function dev(context, flags) {
     config: config3,
     accessToken: () => accessToken(config3.mcp_url, context)
   });
+  if (flags.python !== undefined && flags.python !== "modal" && flags.python !== "local") {
+    throw new CommandError("--python must be modal (the real GPU through FDPocket) or local (CPU)");
+  }
+  const python2 = await resolveDevPython({
+    mode: flags.python,
+    env: process.env,
+    config: config3,
+    accessToken: () => accessToken(config3.mcp_url, context)
+  });
   const liveRaw = flags.live ? process.env[KIT_LIVE_CONFIG_ENV] : undefined;
   if (flags.live && !liveRaw) {
     throw new CommandError(`--live needs ${KIT_LIVE_CONFIG_ENV} (only in the live preview sandbox; use kit dev without --live elsewhere)`);
@@ -82103,7 +83310,8 @@ async function dev(context, flags) {
     projectId,
     as,
     ...liveRaw ? { live: parseLiveConfig(liveRaw) } : {},
-    ...ai2.proxy ? { aiProxy: ai2.proxy } : {}
+    ...ai2.proxy ? { aiProxy: ai2.proxy } : {},
+    ...python2.proxy ? { pythonProxy: python2.proxy } : {}
   });
   if (flags.trigger) {
     try {
@@ -82120,6 +83328,7 @@ async function dev(context, flags) {
     gateway_url: server.gatewayUrl,
     apps: server.apps,
     ai: ai2.mode === "platform" ? "real AI through FDPocket (spends your credits; --ai mock for the free mock)" : ai2.reason === "not_logged_in" ? "mock (run kit.mjs login to use the real AI)" : ai2.reason === "no_gateway_url" ? "mock (run kit.mjs pull to learn the Gateway, then the real AI is used)" : "mock (--ai mock)",
+    python: python2.mode === "modal" ? "tasks run on the real GPU through FDPocket (spends your credits; --python local for the CPU)" : "tasks and servers run on this machine with uv (CPU; --python modal for the real GPU)",
     next: "open host_url in a browser (switch the app and the user at the top); restart kit dev after kit generate; Ctrl-C to stop"
   });
   await context.untilStopped();
@@ -82151,16 +83360,16 @@ async function pack(context) {
   if (tip === base) {
     throw new CommandError("no new commits since the head kit.mjs pull took (base_commit_oid); git commit first");
   }
-  const outputs = join35(workdir, WORKDIR_DIRS.outputs);
-  const reportPath = join35(outputs, "build-report.json");
-  if (!existsSync23(reportPath)) {
+  const outputs = join37(workdir, WORKDIR_DIRS.outputs);
+  const reportPath = join37(outputs, "build-report.json");
+  if (!existsSync24(reportPath)) {
     throw new CommandError("outputs/build-report.json is missing; write it first (instructions.md §2)");
   }
-  const dist = join35(source, "dist");
-  if (!existsSync23(dist))
+  const dist = join37(source, "dist");
+  if (!existsSync24(dist))
     throw new CommandError("source/dist is missing; kit.mjs build first");
-  await mkdir13(outputs, { recursive: true });
-  const bundlePath = join35(outputs, "source.bundle");
+  await mkdir14(outputs, { recursive: true });
+  const bundlePath = join37(outputs, "source.bundle");
   await gitOk(context.git, source, [
     "bundle",
     "create",
@@ -82170,12 +83379,12 @@ async function pack(context) {
     ...base === null ? [] : [`^${base}`]
   ]);
   const distArchive = buildDistArchive(await collectFiles(dist));
-  await writeFile15(join35(outputs, "dist.tar.gz"), distArchive);
+  await writeFile15(join37(outputs, "dist.tar.gz"), distArchive);
   print(context, {
     files: {
-      "source.bundle": describeFile(new Uint8Array(await readFile22(bundlePath))),
+      "source.bundle": describeFile(new Uint8Array(await readFile23(bundlePath))),
       "dist.tar.gz": describeFile(distArchive),
-      "build-report.json": describeFile(new Uint8Array(await readFile22(reportPath)))
+      "build-report.json": describeFile(new Uint8Array(await readFile23(reportPath)))
     },
     project_id: config3.project_id,
     session_id: config3.session_id,
@@ -82206,7 +83415,7 @@ async function uploadOutputs(context, flags) {
     throw new CommandError(`uploading the LFS files failed: ${lfs.stderr.trim()} (not logged in? run kit.mjs login)`);
   }
   for (const [name3, contentType2] of Object.entries(OUTPUT_FILES)) {
-    const bytes = new Uint8Array(await readFile22(join35(workdir, WORKDIR_DIRS.outputs, name3)));
+    const bytes = new Uint8Array(await readFile23(join37(workdir, WORKDIR_DIRS.outputs, name3)));
     await upload(name3, urls[name3], bytes, contentType2, context.fetch);
   }
   print(context, { uploaded: Object.keys(OUTPUT_FILES) });
@@ -82290,8 +83499,8 @@ async function addAsset(context, flags) {
   }
   const workdir = await findWorkdir(context.cwd);
   const bytes = await fetchVerified(context, path, flags.url, flags.sha256);
-  const target = join35(sourceOf(workdir), ...segments);
-  await mkdir13(dirname12(target), { recursive: true });
+  const target = join37(sourceOf(workdir), ...segments);
+  await mkdir14(dirname12(target), { recursive: true });
   await writeFile15(target, bytes);
   print(context, {
     path,
@@ -82325,8 +83534,8 @@ async function codexConfig(context, flags) {
     context.stdout(codexApprovalToml(pluginId, MCP_SERVER_NAME));
     return;
   }
-  const path = join35(context.codexHome, "config.toml");
-  const existing = existsSync23(path) ? await readFile22(path, "utf8") : "";
+  const path = join37(context.codexHome, "config.toml");
+  const existing = existsSync24(path) ? await readFile23(path, "utf8") : "";
   let merged;
   try {
     merged = mergeCodexApproval(existing, pluginId, MCP_SERVER_NAME);
@@ -82337,7 +83546,7 @@ async function codexConfig(context, flags) {
   }
   const changed = merged !== existing;
   if (changed) {
-    await mkdir13(context.codexHome, { recursive: true });
+    await mkdir14(context.codexHome, { recursive: true });
     await writeFile15(path, merged);
   }
   print(context, {

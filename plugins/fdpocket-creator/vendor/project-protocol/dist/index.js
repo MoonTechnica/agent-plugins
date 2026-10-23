@@ -25,6 +25,7 @@ export * from "./origin-listing.js";
 export * from "./paths.js";
 export * from "./platform-dispatch.js";
 export * from "./profile.js";
+export * from "./python.js";
 export * from "./realtime.js";
 export * from "./resolve.js";
 export * from "./safety.js";

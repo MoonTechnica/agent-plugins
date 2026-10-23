@@ -141,6 +141,7 @@ export declare const reportSchema: z.ZodObject<{
                 web: "web";
                 api: "api";
                 jobs: "jobs";
+                python: "python";
             }>;
             access: z.ZodOptional<z.ZodEnum<{
                 public: "public";
@@ -172,6 +173,7 @@ export declare const reportSchema: z.ZodObject<{
                 ai: z.ZodOptional<z.ZodObject<{
                     chat: z.ZodBoolean;
                 }, z.core.$strict>>;
+                python: z.ZodOptional<z.ZodRecord<z.ZodString, z.ZodArray<z.ZodString>>>;
             }, z.core.$strict>>;
             anonymous: z.ZodOptional<z.ZodObject<{
                 allowed: z.ZodBoolean;
@@ -194,12 +196,48 @@ export declare const reportSchema: z.ZodObject<{
                 "jobs.schedule": "jobs.schedule";
                 "jobs.consume": "jobs.consume";
                 "ai.chat": "ai.chat";
+                "python.run": "python.run";
             }>>>;
             schedules: z.ZodOptional<z.ZodArray<z.ZodObject<{
                 cron: z.ZodString;
                 handler: z.ZodString;
             }, z.core.$strict>>>;
             routes: z.ZodOptional<z.ZodArray<z.ZodLiteral<"/api/*">>>;
+            python: z.ZodOptional<z.ZodEnum<{
+                3.11: "3.11";
+                3.12: "3.12";
+                3.13: "3.13";
+            }>>;
+            compute: z.ZodOptional<z.ZodObject<{
+                gpu: z.ZodOptional<z.ZodString>;
+                cpu: z.ZodOptional<z.ZodNumber>;
+                memoryMiB: z.ZodOptional<z.ZodNumber>;
+            }, z.core.$strict>>;
+            tasks: z.ZodOptional<z.ZodRecord<z.ZodString, z.ZodObject<{
+                handler: z.ZodString;
+                onFinish: z.ZodOptional<z.ZodObject<{
+                    app: z.ZodString;
+                    handler: z.ZodString;
+                }, z.core.$strict>>;
+                timeoutSeconds: z.ZodOptional<z.ZodNumber>;
+                compute: z.ZodOptional<z.ZodObject<{
+                    gpu: z.ZodOptional<z.ZodString>;
+                    cpu: z.ZodOptional<z.ZodNumber>;
+                    memoryMiB: z.ZodOptional<z.ZodNumber>;
+                }, z.core.$strict>>;
+            }, z.core.$strict>>>;
+            server: z.ZodOptional<z.ZodObject<{
+                handler: z.ZodString;
+                idleTimeoutSeconds: z.ZodOptional<z.ZodNumber>;
+                maxInstances: z.ZodOptional<z.ZodNumber>;
+                targetConcurrency: z.ZodOptional<z.ZodNumber>;
+                compute: z.ZodOptional<z.ZodObject<{
+                    gpu: z.ZodOptional<z.ZodString>;
+                    cpu: z.ZodOptional<z.ZodNumber>;
+                    memoryMiB: z.ZodOptional<z.ZodNumber>;
+                }, z.core.$strict>>;
+            }, z.core.$strict>>;
+            cache: z.ZodOptional<z.ZodBoolean>;
         }, z.core.$strict>>;
         buckets: z.ZodOptional<z.ZodRecord<z.ZodString, z.ZodObject<{
             public: z.ZodBoolean;

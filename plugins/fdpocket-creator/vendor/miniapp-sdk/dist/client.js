@@ -5,6 +5,7 @@ import { createDbClient } from "./db/client.js";
 import { SdkError } from "./errors.js";
 import { createNotifications } from "./notifications/client.js";
 import { createProfile } from "./profile/client.js";
+import { createPython } from "./python/client.js";
 import { createRealtime } from "./realtime/client.js";
 import { createSafety } from "./safety/client.js";
 import { createStorage } from "./storage/client.js";
@@ -262,6 +263,7 @@ export function createClient(options) {
         notifications: createNotifications(transport, bridge),
         workspaces: createWorkspaces(transport),
         ai: createAi(transport, base),
+        python: createPython(transport),
         gateway: base,
         fetch: transport.fetch,
     };

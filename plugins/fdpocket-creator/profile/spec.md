@@ -149,14 +149,71 @@ ai:                                          # ミニアプリ内 AI を使う P
 | 規則 | 内容 |
 |---|---|
 | api / jobs | `access`（public 以外）・`capabilities`・`anonymous`・`requiredPermission`・`displayName` を書けない。利用者の代わりに呼ぶときは `asUser` で、その利用者の web App の capability で判定される |
-| `network.egress` | api / jobs だけ。ホスト名（小文字・2 ラベル以上。先頭に `*.` を 1 つ）を 50 個まで。IP 直指定・`localhost`・`.local` / `.internal` などの内部名・Platform のホスト（Supabase / Turso / R2）は書けない。実行時も http・既定以外のポート・URL の資格情報を拒否し、リダイレクトを追わない |
+| `network.egress` | api / jobs / python だけ。ホスト名（小文字・2 ラベル以上。先頭に `*.` を 1 つ）を 50 個まで。IP 直指定・`localhost`・`.local` / `.internal` などの内部名・Platform のホスト（Supabase / Turso / R2）は書けない。実行時も http・既定以外のポート・URL の資格情報を拒否し、リダイレクトを追わない |
 | `network.browser` | web だけ。`https://host` の形（パス・ポート・末尾の `/` なし）。秘密が要る API は書かず api 経由にする |
-| `secrets` | api / jobs だけ。名前は `[A-Z][A-Z0-9_]` で 50 個まで。`GATEWAY_URL` と `PLATFORM_` で始まる名前は予約。値はコード・manifest・`listing/` に書かない（取り込みの検証が落とす） |
-| `servicePermissions` | api / jobs だけ。`notifications.send`（通知を送る）・`jobs.schedule`（jobs へ仕事を予約する）・`jobs.consume`（予約を受ける jobs 側）・`ai.chat`（api は利用者として、jobs は実行中のジョブとして AI を呼ぶ。§3.8） |
+| `secrets` | api / jobs / python だけ。名前は `[A-Z][A-Z0-9_]` で 50 個まで。`GATEWAY_URL` と `PLATFORM_` で始まる名前は予約。値はコード・manifest・`listing/` に書かない（取り込みの検証が落とす） |
+| `servicePermissions` | api / jobs / python だけ。`notifications.send`（通知を送る）・`jobs.schedule`（jobs へ仕事を予約する）・`jobs.consume`（予約を受ける jobs 側）・`ai.chat`（api は利用者として、jobs は実行中のジョブとして AI を呼ぶ。§3.8）・`python.run`（python の App のタスクを依頼する） |
 | `ai` | AI を使う版だけ書く（書くと利用者の初回の同意に「AI の利用」が加わり、既に同意した人にも出し直す）。`instructions` / `schemas` は宣言した名前のファイルだけが版に固定される（実行時にファイルを読み直さない） |
 | `schedules` | jobs だけ。UTC の 5 フィールドの cron と handler 名。main / prod だけで動く（branch / preview では動かない） |
 | `routes` | api だけ。`["/api/*"]` だけ |
 | `notifications` | テンプレートは 50 個まで。文中の `{{名前}}` はすべて `params` に宣言する。パスワード・金額・個人情報を文面とパラメータに入れない（ロック画面に出る） |
+
+GPU で AI の処理（深層学習の推論・学習・埋め込み・画像や音声の処理）をする Project は、`kind: python` の App を足す（Platform の Modal の Sandbox で動く。費用は依頼した利用者、cron は Project の持ち主、HTTP サーバーの時間は Project の持ち主のクレジット）。
+
+**サーバーの App の選び方**（1 つの Project に api・jobs・python を一緒に置ける。DB と Storage は共有）:
+
+| | api / jobs（TypeScript） | python |
+|---|---|---|
+| 動く場所 | Cloudflare Workers（`nodejs_compat`。常駐プロセス・ネイティブモジュールは無い） | Modal の Sandbox（Linux。GPU は任意） |
+| 向いている処理 | 普段の API・Webhook・定期処理・外部 API の呼び出し・集計 | GPU の推論・学習、PyTorch・transformers など Python にしかないライブラリ |
+| 起動 | すぐ | 止まっていると数十秒（初回の Image は数分） |
+| 費用 | 利用者のクレジットを使わない | Modal の実費（タスクは依頼した人、サーバーは持ち主） |
+
+- 迷ったら api / jobs。python は GPU か Python のライブラリが要るときだけ足す。
+- **呼ぶ向き**: 画面・api・jobs → python は `python.run`（§3.9）。python → jobs は、タスクの終わりを受ける `onFinish`
+  （下の表。失敗・時間切れ・キャンセルも届く）と、タスクの途中から渡す `ctx.jobs.schedule`。どちらも python の App に
+  `jobs.schedule`、宛先の jobs に `jobs.consume`。**python から api の App は呼べない**（必要なデータは python から
+  `db` / `storage` で直接読み書きする）。
+
+```yaml
+version: 1
+sdkVersion: 3
+apps:
+  web:
+    kind: web
+    access: public
+    capabilities:
+      models: {}
+      python: { vision: [caption] }          # 画面から依頼できるタスク（App → タスク名）
+  vision:
+    kind: python
+    python: "3.12"                           # 3.11 / 3.12 / 3.13。apps/vision/pyproject.toml と uv.lock が要る
+    compute: { gpu: L4, cpu: 2, memoryMiB: 16384 }   # App の既定。gpu は省略で CPU だけ。"H100:2" で枚数
+    tasks:
+      caption:
+        handler: "vision.tasks:caption"      # apps/vision/src/vision/tasks.py の caption
+        timeoutSeconds: 600
+        onFinish: { app: batch, handler: captionDone }   # 任意。終わったら（成功も失敗も）batch の queue に届く
+    server: { handler: "vision.server:app", idleTimeoutSeconds: 300, maxInstances: 2 }    # 任意。ASGI の app を /api/vision/* で受ける
+    cache: true                              # /cache（モデルの重みなど作り直せるもの。Project×環境×App ごと）
+    network:
+      egress: [huggingface.co, "*.hf.co"]
+    servicePermissions: [ai.chat, jobs.schedule]   # jobs.schedule: タスクの続きを jobs に渡す（ctx.jobs）
+  batch:
+    kind: jobs
+    schedules:
+      - { cron: "0 3 * * *", handler: nightly }
+    servicePermissions: [jobs.consume, python.run]   # python.run: jobs / api から python のタスクを依頼する。jobs.consume: onFinish を受ける
+```
+
+| 規則 | 内容 |
+|---|---|
+| python | `python` と、`tasks` か `server` の 1 つ以上が要る。タスク名は `[a-z][a-z0-9_]` で 32 個まで。`handler` は `module.path:attr` |
+| `compute` | GPU は `T4` / `L4` / `A10` / `L40S` / `A100-40GB` / `A100-80GB` / `RTX-PRO-6000` / `H100` / `H200` / `B200`（枚数は 8 まで。A10 は 4）。CPU は 0.25〜16 コア、メモリは 512〜131072 MiB。タスク・サーバーで上書きできる |
+| 時間 | タスクは 10〜86400 秒（既定 600）。サーバーは要求が無い時間が `idleTimeoutSeconds`（60〜3600。既定 300）を超えると止まる |
+| `onFinish` | タスクが終わったら（成功・失敗・時間切れ・キャンセル・停止。途中停止のやり直しは除く）Platform が宛先の jobs の App にジョブを 1 つ登録する。宛先は `jobs.consume` のある jobs の App、python の App に `jobs.schedule` が要る。中身は `{ runId, app, task, status, error }`（出力は載せない。`forJob(job).python.get(runId)` で読む）。払う人は実行の払う人。配備した環境では main / prod だけ（branch / preview では届かない）。`kit dev`（手元の CPU・ライブプレビューの本物の GPU）は手元の jobs に渡す |
+| 台数 | サーバーは `maxInstances`（1〜10。既定 1）台まで。1 台あたりの同時の要求の平均が `targetConcurrency`（1〜1000。既定 4）を超えると Platform が足し、空いた台は止まる。どの台も持ち主が払う。`kit dev` は 1 台 |
+| `secrets` | python でも書ける。`MODAL_` で始まる名前は予約 |
 
 ## 3. SDK（`@workspace/miniapp-sdk`）
 
@@ -389,7 +446,8 @@ notifications:
   `openai()`）でその利用者として呼ぶ（`servicePermissions: [ai.chat]`。その利用者のクレジットから引く）。
 - jobs からは、受け取った queue / scheduled のイベントを `createServerClient(...).forJob(event)` に渡し、`.ai.openai()` で呼ぶ
   （`servicePermissions: [jobs.consume, ai.chat]`）。払うのは、`asUser(request).jobs.schedule(...)` で**利用者として登録した
-  ジョブならその利用者**、project.yaml の **cron なら Project の持ち主**。サーバーとして（`asUser` 無しで）登録したジョブは
+  ジョブならその利用者**、project.yaml の **cron なら Project の持ち主**、python のタスクが `ctx.jobs` で登録したジョブなら
+  **そのタスクの払う人**。サーバーとして（`asUser` 無しで）登録したジョブは
   払う人がいないので `FORBIDDEN`。呼べるのは配送中の間だけ。jobs では `fdpocket-file:` を使えない（Storage から読んで data URL で渡す）。
 
 `openai()` の要点（`model` は `auto`＝Jev Router か、project.yaml の `ai.model` / 許可一覧の ID）:
@@ -409,6 +467,50 @@ const llm = new ChatOpenAI({ model: 'auto', apiKey, configuration: { baseURL, fe
 - 断られたときは OpenAI の形のエラー（本文の `error.code` が `SdkErrorCode`）。`402`（`QUOTA_EXCEEDED`）は再試行しない。
 - 自分の API キーで外部の AI を呼ぶこともできる（`$fdpocket-app-integrations`。費用は作者持ち）。利用者に払ってもらうならこの `client.ai`。
 - 作り方（宣言・指示文と Schema・画面で必ずすること・`kit dev` の本物と模擬の使い分け）は `$fdpocket-app-ai`。
+
+### 3.9 `client.python` — python の App のタスク（`Python` / `PythonRunHandle`）
+
+GPU の AI の処理（推論・学習・埋め込み・画像や音声の変換）は `kind: python` の App のタスクに書き（§2）、画面・api・jobs から
+依頼して結果を待つ。**費用は依頼した本人のクレジット**（GPU・CPU・メモリの秒単位の実費）。匿名の利用者は使えない。
+
+| API | 書き方 |
+|---|---|
+| `client.python.run(app, task, input, { idempotencyKey? })` | 依頼する（`PythonRunHandle` を返す）。画面からは `capabilities.python` に宣言したタスクだけ。`input` は JSON（256 KiB まで。画像や音声は Storage の `fileId` を渡す） |
+| `client.python.run(...).wait({ timeoutMs?, intervalMs?, onProgress? })` | 終わるまで待つ（`PythonRun`）。失敗も結果として返る: `status` が `succeeded` なら `output`、`failed` / `cancelled` / `timed_out` / `stopped` なら `error`（`code` は例外の型か理由）。`timeoutMs`（既定 1 時間）を過ぎると待つのをやめる（実行は続く。`GATEWAY_UNAVAILABLE`） |
+| `client.python.get(runId)` | 依頼済みの実行を読む（依頼した本人か、同じ環境の api / jobs。`onFinish` で届いたジョブが結果を読む） |
+| `client.python.run(...).get()` / `.cancel()` | `runId`（依頼の id）と今の状態（`progress` 0〜1・`progressMessage`）／止める（それまでの費用は戻らない） |
+
+- api からは `asUser(request)` の戻り値の `python`（`servicePermissions: [python.run]`。その利用者が払う）、jobs からは
+  `forJob(event)` の戻り値の `python`（そのジョブの払う人）。
+- 起動に数十秒かかることがある（Image の作成は初回だけ数分）。画面には進み具合（`onProgress`）と「GPU を使うとクレジットを消費します」を出す。
+- 失敗を画面に出す: 残高不足は `QUOTA_EXCEEDED`（`client.ui.openCredits()`）、宣言に無いタスク・匿名は `FORBIDDEN`。
+
+python の App の中（`apps/<slug>/src/`）は Platform の Python の SDK（`fdpocket`。Kit が `packages/fdpocket-py/` に置く）を使う:
+
+```python
+# apps/vision/src/vision/tasks.py — handler は (ctx, input)。戻り値（JSON）が output になる
+def caption(ctx, input):
+    ctx.progress(0.1, "モデルを読み込み中")
+    model = load_model(ctx.cache_dir)           # /cache（重みなど作り直せるもの）。無ければ取得して置く
+    svc = ctx.client                            # python の App のサービスとして Gateway を呼ぶ（Client）
+    image = svc.storage.download(input["fileId"])
+    text = model(image)
+    svc.db.create("Caption", data={"fileId": input["fileId"], "text": text})
+    return {"text": text}
+```
+
+- `ctx.client` は python の App のサービスとしての `db` / `storage` / `notifications`。`ctx.ai.openai` は Platform の AI
+  （`OpenAI(**ctx.ai.openai())`・LangChain の `ChatOpenAI` に渡す）、`ctx.python` は別のタスクの依頼で、どちらも払うのはこのタスクの払う人。
+- **終わりを TypeScript で受ける**: タスクに `onFinish` を宣言する（§2）。成功も失敗も、タスクのコードが落ちても届く。
+  api / jobs で `wait()` し続けない（GPU の処理は数分〜数時間かかり、Worker の時間を使い切る）。
+- **途中から続きを渡す**: `ctx.jobs.schedule`（引数は `app`・`handler`・`payload` と、キーワードの `idempotency_key`・`run_at`）。
+  終わりの通知には使わない（失敗では呼ばれない）。そのジョブの中の AI・python も**このタスクの払う人**が払う。payload は
+  64 KiB まで（大きい結果は DB か Storage に置き、id を渡す）。冪等キーは `f"<用途>:{ctx.run_id}"`（途中停止でやり直しても
+  1 回だけ。`python-finish:` で始まるキーは Platform 用）。main / prod でだけ動き、branch / preview では `FORBIDDEN`。
+- サーバー（`server`）は ASGI の `app`（FastAPI など）。`/api/<slug>/*` で受け、利用者のトークンは `X-Fdpocket-Authorization`
+  （`fdpocket.asgi` の `user_token` で取り出し、`Client` の `as_user` に渡して本人として呼ぶ）。
+- 依存は `apps/<slug>/pyproject.toml` に書いて `uv lock`、`uv.lock` を commit する（httpx は SDK が使う。サーバーなら uvicorn）。
+- 作り方（GPU の選び方・重みの置き場・`kit dev` の CPU 実行）は `$fdpocket-app-python`。
 
 ## 4. エラー（`SdkError`）
 

@@ -2,6 +2,7 @@ import { z } from 'zod';
 import { isAppPath } from "./app-path.js";
 import { PROJECT_BUCKETS_MAX, STORAGE_FILE_MAX_BYTES } from "./limits.js";
 import { browserOriginIssue, egressDeclarationIssue } from "./network.js";
+import { PYTHON_RESERVED_SECRET_PREFIX, PYTHON_SERVER_IDLE_DEFAULT, PYTHON_SERVER_INSTANCES_DEFAULT, PYTHON_SERVER_TARGET_CONCURRENCY_DEFAULT, PYTHON_TASK_NAME_PATTERN, PYTHON_TASK_TIMEOUT_DEFAULT, PYTHON_TASKS_MAX, PYTHON_VERSIONS, pythonComputeSchema, pythonServerSchema, pythonTaskSchema, resolvePythonCompute, } from "./python.js";
 import { realtimeManifestSchema } from "./realtime.js";
 import { validateSchedule } from "./schedules.js";
 /**
@@ -29,17 +30,23 @@ const MODEL_KEY_PATTERN = /^[a-z][A-Za-z0-9]{0,63}$/;
 const CONTENT_TYPE_PATTERN = /^[a-z]+\/([a-z0-9.+-]+|\*)$/;
 /**
  * App の種類。`web` は静的サイト（admin も `access: restricted` の web）、
- * `api` / `jobs` は Workers for Platforms（P1。README Q5。integrations.md §3.1）。
+ * `api` / `jobs` は Workers for Platforms（P1。README Q5。integrations.md §3.1）、
+ * `python` は Modal の Sandbox で動く GPU の Python（python-backend.md）。
  */
-export const APP_KINDS = ['web', 'api', 'jobs'];
-export const SERVER_APP_KINDS = ['api', 'jobs'];
+export const APP_KINDS = ['web', 'api', 'jobs', 'python'];
+/** 利用者の代わりに Gateway を呼ぶ App（capability を持たず、secrets・egress・servicePermissions を持つ） */
+export const SERVER_APP_KINDS = ['api', 'jobs', 'python'];
+/** Workers for Platforms に配備する App（TypeScript の Worker） */
+export const WORKER_APP_KINDS = ['api', 'jobs'];
 /** サーバーの App のサービストークンに付けられる権限（gateway.md §3.4。`notifications.send` は tasks/0476） */
 export const SERVICE_PERMISSIONS = [
     'notifications.send',
     'jobs.schedule',
     'jobs.consume',
-    /** 利用者として（`X-Act-As`）ミニアプリ内 AI を呼ぶ。api だけ（jobs には払う利用者がいない。project-ai.md §3.3） */
+    /** ミニアプリ内 AI を呼ぶ（api は利用者として、jobs・python は実行の払う人として。project-ai.md §3.3・§3.6） */
     'ai.chat',
+    /** python の App のタスクを依頼する（python-backend.md §5） */
+    'python.run',
 ];
 /** secret の名前（`env.<NAME>`）。Worker の binding の名前になる */
 export const SECRET_NAME_PATTERN = /^[A-Z][A-Z0-9_]{0,63}$/;
@@ -101,6 +108,8 @@ const appSchema = z.strictObject({
             .optional(),
         /** ミニアプリ内 AI（project-ai.md §4）。費用は使った利用者本人 */
         ai: z.strictObject({ chat: z.boolean() }).optional(),
+        /** 画面から依頼できる python の App のタスク（App → タスク名。python-backend.md §3）。費用は本人 */
+        python: z.record(z.string(), uniqueList(z.string())).optional(),
     })
         .optional(),
     anonymous: z.strictObject({ allowed: z.boolean(), write: z.boolean() }).optional(),
@@ -123,6 +132,12 @@ const appSchema = z.strictObject({
     }))
         .optional(),
     routes: z.array(z.literal('/api/*')).length(1).optional(),
+    /** python の App だけ（python-backend.md §3） */
+    python: z.enum(PYTHON_VERSIONS).optional(),
+    compute: pythonComputeSchema.optional(),
+    tasks: z.record(z.string(), pythonTaskSchema).optional(),
+    server: pythonServerSchema.optional(),
+    cache: z.boolean().optional(),
 });
 const bucketSchema = z
     .strictObject({
@@ -268,6 +283,7 @@ function refineServerFields(ctx, slug, app) {
     if (app.routes !== undefined && app.kind !== 'api') {
         report(ctx, [...path, 'routes'], 'not_allowed', 'only api apps declare routes');
     }
+    refinePythonFields(ctx, slug, app);
     if (!server) {
         if (app.access === undefined)
             report(ctx, [...path, 'access'], 'required', 'web apps need access');
@@ -288,11 +304,11 @@ function refineServerFields(ctx, slug, app) {
     }
     for (const key of ['secrets', 'servicePermissions']) {
         if (!server && app[key] !== undefined) {
-            report(ctx, [...path, key], 'not_allowed', `only api / jobs apps take ${key}`);
+            report(ctx, [...path, key], 'not_allowed', `only server apps take ${key}`);
         }
     }
     if (!server && app.network?.egress !== undefined) {
-        report(ctx, [...path, 'network', 'egress'], 'not_allowed', 'only api / jobs apps take egress');
+        report(ctx, [...path, 'network', 'egress'], 'not_allowed', 'only server apps take egress');
     }
     if (server && app.network?.browser !== undefined) {
         report(ctx, [...path, 'network', 'browser'], 'not_allowed', 'only web apps take browser');
@@ -317,12 +333,81 @@ function refineServerFields(ctx, slug, app) {
             secret.name.startsWith(RESERVED_SECRET_PREFIX)) {
             report(ctx, at, 'reserved_secret_name', `"${secret.name}" is reserved by the platform`);
         }
+        else if (app.kind === 'python' && secret.name.startsWith(PYTHON_RESERVED_SECRET_PREFIX)) {
+            report(ctx, at, 'reserved_secret_name', `"${secret.name}" is reserved for the GPU runtime`);
+        }
         if (names.has(secret.name))
             report(ctx, at, 'duplicate', `secret "${secret.name}" is declared twice`);
         names.add(secret.name);
     }
 }
+const PYTHON_ONLY_KEYS = ['python', 'compute', 'tasks', 'server', 'cache'];
+function refinePythonFields(ctx, slug, app) {
+    const path = ['apps', slug];
+    if (app.kind !== 'python') {
+        for (const key of PYTHON_ONLY_KEYS) {
+            if (app[key] !== undefined) {
+                report(ctx, [...path, key], 'not_allowed', `only python apps declare ${key}`);
+            }
+        }
+        return;
+    }
+    if (app.python === undefined) {
+        report(ctx, [...path, 'python'], 'required', 'python apps need a python version');
+    }
+    if (app.tasks === undefined && app.server === undefined) {
+        report(ctx, [...path, 'tasks'], 'required', 'python apps need tasks or a server');
+    }
+    const tasks = Object.keys(app.tasks ?? {});
+    if (tasks.length > PYTHON_TASKS_MAX) {
+        report(ctx, [...path, 'tasks'], 'not_allowed', `at most ${PYTHON_TASKS_MAX} tasks`);
+    }
+    for (const name of tasks) {
+        if (!PYTHON_TASK_NAME_PATTERN.test(name)) {
+            report(ctx, [...path, 'tasks', name], 'invalid_task_name', 'task names are [a-z][a-z0-9_]{0,31}');
+        }
+    }
+}
+/** web の `capabilities.python` が実在の python App のタスクを指すこと・`python.run` に宛先があること */
+function refinePythonCallers(m, ctx) {
+    const hasPython = Object.values(m.apps).some((app) => app.kind === 'python');
+    for (const [slug, app] of Object.entries(m.apps)) {
+        for (const [target, tasks] of Object.entries(app.capabilities?.python ?? {})) {
+            const declared = m.apps[target]?.kind === 'python' ? (m.apps[target]?.tasks ?? {}) : null;
+            if (!declared || tasks.some((task) => !(task in declared))) {
+                report(ctx, ['apps', slug, 'capabilities', 'python', target], 'unknown_python_task', `"${target}" is not a python App with these tasks`);
+            }
+        }
+        if (!hasPython && (app.servicePermissions ?? []).includes('python.run')) {
+            report(ctx, ['apps', slug, 'servicePermissions'], 'not_allowed', 'python.run needs a python App in the project');
+        }
+    }
+}
+/**
+ * タスクの `onFinish`: 宛先は jobs.consume のある jobs の App。登録するのは python の App なので
+ * その App に jobs.schedule（api の `jobs.schedule` と同じ権限の形。配送直前にも再確認される）
+ */
+function refinePythonFinish(m, ctx) {
+    for (const [slug, app] of Object.entries(m.apps)) {
+        if (app.kind !== 'python')
+            continue;
+        for (const [name, task] of Object.entries(app.tasks ?? {})) {
+            if (!task.onFinish)
+                continue;
+            const at = ['apps', slug, 'tasks', name, 'onFinish'];
+            const target = m.apps[task.onFinish.app];
+            if (target?.kind !== 'jobs' || !(target.servicePermissions ?? []).includes('jobs.consume')) {
+                report(ctx, at, 'unknown_finish_target', `"${task.onFinish.app}" is not a jobs App with jobs.consume`);
+            }
+            if (!(app.servicePermissions ?? []).includes('jobs.schedule')) {
+                report(ctx, at, 'missing_permission', 'onFinish needs jobs.schedule on the python App');
+            }
+        }
+    }
+}
 function refineManifest(m, ctx) {
+    refinePythonCallers(m, ctx);
+    refinePythonFinish(m, ctx);
     let aiUsed = false;
     if (Object.keys(m.apps).length === 0)
         report(ctx, ['apps'], 'required', 'at least one App is required');
@@ -500,8 +585,37 @@ function sortedRecord(record, map) {
         .map((key) => [key, map(record[key])]));
 }
 const sorted = (list) => [...(list ?? [])].sort(byKey);
-function entryOf(slug, kind) {
-    return kind === 'web' ? `dist/${slug}/index.html` : `dist/${slug}/index.js`;
+/** App の配信物の入口（`dist/` からの相対。web は index.html、Worker は index.js、python は pyproject.toml） */
+export function appEntryOf(slug, kind) {
+    if (kind === 'web')
+        return `${slug}/index.html`;
+    return kind === 'python' ? `${slug}/pyproject.toml` : `${slug}/index.js`;
+}
+const entryOf = (slug, kind) => `dist/${appEntryOf(slug, kind)}`;
+function normalizePythonApp(app) {
+    return {
+        version: app.python,
+        cache: app.cache ?? false,
+        tasks: sortedRecord(app.tasks, (task) => ({
+            handler: task.handler,
+            timeoutSeconds: task.timeoutSeconds ?? PYTHON_TASK_TIMEOUT_DEFAULT,
+            compute: resolvePythonCompute(app.compute, task.compute),
+            ...(task.onFinish
+                ? { onFinish: { app: task.onFinish.app, handler: task.onFinish.handler } }
+                : {}),
+        })),
+        ...(app.server
+            ? {
+                server: {
+                    handler: app.server.handler,
+                    idleTimeoutSeconds: app.server.idleTimeoutSeconds ?? PYTHON_SERVER_IDLE_DEFAULT,
+                    maxInstances: app.server.maxInstances ?? PYTHON_SERVER_INSTANCES_DEFAULT,
+                    targetConcurrency: app.server.targetConcurrency ?? PYTHON_SERVER_TARGET_CONCURRENCY_DEFAULT,
+                    compute: resolvePythonCompute(app.compute, app.server.compute),
+                },
+            }
+            : {}),
+    };
 }
 /**
  * 検証済みの manifest を、宣言の順序に依らない形にする（同じ宣言 → 同じ JSON）。
@@ -526,6 +640,9 @@ export function normalizeProjectManifest(manifest) {
                     ? { realtime: sortedRecord(app.capabilities.realtime, sorted) }
                     : {}),
                 ...(app.capabilities?.ai ? { ai: { chat: app.capabilities.ai.chat } } : {}),
+                ...(app.capabilities?.python
+                    ? { python: sortedRecord(app.capabilities.python, sorted) }
+                    : {}),
             },
             anonymous: app.anonymous ?? { allowed: false, write: false },
             network: {
@@ -550,6 +667,7 @@ export function normalizeProjectManifest(manifest) {
                     })),
                 }
                 : {}),
+            ...(app.kind === 'python' ? { python: normalizePythonApp(app) } : {}),
         };
     });
     return {

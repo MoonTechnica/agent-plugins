@@ -3,6 +3,7 @@ import { type NotificationSendRequest, type NotificationSendResponse } from '@wo
 import type { SchemaDef } from '@zenstackhq/schema';
 import { type Ai, type OpenAiCompatible } from '../ai/client.ts';
 import type { DbClient } from '../db/types.ts';
+import { type Python } from '../python/client.ts';
 import { type Storage } from '../storage/client.ts';
 import { createJobs } from './jobs.ts';
 export interface PlatformBindings {
@@ -26,12 +27,15 @@ export interface ServerClient<S extends SchemaDef = SchemaDef> extends ServerDat
     /**
      * jobs の App の queue / scheduled のイベントを渡す。今配送中の実行として AI を呼ぶ（tasks/0537）。
      * 払うのは、`asUser(...).jobs.schedule` で登録したジョブならその利用者、project.yaml の cron なら
-     * Project の持ち主。利用者の無い `jobs.schedule`（サーバーとしての登録）のジョブは AI を使えない
+     * Project の持ち主、python のタスクが `ctx.jobs` で登録したジョブならそのタスクの払う人。
+     * 利用者の無い `jobs.schedule`（サーバーとしての登録）のジョブは AI を使えない
      */
     forJob(event: JobRun): {
         readonly ai: {
             openai(): OpenAiCompatible;
         };
+        /** python の App のタスクを依頼する（払うのはこのジョブの払う人。python-backend.md §5） */
+        readonly python: Python;
     };
 }
 /** queue のイベント（`id`）か scheduled のイベント（`id` と `cron`） */
@@ -47,6 +51,11 @@ export interface ServerUserClient<S extends SchemaDef = SchemaDef> extends Serve
     readonly ai: Ai;
     /** その利用者として登録する（ジョブの中の AI はこの利用者のクレジットから引く。tasks/0537） */
     readonly jobs: ReturnType<typeof createJobs>;
+    /**
+     * その利用者として python の App のタスクを依頼する（その利用者のクレジットから引く。python-backend.md §5）。
+     * App の `servicePermissions` に `python.run` が要る
+     */
+    readonly python: Python;
 }
 /** Worker 専用。資格情報は Worker の binding に保ち、10 分の token だけを Gateway に送る。 */
 export declare function createServerClient<S extends SchemaDef = SchemaDef>(options: {
@@ -54,6 +63,9 @@ export declare function createServerClient<S extends SchemaDef = SchemaDef>(opti
     fetch?: typeof globalThis.fetch;
     now?: () => number;
 }): ServerClient<S>;
-export type { JobCancelResponse, JobDelivery, JobScheduleRequest, JobScheduleResponse, } from '@workspace/project-protocol';
+export type { JobCancelResponse, JobDelivery, JobScheduleRequest, JobScheduleResponse, PythonRun, PythonRunFinished, } from '@workspace/project-protocol';
+/** onFinish で届いたジョブの payload を確かめる（python-backend.md §4.2） */
+export { pythonRunFinishedSchema } from '@workspace/project-protocol';
 export type { Ai, AiChatInput, OpenAiCompatible } from '../ai/client.ts';
 export { SdkError } from '../errors.ts';
+export type { Python, PythonRunHandle } from '../python/client.ts';

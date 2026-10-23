@@ -119,6 +119,7 @@ export declare const sessionAppSchema: z.ZodObject<{
         web: "web";
         api: "api";
         jobs: "jobs";
+        python: "python";
     }>;
     access: z.ZodEnum<{
         public: "public";
@@ -148,6 +149,7 @@ export declare const sessionSchema: z.ZodObject<{
             web: "web";
             api: "api";
             jobs: "jobs";
+            python: "python";
         }>;
         access: z.ZodEnum<{
             public: "public";
@@ -177,6 +179,7 @@ export declare const tokenExchangeResponseSchema: z.ZodObject<{
                 web: "web";
                 api: "api";
                 jobs: "jobs";
+                python: "python";
             }>;
             access: z.ZodEnum<{
                 public: "public";
@@ -205,6 +208,7 @@ export declare const meResponseSchema: z.ZodObject<{
             web: "web";
             api: "api";
             jobs: "jobs";
+            python: "python";
         }>;
         access: z.ZodEnum<{
             public: "public";

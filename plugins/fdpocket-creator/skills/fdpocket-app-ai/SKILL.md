@@ -152,6 +152,7 @@ for (let step = 0; step < 5; step++) {
 `createServerClient({ env }).forJob(event).ai.openai()` に渡す。払うのは:
 - api が `asUser(request).jobs.schedule(...)` で**利用者として登録したジョブ** → その利用者
 - project.yaml の **cron** → Project の持ち主
+- python のタスクが `ctx.jobs.schedule(...)` で登録したジョブ → そのタスクの払う人（`$fdpocket-app-python`）
 - サーバーとして登録したジョブ → 払う人がいないので使えない（`FORBIDDEN`）
 
 利用者の操作で始まる AI の重い処理は、api で `asUser(request).jobs.schedule` に回せば、その利用者が払う。

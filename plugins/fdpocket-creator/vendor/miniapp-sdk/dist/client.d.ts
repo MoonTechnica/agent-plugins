@@ -5,6 +5,7 @@ import { type Ai } from './ai/client.ts';
 import type { DbClient } from './db/types.ts';
 import { type Notifications } from './notifications/client.ts';
 import { type Profile } from './profile/client.ts';
+import { type Python } from './python/client.ts';
 import { type Realtime, type RealtimeSocketFactory } from './realtime/client.ts';
 import { type Safety } from './safety/client.ts';
 import { type Storage } from './storage/client.ts';
@@ -76,6 +77,8 @@ export interface ProjectClient<S extends SchemaDef = SchemaDef> {
     readonly workspaces: Workspaces;
     /** ミニアプリ内 AI（使った本人のクレジットから引く。project-ai.md §7） */
     readonly ai: Ai;
+    /** python の App のタスク（GPU の AI 処理など。費用は本人。python-backend.md §4.2） */
+    readonly python: Python;
     /** Gateway の URL（`./react` が ZenStack のフックの endpoint に使う） */
     readonly gateway: string;
     /** 認証付きの fetch（ZenStack の TanStack Query フックの `fetch` に渡す）。失敗は `SdkError` を投げる */

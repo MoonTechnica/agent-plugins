@@ -1,4 +1,5 @@
 import { z } from 'zod';
+import { type NormalizedPythonApp } from './python.ts';
 /**
  * `infra/project.yaml`（project-runtime.md §2）の正本。
  *
@@ -20,13 +21,17 @@ export declare const PERMISSION_PATTERN: RegExp;
 export declare const RESERVED_PERMISSION_PREFIX = "platform.";
 /**
  * App の種類。`web` は静的サイト（admin も `access: restricted` の web）、
- * `api` / `jobs` は Workers for Platforms（P1。README Q5。integrations.md §3.1）。
+ * `api` / `jobs` は Workers for Platforms（P1。README Q5。integrations.md §3.1）、
+ * `python` は Modal の Sandbox で動く GPU の Python（python-backend.md）。
  */
-export declare const APP_KINDS: readonly ["web", "api", "jobs"];
+export declare const APP_KINDS: readonly ["web", "api", "jobs", "python"];
 export type AppKind = (typeof APP_KINDS)[number];
+/** 利用者の代わりに Gateway を呼ぶ App（capability を持たず、secrets・egress・servicePermissions を持つ） */
 export declare const SERVER_APP_KINDS: readonly AppKind[];
+/** Workers for Platforms に配備する App（TypeScript の Worker） */
+export declare const WORKER_APP_KINDS: readonly AppKind[];
 /** サーバーの App のサービストークンに付けられる権限（gateway.md §3.4。`notifications.send` は tasks/0476） */
-export declare const SERVICE_PERMISSIONS: readonly ["notifications.send", "jobs.schedule", "jobs.consume", "ai.chat"];
+export declare const SERVICE_PERMISSIONS: readonly ["notifications.send", "jobs.schedule", "jobs.consume", "ai.chat", "python.run"];
 export type ServicePermission = (typeof SERVICE_PERMISSIONS)[number];
 /** secret の名前（`env.<NAME>`）。Worker の binding の名前になる */
 export declare const SECRET_NAME_PATTERN: RegExp;
@@ -49,7 +54,7 @@ export type BucketOperation = (typeof BUCKET_OPERATIONS)[number];
  */
 export declare const FORBIDDEN_MODEL_OPERATIONS: Readonly<Record<string, readonly ModelOperation[]>>;
 /** 取り込みを止めずに作者・Agent へ返す注意 */
-export type ProjectManifestIssueCode = 'invalid_slug' | 'reserved_slug' | 'invalid_bucket_name' | 'invalid_role_name' | 'invalid_model_name' | 'required' | 'not_allowed' | 'too_many_buckets' | 'unknown_bucket' | 'unknown_role' | 'reserved_permission' | 'forbidden_operation' | 'anonymous_write_without_access' | 'duplicate' | 'invalid_template_key' | 'invalid_notification_path' | 'undeclared_notification_param' | 'unknown_notification_template' | 'notification_params_mismatch' | 'invalid_trigger_value' | 'invalid_host' | 'invalid_origin' | 'ip_literal' | 'internal_host' | 'platform_host' | 'invalid_secret_name' | 'reserved_secret_name';
+export type ProjectManifestIssueCode = 'invalid_slug' | 'reserved_slug' | 'invalid_bucket_name' | 'invalid_role_name' | 'invalid_model_name' | 'required' | 'not_allowed' | 'too_many_buckets' | 'unknown_bucket' | 'unknown_role' | 'reserved_permission' | 'forbidden_operation' | 'anonymous_write_without_access' | 'duplicate' | 'invalid_template_key' | 'invalid_notification_path' | 'undeclared_notification_param' | 'unknown_notification_template' | 'notification_params_mismatch' | 'invalid_trigger_value' | 'invalid_host' | 'invalid_origin' | 'ip_literal' | 'internal_host' | 'platform_host' | 'invalid_secret_name' | 'reserved_secret_name' | 'invalid_task_name' | 'unknown_python_task' | 'unknown_finish_target' | 'missing_permission';
 export type ProjectManifestWarningCode = 'anonymous_write' | 'sensitive_notification_param';
 /** App の表示名（Platform が返すときは長さを問わない。宣言の検証は appSchema が持つ） */
 export declare const localizedNameSchema: z.ZodObject<{
@@ -99,6 +104,7 @@ declare const baseSchema: z.ZodObject<{
             web: "web";
             api: "api";
             jobs: "jobs";
+            python: "python";
         }>;
         access: z.ZodOptional<z.ZodEnum<{
             public: "public";
@@ -130,6 +136,7 @@ declare const baseSchema: z.ZodObject<{
             ai: z.ZodOptional<z.ZodObject<{
                 chat: z.ZodBoolean;
             }, z.core.$strict>>;
+            python: z.ZodOptional<z.ZodRecord<z.ZodString, z.ZodArray<z.ZodString>>>;
         }, z.core.$strict>>;
         anonymous: z.ZodOptional<z.ZodObject<{
             allowed: z.ZodBoolean;
@@ -152,12 +159,48 @@ declare const baseSchema: z.ZodObject<{
             "jobs.schedule": "jobs.schedule";
             "jobs.consume": "jobs.consume";
             "ai.chat": "ai.chat";
+            "python.run": "python.run";
         }>>>;
         schedules: z.ZodOptional<z.ZodArray<z.ZodObject<{
             cron: z.ZodString;
             handler: z.ZodString;
         }, z.core.$strict>>>;
         routes: z.ZodOptional<z.ZodArray<z.ZodLiteral<"/api/*">>>;
+        python: z.ZodOptional<z.ZodEnum<{
+            3.11: "3.11";
+            3.12: "3.12";
+            3.13: "3.13";
+        }>>;
+        compute: z.ZodOptional<z.ZodObject<{
+            gpu: z.ZodOptional<z.ZodString>;
+            cpu: z.ZodOptional<z.ZodNumber>;
+            memoryMiB: z.ZodOptional<z.ZodNumber>;
+        }, z.core.$strict>>;
+        tasks: z.ZodOptional<z.ZodRecord<z.ZodString, z.ZodObject<{
+            handler: z.ZodString;
+            onFinish: z.ZodOptional<z.ZodObject<{
+                app: z.ZodString;
+                handler: z.ZodString;
+            }, z.core.$strict>>;
+            timeoutSeconds: z.ZodOptional<z.ZodNumber>;
+            compute: z.ZodOptional<z.ZodObject<{
+                gpu: z.ZodOptional<z.ZodString>;
+                cpu: z.ZodOptional<z.ZodNumber>;
+                memoryMiB: z.ZodOptional<z.ZodNumber>;
+            }, z.core.$strict>>;
+        }, z.core.$strict>>>;
+        server: z.ZodOptional<z.ZodObject<{
+            handler: z.ZodString;
+            idleTimeoutSeconds: z.ZodOptional<z.ZodNumber>;
+            maxInstances: z.ZodOptional<z.ZodNumber>;
+            targetConcurrency: z.ZodOptional<z.ZodNumber>;
+            compute: z.ZodOptional<z.ZodObject<{
+                gpu: z.ZodOptional<z.ZodString>;
+                cpu: z.ZodOptional<z.ZodNumber>;
+                memoryMiB: z.ZodOptional<z.ZodNumber>;
+            }, z.core.$strict>>;
+        }, z.core.$strict>>;
+        cache: z.ZodOptional<z.ZodBoolean>;
     }, z.core.$strict>>;
     buckets: z.ZodOptional<z.ZodRecord<z.ZodString, z.ZodObject<{
         public: z.ZodBoolean;
@@ -241,6 +284,7 @@ export declare const projectManifestSchema: z.ZodObject<{
             web: "web";
             api: "api";
             jobs: "jobs";
+            python: "python";
         }>;
         access: z.ZodOptional<z.ZodEnum<{
             public: "public";
@@ -272,6 +316,7 @@ export declare const projectManifestSchema: z.ZodObject<{
             ai: z.ZodOptional<z.ZodObject<{
                 chat: z.ZodBoolean;
             }, z.core.$strict>>;
+            python: z.ZodOptional<z.ZodRecord<z.ZodString, z.ZodArray<z.ZodString>>>;
         }, z.core.$strict>>;
         anonymous: z.ZodOptional<z.ZodObject<{
             allowed: z.ZodBoolean;
@@ -294,12 +339,48 @@ export declare const projectManifestSchema: z.ZodObject<{
             "jobs.schedule": "jobs.schedule";
             "jobs.consume": "jobs.consume";
             "ai.chat": "ai.chat";
+            "python.run": "python.run";
         }>>>;
         schedules: z.ZodOptional<z.ZodArray<z.ZodObject<{
             cron: z.ZodString;
             handler: z.ZodString;
         }, z.core.$strict>>>;
         routes: z.ZodOptional<z.ZodArray<z.ZodLiteral<"/api/*">>>;
+        python: z.ZodOptional<z.ZodEnum<{
+            3.11: "3.11";
+            3.12: "3.12";
+            3.13: "3.13";
+        }>>;
+        compute: z.ZodOptional<z.ZodObject<{
+            gpu: z.ZodOptional<z.ZodString>;
+            cpu: z.ZodOptional<z.ZodNumber>;
+            memoryMiB: z.ZodOptional<z.ZodNumber>;
+        }, z.core.$strict>>;
+        tasks: z.ZodOptional<z.ZodRecord<z.ZodString, z.ZodObject<{
+            handler: z.ZodString;
+            onFinish: z.ZodOptional<z.ZodObject<{
+                app: z.ZodString;
+                handler: z.ZodString;
+            }, z.core.$strict>>;
+            timeoutSeconds: z.ZodOptional<z.ZodNumber>;
+            compute: z.ZodOptional<z.ZodObject<{
+                gpu: z.ZodOptional<z.ZodString>;
+                cpu: z.ZodOptional<z.ZodNumber>;
+                memoryMiB: z.ZodOptional<z.ZodNumber>;
+            }, z.core.$strict>>;
+        }, z.core.$strict>>>;
+        server: z.ZodOptional<z.ZodObject<{
+            handler: z.ZodString;
+            idleTimeoutSeconds: z.ZodOptional<z.ZodNumber>;
+            maxInstances: z.ZodOptional<z.ZodNumber>;
+            targetConcurrency: z.ZodOptional<z.ZodNumber>;
+            compute: z.ZodOptional<z.ZodObject<{
+                gpu: z.ZodOptional<z.ZodString>;
+                cpu: z.ZodOptional<z.ZodNumber>;
+                memoryMiB: z.ZodOptional<z.ZodNumber>;
+            }, z.core.$strict>>;
+        }, z.core.$strict>>;
+        cache: z.ZodOptional<z.ZodBoolean>;
     }, z.core.$strict>>;
     buckets: z.ZodOptional<z.ZodRecord<z.ZodString, z.ZodObject<{
         public: z.ZodBoolean;
@@ -407,6 +488,8 @@ export interface NormalizedAppCapabilities {
     ai?: {
         chat: boolean;
     };
+    /** python の App → 依頼できるタスク（名前順） */
+    python?: Record<string, string[]>;
     realtime?: Record<string, ('broadcastReceive' | 'broadcastSend' | 'presenceRead' | 'presenceTrack')[]>;
 }
 export interface NormalizedSecret {
@@ -445,6 +528,8 @@ export interface NormalizedProjectApp {
         cron: string;
         handler: string;
     }[];
+    /** python の App だけ（python-backend.md §3。資源は App の既定で埋めた値） */
+    python?: NormalizedPythonApp;
 }
 export interface NormalizedBucket {
     public: boolean;
@@ -515,6 +600,8 @@ export interface NormalizedProjectManifest {
         triggers?: NormalizedNotificationTrigger[];
     };
 }
+/** App の配信物の入口（`dist/` からの相対。web は index.html、Worker は index.js、python は pyproject.toml） */
+export declare function appEntryOf(slug: string, kind: AppKind): string;
 /**
  * 検証済みの manifest を、宣言の順序に依らない形にする（同じ宣言 → 同じ JSON）。
  * `apps` は `project_version_apps` の行（slug 順）。

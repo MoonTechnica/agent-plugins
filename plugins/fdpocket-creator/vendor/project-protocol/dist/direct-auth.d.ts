@@ -50,6 +50,7 @@ export declare const directAuthResultSchema: z.ZodObject<{
                 web: "web";
                 api: "api";
                 jobs: "jobs";
+                python: "python";
             }>;
             access: z.ZodEnum<{
                 public: "public";
@@ -82,6 +83,7 @@ export declare const directAuthResultSchema: z.ZodObject<{
                     web: "web";
                     api: "api";
                     jobs: "jobs";
+                    python: "python";
                 }>;
                 access: z.ZodEnum<{
                     public: "public";

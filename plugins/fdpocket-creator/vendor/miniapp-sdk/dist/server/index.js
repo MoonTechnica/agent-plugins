@@ -1,8 +1,9 @@
 import "../zod-jitless.js";
-import { ACT_AS_HEADER, AI_RUN_HEADER, notificationSendRequestSchema, notificationSendResponseSchema, SERVICE_CREDENTIAL_PATTERN, serviceTokenResponseSchema, } from '@workspace/project-protocol';
+import { ACT_AS_HEADER, notificationSendRequestSchema, notificationSendResponseSchema, RUN_CONTEXT_HEADER, SERVICE_CREDENTIAL_PATTERN, serviceTokenResponseSchema, } from '@workspace/project-protocol';
 import { createAi } from "../ai/client.js";
 import { createDbClient } from "../db/client.js";
 import { SdkError } from "../errors.js";
+import { createPython } from "../python/client.js";
 import { createStorage } from "../storage/client.js";
 import { createTransport } from "../transport.js";
 import { createJobs } from "./jobs.js";
@@ -97,13 +98,19 @@ export function createServerClient(options) {
                 ...dataClient(token),
                 ai: createAi(transport, base),
                 jobs: createJobs((path, body) => transport.send(path, { method: 'POST', body })),
+                python: createPython(transport),
             };
         },
         forJob(event) {
             const run = `${event.cron === undefined ? 'queue' : 'schedule'}:${event.id}`;
-            const transport = serviceTransport({ [AI_RUN_HEADER]: run });
-            return { ai: { openai: () => createAi(transport, base).openai() } };
+            const transport = serviceTransport({ [RUN_CONTEXT_HEADER]: run });
+            return {
+                ai: { openai: () => createAi(transport, base).openai() },
+                python: createPython(transport),
+            };
         },
     };
 }
+/** onFinish で届いたジョブの payload を確かめる（python-backend.md §4.2） */
+export { pythonRunFinishedSchema } from '@workspace/project-protocol';
 export { SdkError } from "../errors.js";

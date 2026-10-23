@@ -26,13 +26,13 @@ export declare const REALTIME_LIMITS: {
 export declare const realtimeFilterSchema: z.ZodObject<{
     field: z.ZodString;
     op: z.ZodEnum<{
+        in: "in";
         eq: "eq";
         neq: "neq";
         lt: "lt";
         lte: "lte";
         gt: "gt";
         gte: "gte";
-        in: "in";
     }>;
     value: z.ZodUnion<readonly [z.ZodUnion<readonly [z.ZodString, z.ZodNumber, z.ZodBoolean, z.ZodNull]>, z.ZodArray<z.ZodUnion<readonly [z.ZodString, z.ZodNumber, z.ZodBoolean, z.ZodNull]>>]>;
 }, z.core.$strict>;
@@ -47,13 +47,13 @@ export declare const realtimeSubscriptionSchema: z.ZodObject<{
     filter: z.ZodOptional<z.ZodObject<{
         field: z.ZodString;
         op: z.ZodEnum<{
+            in: "in";
             eq: "eq";
             neq: "neq";
             lt: "lt";
             lte: "lte";
             gt: "gt";
             gte: "gte";
-            in: "in";
         }>;
         value: z.ZodUnion<readonly [z.ZodUnion<readonly [z.ZodString, z.ZodNumber, z.ZodBoolean, z.ZodNull]>, z.ZodArray<z.ZodUnion<readonly [z.ZodString, z.ZodNumber, z.ZodBoolean, z.ZodNull]>>]>;
     }, z.core.$strict>>;
@@ -77,13 +77,13 @@ export declare const realtimeJoinSchema: z.ZodObject<{
         filter: z.ZodOptional<z.ZodObject<{
             field: z.ZodString;
             op: z.ZodEnum<{
+                in: "in";
                 eq: "eq";
                 neq: "neq";
                 lt: "lt";
                 lte: "lte";
                 gt: "gt";
                 gte: "gte";
-                in: "in";
             }>;
             value: z.ZodUnion<readonly [z.ZodUnion<readonly [z.ZodString, z.ZodNumber, z.ZodBoolean, z.ZodNull]>, z.ZodArray<z.ZodUnion<readonly [z.ZodString, z.ZodNumber, z.ZodBoolean, z.ZodNull]>>]>;
         }, z.core.$strict>>;

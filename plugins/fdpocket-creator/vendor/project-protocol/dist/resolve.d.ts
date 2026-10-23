@@ -62,6 +62,7 @@ declare const activeSchema: z.ZodObject<{
             web: "web";
             api: "api";
             jobs: "jobs";
+            python: "python";
         }>;
         access: z.ZodEnum<{
             public: "public";
@@ -131,6 +132,7 @@ declare const activeSchema: z.ZodObject<{
             web: "web";
             api: "api";
             jobs: "jobs";
+            python: "python";
         }>;
         access: z.ZodEnum<{
             public: "public";
@@ -162,6 +164,7 @@ export declare const projectConsentSchema: z.ZodObject<{
     }, z.core.$strict>;
     notifications: z.ZodBoolean;
     ai: z.ZodOptional<z.ZodLiteral<true>>;
+    compute: z.ZodOptional<z.ZodLiteral<true>>;
     privacySummary: z.ZodNullable<z.ZodObject<{
         ja: z.ZodString;
         en: z.ZodString;
@@ -214,6 +217,7 @@ export declare const gatewayResolveResultSchema: z.ZodDiscriminatedUnion<[z.ZodO
             web: "web";
             api: "api";
             jobs: "jobs";
+            python: "python";
         }>;
         access: z.ZodEnum<{
             public: "public";
@@ -283,6 +287,7 @@ export declare const gatewayResolveResultSchema: z.ZodDiscriminatedUnion<[z.ZodO
             web: "web";
             api: "api";
             jobs: "jobs";
+            python: "python";
         }>;
         access: z.ZodEnum<{
             public: "public";
@@ -311,6 +316,7 @@ export declare const gatewayResolveResultSchema: z.ZodDiscriminatedUnion<[z.ZodO
         }, z.core.$strict>;
         notifications: z.ZodBoolean;
         ai: z.ZodOptional<z.ZodLiteral<true>>;
+        compute: z.ZodOptional<z.ZodLiteral<true>>;
         privacySummary: z.ZodNullable<z.ZodObject<{
             ja: z.ZodString;
             en: z.ZodString;

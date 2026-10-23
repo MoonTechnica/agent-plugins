@@ -20,3 +20,9 @@ export const jobScheduleResponseSchema = z.strictObject({
 });
 export const jobCancelRequestSchema = z.strictObject({ id: z.uuid() });
 export const jobCancelResponseSchema = z.strictObject({ cancelled: z.boolean() });
+/**
+ * サーバーの App が今配送中の実行として Gateway を呼ぶときに添えるヘッダ（`queue:<job id>` / `schedule:<schedule id>` /
+ * `python:<run id>`）。払う人は Platform が決める（登録した利用者・cron は Project の持ち主・python の実行はその実行の
+ * 払う人。tasks/0537・python-backend.md §5）
+ */
+export const RUN_CONTEXT_HEADER = 'x-fdpocket-run';

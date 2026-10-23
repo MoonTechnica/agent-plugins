@@ -19,6 +19,34 @@ export default {
 }
 ```
 
+**登録されたジョブ**（api の `jobs.schedule`・python のタスクの `onFinish` と `ctx.jobs.schedule` から）は `queue(job, env, ctx)` で受ける。
+`job` は `{ id, handler, payload, attempt, scheduledTime, noRetry() }`。jobs の App に `servicePermissions: [jobs.consume]`
+を宣言する。失敗（例外）は最大 5 回まで再試行されるので、副作用は冪等にする（`job.id` を相手の冪等キーにする）。
+
+```ts
+import { createServerClient } from '@workspace/miniapp-sdk/server'
+import type { SchemaType } from '@workspace/sdk'
+
+export default {
+  async queue(job, env, ctx) {
+    const server = createServerClient<SchemaType>({ env })
+    if (job.handler === 'afterCaption') {
+      const caption = await server.db.caption.findUnique({ where: { id: job.payload.captionId } })
+      // AI・python はこのジョブの払う人で呼ぶ（登録した利用者・python のタスクの払う人。サーバーとしての登録では使えない）
+      const ai = server.forJob(job).ai.openai()
+      // …外部 API に送る・通知する
+    }
+  },
+}
+```
+
+登録は api なら `server.asUser(request).jobs.schedule({ app, handler, payload, idempotencyKey, runAt? })`
+（その利用者が払う。`asUser` 無しの `server.jobs.schedule` は払う人がいないので、ジョブから AI・python を使えない）、
+python のタスクの終わりは `project.yaml` の `onFinish`（Platform が登録する。中身は `{ runId, app, task, status, error }` で
+`pythonRunFinishedSchema` で確かめ、出力は `server.forJob(job).python.get(runId)` で読む）、途中からは `ctx.jobs.schedule(...)`
+（`$fdpocket-app-python`）。payload は JSON で 64 KiB まで、`runAt` は 30 日先まで。
+ジョブは main / prod でだけ動く（branch / preview では登録も `FORBIDDEN`）。
+
 web からAPIを呼ぶときはapiPathでAPI Appを明示する。現在の画面のBASE_URLではなくProject共通prefixを使い、ライブプレビューのtokenも維持する。
 
 ```ts
