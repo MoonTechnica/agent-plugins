@@ -14719,6 +14719,7 @@ var commerceProductPageSchema = strictObject({
 });
 // frontend/packages/app-protocol/src/debug.ts
 var DEBUG_CATALOG_PATH = "debug/catalog.json";
+var DEBUG_PACK_PATH = "debug/dev.pck";
 var DEBUG_CATALOG_MAX_BYTES = 512 * 1024;
 var debugIdSchema = string2().regex(/^[a-z][a-z0-9_]{0,63}$/);
 var label = strictObject({ ja: string2().min(1).max(128), en: string2().min(1).max(128) });
@@ -14930,6 +14931,7 @@ var gameAssetCatalogSchema = object({
 }).strict().refine((catalog) => new Set(catalog.items.map((item) => item.id)).size === catalog.items.length && new Set(catalog.items.map((item) => item.name)).size === catalog.items.length);
 // frontend/packages/app-protocol/src/godot-ops.mjs
 var IMAGE_TYPES = new Set(["image/jpeg", "image/png", "image/webp"]);
+var DEBUG_PACK_NAME = "debug_dev";
 var DEBUG_FAIL_CODES = new Set([
   "INVALID_PRESET",
   "LOAD_FAILED",
@@ -15032,9 +15034,10 @@ var avatarMessageSchema = strictObject({
     bytes: custom(isArrayBuffer, "must be an ArrayBuffer")
   }).nullable()
 });
+var packNameSchema = union([regionNameSchema, literal(DEBUG_PACK_NAME)]);
 var regionRequestMessageSchema = strictObject({
   type: literal("region_request"),
-  name: regionNameSchema
+  name: packNameSchema
 });
 var REGION_FAILURE_CODES = [
   "REGION_UNKNOWN",
@@ -15045,13 +15048,13 @@ var REGION_FAILURE_CODES = [
 var regionMessageSchema = union([
   strictObject({
     type: literal("region"),
-    name: regionNameSchema,
+    name: packNameSchema,
     bytes: custom(isArrayBuffer, "must be an ArrayBuffer"),
     code: _null3()
   }),
   strictObject({
     type: literal("region"),
-    name: regionNameSchema,
+    name: packNameSchema,
     bytes: _null3(),
     code: _enum(REGION_FAILURE_CODES)
   })
@@ -15372,6 +15375,43 @@ var corpusEntrySchema = strictObject({
 var corpusIndexSchema = strictObject({
   entries: array(corpusEntrySchema).min(1).max(CORPUS_MAX_ENTRIES)
 });
+// frontend/packages/app-validator/src/development.ts
+var PCK_MAGIC = [71, 68, 80, 67];
+function validateDevelopmentDelta(files) {
+  const errors = [];
+  const catalog = files.find((file) => file.path === DEBUG_CATALOG_PATH);
+  if (!catalog || catalog.size > DEBUG_CATALOG_MAX_BYTES)
+    errors.push({
+      code: "DEBUG_CATALOG_MISSING",
+      message: "development Artifact requires a bounded catalog"
+    });
+  else {
+    try {
+      debugCatalogSchema.parse(JSON.parse(new TextDecoder().decode(catalog.bytes)));
+    } catch (error) {
+      errors.push({
+        code: "DEBUG_CATALOG_INVALID",
+        message: String(error),
+        path: DEBUG_CATALOG_PATH
+      });
+    }
+  }
+  const pack = files.find((file) => file.path === DEBUG_PACK_PATH);
+  if (pack && !PCK_MAGIC.every((byte, index) => pack.bytes[index] === byte))
+    errors.push({
+      code: "DEBUG_PACK_INVALID",
+      message: "the development pack is not a Godot pack",
+      path: DEBUG_PACK_PATH
+    });
+  for (const file of files)
+    if (file.path !== DEBUG_CATALOG_PATH && file.path !== DEBUG_PACK_PATH)
+      errors.push({
+        code: "DEBUG_UNEXPECTED_FILE",
+        message: "the development Artifact holds only the catalog and the development pack",
+        path: file.path
+      });
+  return { errors, warnings: [] };
+}
 // frontend/packages/app-validator/src/schema-fields.ts
 function stableJson(value) {
   if (Array.isArray(value))
@@ -15642,33 +15682,13 @@ function validateStatic(files, options = {}) {
   const byPath = new Map(files.map((file) => [file.path, file]));
   const errors = [];
   const warnings = [];
-  const debugFile = byPath.get(DEBUG_CATALOG_PATH);
-  if (options.artifactFlavor === "debug") {
-    if (!debugFile || debugFile.size > DEBUG_CATALOG_MAX_BYTES)
+  for (const file of files) {
+    if (file.path.startsWith("debug/") || file.path.startsWith("bundles/debug_"))
       errors.push({
-        code: "DEBUG_CATALOG_MISSING",
-        message: "development Artifact requires a bounded catalog"
+        code: "DEBUG_IN_PRODUCTION",
+        message: "production Artifact contains development files",
+        path: file.path
       });
-    else {
-      try {
-        debugCatalogSchema.parse(JSON.parse(decode2(debugFile)));
-      } catch (error) {
-        errors.push({
-          code: "DEBUG_CATALOG_INVALID",
-          message: String(error),
-          path: DEBUG_CATALOG_PATH
-        });
-      }
-    }
-  } else {
-    for (const file of files) {
-      if (file.path.startsWith("debug/") || file.path.startsWith("bundles/debug_") || file.path.endsWith(".js") && /\bapp\s*\.\s*debug\s*\./.test(decode2(file)))
-        errors.push({
-          code: "DEBUG_IN_PRODUCTION",
-          message: "production Artifact contains development contract or files",
-          path: file.path
-        });
-    }
   }
   const manifestFile = byPath.get(MANIFEST_PATH);
   if (!manifestFile) {
@@ -15681,13 +15701,6 @@ function validateStatic(files, options = {}) {
     throw new Error(`app-validator: ${MANIFEST_PATH} is not a valid manifest: ${cause}`);
   }
   const trustedGodot = validateGodotReferences(manifest, byPath, errors);
-  if (options.artifactFlavor === "debug" && !requiresDevelopmentArtifact(manifest)) {
-    errors.push({
-      code: "INVALID_DEBUG_CATALOG",
-      message: "Document development previews are outside Phase 1–3",
-      path: DEBUG_CATALOG_PATH
-    });
-  }
   errors.push(...checkStoreSchema(options.previousStoreSchema ?? null, manifest.storeSchema, manifest.storeSchemaVersion));
   if (!byPath.has(manifest.entrypoint)) {
     errors.push({
@@ -30276,6 +30289,14 @@ async function validateArchive(archive, options = {}) {
     size: file.size
   }));
   const staticStage = startStage("static");
+  if (options.artifactFlavor === "debug") {
+    const result = validateDevelopmentDelta(files);
+    stages.push(staticStage.finish(result.errors.length === 0 ? "passed" : "failed", {
+      errors: result.errors,
+      warnings: result.warnings
+    }));
+    return { report: buildReport({ artifactHash, files: reportFiles, stages }), files };
+  }
   let manifest = null;
   let aiPrompts = [];
   try {
@@ -30399,11 +30420,11 @@ class KitBuildError extends Error {
   name = "KitBuildError";
 }
 var GODOT_BUILD_SCRIPT = "godot-build.mjs";
-var DEBUG_BUILD_SCRIPT = "debug-build.mjs";
 var GODOT_PROJECT = "godot/project.godot";
 var MANIFEST_PATH2 = "manifest.json";
 async function kitBuild(source) {
-  await rm(join3(source, "debug-dist"), { recursive: true, force: true });
+  const debugDist = join3(source, "debug-dist");
+  await rm(debugDist, { recursive: true, force: true });
   const sourceManifest = manifestSchema.parse(JSON.parse(await readFile3(join3(source, MANIFEST_PATH2), "utf8")));
   if (!existsSync(join3(source, GODOT_PROJECT)))
     throw new KitBuildError(`kit build only builds Godot games (${GODOT_PROJECT} is missing)`);
@@ -30413,7 +30434,7 @@ async function kitBuild(source) {
   await validateGameAssetCatalog(source);
   const dist = join3(source, "dist");
   await rm(dist, { recursive: true, force: true });
-  await runNode(buildConfigScript(source, GODOT_BUILD_SCRIPT), source);
+  await runNode(buildConfigScript(source, GODOT_BUILD_SCRIPT), source, hasDebug ? ["--dev-pack", join3(debugDist, DEBUG_PACK_PATH)] : []);
   const manifestPath = join3(dist, MANIFEST_PATH2);
   if (!existsSync(manifestPath)) {
     throw new KitBuildError(`the build left no ${MANIFEST_PATH2} at the root of dist/`);
@@ -30429,16 +30450,10 @@ async function kitBuild(source) {
     throw new KitBuildError("production Artifact contains development-only files");
   if (!hasDebug)
     return { dist, artifactHash: index.artifactHash };
-  const debugDist = join3(source, "debug-dist");
-  await cp(dist, debugDist, { recursive: true });
-  await rm(join3(debugDist, ARTIFACT_INDEX_PATH), { force: true });
   await mkdir(join3(debugDist, "debug"), { recursive: true });
-  await cp(join3(source, "debug/catalog.json"), join3(debugDist, "debug/catalog.json"));
-  if (existsSync(join3(source, "debug/assets")))
-    await cp(join3(source, "debug/assets"), join3(debugDist, "debug/assets"), { recursive: true });
-  await runNode(buildConfigScript(source, DEBUG_BUILD_SCRIPT), source);
+  await cp(join3(source, DEBUG_CATALOG_PATH), join3(debugDist, DEBUG_CATALOG_PATH));
   const debugIndex = await buildDistIndex(await readDist(debugDist), {
-    entrypoint: manifest.entrypoint
+    entrypoint: DEBUG_CATALOG_PATH
   });
   await writeFile(join3(debugDist, ARTIFACT_INDEX_PATH), `${JSON.stringify(debugIndex, null, 2)}
 `);
@@ -30452,9 +30467,9 @@ function buildConfigScript(source, name) {
   const config = createRequire2(join3(source, "package.json")).resolve("@workspace/app-sdk/build-config");
   return join3(dirname(config), name);
 }
-function runNode(script, cwd) {
+function runNode(script, cwd, args = []) {
   return new Promise((resolve, reject) => {
-    const child = spawn("node", [script], { cwd, stdio: ["ignore", 2, 2] });
+    const child = spawn("node", [script, ...args], { cwd, stdio: ["ignore", 2, 2] });
     child.once("error", reject);
     child.once("exit", (code, signal) => {
       if (code === 0)

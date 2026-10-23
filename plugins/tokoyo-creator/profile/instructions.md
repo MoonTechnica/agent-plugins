@@ -35,9 +35,9 @@
    遊べる核・stage・キャラ・機能アイテムを作る/変えるときは `$game-playtest` の
    `references/development-preview.md` を読み、本編処理から開発ケース・preset・試験場を作る。
    `debug-catalog` / `debug-validate`を同梱Kitで実行する。通常開始ケースは新規ゲームで必須。
-   **メニューUIもゲームリポジトリ内の`debug/`へ作る**。作品のステージ構成・状態表示・試験操作に合わせ、SDKの型付き操作を使う。
+   **メニューUIと試験用の処理はゲームの`godot/dev/`（入口`res://dev/dev.tscn`）へ作る**。カタログは根の`debug/`。作品のステージ構成・状態表示・試験操作に合わせ、SDKの型付き操作を使う。
    独立して開ける開発panel/overlayを既定とし、通常開始は本編の入口を共有する。タイトルへの補助入口は作品に合わせて選び、全作品へ同じ開始メニュー項目を追加しない。
-   開発入口と専用素材は本番`dist/`へ含めない。開発対応の出力には`debug-dist.tar.gz`も別に提出する。
+   `godot/dev/`は`kit build`がGodotの追加pack（開発用pack）にし、本番のpackへ入れない。開発対応の出力には`debug-dist.tar.gz`（カタログと開発用packだけの差分）も別に提出する。
 5. **`./input/` を見る**（§4.0）。前の版があれば、それを土台にして続きを作る。
 | Skill | 使うとき |
 |---|---|
@@ -146,7 +146,7 @@ source-dirは`./source`。SDKのCLIと作業ディレクトリ側の`scripts/kit
 |---|---|
 | `source.bundle` | `kit.mjs pack` が作る、取り込んだ head（`base_commit_oid`）からの新しい commit（git の bundle）。次のターンとリミックスの土台。**掲載情報の `listing/`（`$game-listing`）を必ず commit に含める**。自分で作らない |
 | `dist.tar.gz` | **配信用 Artifact**。下の構成を**書庫の根**に置いて固める |
-| `debug-dist.tar.gz` | **開発専用Artifact**。対応対象のゲームでは必須。Document read/write要求は今回対象外として本番のみ。`debug-dist/`の中身を別書庫の根に固める。公開版へコピーしない |
+| `debug-dist.tar.gz` | **開発専用の差分**（`debug/catalog.json`と`godot/dev/`から書き出した`debug/dev.pck`だけ。ゲーム本体は入らない）。対応対象のゲームでは必須。Document read/write要求は今回対象外として本番のみ。`debug-dist/`の中身を別書庫の根に固める。公開版へコピーしない |
 | `build-report.json` | `{ "manifest": <manifest.json と同じ JSON>, "buildConfig": { ... }, "notes": ["…"], "listingRequested": ["title"] }`（`notes` は実装できなかった要求・Skill と食い違った点・掲載情報を直した理由・性能の懸念と測定環境/未確認。無ければ省く。`listingRequested` は利用者が手で直した掲載情報の項目を、依頼どおりに変えたときだけ。`$game-listing` §5。利用者が試遊を明確に頼んだときだけ `"playtest": { "level": "thorough" }`。`$game-playtest` §3） |
 
 `dist.tar.gz` の中身（`tar -C dist -czf ../outputs/dist.tar.gz .` 相当。**`dist/` を入れ子にしない**）:

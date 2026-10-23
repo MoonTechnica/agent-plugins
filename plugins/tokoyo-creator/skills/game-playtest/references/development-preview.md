@@ -1,11 +1,13 @@
 # 開発ケースと本編の検査
 
-制作Hostの「開発テスト」から起動する。**Debug MenuのUIはこのゲームのリポジトリ内の`debug/`に作る**。
+制作Hostの「開発テスト」から起動する。**Debug MenuのUIと試験用の処理はこのゲームの`godot/dev/`（`res://dev/`、入口は`res://dev/dev.tscn`）に作る**。
+カタログ（`debug/catalog.json`等）はゲームの根の`debug/`に置く。
 ステージ構成、状態表示、試験操作に合わせて設計し、全作品へ同じ画面を強制しない。
 SDKの型付き操作と検査・結果・timeoutを使い、ケース切替はHostの認可と新Scopeでの起動を経由する。
 任意JavaScriptコンソールは作らない。
-通常試遊/公開版には開発機能を配信しない。同じソースから本番`dist/`と私有の`debug-dist/`を作る。
-本番入口から`debug/`をimportしない。専用素材は開発ビルドだけに含め、共通素材は既存のhash/台帳を再利用する。
+通常試遊/公開版には開発機能を配信しない。`kit build`が`godot/dev/`をゲームのpackから外し、Godotの追加pack（開発用pack）として書き出す。
+開発テストではゲームは本番の成果物のまま動き、`TokoyoApp`が開発用packを`load_resource_pack`で読み込んで`res://dev/dev.tscn`を足す。
+`godot/dev/`の外から`res://dev/`を`preload`・シーン・`project.godot`で参照しない（ビルドが断る）。専用素材も`godot/dev/`に置く。
 
 ## 開発UIと通常開始
 
@@ -25,7 +27,8 @@ Godotでは`$game-godot`と`$game-3d-and-bundles`の開発シーン・資源寿�
 `debug/catalog.json`・`debug/definitions.json`・`debug/presets/`を作る。新規ゲームは通常開始ケースを含める。
 本編の安定したstage/entry/subject IDと進行restoreを使い、所持品、能力、扉、イベント、敵の状態とseedを
 `debug/presets/`へ置く。配列indexや実ユーザーのセーブ、Document ID、tokenをfixtureへ入れない。
-ケースの読み取り・command登録・`ready`/`fail`はGDScriptの`TokoyoApp.debug`で行う（`$game-godot`の「Development preview from GDScript」）。
+ケースの読み取り・command登録・`ready`/`fail`は`godot/dev/`のシーンから`TokoyoApp.debug`で行う（`$game-godot`の「Development preview from GDScript」）。
+本編側は開発シーンが呼ぶ小さな公開メソッドだけを持ち、開発用の分岐を本編に書かない。
 初期保存のACKと必要bundle、衝突、カメラの準備後に`TokoyoApp.debug.ready()`を呼ぶ。未実装の遠隔操作APIを呼ばない。
 
 キャラ・機能アイテム・敵・仕掛けの試験場は本編factory/controller、animation、inventory/item effect、AI、
@@ -47,11 +50,11 @@ node <kit>/sdk/app-sdk/build-config/kit.mjs debug-validate <source-dir>
 ```
 
 `<source-dir>`は実際の制作ソース（Sandboxでは`/workspace/game`、手元では`source/`）。
-カタログの構文/参照検査と実画面の確認を区別する。本番/開発の両ビルドを検査し、
-`debug-dist.tar.gz`を通常の`dist.tar.gz`と別の成果物として提出する。
+カタログの構文/参照検査と実画面の確認を区別する。`debug-dist/`はカタログと開発用packだけの差分
+（ゲーム本体は入らない）で、`debug-dist.tar.gz`として`dist.tar.gz`と別に提出する。
 `documents.read`または`documents.write`を要求するゲームは今回の開発起動対象外。
 その場合は本番成果物だけを作り、使えない開発メニューや試験adapterを追加しない。
-対応対象は元版やSDK版に関係なく両成果物を必須とする。
+対応対象は元版やSDK版に関係なく開発用の差分を必須とする。
 
 `design/playtest.md`にsource revision、Artifact/SDK release、case/preset/schema、seed、端末、操作、観察、
 passed/failed/unverifiedを記録する。ケースを起動しただけで全編の品質・クリア可能性を保証しない。
