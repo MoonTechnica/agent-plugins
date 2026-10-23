@@ -28,6 +28,7 @@ const capabilitiesSchema = z.strictObject({
     realtime: z
         .record(z.string(), z.array(z.enum(['broadcastReceive', 'broadcastSend', 'presenceRead', 'presenceTrack'])))
         .optional(),
+    ai: z.strictObject({ chat: z.boolean() }).optional(),
 });
 const resolvedBucketSchema = z.strictObject({
     public: z.boolean(),

@@ -86,6 +86,9 @@ declare const activeSchema: z.ZodObject<{
                 presenceRead: "presenceRead";
                 presenceTrack: "presenceTrack";
             }>>>>;
+            ai: z.ZodOptional<z.ZodObject<{
+                chat: z.ZodBoolean;
+            }, z.core.$strict>>;
         }, z.core.$strict>;
         anonymous: z.ZodObject<{
             allowed: z.ZodBoolean;
@@ -235,6 +238,9 @@ export declare const gatewayResolveResultSchema: z.ZodDiscriminatedUnion<[z.ZodO
                 presenceRead: "presenceRead";
                 presenceTrack: "presenceTrack";
             }>>>>;
+            ai: z.ZodOptional<z.ZodObject<{
+                chat: z.ZodBoolean;
+            }, z.core.$strict>>;
         }, z.core.$strict>;
         anonymous: z.ZodObject<{
             allowed: z.ZodBoolean;

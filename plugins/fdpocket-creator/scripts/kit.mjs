@@ -65398,7 +65398,8 @@ var RESOLVE_STATUSES = [
 var capabilitiesSchema = exports_external.strictObject({
   models: exports_external.record(exports_external.string(), exports_external.array(exports_external.enum(MODEL_OPERATIONS))),
   buckets: exports_external.record(exports_external.string(), exports_external.array(exports_external.enum(BUCKET_OPERATIONS))),
-  realtime: exports_external.record(exports_external.string(), exports_external.array(exports_external.enum(["broadcastReceive", "broadcastSend", "presenceRead", "presenceTrack"]))).optional()
+  realtime: exports_external.record(exports_external.string(), exports_external.array(exports_external.enum(["broadcastReceive", "broadcastSend", "presenceRead", "presenceTrack"]))).optional(),
+  ai: exports_external.strictObject({ chat: exports_external.boolean() }).optional()
 });
 var resolvedBucketSchema = exports_external.strictObject({
   public: exports_external.boolean(),
