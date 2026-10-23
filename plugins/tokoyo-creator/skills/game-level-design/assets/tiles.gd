@@ -740,7 +740,7 @@ func _paint(args: Array) -> bool:
 		for s in tile_set.get_terrain_sets_count():
 			for t in tile_set.get_terrains_count(s):
 				terrain_ref[tile_set.get_terrain_name(s, t)] = Vector2i(s, t)
-	var report := {"layers": {}, "unmatched": []}
+	var report := {"layers": {}, "unmatched": [], "cleared": {}}
 	var origin := _vec2i(spec.get("origin"), Vector2i.ZERO)
 	var layers: Array = spec.get("layers", [])
 	var painted := []
@@ -808,6 +808,7 @@ func _paint(args: Array) -> bool:
 		png = spec_path.get_basename() + ".png"
 		picture.save_png(png)
 	root.queue_free()
+	report.erase("cleared")
 	_write(spec_path.get_basename() + ".report.json", JSON.stringify(report, "  "))
 	print("TILES_PAINT=", JSON.stringify({"scene": scene_path, "picture": png, "unmatched": report.unmatched.size()}))
 	return true
@@ -829,9 +830,12 @@ func _paint_gridmap(root: Node, node_name: String, def: Dictionary, origin: Vect
 	grid_map.mesh_library = library
 	if def.has("cell_size"): grid_map.cell_size = Vector3(def.cell_size[0], def.cell_size[1], def.cell_size[2])
 	var floor_y := int(def.get("floor", 0))
-	if def.get("clear", true):
-		for cell in grid_map.get_used_cells():
-			if cell.y == floor_y: grid_map.set_cell_item(cell, GridMap.INVALID_CELL_ITEM)
+	# The grids are the source of truth: the first layer of a run that paints this node empties it,
+	# so cells left over from an earlier floor or shape do not survive; later layers (other
+	# floors of the same node) add to it.
+	if def.get("clear", true) and not report.cleared.has(node_name):
+		grid_map.clear()
+	report.cleared[node_name] = true
 	var counts := {}
 	var legend: Dictionary = def.get("legend", {})
 	var rows: Array = def.get("grid", [])
