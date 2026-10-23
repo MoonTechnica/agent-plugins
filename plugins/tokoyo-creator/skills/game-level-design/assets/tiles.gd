@@ -143,9 +143,14 @@ func _sheet(args: Array) -> bool:
 	var guess := {}
 	if tile == Vector2i.ZERO or separation.x < 0:
 		guess = _guess_grid(image, margin, tile, separation)
-		if guess.is_empty(): return _fail("sheet: could not guess the grid; pass --tile WxH (and --separation)")
-		tile = guess.tile
-		separation = guess.separation
+		if guess.is_empty() and tile != Vector2i.ZERO:
+			# The size is given and no gutter fits it: a sheet without gutters.
+			separation = Vector2i.ZERO
+		elif guess.is_empty():
+			return _fail("sheet: could not guess the grid; pass --tile WxH (and --separation X,Y if the tiles have gutters)")
+		else:
+			tile = guess.tile
+			separation = guess.separation
 	var grid := Vector2i((image.get_width() - margin.x * 2 + separation.x) / (tile.x + separation.x), (image.get_height() - margin.y * 2 + separation.y) / (tile.y + separation.y))
 	var tiles := []
 	for y in grid.y:
@@ -796,6 +801,7 @@ func _paint(args: Array) -> bool:
 	for layer in painted:
 		report.unmatched.append_array(_mismatches(layer))
 	report.unmatched.append_array(_tile_overlaps(painted))
+	report.unmatched = _without_covered_holes(report.unmatched, grid_maps)
 	if not grid_maps.is_empty(): report.unmatched.append_array(_grounding(grid_maps, report.rests_on))
 	DirAccess.make_dir_recursive_absolute(ProjectSettings.globalize_path(scene_path.get_base_dir()))
 	var packed := PackedScene.new()
@@ -838,6 +844,9 @@ func _paint_gridmap(root: Node, node_name: String, def: Dictionary, origin: Vect
 		grid_map.owner = root
 	grid_map.mesh_library = library
 	if def.has("cell_size"): grid_map.cell_size = Vector3(def.cell_size[0], def.cell_size[1], def.cell_size[2])
+	# Kit pieces have their origin on the floor (Kenney, KayKit), so floor N stands at
+	# y = N * cell height, not half a cell above it (GridMap's default centres cells on Y).
+	grid_map.cell_center_y = bool(def.get("center_y", false))
 	var floor_y := int(def.get("floor", 0))
 	# The grids are the source of truth: the first layer of a run that paints this node empties it,
 	# so cells left over from an earlier floor or shape do not survive; later layers (other
@@ -1022,6 +1031,21 @@ func _top_view(maps: Array, marks: Array, view_basis: Basis = Basis.IDENTITY) ->
 ## From the south-east and above, so heights show: floating, sunk or doubled pieces are visible.
 func _angle_view() -> Basis:
 	return Basis(Vector3.RIGHT, -0.75) * Basis(Vector3.UP, -0.5)
+
+## A gap in the floor is not a hole when another layer stands there (a wall between rooms).
+func _without_covered_holes(problems: Array, maps: Array) -> Array:
+	var kept := []
+	for p in problems:
+		if not str(p.get("problem", "")).begins_with("hole") or not _covered(maps, String(p.layer), p.cell):
+			kept.append(p)
+	return kept
+
+func _covered(maps: Array, layer: String, cell: Array) -> bool:
+	for gm in maps:
+		if String(gm.name) == layer: continue
+		for c in gm.get_used_cells():
+			if c.x == cell[0] and c.z == cell[1]: return true
+	return false
 
 # ---------------------------------------------------------------------------------------------
 # Checks a picture from above cannot show: pieces must stand on something, and layers must not

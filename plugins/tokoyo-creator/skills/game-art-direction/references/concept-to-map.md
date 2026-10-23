@@ -11,12 +11,14 @@ LOOK=<kit>/skills/game-art-direction/assets/look.gd   # 画像をファイルの
 godot --headless --path <source>/godot -s $LOOK -- palette <source>/design/concept/key-art.png --out <source>/design/palette.json
 godot --headless --path <source>/godot -s $LOOK -- compare <source>/design/concept/key-art.png <実画面.png> [--out <比較.png>]
 godot --headless --path <source>/godot -s $LOOK -- recolor res://<画像>.png --palette <source>/design/palette.json --out res://<画像>.png [--mode transfer|map] [--strength 0.7]
+godot --headless --path <source>/godot -s $LOOK -- recolor-kit res://kit/<name>_library.tres --palette <source>/design/palette.json [--strength 0.7]
 ```
 
 | コマンド | すること |
 |---|---|
 | `palette` | コンセプトの主な色と面積、明るさ（平均・暗部・明部・コントラスト）、鮮やかさ、暖かさ、環境光・影・主光の色の提案を `palette.json` に書き、色の帯の絵（`palette.png`）を出す |
 | `compare` | コンセプトと実画面を色の帯つきで並べた絵と、差（明るい / 暗い、コントラスト、鮮やかさ、暖かさ、コンセプトにあって画面に無い色、画面で大きいのにコンセプトに無い色）を出す |
+| `recolor-kit` | 3D キットの材質の色（色の画像の無い材質だけ）を同じ方法で寄せ、MeshLibrary を上書きする。色の画像がある材質はその画像を `recolor` する |
 | `recolor` | 画像をコンセプトの色へ寄せる。`transfer` は色の傾向だけを合わせて描き込みを残す（既定）。`map` は明るさの順にパレットの色で塗り直す（ドット絵向き・強い）。透明は保つ。`--strength` で寄せ具合 |
 
 ## 2. 変換表（企画のターン、コンセプトを作った直後）
@@ -40,13 +42,15 @@ godot --headless --path <source>/godot -s $LOOK -- recolor res://<画像>.png --
 1. **パックを選ぶ**: 形・描き込み・視点・比率が変換表に合うパックを 1 つ（2D は `$game-level-design` references/tilemaps.md §2、
    3D はキットのフォルダ取り込み）。色を見て決めない。色はあとで寄せられるが、形と描き込みは寄せられない。
 2. **色を寄せる**: パックのシート（2D）やキットの色の画像（3D。`meshlib` の出力の `textures`）を `recolor` で上書きする。
+   色の画像が無く材質の色だけで塗ったキットは `recolor-kit` で MeshLibrary の材質の色を寄せる。
    まず `transfer`、ドット絵で色数を揃えたいときは `map`。寄せすぎて読みにくくなったら `--strength` を下げる。
    `--import` してから塗り直し、`paint` の絵を `compare` でコンセプトと並べる。
 3. **コンセプトの画風で作る**: 形や質感がどのパックでも合わない（色を寄せてもコンセプトに見えない）とき。
    - 2D: 地形ごとに継ぎ目なしの模様と縁の帯を画像生成で作り、`tiles.gd compose` でタイルにする（tilemaps.md §3.1）。
    - 3D: 地面・壁は単純な形（キットや `$game-3d-studio` のモデリング）に、生成した模様を材質として貼る。
      目印になる建物・主役級の物だけを画像→3D で作る（`$game-3d-studio`）。
-   - どちらも生成の指示にコンセプト画像を参照で渡し、style-guide の 5 行と変換表の行を入れる。費用は SKILL §4 の素材一覧の予算に入れる。
+   - どちらも生成はコンセプト画像を元にする: `generate_image` は参照の画像を受け取らないので、コンセプト画像の素材に `edit_image` で
+     「この絵の画風と色で <模様・部品> を描く」と頼む。指示には style-guide の 5 行と変換表の行を入れる。費用は SKILL §4 の素材一覧の予算に入れる。
 4. 混ぜた素材は `asset-manifest.md` に **採用 / 加工して採用 / 置換** と理由を書く（SKILL §5）。
 
 ## 4. 光・空気・小物

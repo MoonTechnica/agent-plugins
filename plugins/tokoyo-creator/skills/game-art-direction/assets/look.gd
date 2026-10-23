@@ -6,6 +6,7 @@ extends SceneTree
 ##   godot --headless --path <source>/godot -s <tool> -- palette <concept.png> --out <source>/design/palette.json [--colors 8]
 ##   godot --headless --path <source>/godot -s <tool> -- compare <concept.png> <shot.png> [--out <compare.png>]
 ##   godot --headless --path <source>/godot -s <tool> -- recolor <image.png> --palette <palette.json> --out <image.png> [--mode transfer|map] [--strength 0..1]
+##   godot --headless --path <source>/godot -s <tool> -- recolor-kit <res://kit_library.tres> --palette <palette.json> [--strength 0..1]
 ##
 ## palette: the concept's main colours with their share of the picture, its light (mean, darkest,
 ##   brightest, contrast), colourfulness and warmth, and suggested ambient / key light / shadow
@@ -15,6 +16,9 @@ extends SceneTree
 ## recolor: moves an image (a tile sheet, a fill texture, a 3D kit's colour map) onto the
 ##   palette: `transfer` matches its colour statistics (keeps detail), `map` repaints it by
 ##   brightness with the palette's colours (strong, for pixel art). Alpha is kept.
+## recolor-kit: the same colour transfer for a 3D kit's materials (their albedo colours), for kits
+##   painted with plain colours and no texture (Kenney Nature Kit and the like). Saves the
+##   MeshLibrary in place; run it again after every `tiles.gd meshlib`.
 
 func _initialize() -> void:
 	var args := OS.get_cmdline_user_args()
@@ -23,7 +27,8 @@ func _initialize() -> void:
 		"palette": ok = _palette(args.slice(1))
 		"compare": ok = _compare(args.slice(1))
 		"recolor": ok = _recolor(args.slice(1))
-		_: printerr("usage: look.gd -- palette|compare|recolor ...")
+		"recolor-kit": ok = _recolor_kit(args.slice(1))
+		_: printerr("usage: look.gd -- palette|compare|recolor|recolor-kit ...")
 	quit(0 if ok else 1)
 
 func _fail(message: String) -> bool:
@@ -316,3 +321,57 @@ func _gradient_map(image: Image, palette: Dictionary) -> Image:
 			var i := mini(int(t), ramp.size() - 2)
 			out.set_pixel(x, y, _rgb((ramp[i] as Vector3).lerp(ramp[i + 1], t - i), c.a))
 	return out
+
+# ---------------------------------------------------------------------------------------------
+# recolor-kit
+
+## Moves the colours of a MeshLibrary's untextured materials onto the palette's statistics
+## (Reinhard in Lab, like `transfer`). Textured materials are left alone and listed: recolour
+## their image with `recolor` instead, so nothing is tinted twice.
+func _recolor_kit(args: Array) -> bool:
+	if args.is_empty(): return _fail("recolor-kit needs a res://…tres MeshLibrary")
+	var library = load(args[0])
+	if not library is MeshLibrary: return _fail("cannot load %s as a MeshLibrary; run tiles.gd meshlib first" % args[0])
+	var palette = JSON.parse_string(FileAccess.get_file_as_string(_path(_option(args, "--palette"))))
+	if not palette is Dictionary or not palette.has("lab"): return _fail("recolor-kit needs --palette <palette.json> written by `palette`")
+	var strength := clampf(float(_option(args, "--strength", "1")), 0.0, 1.0)
+	var materials := {}
+	var textured := {}
+	for id in library.get_item_list():
+		var mesh: Mesh = library.get_item_mesh(id)
+		if mesh == null: continue
+		for s in mesh.get_surface_count():
+			var m := mesh.surface_get_material(s) as BaseMaterial3D
+			if m == null: continue
+			if m.albedo_texture != null: textured[m.albedo_texture.resource_path] = true
+			else: materials[m] = true
+	if materials.is_empty():
+		print("LOOK_RECOLOR_KIT=", JSON.stringify({"library": args[0], "materials": 0, "textured": textured.keys()}))
+		return true
+	var labs := PackedVector3Array()
+	for m in materials: labs.append(_lab(m.albedo_color))
+	var mean := Vector3.ZERO
+	for v in labs: mean += v
+	mean /= labs.size()
+	var spread := Vector3.ZERO
+	for v in labs: spread += (v - mean) * (v - mean)
+	spread = Vector3(sqrt(spread.x / labs.size()), sqrt(spread.y / labs.size()), sqrt(spread.z / labs.size()))
+	var target_mean := Vector3(palette.lab.mean[0], palette.lab.mean[1], palette.lab.mean[2])
+	var target_spread := Vector3(palette.lab.spread[0], palette.lab.spread[1], palette.lab.spread[2])
+	var scale := Vector3(target_spread.x / maxf(spread.x, 0.5), target_spread.y / maxf(spread.y, 0.5), target_spread.z / maxf(spread.z, 0.5))
+	var replaced := {}
+	for m in materials:
+		var copy := m.duplicate() as BaseMaterial3D
+		var v := (_lab(m.albedo_color) - mean) * scale + target_mean
+		copy.albedo_color = m.albedo_color.lerp(_rgb(Vector3(clampf(v.x, 0, 100), v.y, v.z), m.albedo_color.a), strength)
+		replaced[m] = copy
+	for id in library.get_item_list():
+		var mesh: Mesh = library.get_item_mesh(id)
+		if mesh == null: continue
+		for s in mesh.get_surface_count():
+			var m := mesh.surface_get_material(s) as BaseMaterial3D
+			if m != null and replaced.has(m): mesh.surface_set_material(s, replaced[m])
+	var err := ResourceSaver.save(library, args[0])
+	if err != OK: return _fail("cannot save %s (%s)" % [args[0], error_string(err)])
+	print("LOOK_RECOLOR_KIT=", JSON.stringify({"library": args[0], "materials": materials.size(), "textured": textured.keys()}))
+	return true
