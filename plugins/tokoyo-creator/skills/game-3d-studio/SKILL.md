@@ -117,6 +117,13 @@ Blender が無く、利用者が入れない場合は 3D スタジオを使わ�
 描画は **Cycles（CPU）**、サンプル 16〜32、解像度はゲームで表示する大きさ（64〜256 px）。
 背景は透明。できた PNG を GodotのSpriteFramesへ登録する（`$game-godot`）。
 
+### 4.4.1 草・木・茂み
+
+`<kit>/skills/game-3d-studio/assets/foliage_recipe.py` を `art/3d/` にコピーして数値を直す（草の株・葉のカードの木）。
+葉の法線は Normal Edit の `RADIAL`（樹冠の楕円体から外向き）、草は `DIRECTIONAL`（上向き）、揺れの重みは色の属性 `wind` を
+`export_vertex_color="ACTIVE"` で `COLOR_0` に出す（既定の `MATERIAL` では黙って消える）。葉の alpha は Math の ROUND を通して MASK にする。
+Godot では取り込んだ材質が頂点カラーを基本色に掛けるので、葉と幹の材質は差し替える（`$game-art-direction` references/nature.md）。
+
 ### 4.5 ベイク
 
 高密度原型から軽量モデルへ法線/色を移すときは references/model-quality.md §3 を使う。

@@ -69,6 +69,7 @@ tint・パレット変換・全画面の color grading は形や描き方の違�
 - HUDはCanvasLayerへ分離し、暗化・霧・揺れに巻き込まない。
 - 同時光源・透明描画・全画面処理を増やし過ぎず、重いshaderは必要な対象だけに使う。
 - pixel artはfilter・整数拡大・カメラ位置を揃え、移動時のちらつきも実画面で確認する。
+- 草・茂み・花を揺らすときは根元を固定した頂点の揺れ（`assets/nature/sway_2d.gdshader`、references/nature.md）。
 
 読み込み・画面・性能は`$game-godot`、`$game-screen-layout`、`$game-3d-and-bundles`に従う。
 
@@ -106,6 +107,8 @@ tint・パレット変換・全画面の color grading は形や描き方の違�
   型だけで描画互換性を保証せず、得られた画像で確認する。未確認の描画経路は未確認と報告する。
 
 標準マテリアルを先に使う。CDN・Inspector・独自の外部 shader compiler は追加しない。
+Web とスマホの Compatibility には SSAO / SSR / SDFGI / 体積フォグ / 被写界深度が無く、Glow は簡易版で、alpha to coverage と葉の SSS 透過は効かない。
+屋外・植生・空・霧・影の設定と重さは references/nature.md（読む公式の章と、資料に無い落とし穴）に従う。
 解像度、KTX2、GPU メモリ、素材の解放は `$game-3d-and-bundles` に従う。
 
 ## 6. 画面で確かめ、修正を残す

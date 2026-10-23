@@ -11,6 +11,7 @@ description: 2D / 3D の画風・質感・光・影・色調・カメラを揃�
 **素材の配色だけでなく、組み合わせたプレイ画面までディレクションする。** 最初に
 [references/visual-direction.md](references/visual-direction.md) の §1〜§3 を読み、2D は §4、3D は §5、仕上げは §6 を読む。
 マップ・ステージ・世界を作る作品は [references/concept-to-map.md](references/concept-to-map.md) も読み、コンセプトを変換表に書き下ろしてから素材と照明を決める。
+草原・森・川・空など屋外や自然を見せる作品は [references/nature.md](references/nature.md) で公式資料の読む場所・Compatibility の落とし穴・検証済みの部品（草・葉・地面・水の shader と MultiMesh の配置）・重さの予算を確かめてから作る。
 利用者の指定と既存の作品の基準を優先する。ジャンル名から固定プリセットを当てない。
 
 ## 1. コンセプト（`design/concept/` と `design/style-guide.md`）

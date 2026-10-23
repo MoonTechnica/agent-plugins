@@ -46,7 +46,7 @@ GDExtensionの地形（Terrain3D等）は使えない（WebとiOSの実行環境
   ツール（`build`）で作る。ノイズだけの地形にしない（目印の山・川の谷・均した道・町の台地を意図して置く）。高さ・植生の密度・道/川は主PCKの
   `terrain/*.bin` に入れ、細かい高さタイルが要るなら地域packに入れる。8 bitの高さは段差になるので使わない。
 - **当たり判定**: 利用者（と対戦相手）の周囲の数チャンクだけ`HeightMapShape3D`を作り、離れたら外す。生成もフレームの時間予算に含める。
-- **植生・小物**: `MultiMeshInstance3D`を地域×区画ごとに分ける（1つのMultiMeshは全体で同じLODになる）。配置表は地域packに置く。
+- **植生・小物**: `MultiMeshInstance3D`を地域×区画ごとに分ける（1つのMultiMeshは全体で同じLODになる）。配置表は地域packに置く。草・木・地面・水の見た目と重さは `$game-art-direction` references/nature.md の部品と予算を使う。
   半透明を避け、不透明かアルファテストにする。
 - **遠景**: 霧で遠景を消し、`Camera3D.far`を縮める（既定4000。1.5〜2 kmから実測で決める）。さらに遠くは最も粗いリングで描く。
   影の距離は延ばさない。Web・モバイルのCompatibility rendererでは可視範囲（`visibility_range_*`）のフェードが効かず即座に切り替わるので、
