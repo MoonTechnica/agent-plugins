@@ -163,6 +163,9 @@ Smart Topologyや複数視点等を公式サイトで見つけても、現行ツ
   渡すと、直下の同じ大きさのタイルを名前順に 1 枚のシートにして取り込み、`tileset`（タイルの大きさ・列数・ファイル名ごとの [列, 行]）を返す。
   `stock` 枠は 1 回。Kenney の元のシートと同じ並びにしたいときは `columns` を指定する（Pixel Platformer は 20）。
   タイルを 1 枚ずつ取り込まない。取り込んだシートは `$game-level-design` references/tilemaps.md の `sheet` → `tileset` → `paint` で使う。
+- **3D キット（壁・床・柵の部品）もフォルダで 1 回**: 画像が無く 3D のモデルが並ぶフォルダ（例 `kenney:3d/castle/`）を渡すと、
+  部品ごとに 1 つのノード（名前はファイル名）にまとめた 1 つの GLB を取り込み、`kit`（ファイル名→ノード名、外した物）を返す。
+  動きや骨のあるモデル（キャラ・開く宝箱）は外れるので 1 つずつ取り込む。GLB は `godot/kit/` に置き、`tiles.gd meshlib` で部品の一覧にする（tilemaps.md §6）。
 
 - **3Dは結果の`animations`**をGodotのAnimationPlayer/AnimationTreeで再生する。
   GLBをimportしてシーンへ配置し、実際のクリップ名を確認する。終了時はシーンと保持したResource参照を解放する。

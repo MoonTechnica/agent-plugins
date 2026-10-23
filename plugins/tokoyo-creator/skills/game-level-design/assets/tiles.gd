@@ -1,28 +1,32 @@
 extends SceneTree
 ## Tile tools for the game agent (game-level-design references/tilemaps.md). Build-time only:
 ## nothing here ships in the game. Run `godot --headless --path <source>/godot --import` first so
-## the tile images are imported resources.
+## the tile images and kits are imported resources.
 ##
 ##   godot --headless --path <source>/godot -s <tool> -- atlas <res://dir> --out <res://sheet.png> [--columns N]
 ##   godot --headless --path <source>/godot -s <tool> -- sheet <res://image.png> [--tile WxH] [--margin X,Y] [--separation X,Y]
 ##   godot --headless --path <source>/godot -s <tool> -- greybox <res://dir> --tile N --terrains a,b,c
+##   godot --headless --path <source>/godot -s <tool> -- compose <source>/design/tiles/<name>.compose.json
 ##   godot --headless --path <source>/godot -s <tool> -- tileset <source>/design/tiles/<name>.json
 ##   godot --headless --path <source>/godot -s <tool> -- paint <source>/design/tilemaps/<room>.json
-##   godot --headless --path <source>/godot -s <tool> -- meshlib <res://kit.glb> <res://out.tres>
+##   godot --headless --path <source>/godot -s <tool> -- meshlib <res://kit.glb|res://dir> <res://out.tres> [--collision box|convex|trimesh|none]
 ##
 ## atlas: packs single tile images (one PNG per tile, as CC0 packs like Kenney ship them) into one
 ##   sheet in file-name order and writes `<sheet>.atlas.json` (file → atlas coords).
 ## sheet: reads a tile sheet, guesses the grid when --tile is missing, and writes `<image>.sheet.png`
 ##   (enlarged, gridded, row/column numbers) plus `<image>.sheet.json` (per-tile edge opacity and a
 ##   suggested terrain shape) next to the image, so the agent can look at the sheet before mapping it.
-## greybox: writes a flat-colour corner tile sheet (16 tiles per terrain) and its tileset spec, so a
-##   greybox map can autotile before any art exists.
+## compose: draws all 47 "corners and sides" tiles of each terrain from a fill texture (made
+##   seamless on request) and edge strips (a grass cap, a rim), so art in the concept's style
+##   becomes an autotiling tile set. Writes the sheet and its tileset spec.
+## greybox: compose with flat colours, so a greybox map autotiles before any art exists.
 ## tileset: builds a TileSet resource from a JSON spec (atlas grid, padding, collision, one-way,
 ##   custom data, terrain sets with peering bits, probability, animation).
-## paint: paints TileMapLayer nodes of a scene from character grids with terrain connect, saves the
-##   scene, writes a picture of the result (from the atlas, no GPU) and reports cells whose
-##   neighbours have no matching tile.
-## meshlib: turns each mesh of a 3D kit into a MeshLibrary item (with a collision shape) for GridMap.
+## paint: paints TileMapLayer / GridMap nodes of a scene from character grids (2D terrain connect,
+##   3D pieces chosen and turned by their neighbours), saves the scene, writes a picture of the
+##   result (from the data, no GPU; problems marked red) and a report of what did not fit.
+## meshlib: turns each piece of a 3D kit into one MeshLibrary item (with a collision shape) for
+##   GridMap and writes a contact sheet of the pieces seen from above and from the front.
 
 const MODES := {"corners_and_sides": TileSet.TERRAIN_MODE_MATCH_CORNERS_AND_SIDES, "corners": TileSet.TERRAIN_MODE_MATCH_CORNERS, "sides": TileSet.TERRAIN_MODE_MATCH_SIDES}
 ## Peering bits in the order a shape string lists them (clockwise from the top left).
@@ -37,7 +41,7 @@ const COMMON_SIZES := [16, 18, 32, 64, 24, 48, 8, 12, 20, 21, 128]
 
 func _initialize() -> void:
 	var args := OS.get_cmdline_user_args()
-	var commands := ["atlas", "sheet", "greybox", "tileset", "paint", "meshlib"]
+	var commands := ["atlas", "sheet", "greybox", "compose", "tileset", "paint", "meshlib"]
 	if args.is_empty() or not args[0] in commands:
 		_fail("usage: tiles.gd -- %s ..." % "|".join(commands))
 		return
@@ -46,6 +50,7 @@ func _initialize() -> void:
 		"atlas": ok = _atlas(args.slice(1))
 		"sheet": ok = _sheet(args.slice(1))
 		"greybox": ok = _greybox(args.slice(1))
+		"compose": ok = _compose(args.slice(1))
 		"tileset": ok = _tileset(args.slice(1))
 		"paint": ok = await _paint(args.slice(1))
 		"meshlib": ok = _meshlib(args.slice(1))
@@ -303,9 +308,10 @@ func _preview(image: Image, tile: Vector2i, margin: Vector2i, separation: Vector
 	return out
 
 # ---------------------------------------------------------------------------------------------
-# greybox: flat-colour corner tiles so a greybox map autotiles before art exists
+# compose / greybox: textures and edge strips → the 47 tiles of each terrain
 
 const GREYBOX_COLORS := [Color(0.55, 0.55, 0.6), Color(0.4, 0.62, 0.36), Color(0.3, 0.5, 0.8), Color(0.72, 0.6, 0.38), Color(0.62, 0.38, 0.38), Color(0.5, 0.42, 0.66)]
+const SIDE_NAMES := ["top", "right", "bottom", "left"]
 
 func _greybox(args: Array) -> bool:
 	if args.is_empty(): return _fail("greybox needs an output res:// directory")
@@ -313,54 +319,151 @@ func _greybox(args: Array) -> bool:
 	var size := int(_option(args, "--tile", "16"))
 	var names := _option(args, "--terrains", "ground").split(",", false)
 	if size < 6 or names.is_empty(): return _fail("greybox needs --tile >= 6 and --terrains a,b")
-	DirAccess.make_dir_recursive_absolute(ProjectSettings.globalize_path(dir))
+	var terrains := []
+	for t in names.size():
+		var base: Color = GREYBOX_COLORS[t % GREYBOX_COLORS.size()]
+		# A darker rim where the terrain meets empty space keeps the shape readable.
+		terrains.append({"name": names[t], "fill": "#" + base.to_html(false), "edge": {"color": "#" + base.darkened(0.35).to_html(false), "width": maxi(1, size / 16)}})
+	return _compose_tiles({"output": dir.path_join("greybox_tiles"), "tile": size, "pixel_art": true, "terrains": terrains}, "TILES_GREYBOX")
+
+func _compose(args: Array) -> bool:
+	if args.is_empty(): return _fail("compose needs a spec path")
+	var spec := _read_json(args[0])
+	if spec.is_empty(): return _fail("compose: no spec")
+	return _compose_tiles(spec, "TILES_COMPOSE")
+
+func _compose_tiles(spec: Dictionary, tag: String) -> bool:
+	var size := int(spec.get("tile", 16))
+	var out: String = spec.get("output", "")
+	var defs: Array = spec.get("terrains", [])
+	if out == "" or size < 6 or defs.is_empty(): return _fail("compose needs \"output\" (res://dir/name), \"tile\" >= 6 and \"terrains\"")
+	var pixel := bool(spec.get("pixel_art", size <= 32))
+	DirAccess.make_dir_recursive_absolute(ProjectSettings.globalize_path(out.get_base_dir()))
 	var shapes := _blob_shapes()
 	var columns := 8
 	var rows_per := ceili(float(shapes.size()) / columns)
-	var image := Image.create(size * columns, size * rows_per * names.size(), false, Image.FORMAT_RGBA8)
+	var image := Image.create(size * columns, size * rows_per * defs.size(), false, Image.FORMAT_RGBA8)
 	var tiles := {}
 	var terrains := []
-	var third := size / 3
-	# 3x3 parts of a tile in shape order (TL, T, TR, R, BR, B, BL, L), then the centre.
-	var parts := [Rect2i(0, 0, third, third), Rect2i(third, 0, size - third * 2, third), Rect2i(size - third, 0, third, third),
-		Rect2i(size - third, third, third, size - third * 2), Rect2i(size - third, size - third, third, third),
-		Rect2i(third, size - third, size - third * 2, third), Rect2i(0, size - third, third, third), Rect2i(0, third, third, size - third * 2)]
-	var centre := Rect2i(third, third, size - third * 2, size - third * 2)
-	for t in names.size():
-		var base: Color = GREYBOX_COLORS[t % GREYBOX_COLORS.size()]
-		terrains.append({"name": names[t], "color": "#" + base.to_html(false)})
+	var names := []
+	for t in defs.size():
+		var def: Dictionary = defs[t]
+		var name := str(def.get("name", "terrain%d" % t))
+		var fill := _fill_image(def.get("fill", "#888888"), size, pixel, bool(def.get("seamless", false)))
+		if fill == null: return _fail("compose: cannot read the fill of %s" % name)
+		var strips := []
+		for s in 4:
+			var strip = _edge_strip(def.get(SIDE_NAMES[s], def.get("edge")), size, pixel)
+			if strip is String: return _fail("compose: %s %s: %s" % [name, SIDE_NAMES[s], strip])
+			strips.append(strip)
+		names.append(name)
+		terrains.append({"name": name, "color": "#" + _average(fill, Rect2i(Vector2i.ZERO, fill.get_size())).to_html(false)})
 		for i in shapes.size():
-			var shape: String = shapes[i]
 			var at := Vector2i(i % columns, t * rows_per + i / columns)
-			var origin := at * size
-			image.fill_rect(Rect2i(origin + centre.position, centre.size), base)
-			for k in 8:
-				if shape[k] == "#": image.fill_rect(Rect2i(origin + parts[k].position, parts[k].size), base)
-			# A darker rim where the terrain meets empty space keeps the shape readable.
-			for y in size:
-				for x in size:
-					var px := origin + Vector2i(x, y)
-					if image.get_pixelv(px).a == 0.0: continue
-					var edge := x == 0 and shape[7] == "." or x == size - 1 and shape[3] == "." or y == 0 and shape[1] == "." or y == size - 1 and shape[5] == "."
-					for d in [Vector2i(1, 0), Vector2i(-1, 0), Vector2i(0, 1), Vector2i(0, -1)]:
-						var n: Vector2i = Vector2i(x, y) + d
-						if n.x >= 0 and n.y >= 0 and n.x < size and n.y < size and image.get_pixelv(origin + n).a == 0.0: edge = true
-					if edge: image.set_pixelv(px, base.darkened(0.35))
-			tiles["%d,%d" % [at.x, at.y]] = {"terrain": names[t], "shape": shape, "collision": "solid"}
-	var png := dir.path_join("greybox_tiles.png")
+			_draw_shape(image, at * size, size, shapes[i], fill, strips, int(def.get("round", 0)))
+			tiles["%d,%d" % [at.x, at.y]] = {"terrain": name, "shape": shapes[i], "collision": def.get("collision", "solid")}
+	var png := out + ".png"
 	image.save_png(ProjectSettings.globalize_path(png))
-	var spec := {
+	var tileset_spec := {
 		"version": 1,
 		"image": png,
 		"tile_size": [size, size],
-		"output": dir.path_join("greybox_tiles.tres"),
+		"output": out + ".tres",
 		"physics_layers": [{"collision_layer": 1, "collision_mask": 1}],
 		"terrain_sets": [{"mode": "corners_and_sides", "terrains": terrains}],
 		"tiles": tiles,
 	}
-	_write(dir.path_join("greybox_tiles.json"), JSON.stringify(spec, "  "))
-	print("TILES_GREYBOX=", JSON.stringify({"image": png, "spec": dir.path_join("greybox_tiles.json"), "terrains": names, "tiles_per_terrain": shapes.size()}))
+	_write(out + ".json", JSON.stringify(tileset_spec, "  "))
+	print(tag, "=", JSON.stringify({"image": png, "spec": out + ".json", "terrains": names, "tiles_per_terrain": shapes.size()}))
 	return true
+
+## A colour, or an image scaled to one tile. A tile is reused everywhere, so the texture must
+## wrap; `seamless` blends its borders so the repeats do not show.
+func _fill_image(value, size: int, pixel: bool, seamless: bool) -> Image:
+	var text := str(value)
+	if text.begins_with("#"):
+		var flat := Image.create(size, size, false, Image.FORMAT_RGBA8)
+		flat.fill(Color.from_string(text, Color.GRAY))
+		return flat
+	var image := _load_image(text)
+	if image == null: return null
+	if seamless: image = _seamless(image)
+	image.resize(size, size, Image.INTERPOLATE_NEAREST if pixel else Image.INTERPOLATE_LANCZOS)
+	return image
+
+## The edge strip of one side, `size` long and `width` deep; row 0 touches the empty side.
+## Returns null for no edge and a String for an error.
+func _edge_strip(def, size: int, pixel: bool):
+	if not def is Dictionary: return null
+	var width := clampi(int(def.get("width", maxi(1, size / 8))), 1, size / 2)
+	var strip: Image
+	if def.has("image"):
+		strip = _load_image(str(def.image))
+		if strip == null: return "cannot read %s" % def.image
+		strip.resize(size, width, Image.INTERPOLATE_NEAREST if pixel else Image.INTERPOLATE_LANCZOS)
+	else:
+		strip = Image.create(size, width, false, Image.FORMAT_RGBA8)
+		strip.fill(Color.from_string(str(def.get("color", "#000000")), Color.BLACK))
+	return strip
+
+## Each pixel takes the fill, then the strip of the nearest empty side (or inner corner) within
+## that strip's depth. Outer corners can be rounded off.
+func _draw_shape(image: Image, origin: Vector2i, size: int, shape: String, fill: Image, strips: Array, round: int) -> void:
+	for y in size:
+		for x in size:
+			if round > 0 and _rounded_off(shape, size, x, y, round): continue
+			var colour := fill.get_pixel(x, y)
+			var near := _nearest_edge(shape, size, x, y, strips)
+			if near.x >= 0:
+				var strip: Image = strips[near.x]
+				colour = colour.blend(strip.get_pixel(x if near.x % 2 == 0 else y, near.y))
+			image.set_pixelv(origin + Vector2i(x, y), colour)
+
+## [side, depth] of the closest exposed edge that has a strip, or [-1, -1].
+func _nearest_edge(shape: String, size: int, x: int, y: int, strips: Array) -> Vector2i:
+	var far := [y, size - 1 - x, size - 1 - y, x]  # distance to the top, right, bottom, left border
+	var best := Vector2i(-1, -1)
+	for s in 4:
+		if shape[s * 2 + 1] == "." and strips[s] != null and far[s] < strips[s].get_height() and (best.x < 0 or far[s] < best.y): best = Vector2i(s, far[s])
+	# Inner corners: both sides connect but the diagonal cell is empty.
+	for k in [0, 2, 4, 6]:
+		if shape[k] != "." or shape[k + 1] != "#" or shape[(k + 7) % 8] != "#": continue
+		var vertical: int = 0 if k < 4 else 2  # the top or bottom side this corner touches
+		var horizontal: int = 3 if k == 0 or k == 6 else 1
+		var dy: int = far[vertical]
+		var dx: int = far[horizontal]
+		var s: int = vertical if dy >= dx else horizontal
+		var d := maxi(dx, dy)
+		if strips[s] != null and d < strips[s].get_height() and (best.x < 0 or d < best.y): best = Vector2i(s, d)
+	return best
+
+func _rounded_off(shape: String, size: int, x: int, y: int, r: int) -> bool:
+	var cx := x if x < r else (size - 1 - x if x >= size - r else -1)
+	var cy := y if y < r else (size - 1 - y if y >= size - r else -1)
+	if cx < 0 or cy < 0: return false
+	var side_x := 7 if x < r else 3
+	var side_y := 1 if y < r else 5
+	if shape[side_x] != "." or shape[side_y] != ".": return false
+	return Vector2(r - cx - 0.5, r - cy - 0.5).length() > r
+
+## Tileable in both directions: each axis is blended with its half-offset copy near the borders,
+## where the copy is continuous across the wrap; its own seam sits in the middle at zero weight.
+func _seamless(image: Image) -> Image:
+	var result := image
+	for axis in 2:
+		var w := result.get_width()
+		var h := result.get_height()
+		var out := result.duplicate() as Image
+		var length := w if axis == 0 else h
+		for y in h:
+			for x in w:
+				var p := x if axis == 0 else y
+				var weight := clampf((absf(float(p) / maxf(length - 1, 1) * 2.0 - 1.0) - 0.5) * 2.0, 0.0, 1.0)
+				if weight == 0.0: continue
+				var other := result.get_pixel((x + w / 2) % w, y) if axis == 0 else result.get_pixel(x, (y + h / 2) % h)
+				out.set_pixel(x, y, result.get_pixel(x, y).lerp(other, weight))
+		result = out
+	return result
 
 ## The 47 neighbour shapes of a "corners and sides" set: a corner counts only when both sides
 ## next to it connect (Godot's 3x3 minimal layout).
@@ -628,7 +731,8 @@ func _paint(args: Array) -> bool:
 	if ResourceLoader.exists(scene_path):
 		root = (load(scene_path) as PackedScene).instantiate()
 	else:
-		root = Node2D.new()
+		var three_d: bool = spec.get("layers", []).any(func(l) -> bool: return l is Dictionary and l.has("mesh_library"))
+		root = Node3D.new() if three_d else Node2D.new()
 		root.name = scene_path.get_file().get_basename().to_pascal_case()
 	get_root().add_child(root)
 	var terrain_ref := {}
@@ -640,10 +744,12 @@ func _paint(args: Array) -> bool:
 	var origin := _vec2i(spec.get("origin"), Vector2i.ZERO)
 	var layers: Array = spec.get("layers", [])
 	var painted := []
+	var grid_maps := []
 	for layer_def in layers:
 		var node_name: String = layer_def.get("node", "Ground")
 		if layer_def.has("mesh_library"):
-			report.layers[node_name] = _paint_gridmap(root, node_name, layer_def, origin, report)
+			var grid_map := _paint_gridmap(root, node_name, layer_def, origin, report)
+			if grid_map != null: grid_maps.append(grid_map)
 			continue
 		var layer := root.get_node_or_null(node_name) as TileMapLayer
 		if layer == null:
@@ -666,14 +772,14 @@ func _paint(args: Array) -> bool:
 				var ch := row[x]
 				if ch == "." or ch == " ": continue
 				if not legend.has(ch):
-					report.unmatched.append({"layer": node_name, "cell": [x, y], "problem": "no legend for '%s'" % ch})
+					report.unmatched.append({"layer": node_name, "cell": [origin.x + x, origin.y + y], "problem": "no legend for '%s'" % ch})
 					continue
 				var cell := origin + Vector2i(x, y)
 				var entry: Dictionary = legend[ch]
 				counts[ch] = counts.get(ch, 0) + 1
 				if entry.has("terrain"):
 					if not terrain_ref.has(entry.terrain):
-						report.unmatched.append({"layer": node_name, "cell": [x, y], "problem": "unknown terrain %s" % entry.terrain})
+						report.unmatched.append({"layer": node_name, "cell": [origin.x + x, origin.y + y], "problem": "unknown terrain %s" % entry.terrain})
 						continue
 					if not by_terrain.has(entry.terrain): by_terrain[entry.terrain] = []
 					by_terrain[entry.terrain].append(cell)
@@ -694,7 +800,9 @@ func _paint(args: Array) -> bool:
 	var err := packed.pack(root)
 	if err == OK: err = ResourceSaver.save(packed, scene_path)
 	if err != OK: return _fail("paint: cannot save %s (%s)" % [scene_path, error_string(err)])
-	var picture := _picture(painted, tile_set) if tile_set != null else null
+	var picture: Image = null
+	if tile_set != null and not painted.is_empty(): picture = _picture(painted, tile_set, report.unmatched)
+	elif not grid_maps.is_empty(): picture = _top_view(grid_maps, report.unmatched)
 	var png := ""
 	if picture != null:
 		png = spec_path.get_basename() + ".png"
@@ -704,13 +812,14 @@ func _paint(args: Array) -> bool:
 	print("TILES_PAINT=", JSON.stringify({"scene": scene_path, "picture": png, "unmatched": report.unmatched.size()}))
 	return true
 
-## 3D: the same character grid fills a GridMap floor. Legend entries name MeshLibrary items and an
-## optional rotation around Y in degrees (0, 90, 180, 270).
-func _paint_gridmap(root: Node, node_name: String, def: Dictionary, origin: Vector2i, report: Dictionary) -> Dictionary:
+## 3D: the same character grid fills a GridMap floor. A legend entry names one MeshLibrary item
+## (with an optional turn around Y in degrees), or lists `pieces` with the sides they connect on,
+## and each cell gets the piece and the turn that fit its neighbours (walls, fences, roads, rims).
+func _paint_gridmap(root: Node, node_name: String, def: Dictionary, origin: Vector2i, report: Dictionary) -> GridMap:
 	var library = load(def.mesh_library)
 	if not library is MeshLibrary:
 		report.unmatched.append({"layer": node_name, "problem": "cannot load mesh library %s" % def.mesh_library})
-		return {}
+		return null
 	var grid_map := root.get_node_or_null(node_name) as GridMap
 	if grid_map == null:
 		grid_map = GridMap.new()
@@ -726,20 +835,289 @@ func _paint_gridmap(root: Node, node_name: String, def: Dictionary, origin: Vect
 	var counts := {}
 	var legend: Dictionary = def.get("legend", {})
 	var rows: Array = def.get("grid", [])
+	var outside := _outside_cells(rows)
 	for z in rows.size():
 		var row: String = rows[z]
 		for x in row.length():
 			var ch := row[x]
 			if ch == "." or ch == " ": continue
-			var entry: Dictionary = legend.get(ch, {})
-			var item: int = library.find_item_by_name(str(entry.get("item", "")))
-			if item < 0:
-				report.unmatched.append({"layer": node_name, "cell": [x, z], "problem": "no mesh library item for '%s'" % ch})
+			if not legend.has(ch):
+				report.unmatched.append({"layer": node_name, "cell": [origin.x + x, origin.y + z], "problem": "no legend for '%s'" % ch})
 				continue
-			var basis := Basis(Vector3.UP, deg_to_rad(float(entry.get("rotate", 0))))
+			var choice := _choose_piece(legend[ch], rows, x, z, ch, outside)
+			if choice.has("problem"): report.unmatched.append({"layer": node_name, "cell": [origin.x + x, origin.y + z], "problem": choice.problem})
+			if choice.item == "": continue
+			var item: int = library.find_item_by_name(choice.item)
+			if item < 0:
+				report.unmatched.append({"layer": node_name, "cell": [origin.x + x, origin.y + z], "problem": "no mesh library item '%s'" % choice.item})
+				continue
+			var basis := Basis(Vector3.UP, deg_to_rad(choice.rotate))
 			grid_map.set_cell_item(Vector3i(origin.x + x, floor_y, origin.y + z), item, grid_map.get_orthogonal_index_from_basis(basis))
 			counts[ch] = counts.get(ch, 0) + 1
-	return counts
+	if def.get("walkable", false): report.unmatched.append_array(_holes(rows, node_name, origin))
+	report.layers[node_name] = counts
+	return grid_map
+
+## Neighbour order of masks (as in 2D shapes): NW, N, NE, E, SE, S, SW, W.
+const AROUND := [Vector2i(-1, -1), Vector2i(0, -1), Vector2i(1, -1), Vector2i(1, 0), Vector2i(1, 1), Vector2i(0, 1), Vector2i(-1, 1), Vector2i(-1, 0)]
+
+## Picks {item, rotate} for one cell. A piece's `sides` says where it connects when not turned:
+## 4 characters N E S W, or 8 characters NW N NE E SE S SW W ("#" connects, "." does not, "?"
+## either). Turning by +90 degrees around Y carries east to north, i.e. mask index i to i - 2.
+## A piece with a `front` (N/E/S/W: its inner, decorated face) is turned so that face looks into
+## the enclosed area rather than outside; otherwise the smallest fitting turn wins. Several
+## fitting pieces (variants) are picked by cell position, so the result is repeatable.
+func _choose_piece(entry: Dictionary, rows: Array, x: int, z: int, ch: String, outside: Dictionary) -> Dictionary:
+	if not entry.has("pieces"): return {"item": str(entry.get("item", "")), "rotate": float(entry.get("rotate", 0))}
+	var mask := _neighbour_mask(rows, x, z, str(entry.get("joins", "")) + ch)
+	var fits := []
+	var best := -2
+	var pieces: Array = entry.pieces
+	for p in pieces.size():
+		var piece: Dictionary = pieces[p]
+		var sides := str(piece.get("sides", ""))
+		if sides.length() == 4: sides = "?%s?%s?%s?%s" % [sides[0], sides[1], sides[2], sides[3]]
+		if sides.length() != 8: continue
+		for k in 4:
+			if not _turned_fits(sides, k, mask): continue
+			var score := _front_score(str(piece.get("front", "")), k, rows, x, z, outside)
+			best = maxi(best, score)
+			fits.append({"item": str(piece.item), "rotate": float(piece.get("rotate", 0)) + k * 90.0, "score": score, "piece": p})
+	if fits.is_empty(): return {"item": str(entry.get("fallback", "")), "rotate": 0.0, "problem": "no piece connects like %s (NW N NE E SE S SW W)" % mask}
+	var first_per_piece := {}
+	for fit in fits:
+		if fit.score == best and not first_per_piece.has(fit.piece): first_per_piece[fit.piece] = fit
+	var options := first_per_piece.values()
+	return options[absi(x * 73856093 ^ z * 19349663) % options.size()]
+
+## +1 when the turned front faces an enclosed empty cell, -1 when it faces the outside, else 0.
+func _front_score(front: String, k: int, rows: Array, x: int, z: int, outside: Dictionary) -> int:
+	var local := {"N": 1, "E": 3, "S": 5, "W": 7}.get(front, -1) as int
+	if local < 0: return 0
+	var at: Vector2i = Vector2i(x, z) + AROUND[posmod(local - 2 * k, 8)]
+	if outside.has(at): return -1
+	if at.y >= 0 and at.y < rows.size() and at.x >= 0 and at.x < (rows[at.y] as String).length() and (rows[at.y] as String)[at.x] in [".", " "]: return 1
+	return 0
+
+## Empty cells reachable from beyond the grid without crossing a piece: the outside of rooms.
+func _outside_cells(rows: Array) -> Dictionary:
+	var width := 0
+	for row in rows: width = maxi(width, (row as String).length())
+	var outside := {}
+	var queue := []
+	for x in range(-1, width + 1):
+		queue.append(Vector2i(x, -1))
+		queue.append(Vector2i(x, rows.size()))
+	for z in rows.size():
+		queue.append(Vector2i(-1, z))
+		queue.append(Vector2i(width, z))
+	while not queue.is_empty():
+		var at: Vector2i = queue.pop_back()
+		if outside.has(at) or at.x < -1 or at.y < -1 or at.x > width or at.y > rows.size(): continue
+		var inside_grid := at.y >= 0 and at.y < rows.size() and at.x >= 0 and at.x < (rows[at.y] as String).length()
+		if inside_grid and not (rows[at.y] as String)[at.x] in [".", " "]: continue
+		outside[at] = true
+		for d in [Vector2i(0, -1), Vector2i(1, 0), Vector2i(0, 1), Vector2i(-1, 0)]: queue.append(at + d)
+	return outside
+
+func _turned_fits(sides: String, k: int, mask: String) -> bool:
+	for i in 8:
+		var want := sides[i]
+		if want != "?" and want != mask[posmod(i - 2 * k, 8)]: return false
+	return true
+
+## Which neighbours join this cell; a corner counts only when both sides next to it join.
+func _neighbour_mask(rows: Array, x: int, z: int, joins: String) -> String:
+	var on := []
+	for d in AROUND:
+		var at: Vector2i = Vector2i(x, z) + d
+		var joined := false
+		if at.y >= 0 and at.y < rows.size() and at.x >= 0 and at.x < (rows[at.y] as String).length():
+			joined = joins.contains((rows[at.y] as String)[at.x])
+		on.append(joined)
+	var mask := ""
+	for i in 8:
+		var j: bool = on[i]
+		if i % 2 == 0: j = j and on[(i + 7) % 8] and on[i + 1]
+		mask += "#" if j else "."
+	return mask
+
+## Empty cells walled in on three or four sides by a walkable layer: likely a missing floor piece.
+func _holes(rows: Array, node_name: String, origin: Vector2i) -> Array:
+	var found := []
+	for z in rows.size():
+		var row: String = rows[z]
+		for x in row.length():
+			if row[x] != "." and row[x] != " ": continue
+			var closed := 0
+			for d in [Vector2i(0, -1), Vector2i(1, 0), Vector2i(0, 1), Vector2i(-1, 0)]:
+				var at: Vector2i = Vector2i(x, z) + d
+				if at.y >= 0 and at.y < rows.size() and at.x >= 0 and at.x < (rows[at.y] as String).length() and not (rows[at.y] as String)[at.x] in [".", " "]: closed += 1
+			if closed >= 3: found.append({"layer": node_name, "cell": [origin.x + x, origin.y + z], "problem": "hole: an empty cell inside the floor"})
+	return found
+
+# ---------------------------------------------------------------------------------------------
+# Pictures of 3D pieces, drawn from the mesh data (headless Godot has no GPU)
+
+const NO_HEIGHT := -1.0e9
+
+## GridMaps seen from above: each piece's faces coloured by material and texture, shaded by how
+## much they face up, with outlines where the height drops. Problem cells are framed in red.
+func _top_view(maps: Array, marks: Array) -> Image:
+	var lo := Vector2i(1 << 30, 1 << 30)
+	var hi := Vector2i(-(1 << 30), -(1 << 30))
+	for gm in maps:
+		for c in gm.get_used_cells():
+			lo = Vector2i(mini(lo.x, c.x), mini(lo.y, c.z))
+			hi = Vector2i(maxi(hi.x, c.x), maxi(hi.y, c.z))
+	if lo.x > hi.x: return null
+	var span := hi - lo + Vector2i(3, 3)
+	var cell_px := clampi(4096 / maxi(span.x, span.y), 4, 48)
+	var size := span * cell_px
+	var view := {"image": Image.create(size.x, size.y, false, Image.FORMAT_RGBA8), "heights": PackedFloat32Array(), "size": size}
+	view.image.fill(Color(0.1, 0.11, 0.14))
+	view.heights.resize(size.x * size.y)
+	view.heights.fill(NO_HEIGHT)
+	var sprites := {}
+	for gm in maps:
+		var cs: Vector3 = gm.cell_size
+		var ppm := float(cell_px) / cs.x
+		var lib: MeshLibrary = gm.mesh_library
+		for c in gm.get_used_cells():
+			var item: int = gm.get_cell_item(c)
+			var orient: int = gm.get_cell_item_orientation(c)
+			var key := "%d/%d/%d" % [lib.get_instance_id(), item, orient]
+			if not sprites.has(key):
+				var mesh := lib.get_item_mesh(item)
+				sprites[key] = null if mesh == null else _sprite(mesh, Transform3D(gm.get_basis_with_orthogonal_index(orient), Vector3.ZERO) * lib.get_item_mesh_transform(item), ppm)
+			if sprites[key] == null: continue
+			var centre: Vector3 = gm.map_to_local(c)
+			var at := Vector2i(roundi((centre.x / cs.x - lo.x + 1) * cell_px), roundi((centre.z / cs.z - lo.y + 1) * cell_px))
+			_stamp(view, sprites[key], at, centre.y)
+	_outline(view, 0.25 * (maps[0] as GridMap).cell_size.y)
+	for m in marks:
+		if not m.has("cell"): continue
+		var at := (Vector2i(m.cell[0], m.cell[1]) - lo + Vector2i.ONE) * cell_px
+		_frame(view.image, Rect2i(at, Vector2i(cell_px, cell_px)), Color(1, 0.2, 0.2))
+	return view.image
+
+## One piece rasterised from above at `ppm` pixels per metre: colours, heights and the pixel
+## offset of its top-left corner from the cell centre.
+func _sprite(mesh: Mesh, xf: Transform3D, ppm: float) -> Dictionary:
+	var box := xf * mesh.get_aabb()
+	var offset := Vector2i(floori(box.position.x * ppm) - 1, floori(box.position.z * ppm) - 1)
+	var size := Vector2i(ceili(box.end.x * ppm) + 1, ceili(box.end.z * ppm) + 1) - offset
+	size = size.clamp(Vector2i.ONE, Vector2i(1024, 1024))
+	var sprite := {"image": Image.create(size.x, size.y, false, Image.FORMAT_RGBA8), "heights": PackedFloat32Array(), "offset": offset, "size": size}
+	sprite.heights.resize(size.x * size.y)
+	sprite.heights.fill(NO_HEIGHT)
+	for s in mesh.get_surface_count():
+		var arrays := mesh.surface_get_arrays(s)
+		var verts: PackedVector3Array = arrays[Mesh.ARRAY_VERTEX]
+		var uvs = arrays[Mesh.ARRAY_TEX_UV]
+		var indices = arrays[Mesh.ARRAY_INDEX]
+		if indices == null or (indices as PackedInt32Array).is_empty():
+			indices = PackedInt32Array(range(verts.size()))
+		var look := _surface_look(mesh.surface_get_material(s))
+		for t in range(0, indices.size() - 2, 3):
+			var ids := [indices[t], indices[t + 1], indices[t + 2]]
+			var p := [xf * verts[ids[0]], xf * verts[ids[1]], xf * verts[ids[2]]]
+			var normal: Vector3 = (p[1] - p[0]).cross(p[2] - p[0]).normalized()
+			if absf(normal.y) < 0.05: continue
+			var colour: Color = look.color
+			if look.image != null and uvs != null and (uvs as PackedVector2Array).size() == verts.size():
+				var uv: Vector2 = (uvs[ids[0]] + uvs[ids[1]] + uvs[ids[2]]) / 3.0
+				var img: Image = look.image
+				colour *= img.get_pixel(posmod(int(uv.x * img.get_width()), img.get_width()), posmod(int(uv.y * img.get_height()), img.get_height()))
+			colour = colour.darkened(0.45 * (1.0 - absf(normal.y)))
+			_fill_triangle(sprite, p, ppm, colour)
+	return sprite
+
+func _surface_look(material: Material) -> Dictionary:
+	var look := {"color": Color(0.7, 0.7, 0.7), "image": null}
+	var base := material as BaseMaterial3D
+	if base == null: return look
+	look.color = base.albedo_color
+	if base.albedo_texture != null: look.image = _texture_image(base.albedo_texture)
+	return look
+
+var _texture_images := {}
+
+func _texture_image(texture: Texture2D) -> Image:
+	var key := texture.get_instance_id()
+	if _texture_images.has(key): return _texture_images[key]
+	var image := texture.get_image()
+	if (image == null or image.is_empty()) and texture.resource_path.get_extension().to_lower() in ["png", "jpg", "jpeg", "webp"]:
+		image = _load_image(texture.resource_path)
+	elif image != null:
+		if image.is_compressed(): image.decompress()
+		image.convert(Image.FORMAT_RGBA8)
+	_texture_images[key] = image
+	return image
+
+func _fill_triangle(sprite: Dictionary, p: Array, ppm: float, colour: Color) -> void:
+	var a := Vector2(p[0].x, p[0].z) * ppm - Vector2(sprite.offset)
+	var b := Vector2(p[1].x, p[1].z) * ppm - Vector2(sprite.offset)
+	var c := Vector2(p[2].x, p[2].z) * ppm - Vector2(sprite.offset)
+	var area := (b - a).cross(c - a)
+	if absf(area) < 1e-6: return
+	var size: Vector2i = sprite.size
+	var x0 := clampi(floori(minf(a.x, minf(b.x, c.x))), 0, size.x - 1)
+	var x1 := clampi(ceili(maxf(a.x, maxf(b.x, c.x))), 0, size.x - 1)
+	var y0 := clampi(floori(minf(a.y, minf(b.y, c.y))), 0, size.y - 1)
+	var y1 := clampi(ceili(maxf(a.y, maxf(b.y, c.y))), 0, size.y - 1)
+	for y in range(y0, y1 + 1):
+		for x in range(x0, x1 + 1):
+			var q := Vector2(x + 0.5, y + 0.5)
+			var w0 := (c - b).cross(q - b) / area
+			var w1 := (a - c).cross(q - c) / area
+			var w2 := 1.0 - w0 - w1
+			if w0 < -0.001 or w1 < -0.001 or w2 < -0.001: continue
+			var h: float = w0 * p[0].y + w1 * p[1].y + w2 * p[2].y
+			var i := y * size.x + x
+			if h <= sprite.heights[i]: continue
+			sprite.heights[i] = h
+			sprite.image.set_pixel(x, y, colour)
+
+func _stamp(view: Dictionary, sprite: Dictionary, centre: Vector2i, lift: float) -> void:
+	var size: Vector2i = sprite.size
+	var vsize: Vector2i = view.size
+	for y in size.y:
+		for x in size.x:
+			var h: float = sprite.heights[y * size.x + x]
+			if h == NO_HEIGHT: continue
+			var at: Vector2i = centre + sprite.offset + Vector2i(x, y)
+			if at.x < 0 or at.y < 0 or at.x >= vsize.x or at.y >= vsize.y: continue
+			var i: int = at.y * vsize.x + at.x
+			if h + lift <= view.heights[i]: continue
+			view.heights[i] = h + lift
+			view.image.set_pixelv(at, sprite.image.get_pixel(x, y))
+
+## Darkens pixels next to a drop in height (wall tops, steps, edges of the floor).
+func _outline(view: Dictionary, drop: float) -> void:
+	var size: Vector2i = view.size
+	var dark := []
+	for y in size.y:
+		for x in size.x:
+			var h: float = view.heights[y * size.x + x]
+			if h == NO_HEIGHT: continue
+			for d in [Vector2i(1, 0), Vector2i(-1, 0), Vector2i(0, 1), Vector2i(0, -1)]:
+				var n: Vector2i = Vector2i(x, y) + d
+				if n.x < 0 or n.y < 0 or n.x >= size.x or n.y >= size.y: continue
+				if view.heights[n.y * size.x + n.x] < h - drop:
+					dark.append(Vector2i(x, y))
+					break
+	for at in dark: view.image.set_pixelv(at, view.image.get_pixelv(at).darkened(0.5))
+
+func _frame(image: Image, rect: Rect2i, colour: Color) -> void:
+	rect = rect.intersection(Rect2i(Vector2i.ZERO, image.get_size()))
+	if rect.size.x <= 0 or rect.size.y <= 0: return
+	for x in range(rect.position.x, rect.end.x):
+		image.set_pixel(x, rect.position.y, colour)
+		image.set_pixel(x, rect.end.y - 1, colour)
+	for y in range(rect.position.y, rect.end.y):
+		image.set_pixel(rect.position.x, y, colour)
+		image.set_pixel(rect.end.x - 1, y, colour)
 
 ## Visible seams: neighbouring tiles must agree on the edge or corner they share (an empty or
 ## non-terrain cell counts as empty). A disagreement means the tile set has no tile for that
@@ -780,8 +1158,9 @@ func _bit_at(layer: TileMapLayer, cell: Vector2i, bit: int, terrain_set: int) ->
 func _bit_name(bit: int) -> String:
 	return {0: "right side", 3: "bottom-right corner", 4: "bottom side", 7: "bottom-left corner", 8: "left side", 11: "top-left corner", 12: "top side", 15: "top-right corner"}.get(bit, str(bit))
 
-## The painted layers drawn from their atlas regions (no GPU), 2x for small tiles.
-func _picture(layers: Array, tile_set: TileSet) -> Image:
+## The painted layers drawn from their atlas regions (no GPU), 2x for small tiles; cells in the
+## report are framed in red.
+func _picture(layers: Array, tile_set: TileSet, marks: Array) -> Image:
 	var used := Rect2i()
 	var first := true
 	for layer in layers:
@@ -808,39 +1187,63 @@ func _picture(layers: Array, tile_set: TileSet) -> Image:
 			var region := image.get_region(atlas.get_tile_texture_region(layer.get_cell_atlas_coords(cell)))
 			if scale != 1: region.resize(region.get_width() * scale, region.get_height() * scale, Image.INTERPOLATE_NEAREST)
 			out.blend_rect(region, Rect2i(Vector2i.ZERO, region.get_size()), (cell - used.position) * ts * scale)
+	for m in marks:
+		if m.has("cell"): _frame(out, Rect2i((Vector2i(m.cell[0], m.cell[1]) - used.position) * ts * scale, ts * scale), Color(1, 0.2, 0.2))
 	return out
 
 # ---------------------------------------------------------------------------------------------
 # meshlib: 3D kit → MeshLibrary for GridMap
 
+## A kit is a folder of GLBs (one piece each), one GLB per piece, or one GLB whose top-level
+## nodes are the pieces (a kit imported as a folder: one node per file). Each piece becomes one
+## item with all its meshes merged, named after the piece.
 func _meshlib(args: Array) -> bool:
 	if args.size() < 2: return _fail("meshlib needs <res://kit.glb|res://dir> <res://out.tres>")
-	var meshes := []
 	var sources := []
 	if args[0].ends_with("/") or DirAccess.dir_exists_absolute(ProjectSettings.globalize_path(args[0])):
 		for file in DirAccess.get_files_at(args[0]):
 			if file.get_extension() in ["glb", "gltf", "tscn", "scn"]: sources.append(args[0].path_join(file))
+		sources.sort_custom(func(a: String, b: String) -> bool: return a.naturalnocasecmp_to(b) < 0)
 	else:
 		sources.append(args[0])
+	var pieces := []
+	var skipped := []
+	var names := {}
 	for path in sources:
 		var scene = load(path)
 		if not scene is PackedScene: return _fail("meshlib: cannot load %s; run --import first" % path)
 		var root: Node = scene.instantiate()
-		for node in root.find_children("*", "MeshInstance3D", true, false):
-			var mi := node as MeshInstance3D
-			if mi.mesh == null: continue
-			var name: String = String(mi.name) if sources.size() == 1 else "%s/%s" % [path.get_file().get_basename(), mi.name]
-			meshes.append({"name": name, "mesh": mi.mesh, "transform": _relative(mi, root)})
+		var tops := []
+		for child in root.get_children():
+			if child is Node3D and (child is MeshInstance3D or not child.find_children("*", "MeshInstance3D", true, false).is_empty()): tops.append(child)
+		if root is MeshInstance3D or tops.size() < 2: tops = [root]
+		for top in tops:
+			var name: String = String(top.name) if top != root else (path.get_file().get_basename() if sources.size() > 1 or tops.size() == 1 else String(root.name))
+			var mesh := _merged_mesh(top)
+			if mesh == null:
+				skipped.append(name)
+				continue
+			var unique := name
+			var n := 2
+			while names.has(unique):
+				unique = "%s_%d" % [name, n]
+				n += 1
+			names[unique] = true
+			pieces.append({"name": unique, "mesh": mesh})
 		root.free()
-	if meshes.is_empty(): return _fail("meshlib: no meshes found")
+	if pieces.is_empty(): return _fail("meshlib: no meshes found")
 	var library := MeshLibrary.new()
 	var collision := _option(args, "--collision", "box")
-	for i in meshes.size():
-		var m: Dictionary = meshes[i]
+	var textures := {}
+	for i in pieces.size():
+		var m: Dictionary = pieces[i]
 		library.create_item(i)
 		library.set_item_name(i, m.name)
 		library.set_item_mesh(i, m.mesh)
-		library.set_item_mesh_transform(i, m.transform)
+		for s in m.mesh.get_surface_count():
+			var base := m.mesh.surface_get_material(s) as BaseMaterial3D
+			if base != null and base.albedo_texture != null: textures[base.albedo_texture.resource_path] = true
+		var shape_xf := Transform3D.IDENTITY
 		var shape: Shape3D
 		match collision:
 			"none": shape = null
@@ -853,18 +1256,39 @@ func _meshlib(args: Array) -> bool:
 				var thin := Vector3(maxf(0.1 - aabb.size.x, 0.0), maxf(0.1 - aabb.size.y, 0.0), maxf(0.1 - aabb.size.z, 0.0))
 				box.size = aabb.size + thin
 				shape = box
-				m.transform = m.transform * Transform3D(Basis.IDENTITY, aabb.get_center() - Vector3(0, thin.y / 2.0, 0))
-		if shape != null: library.set_item_shapes(i, [shape, m.transform])
+				shape_xf = Transform3D(Basis.IDENTITY, aabb.get_center() - Vector3(0, thin.y / 2.0, 0))
+		if shape != null: library.set_item_shapes(i, [shape, shape_xf])
 	var out: String = args[1]
 	DirAccess.make_dir_recursive_absolute(ProjectSettings.globalize_path(out.get_base_dir()))
 	var err := ResourceSaver.save(library, out)
 	if err != OK: return _fail("meshlib: cannot save %s (%s)" % [out, error_string(err)])
 	var listing := []
-	for i in meshes.size():
-		var aabb: AABB = meshes[i].mesh.get_aabb()
-		listing.append({"id": i, "name": meshes[i].name, "size": [snappedf(aabb.size.x, 0.01), snappedf(aabb.size.y, 0.01), snappedf(aabb.size.z, 0.01)]})
-	print("TILES_MESHLIB=", JSON.stringify({"output": out, "items": listing}))
+	for i in pieces.size():
+		var aabb: AABB = pieces[i].mesh.get_aabb()
+		listing.append({"id": i, "name": pieces[i].name, "size": [snappedf(aabb.size.x, 0.01), snappedf(aabb.size.y, 0.01), snappedf(aabb.size.z, 0.01)], "min": [snappedf(aabb.position.x, 0.01), snappedf(aabb.position.y, 0.01), snappedf(aabb.position.z, 0.01)]})
+	var sheet := out.get_basename() + ".png"
+	_contact_sheet(pieces).save_png(ProjectSettings.globalize_path(sheet))
+	_write(out.get_basename() + ".items.json", JSON.stringify(listing, "  "))
+	print("TILES_MESHLIB=", JSON.stringify({"output": out, "picture": sheet, "items": listing, "textures": textures.keys(), "skipped": skipped}))
 	return true
+
+## All meshes under `top` (skinned ones excluded) as one ArrayMesh in `top`'s own space; the
+## piece's position in the kit scene is dropped so every item sits on its own origin.
+func _merged_mesh(top: Node) -> ArrayMesh:
+	var instances := top.find_children("*", "MeshInstance3D", true, false)
+	if top is MeshInstance3D: instances.push_front(top)
+	var merged := ArrayMesh.new()
+	for node in instances:
+		var mi := node as MeshInstance3D
+		if mi.mesh == null or mi.skin != null: continue
+		var xf := Transform3D.IDENTITY if mi == top else _relative(mi, top)
+		for s in mi.mesh.get_surface_count():
+			if mi.mesh.surface_get_primitive_type(s) != Mesh.PRIMITIVE_TRIANGLES: continue
+			var st := SurfaceTool.new()
+			st.append_from(mi.mesh, s, xf)
+			st.set_material(mi.get_surface_override_material(s) if mi.get_surface_override_material(s) != null else mi.mesh.surface_get_material(s))
+			st.commit(merged)
+	return merged if merged.get_surface_count() > 0 else null
 
 func _relative(node: Node3D, root: Node) -> Transform3D:
 	var t := node.transform
@@ -873,6 +1297,35 @@ func _relative(node: Node3D, root: Node) -> Transform3D:
 		if p is Node3D: t = (p as Node3D).transform * t
 		p = p.get_parent()
 	return t
+
+## Every item from above (left) and from the front (right) at one common scale, with its id.
+func _contact_sheet(pieces: Array) -> Image:
+	const CELL := 112
+	const COLUMNS := 6
+	var extent := 0.01
+	for m in pieces:
+		var size: Vector3 = m.mesh.get_aabb().size
+		extent = maxf(extent, maxf(size.x, maxf(size.y, size.z)))
+	var ppm := (CELL - 8) / extent
+	var rows := ceili(float(pieces.size()) / COLUMNS)
+	var sheet := Image.create(COLUMNS * CELL * 2, rows * (CELL + 14), false, Image.FORMAT_RGBA8)
+	sheet.fill(Color(0.1, 0.11, 0.14))
+	# Front: turn -90 degrees around X so height becomes depth and up becomes the top of the picture.
+	var front := Transform3D(Basis(Vector3.RIGHT, -PI / 2.0), Vector3.ZERO)
+	for i in pieces.size():
+		var at := Vector2i((i % COLUMNS) * CELL * 2, (i / COLUMNS) * (CELL + 14))
+		_number(sheet, Vector2(at.x + 3, at.y + 2), i)
+		for v in 2:
+			var sprite := _sprite(pieces[i].mesh, Transform3D.IDENTITY if v == 0 else front, ppm)
+			var view := {"image": Image.create(CELL, CELL, false, Image.FORMAT_RGBA8), "heights": PackedFloat32Array(), "size": Vector2i(CELL, CELL)}
+			view.image.fill(Color(0.16, 0.17, 0.21) if v == 0 else Color(0.13, 0.15, 0.19))
+			view.heights.resize(CELL * CELL)
+			view.heights.fill(NO_HEIGHT)
+			# Centre each view on the piece's own bounds; up in the top view is north (-Z).
+			_stamp(view, sprite, Vector2i(CELL / 2, CELL / 2) - sprite.offset - sprite.size / 2, 0.0)
+			_outline(view, 0.05)
+			sheet.blit_rect(view.image, Rect2i(0, 0, CELL, CELL), at + Vector2i(v * CELL, 14))
+	return sheet
 
 # ---------------------------------------------------------------------------------------------
 
