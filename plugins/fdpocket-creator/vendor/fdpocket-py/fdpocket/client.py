@@ -20,6 +20,7 @@ import httpx
 from fdpocket._transport import UNREACHABLE, Transport, read
 from fdpocket.errors import (
     GATEWAY_UNAVAILABLE,
+    NOT_AVAILABLE_IN_DEVELOPMENT,
     UNAUTHENTICATED,
     FdpocketError,
 )
@@ -44,6 +45,10 @@ READS = (
 DELETES = ("delete", "deleteMany")
 UPDATES = ("update", "updateMany", "updateManyAndReturn")
 BINDINGS_MISSING = "GATEWAY_URL and PLATFORM_SERVICE_CREDENTIAL are not set"
+DEVELOPMENT_RUN = (
+    "DB, Storage, notifications and jobs are not available in development runs on a"
+    " real GPU (live preview / kit dev --python modal); merge to main and try there"
+)
 
 
 class ServiceToken:
@@ -70,6 +75,8 @@ class ServiceToken:
         return expires - REFRESH_MARGIN <= datetime.now(UTC)
 
     def _exchange(self) -> tuple[str, datetime]:
+        if not self._credential:
+            raise FdpocketError(NOT_AVAILABLE_IN_DEVELOPMENT, DEVELOPMENT_RUN)
         try:
             response = self._http.post(
                 f"{self._base}/v1/token/service",

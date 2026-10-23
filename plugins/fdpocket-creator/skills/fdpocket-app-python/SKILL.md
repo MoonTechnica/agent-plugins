@@ -70,7 +70,7 @@ def caption(ctx, input):
 - 例外はそのまま投げる（Platform が `failed` と型名・メッセージを記録する）。握りつぶして成功を返さない。
 - 入力・出力は 256 KiB まで。大きい結果は Storage に置き、`fileId` を返す。
 - GPU のタスクは Modal が途中で止めることがあり、そのときは Platform が**最初から**やり直す（全部で 3 回まで。止められた回は利用者に請求されない）。同じ入力で 2 回動いても困らないように書く（外部への送信・DB への追加は最後に 1 回、`ctx.run_id` を冪等キーにする）。数十分を超える学習は `ctx.cache_dir` にチェックポイントを書き、起動時に続きから始める。3 回とも止められると `error.code` が `preempted` になるので、画面は再依頼を案内する。
-- 画面は `client.python.run(...).wait({ onProgress })` で待ち、進み具合と失敗（`error`）を必ず出す。
+- 画面は `const run = await client.python.run(...)` のあと `await run.wait({ onProgress })` で待ち（`run()` は Promise。`await` せずに `.wait` を続けると `wait is not a function`）、進み具合と失敗（`error`）を必ず出す。
 
 ### 大きなデータ（教師データ）と学習
 
@@ -124,7 +124,7 @@ def generate(request: Request, body: dict):
 
 ## 5. 終わりを TypeScript で受ける（python → jobs）
 
-GPU の処理は数分〜数時間かかる。api / jobs で `python.run(...).wait()` して待ち続けると Worker の時間を使い切るので、
+GPU の処理は数分〜数時間かかる。api / jobs で `run.wait()` して待ち続けると Worker の時間を使い切るので、
 **依頼はすぐ返し（`runId` を自分の行に残す）、終わりは `onFinish` で jobs に受ける**。成功も失敗（例外・時間切れ・
 残高不足・キャンセル・途中停止を使い切った `preempted`）も、タスクのコードが落ちても Platform が必ず 1 回届ける。
 
@@ -182,7 +182,7 @@ export default {
   `kit check` が pyproject・uv.lock・handler・依存・宣言していない secret と宛先を確かめる。
 - `kit dev` の既定: 手元は CPU で `uv run` がタスクとサーバーを動かす（費用は引かない。uv が要る）。
   ライブプレビューと `--python modal` は**タスクを Platform の本物の GPU で動かす**（チャットの持ち主のクレジット）。
-  本物の GPU のタスクの中では `ctx.db` / `ctx.storage` / `ctx.client` は使えない（手元の DB は Platform に無い）ので、
+  本物の GPU のタスクの中では `ctx.db` / `ctx.storage` / `ctx.client` は使えない（手元の DB は Platform に無い。呼ぶと `NOT_AVAILABLE_IN_DEVELOPMENT`）ので、
   入力（`input`）と結果（戻り値）だけで確かめる。サーバーは手元の CPU のまま。
 - 自己テストの繰り返しは CPU（小さなモデル。GPU の有無を torch で確かめて device を切り替える）で、
   GPU でしか確かめられないこと（速度・メモリ・大きなモデル）だけを本物で試す。

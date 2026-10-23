@@ -53,6 +53,7 @@ description: ミニアプリが動くことを確かめる。Vitest で書くテ
 | `bun.lock`（npm レジストリの版 + integrity と `workspace:` だけ） | git・URL・`file:` の依存を外して `bun install` |
 | `migrations/` が取り込んだ版から変わっていない | 変更を戻す（`git checkout <base> -- packages/db-schema/migrations`） |
 | `pending/generated.sql` が最新 | `kit db diff` → commit |
+| 型（`apps/<slug>/tsconfig.json` のある App を `tsc -b`。`TYPE_ERROR` に場所が付く） | 型の誤りを直す。SDK の API の使い方の誤り（例: `client.python.run()` を `await` せずに `.wait()`）もここで落ちる。`// @ts-ignore` や `any` で黙らせない |
 
 通っても Platform 側の検証（取り込み・静的・画面を開く動的検証）は必ず走る。
 

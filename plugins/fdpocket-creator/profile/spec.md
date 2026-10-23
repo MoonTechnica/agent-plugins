@@ -475,10 +475,10 @@ GPU の AI の処理（推論・学習・埋め込み・画像や音声の変換
 
 | API | 書き方 |
 |---|---|
-| `client.python.run(app, task, input, { idempotencyKey? })` | 依頼する（`PythonRunHandle` を返す）。画面からは `capabilities.python` に宣言したタスクだけ。`input` は JSON（256 KiB まで。画像や音声は Storage の `fileId` を渡す） |
-| `client.python.run(...).wait({ timeoutMs?, intervalMs?, onProgress? })` | 終わるまで待つ（`PythonRun`）。失敗も結果として返る: `status` が `succeeded` なら `output`、`failed` / `cancelled` / `timed_out` / `stopped` なら `error`（`code` は例外の型か理由）。`timeoutMs`（既定 1 時間）を過ぎると待つのをやめる（実行は続く。`GATEWAY_UNAVAILABLE`） |
+| `client.python.run(app, task, input, { idempotencyKey? })` | 依頼する（`Promise<PythonRunHandle>`。**`await` してから** `wait` / `get` / `cancel` を呼ぶ: `const run = await client.python.run(...); const done = await run.wait()`）。画面からは `capabilities.python` に宣言したタスクだけ。`input` は JSON（256 KiB まで。画像や音声は Storage の `fileId` を渡す） |
+| `PythonRunHandle` の `wait({ timeoutMs?, intervalMs?, onProgress? })` | 終わるまで待つ（`PythonRun`）。失敗も結果として返る: `status` が `succeeded` なら `output`、`failed` / `cancelled` / `timed_out` / `stopped` なら `error`（`code` は例外の型か理由）。`timeoutMs`（既定 1 時間）を過ぎると待つのをやめる（実行は続く。`GATEWAY_UNAVAILABLE`） |
 | `client.python.get(runId)` | 依頼済みの実行を読む（依頼した本人か、同じ環境の api / jobs。`onFinish` で届いたジョブが結果を読む） |
-| `client.python.run(...).get()` / `.cancel()` | `runId`（依頼の id）と今の状態（`progress` 0〜1・`progressMessage`）／止める（それまでの費用は戻らない） |
+| `PythonRunHandle` の `get()` / `cancel()` | `runId`（依頼の id）と今の状態（`progress` 0〜1・`progressMessage`）／止める（それまでの費用は戻らない） |
 
 - api からは `asUser(request)` の戻り値の `python`（`servicePermissions: [python.run]`。その利用者が払う）、jobs からは
   `forJob(event)` の戻り値の `python`（そのジョブの払う人）。
