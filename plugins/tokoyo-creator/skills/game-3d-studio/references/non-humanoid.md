@@ -8,6 +8,15 @@
 翼/膜/指/脚の隙間を一律のリメッシュで消さず、骨格を付ける前に必要な可動部を保つ。
 
 1. `$game-art-direction` §3に従いライブラリを調査し、合うモデルが無ければBlenderでのモデリングを評価、難しければ `generate_model_3d` で形を作る（非人型ではrig=false）。既存のリグ・必要なクリップが体型と動作に合う場合は再利用し、不足分だけ以下で補う。
+   **骨入れが要るモデルかを先に見分ける**（有料リグの前。`import_stock_asset` / `get_asset` の `animations` と、`tiles.gd meshlib` の部品一覧を見る）:
+
+   | モデルの作り | 骨入れ | 動かし方 |
+   |---|---|---|
+   | 部品を組み合わせた動物（Kenney の Prototype Kit・Cube Pets など。胴・脚・頭が別々のメッシュ） | 不要・できない（曲げる皮膚が無い。rig-checkも通らない） | 付いているクリップ（`animations` の walk / run 等）か、部品ごとの回転で動かす |
+   | 置物・彫像（台座付き・飾りのポーズ・数十 cm の飾り物。Poly Haven の statue など） | できない | 動かさない背景・小物として使う |
+   | 1 つにつながった生き物の体（`generate_model_3d` で作った物・スキン付きキャラ） | Tripo の対象 | 下の 2 → 3 |
+
+   rig-check が通らなかったら、同じモデルで有料リグをやり直さない。上の表で作りを確かめ、つながった体が要るなら `generate_model_3d` で作り直すか、Blender の経路にする。
 2. `rig_model_3d(name, asset_id, rig_type)`で体型に合うTripo v2.5のリグを作る。無料rig-checkで体型一致を確認してから有料リグを依頼する。入力GLBは150 MB以下。
 3. `animate_model_3d(name, asset_id, animations, animate_in_place=true)`へ**rig_model_3dのready成果物**を渡す。体型に合う下記の公式presetだけを使う。
 4. 有料タスクのPROVIDER_TIMEOUTは返されたasset_idをget_assetで回収する。追加の有料生成でやり直さない。無料rig-checkのタイムアウトにはasset_idが無く、有料リグは未送信なので確認から再試行できる。
