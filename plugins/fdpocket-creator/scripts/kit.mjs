@@ -36033,7 +36033,7 @@ function checkInt32(i, min, max) {
     throw Error(invalidArgument + i);
   }
 }
-function checkRoundingDigits(d, i, rm6, repeating) {
+function checkRoundingDigits(d, i, rm7, repeating) {
   var di, k2, r, rd;
   for (k2 = d[0];k2 >= 10; k2 /= 10)
     --i;
@@ -36052,9 +36052,9 @@ function checkRoundingDigits(d, i, rm6, repeating) {
         rd = rd / 100 | 0;
       else if (i == 1)
         rd = rd / 10 | 0;
-      r = rm6 < 4 && rd == 99999 || rm6 > 3 && rd == 49999 || rd == 50000 || rd == 0;
+      r = rm7 < 4 && rd == 99999 || rm7 > 3 && rd == 49999 || rd == 50000 || rd == 0;
     } else {
-      r = (rm6 < 4 && rd + 1 == k2 || rm6 > 3 && rd + 1 == k2 / 2) && (d[di + 1] / k2 / 100 | 0) == mathpow(10, i - 2) - 1 || (rd == k2 / 2 || rd == 0) && (d[di + 1] / k2 / 100 | 0) == 0;
+      r = (rm7 < 4 && rd + 1 == k2 || rm7 > 3 && rd + 1 == k2 / 2) && (d[di + 1] / k2 / 100 | 0) == mathpow(10, i - 2) - 1 || (rd == k2 / 2 || rd == 0) && (d[di + 1] / k2 / 100 | 0) == 0;
     }
   } else {
     if (i < 4) {
@@ -36064,9 +36064,9 @@ function checkRoundingDigits(d, i, rm6, repeating) {
         rd = rd / 100 | 0;
       else if (i == 2)
         rd = rd / 10 | 0;
-      r = (repeating || rm6 < 4) && rd == 9999 || !repeating && rm6 > 3 && rd == 4999;
+      r = (repeating || rm7 < 4) && rd == 9999 || !repeating && rm7 > 3 && rd == 4999;
     } else {
-      r = ((repeating || rm6 < 4) && rd + 1 == k2 || !repeating && rm6 > 3 && rd + 1 == k2 / 2) && (d[di + 1] / k2 / 1000 | 0) == mathpow(10, i - 3) - 1;
+      r = ((repeating || rm7 < 4) && rd + 1 == k2 || !repeating && rm7 > 3 && rd + 1 == k2 / 2) && (d[di + 1] / k2 / 1000 | 0) == mathpow(10, i - 3) - 1;
     }
   }
   return r;
@@ -36109,7 +36109,7 @@ function cosine(Ctor, x2) {
   Ctor.precision -= k2;
   return x2;
 }
-function finalise(x2, sd, rm6, isTruncated) {
+function finalise(x2, sd, rm7, isTruncated) {
   var digits, i, j, k2, rd, roundUp, w2, xd, xdi, Ctor = x2.constructor;
   out:
     if (sd != null) {
@@ -36148,7 +36148,7 @@ function finalise(x2, sd, rm6, isTruncated) {
         }
       }
       isTruncated = isTruncated || sd < 0 || xd[xdi + 1] !== undefined || (j < 0 ? w2 : w2 % mathpow(10, digits - j - 1));
-      roundUp = rm6 < 4 ? (rd || isTruncated) && (rm6 == 0 || rm6 == (x2.s < 0 ? 3 : 2)) : rd > 5 || rd == 5 && (rm6 == 4 || isTruncated || rm6 == 6 && (i > 0 ? j > 0 ? w2 / mathpow(10, digits - j) : 0 : xd[xdi - 1]) % 10 & 1 || rm6 == (x2.s < 0 ? 8 : 7));
+      roundUp = rm7 < 4 ? (rd || isTruncated) && (rm7 == 0 || rm7 == (x2.s < 0 ? 3 : 2)) : rd > 5 || rd == 5 && (rm7 == 4 || isTruncated || rm7 == 6 && (i > 0 ? j > 0 ? w2 / mathpow(10, digits - j) : 0 : xd[xdi - 1]) % 10 & 1 || rm7 == (x2.s < 0 ? 8 : 7));
       if (sd < 1 || !xd[0]) {
         xd.length = 0;
         if (roundUp) {
@@ -36251,10 +36251,10 @@ function getLn10(Ctor, sd, pr) {
   }
   return finalise(new Ctor(LN10), sd, 1, true);
 }
-function getPi(Ctor, sd, rm6) {
+function getPi(Ctor, sd, rm7) {
   if (sd > PI_PRECISION)
     throw Error(precisionLimitExceeded);
-  return finalise(new Ctor(PI), sd, rm6, true);
+  return finalise(new Ctor(PI), sd, rm7, true);
 }
 function getPrecision(digits) {
   var w2 = digits.length - 1, len = w2 * LOG_BASE + 1;
@@ -36314,7 +36314,7 @@ function maxOrMin(Ctor, args, n) {
   return x2;
 }
 function naturalExponential(x2, sd) {
-  var denominator, guard, j, pow, sum, t, wpr, rep = 0, i = 0, k2 = 0, Ctor = x2.constructor, rm6 = Ctor.rounding, pr = Ctor.precision;
+  var denominator, guard, j, pow, sum, t, wpr, rep = 0, i = 0, k2 = 0, Ctor = x2.constructor, rm7 = Ctor.rounding, pr = Ctor.precision;
   if (!x2.d || !x2.d[0] || x2.e > 17) {
     return new Ctor(x2.d ? !x2.d[0] ? 1 : x2.s < 0 ? 0 : 1 / 0 : x2.s ? x2.s < 0 ? 0 : x2 : 0 / 0);
   }
@@ -36342,13 +36342,13 @@ function naturalExponential(x2, sd) {
       while (j--)
         sum = finalise(sum.times(sum), wpr, 1);
       if (sd == null) {
-        if (rep < 3 && checkRoundingDigits(sum.d, wpr - guard, rm6, rep)) {
+        if (rep < 3 && checkRoundingDigits(sum.d, wpr - guard, rm7, rep)) {
           Ctor.precision = wpr += 10;
           denominator = pow = t = new Ctor(1);
           i = 0;
           rep++;
         } else {
-          return finalise(sum, Ctor.precision = pr, rm6, external2 = true);
+          return finalise(sum, Ctor.precision = pr, rm7, external2 = true);
         }
       } else {
         Ctor.precision = pr;
@@ -36359,7 +36359,7 @@ function naturalExponential(x2, sd) {
   }
 }
 function naturalLogarithm(y, sd) {
-  var c, c0, denominator, e, numerator, rep, sum, t, wpr, x1, x2, n = 1, guard = 10, x3 = y, xd = x3.d, Ctor = x3.constructor, rm6 = Ctor.rounding, pr = Ctor.precision;
+  var c, c0, denominator, e, numerator, rep, sum, t, wpr, x1, x2, n = 1, guard = 10, x3 = y, xd = x3.d, Ctor = x3.constructor, rm7 = Ctor.rounding, pr = Ctor.precision;
   if (x3.s < 0 || !xd || !xd[0] || !x3.e && xd[0] == 1 && xd.length == 1) {
     return new Ctor(xd && !xd[0] ? -1 / 0 : x3.s != 1 ? NaN : xd ? 0 : x3);
   }
@@ -36390,7 +36390,7 @@ function naturalLogarithm(y, sd) {
     t = getLn10(Ctor, wpr + 2, pr).times(e + "");
     x3 = naturalLogarithm(new Ctor(c0 + "." + c.slice(1)), wpr - guard).plus(t);
     Ctor.precision = pr;
-    return sd == null ? finalise(x3, pr, rm6, external2 = true) : x3;
+    return sd == null ? finalise(x3, pr, rm7, external2 = true) : x3;
   }
   x1 = x3;
   sum = numerator = x3 = divide(x3.minus(1), x3.plus(1), wpr, 1);
@@ -36405,13 +36405,13 @@ function naturalLogarithm(y, sd) {
         sum = sum.plus(getLn10(Ctor, wpr + 2, pr).times(e + ""));
       sum = divide(sum, new Ctor(n), wpr, 1);
       if (sd == null) {
-        if (checkRoundingDigits(sum.d, wpr - guard, rm6, rep)) {
+        if (checkRoundingDigits(sum.d, wpr - guard, rm7, rep)) {
           Ctor.precision = wpr += guard;
           t = numerator = x3 = divide(x1.minus(1), x1.plus(1), wpr, 1);
           x2 = finalise(x3.times(x3), wpr, 1);
           denominator = rep = 1;
         } else {
-          return finalise(sum, Ctor.precision = pr, rm6, external2 = true);
+          return finalise(sum, Ctor.precision = pr, rm7, external2 = true);
         }
       } else {
         Ctor.precision = pr;
@@ -36600,17 +36600,17 @@ function toLessThanHalfPi(Ctor, x2) {
   }
   return x2.minus(pi).abs();
 }
-function toStringBinary(x2, baseOut, sd, rm6) {
+function toStringBinary(x2, baseOut, sd, rm7) {
   var base, e, i, k2, len, roundUp, str, xd, y, Ctor = x2.constructor, isExp = sd !== undefined;
   if (isExp) {
     checkInt32(sd, 1, MAX_DIGITS);
-    if (rm6 === undefined)
-      rm6 = Ctor.rounding;
+    if (rm7 === undefined)
+      rm7 = Ctor.rounding;
     else
-      checkInt32(rm6, 0, 8);
+      checkInt32(rm7, 0, 8);
   } else {
     sd = Ctor.precision;
-    rm6 = Ctor.rounding;
+    rm7 = Ctor.rounding;
   }
   if (!x2.isFinite()) {
     str = nonFiniteToString(x2);
@@ -36647,7 +36647,7 @@ function toStringBinary(x2, baseOut, sd, rm6) {
         x2 = new Ctor(x2);
         x2.d = xd;
         x2.e = e;
-        x2 = divide(x2, y, sd, rm6, 0, base);
+        x2 = divide(x2, y, sd, rm7, 0, base);
         xd = x2.d;
         e = x2.e;
         roundUp = inexact;
@@ -36655,7 +36655,7 @@ function toStringBinary(x2, baseOut, sd, rm6) {
       i = xd[sd];
       k2 = base / 2;
       roundUp = roundUp || xd[sd + 1] !== undefined;
-      roundUp = rm6 < 4 ? (i !== undefined || roundUp) && (rm6 === 0 || rm6 === (x2.s < 0 ? 3 : 2)) : i > k2 || i === k2 && (rm6 === 4 || roundUp || rm6 === 6 && xd[sd - 1] & 1 || rm6 === (x2.s < 0 ? 8 : 7));
+      roundUp = rm7 < 4 ? (i !== undefined || roundUp) && (rm7 === 0 || rm7 === (x2.s < 0 ? 3 : 2)) : i > k2 || i === k2 && (rm7 === 4 || roundUp || rm7 === 6 && xd[sd - 1] & 1 || rm7 === (x2.s < 0 ? 8 : 7));
       xd.length = sd;
       if (roundUp) {
         for (;++xd[--sd] > base - 1; ) {
@@ -36735,14 +36735,14 @@ function atanh(x2) {
 function atan2(y, x2) {
   y = new this(y);
   x2 = new this(x2);
-  var r, pr = this.precision, rm6 = this.rounding, wpr = pr + 4;
+  var r, pr = this.precision, rm7 = this.rounding, wpr = pr + 4;
   if (!y.s || !x2.s) {
     r = new this(NaN);
   } else if (!y.d && !x2.d) {
     r = getPi(this, wpr, 1).times(x2.s > 0 ? 0.25 : 0.75);
     r.s = y.s;
   } else if (!x2.d || y.isZero()) {
-    r = x2.s < 0 ? getPi(this, pr, rm6) : new this(0);
+    r = x2.s < 0 ? getPi(this, pr, rm7) : new this(0);
     r.s = y.s;
   } else if (!y.d || x2.isZero()) {
     r = getPi(this, wpr, 1).times(0.5);
@@ -36753,7 +36753,7 @@ function atan2(y, x2) {
     r = this.atan(divide(y, x2, wpr, 1));
     x2 = getPi(this, wpr, 1);
     this.precision = pr;
-    this.rounding = rm6;
+    this.rounding = rm7;
     r = y.s < 0 ? r.minus(x2) : r.plus(x2);
   } else {
     r = this.atan(divide(y, x2, wpr, 1));
@@ -37209,19 +37209,19 @@ var init_decimal = __esm(() => {
     return xdL === ydL ? 0 : xdL > ydL ^ xs < 0 ? 1 : -1;
   };
   P2.cosine = P2.cos = function() {
-    var pr, rm6, x2 = this, Ctor = x2.constructor;
+    var pr, rm7, x2 = this, Ctor = x2.constructor;
     if (!x2.d)
       return new Ctor(NaN);
     if (!x2.d[0])
       return new Ctor(1);
     pr = Ctor.precision;
-    rm6 = Ctor.rounding;
+    rm7 = Ctor.rounding;
     Ctor.precision = pr + Math.max(x2.e, x2.sd()) + LOG_BASE;
     Ctor.rounding = 1;
     x2 = cosine(Ctor, toLessThanHalfPi(Ctor, x2));
     Ctor.precision = pr;
-    Ctor.rounding = rm6;
-    return finalise(quadrant == 2 || quadrant == 3 ? x2.neg() : x2, pr, rm6, true);
+    Ctor.rounding = rm7;
+    return finalise(quadrant == 2 || quadrant == 3 ? x2.neg() : x2, pr, rm7, true);
   };
   P2.cubeRoot = P2.cbrt = function() {
     var e, m2, n, r, rep, s2, sd, t, t3, t3plusx, x2 = this, Ctor = x2.constructor;
@@ -37312,13 +37312,13 @@ var init_decimal = __esm(() => {
     return k2 == 1 || k2 === 0;
   };
   P2.hyperbolicCosine = P2.cosh = function() {
-    var k2, n, pr, rm6, len, x2 = this, Ctor = x2.constructor, one = new Ctor(1);
+    var k2, n, pr, rm7, len, x2 = this, Ctor = x2.constructor, one = new Ctor(1);
     if (!x2.isFinite())
       return new Ctor(x2.s ? 1 / 0 : NaN);
     if (x2.isZero())
       return one;
     pr = Ctor.precision;
-    rm6 = Ctor.rounding;
+    rm7 = Ctor.rounding;
     Ctor.precision = pr + Math.max(x2.e, x2.sd()) + 4;
     Ctor.rounding = 1;
     len = x2.d.length;
@@ -37335,14 +37335,14 @@ var init_decimal = __esm(() => {
       cosh2_x = x2.times(x2);
       x2 = one.minus(cosh2_x.times(d8.minus(cosh2_x.times(d8))));
     }
-    return finalise(x2, Ctor.precision = pr, Ctor.rounding = rm6, true);
+    return finalise(x2, Ctor.precision = pr, Ctor.rounding = rm7, true);
   };
   P2.hyperbolicSine = P2.sinh = function() {
-    var k2, pr, rm6, len, x2 = this, Ctor = x2.constructor;
+    var k2, pr, rm7, len, x2 = this, Ctor = x2.constructor;
     if (!x2.isFinite() || x2.isZero())
       return new Ctor(x2);
     pr = Ctor.precision;
-    rm6 = Ctor.rounding;
+    rm7 = Ctor.rounding;
     Ctor.precision = pr + Math.max(x2.e, x2.sd()) + 4;
     Ctor.rounding = 1;
     len = x2.d.length;
@@ -37360,97 +37360,97 @@ var init_decimal = __esm(() => {
       }
     }
     Ctor.precision = pr;
-    Ctor.rounding = rm6;
-    return finalise(x2, pr, rm6, true);
+    Ctor.rounding = rm7;
+    return finalise(x2, pr, rm7, true);
   };
   P2.hyperbolicTangent = P2.tanh = function() {
-    var pr, rm6, x2 = this, Ctor = x2.constructor;
+    var pr, rm7, x2 = this, Ctor = x2.constructor;
     if (!x2.isFinite())
       return new Ctor(x2.s);
     if (x2.isZero())
       return new Ctor(x2);
     pr = Ctor.precision;
-    rm6 = Ctor.rounding;
+    rm7 = Ctor.rounding;
     Ctor.precision = pr + 7;
     Ctor.rounding = 1;
-    return divide(x2.sinh(), x2.cosh(), Ctor.precision = pr, Ctor.rounding = rm6);
+    return divide(x2.sinh(), x2.cosh(), Ctor.precision = pr, Ctor.rounding = rm7);
   };
   P2.inverseCosine = P2.acos = function() {
-    var x2 = this, Ctor = x2.constructor, k2 = x2.abs().cmp(1), pr = Ctor.precision, rm6 = Ctor.rounding;
+    var x2 = this, Ctor = x2.constructor, k2 = x2.abs().cmp(1), pr = Ctor.precision, rm7 = Ctor.rounding;
     if (k2 !== -1) {
-      return k2 === 0 ? x2.isNeg() ? getPi(Ctor, pr, rm6) : new Ctor(0) : new Ctor(NaN);
+      return k2 === 0 ? x2.isNeg() ? getPi(Ctor, pr, rm7) : new Ctor(0) : new Ctor(NaN);
     }
     if (x2.isZero())
-      return getPi(Ctor, pr + 4, rm6).times(0.5);
+      return getPi(Ctor, pr + 4, rm7).times(0.5);
     Ctor.precision = pr + 6;
     Ctor.rounding = 1;
     x2 = new Ctor(1).minus(x2).div(x2.plus(1)).sqrt().atan();
     Ctor.precision = pr;
-    Ctor.rounding = rm6;
+    Ctor.rounding = rm7;
     return x2.times(2);
   };
   P2.inverseHyperbolicCosine = P2.acosh = function() {
-    var pr, rm6, x2 = this, Ctor = x2.constructor;
+    var pr, rm7, x2 = this, Ctor = x2.constructor;
     if (x2.lte(1))
       return new Ctor(x2.eq(1) ? 0 : NaN);
     if (!x2.isFinite())
       return new Ctor(x2);
     pr = Ctor.precision;
-    rm6 = Ctor.rounding;
+    rm7 = Ctor.rounding;
     Ctor.precision = pr + Math.max(Math.abs(x2.e), x2.sd()) + 4;
     Ctor.rounding = 1;
     external2 = false;
     x2 = x2.times(x2).minus(1).sqrt().plus(x2);
     external2 = true;
     Ctor.precision = pr;
-    Ctor.rounding = rm6;
+    Ctor.rounding = rm7;
     return x2.ln();
   };
   P2.inverseHyperbolicSine = P2.asinh = function() {
-    var pr, rm6, x2 = this, Ctor = x2.constructor;
+    var pr, rm7, x2 = this, Ctor = x2.constructor;
     if (!x2.isFinite() || x2.isZero())
       return new Ctor(x2);
     pr = Ctor.precision;
-    rm6 = Ctor.rounding;
+    rm7 = Ctor.rounding;
     Ctor.precision = pr + 2 * Math.max(Math.abs(x2.e), x2.sd()) + 6;
     Ctor.rounding = 1;
     external2 = false;
     x2 = x2.times(x2).plus(1).sqrt().plus(x2);
     external2 = true;
     Ctor.precision = pr;
-    Ctor.rounding = rm6;
+    Ctor.rounding = rm7;
     return x2.ln();
   };
   P2.inverseHyperbolicTangent = P2.atanh = function() {
-    var pr, rm6, wpr, xsd, x2 = this, Ctor = x2.constructor;
+    var pr, rm7, wpr, xsd, x2 = this, Ctor = x2.constructor;
     if (!x2.isFinite())
       return new Ctor(NaN);
     if (x2.e >= 0)
       return new Ctor(x2.abs().eq(1) ? x2.s / 0 : x2.isZero() ? x2 : NaN);
     pr = Ctor.precision;
-    rm6 = Ctor.rounding;
+    rm7 = Ctor.rounding;
     xsd = x2.sd();
     if (Math.max(xsd, pr) < 2 * -x2.e - 1)
-      return finalise(new Ctor(x2), pr, rm6, true);
+      return finalise(new Ctor(x2), pr, rm7, true);
     Ctor.precision = wpr = xsd - x2.e;
     x2 = divide(x2.plus(1), new Ctor(1).minus(x2), wpr + pr, 1);
     Ctor.precision = pr + 4;
     Ctor.rounding = 1;
     x2 = x2.ln();
     Ctor.precision = pr;
-    Ctor.rounding = rm6;
+    Ctor.rounding = rm7;
     return x2.times(0.5);
   };
   P2.inverseSine = P2.asin = function() {
-    var halfPi, k2, pr, rm6, x2 = this, Ctor = x2.constructor;
+    var halfPi, k2, pr, rm7, x2 = this, Ctor = x2.constructor;
     if (x2.isZero())
       return new Ctor(x2);
     k2 = x2.abs().cmp(1);
     pr = Ctor.precision;
-    rm6 = Ctor.rounding;
+    rm7 = Ctor.rounding;
     if (k2 !== -1) {
       if (k2 === 0) {
-        halfPi = getPi(Ctor, pr + 4, rm6).times(0.5);
+        halfPi = getPi(Ctor, pr + 4, rm7).times(0.5);
         halfPi.s = x2.s;
         return halfPi;
       }
@@ -37460,23 +37460,23 @@ var init_decimal = __esm(() => {
     Ctor.rounding = 1;
     x2 = x2.div(new Ctor(1).minus(x2.times(x2)).sqrt().plus(1)).atan();
     Ctor.precision = pr;
-    Ctor.rounding = rm6;
+    Ctor.rounding = rm7;
     return x2.times(2);
   };
   P2.inverseTangent = P2.atan = function() {
-    var i, j, k2, n, px, t, r, wpr, x2, x3 = this, Ctor = x3.constructor, pr = Ctor.precision, rm6 = Ctor.rounding;
+    var i, j, k2, n, px, t, r, wpr, x2, x3 = this, Ctor = x3.constructor, pr = Ctor.precision, rm7 = Ctor.rounding;
     if (!x3.isFinite()) {
       if (!x3.s)
         return new Ctor(NaN);
       if (pr + 4 <= PI_PRECISION) {
-        r = getPi(Ctor, pr + 4, rm6).times(0.5);
+        r = getPi(Ctor, pr + 4, rm7).times(0.5);
         r.s = x3.s;
         return r;
       }
     } else if (x3.isZero()) {
       return new Ctor(x3);
     } else if (x3.abs().eq(1) && pr + 4 <= PI_PRECISION) {
-      r = getPi(Ctor, pr + 4, rm6).times(0.25);
+      r = getPi(Ctor, pr + 4, rm7).times(0.25);
       r.s = x3.s;
       return r;
     }
@@ -37503,7 +37503,7 @@ var init_decimal = __esm(() => {
     if (k2)
       r = r.times(2 << k2 - 1);
     external2 = true;
-    return finalise(r, Ctor.precision = pr, Ctor.rounding = rm6, true);
+    return finalise(r, Ctor.precision = pr, Ctor.rounding = rm7, true);
   };
   P2.isFinite = function() {
     return !!this.d;
@@ -37530,7 +37530,7 @@ var init_decimal = __esm(() => {
     return this.cmp(y) < 1;
   };
   P2.logarithm = P2.log = function(base) {
-    var isBase10, d, denominator, k2, inf, num, sd, r, arg = this, Ctor = arg.constructor, pr = Ctor.precision, rm6 = Ctor.rounding, guard = 5;
+    var isBase10, d, denominator, k2, inf, num, sd, r, arg = this, Ctor = arg.constructor, pr = Ctor.precision, rm7 = Ctor.rounding, guard = 5;
     if (base == null) {
       base = new Ctor(10);
       isBase10 = true;
@@ -37559,7 +37559,7 @@ var init_decimal = __esm(() => {
     num = naturalLogarithm(arg, sd);
     denominator = isBase10 ? getLn10(Ctor, sd + 10) : naturalLogarithm(base, sd);
     r = divide(num, denominator, sd, 1);
-    if (checkRoundingDigits(r.d, k2 = pr, rm6)) {
+    if (checkRoundingDigits(r.d, k2 = pr, rm7)) {
       do {
         sd += 10;
         num = naturalLogarithm(arg, sd);
@@ -37571,13 +37571,13 @@ var init_decimal = __esm(() => {
           }
           break;
         }
-      } while (checkRoundingDigits(r.d, k2 += 10, rm6));
+      } while (checkRoundingDigits(r.d, k2 += 10, rm7));
     }
     external2 = true;
-    return finalise(r, pr, rm6);
+    return finalise(r, pr, rm7);
   };
   P2.minus = P2.sub = function(y) {
-    var d, e, i, j, k2, len, pr, rm6, xd, xe, xLTy, yd, x2 = this, Ctor = x2.constructor;
+    var d, e, i, j, k2, len, pr, rm7, xd, xe, xLTy, yd, x2 = this, Ctor = x2.constructor;
     y = new Ctor(y);
     if (!x2.d || !y.d) {
       if (!x2.s || !y.s)
@@ -37595,15 +37595,15 @@ var init_decimal = __esm(() => {
     xd = x2.d;
     yd = y.d;
     pr = Ctor.precision;
-    rm6 = Ctor.rounding;
+    rm7 = Ctor.rounding;
     if (!xd[0] || !yd[0]) {
       if (yd[0])
         y.s = -y.s;
       else if (xd[0])
         y = new Ctor(x2);
       else
-        return new Ctor(rm6 === 3 ? -0 : 0);
-      return external2 ? finalise(y, pr, rm6) : y;
+        return new Ctor(rm7 === 3 ? -0 : 0);
+      return external2 ? finalise(y, pr, rm7) : y;
     }
     e = mathfloor(y.e / LOG_BASE);
     xe = mathfloor(x2.e / LOG_BASE);
@@ -37666,10 +37666,10 @@ var init_decimal = __esm(() => {
     for (;xd[0] === 0; xd.shift())
       --e;
     if (!xd[0])
-      return new Ctor(rm6 === 3 ? -0 : 0);
+      return new Ctor(rm7 === 3 ? -0 : 0);
     y.d = xd;
     y.e = getBase10Exponent(xd, e);
-    return external2 ? finalise(y, pr, rm6) : y;
+    return external2 ? finalise(y, pr, rm7) : y;
   };
   P2.modulo = P2.mod = function(y) {
     var q, x2 = this, Ctor = x2.constructor;
@@ -37702,7 +37702,7 @@ var init_decimal = __esm(() => {
     return finalise(x2);
   };
   P2.plus = P2.add = function(y) {
-    var carry, d, e, i, k2, len, pr, rm6, xd, yd, x2 = this, Ctor = x2.constructor;
+    var carry, d, e, i, k2, len, pr, rm7, xd, yd, x2 = this, Ctor = x2.constructor;
     y = new Ctor(y);
     if (!x2.d || !y.d) {
       if (!x2.s || !y.s)
@@ -37718,11 +37718,11 @@ var init_decimal = __esm(() => {
     xd = x2.d;
     yd = y.d;
     pr = Ctor.precision;
-    rm6 = Ctor.rounding;
+    rm7 = Ctor.rounding;
     if (!xd[0] || !yd[0]) {
       if (!yd[0])
         y = new Ctor(x2);
-      return external2 ? finalise(y, pr, rm6) : y;
+      return external2 ? finalise(y, pr, rm7) : y;
     }
     k2 = mathfloor(x2.e / LOG_BASE);
     e = mathfloor(y.e / LOG_BASE);
@@ -37769,7 +37769,7 @@ var init_decimal = __esm(() => {
       xd.pop();
     y.d = xd;
     y.e = getBase10Exponent(xd, e);
-    return external2 ? finalise(y, pr, rm6) : y;
+    return external2 ? finalise(y, pr, rm7) : y;
   };
   P2.precision = P2.sd = function(z2) {
     var k2, x2 = this;
@@ -37789,19 +37789,19 @@ var init_decimal = __esm(() => {
     return finalise(new Ctor(x2), x2.e + 1, Ctor.rounding);
   };
   P2.sine = P2.sin = function() {
-    var pr, rm6, x2 = this, Ctor = x2.constructor;
+    var pr, rm7, x2 = this, Ctor = x2.constructor;
     if (!x2.isFinite())
       return new Ctor(NaN);
     if (x2.isZero())
       return new Ctor(x2);
     pr = Ctor.precision;
-    rm6 = Ctor.rounding;
+    rm7 = Ctor.rounding;
     Ctor.precision = pr + Math.max(x2.e, x2.sd()) + LOG_BASE;
     Ctor.rounding = 1;
     x2 = sine(Ctor, toLessThanHalfPi(Ctor, x2));
     Ctor.precision = pr;
-    Ctor.rounding = rm6;
-    return finalise(quadrant > 2 ? x2.neg() : x2, pr, rm6, true);
+    Ctor.rounding = rm7;
+    return finalise(quadrant > 2 ? x2.neg() : x2, pr, rm7, true);
   };
   P2.squareRoot = P2.sqrt = function() {
     var m2, n, sd, r, rep, t, x2 = this, d = x2.d, e = x2.e, s2 = x2.s, Ctor = x2.constructor;
@@ -37855,21 +37855,21 @@ var init_decimal = __esm(() => {
     return finalise(r, e, Ctor.rounding, m2);
   };
   P2.tangent = P2.tan = function() {
-    var pr, rm6, x2 = this, Ctor = x2.constructor;
+    var pr, rm7, x2 = this, Ctor = x2.constructor;
     if (!x2.isFinite())
       return new Ctor(NaN);
     if (x2.isZero())
       return new Ctor(x2);
     pr = Ctor.precision;
-    rm6 = Ctor.rounding;
+    rm7 = Ctor.rounding;
     Ctor.precision = pr + 10;
     Ctor.rounding = 1;
     x2 = x2.sin();
     x2.s = 1;
     x2 = divide(x2, new Ctor(1).minus(x2.times(x2)).sqrt(), pr + 10, 0);
     Ctor.precision = pr;
-    Ctor.rounding = rm6;
-    return finalise(quadrant == 2 || quadrant == 4 ? x2.neg() : x2, pr, rm6, true);
+    Ctor.rounding = rm7;
+    return finalise(quadrant == 2 || quadrant == 4 ? x2.neg() : x2, pr, rm7, true);
   };
   P2.times = P2.mul = function(y) {
     var carry, e, i, k2, r, rL, t, xdL, ydL, x2 = this, Ctor = x2.constructor, xd = x2.d, yd = (y = new Ctor(y)).d;
@@ -37911,47 +37911,47 @@ var init_decimal = __esm(() => {
     y.e = getBase10Exponent(r, e);
     return external2 ? finalise(y, Ctor.precision, Ctor.rounding) : y;
   };
-  P2.toBinary = function(sd, rm6) {
-    return toStringBinary(this, 2, sd, rm6);
+  P2.toBinary = function(sd, rm7) {
+    return toStringBinary(this, 2, sd, rm7);
   };
-  P2.toDecimalPlaces = P2.toDP = function(dp, rm6) {
+  P2.toDecimalPlaces = P2.toDP = function(dp, rm7) {
     var x2 = this, Ctor = x2.constructor;
     x2 = new Ctor(x2);
     if (dp === undefined)
       return x2;
     checkInt32(dp, 0, MAX_DIGITS);
-    if (rm6 === undefined)
-      rm6 = Ctor.rounding;
+    if (rm7 === undefined)
+      rm7 = Ctor.rounding;
     else
-      checkInt32(rm6, 0, 8);
-    return finalise(x2, dp + x2.e + 1, rm6);
+      checkInt32(rm7, 0, 8);
+    return finalise(x2, dp + x2.e + 1, rm7);
   };
-  P2.toExponential = function(dp, rm6) {
+  P2.toExponential = function(dp, rm7) {
     var str, x2 = this, Ctor = x2.constructor;
     if (dp === undefined) {
       str = finiteToString(x2, true);
     } else {
       checkInt32(dp, 0, MAX_DIGITS);
-      if (rm6 === undefined)
-        rm6 = Ctor.rounding;
+      if (rm7 === undefined)
+        rm7 = Ctor.rounding;
       else
-        checkInt32(rm6, 0, 8);
-      x2 = finalise(new Ctor(x2), dp + 1, rm6);
+        checkInt32(rm7, 0, 8);
+      x2 = finalise(new Ctor(x2), dp + 1, rm7);
       str = finiteToString(x2, true, dp + 1);
     }
     return x2.isNeg() && !x2.isZero() ? "-" + str : str;
   };
-  P2.toFixed = function(dp, rm6) {
+  P2.toFixed = function(dp, rm7) {
     var str, y, x2 = this, Ctor = x2.constructor;
     if (dp === undefined) {
       str = finiteToString(x2);
     } else {
       checkInt32(dp, 0, MAX_DIGITS);
-      if (rm6 === undefined)
-        rm6 = Ctor.rounding;
+      if (rm7 === undefined)
+        rm7 = Ctor.rounding;
       else
-        checkInt32(rm6, 0, 8);
-      y = finalise(new Ctor(x2), dp + x2.e + 1, rm6);
+        checkInt32(rm7, 0, 8);
+      y = finalise(new Ctor(x2), dp + x2.e + 1, rm7);
       str = finiteToString(y, false, dp + y.e + 1);
     }
     return x2.isNeg() && !x2.isZero() ? "-" + str : str;
@@ -38001,23 +38001,23 @@ var init_decimal = __esm(() => {
     external2 = true;
     return r;
   };
-  P2.toHexadecimal = P2.toHex = function(sd, rm6) {
-    return toStringBinary(this, 16, sd, rm6);
+  P2.toHexadecimal = P2.toHex = function(sd, rm7) {
+    return toStringBinary(this, 16, sd, rm7);
   };
-  P2.toNearest = function(y, rm6) {
+  P2.toNearest = function(y, rm7) {
     var x2 = this, Ctor = x2.constructor;
     x2 = new Ctor(x2);
     if (y == null) {
       if (!x2.d)
         return x2;
       y = new Ctor(1);
-      rm6 = Ctor.rounding;
+      rm7 = Ctor.rounding;
     } else {
       y = new Ctor(y);
-      if (rm6 === undefined) {
-        rm6 = Ctor.rounding;
+      if (rm7 === undefined) {
+        rm7 = Ctor.rounding;
       } else {
-        checkInt32(rm6, 0, 8);
+        checkInt32(rm7, 0, 8);
       }
       if (!x2.d)
         return y.s ? x2 : y;
@@ -38029,7 +38029,7 @@ var init_decimal = __esm(() => {
     }
     if (y.d[0]) {
       external2 = false;
-      x2 = divide(x2, y, 0, rm6, 1).times(y);
+      x2 = divide(x2, y, 0, rm7, 1).times(y);
       external2 = true;
       finalise(x2);
     } else {
@@ -38041,24 +38041,24 @@ var init_decimal = __esm(() => {
   P2.toNumber = function() {
     return +this;
   };
-  P2.toOctal = function(sd, rm6) {
-    return toStringBinary(this, 8, sd, rm6);
+  P2.toOctal = function(sd, rm7) {
+    return toStringBinary(this, 8, sd, rm7);
   };
   P2.toPower = P2.pow = function(y) {
-    var e, k2, pr, r, rm6, s2, x2 = this, Ctor = x2.constructor, yn = +(y = new Ctor(y));
+    var e, k2, pr, r, rm7, s2, x2 = this, Ctor = x2.constructor, yn = +(y = new Ctor(y));
     if (!x2.d || !y.d || !x2.d[0] || !y.d[0])
       return new Ctor(mathpow(+x2, yn));
     x2 = new Ctor(x2);
     if (x2.eq(1))
       return x2;
     pr = Ctor.precision;
-    rm6 = Ctor.rounding;
+    rm7 = Ctor.rounding;
     if (y.eq(1))
-      return finalise(x2, pr, rm6);
+      return finalise(x2, pr, rm7);
     e = mathfloor(y.e / LOG_BASE);
     if (e >= y.d.length - 1 && (k2 = yn < 0 ? -yn : yn) <= MAX_SAFE_INTEGER) {
       r = intPow(Ctor, x2, k2, pr);
-      return y.s < 0 ? new Ctor(1).div(r) : finalise(r, pr, rm6);
+      return y.s < 0 ? new Ctor(1).div(r) : finalise(r, pr, rm7);
     }
     s2 = x2.s;
     if (s2 < 0) {
@@ -38081,7 +38081,7 @@ var init_decimal = __esm(() => {
     r = naturalExponential(y.times(naturalLogarithm(x2, pr + k2)), pr);
     if (r.d) {
       r = finalise(r, pr + 5, 1);
-      if (checkRoundingDigits(r.d, pr, rm6)) {
+      if (checkRoundingDigits(r.d, pr, rm7)) {
         e = pr + 10;
         r = finalise(naturalExponential(y.times(naturalLogarithm(x2, e + k2)), e), e + 5, 1);
         if (+digitsToString(r.d).slice(pr + 1, pr + 15) + 1 == 100000000000000) {
@@ -38091,37 +38091,37 @@ var init_decimal = __esm(() => {
     }
     r.s = s2;
     external2 = true;
-    Ctor.rounding = rm6;
-    return finalise(r, pr, rm6);
+    Ctor.rounding = rm7;
+    return finalise(r, pr, rm7);
   };
-  P2.toPrecision = function(sd, rm6) {
+  P2.toPrecision = function(sd, rm7) {
     var str, x2 = this, Ctor = x2.constructor;
     if (sd === undefined) {
       str = finiteToString(x2, x2.e <= Ctor.toExpNeg || x2.e >= Ctor.toExpPos);
     } else {
       checkInt32(sd, 1, MAX_DIGITS);
-      if (rm6 === undefined)
-        rm6 = Ctor.rounding;
+      if (rm7 === undefined)
+        rm7 = Ctor.rounding;
       else
-        checkInt32(rm6, 0, 8);
-      x2 = finalise(new Ctor(x2), sd, rm6);
+        checkInt32(rm7, 0, 8);
+      x2 = finalise(new Ctor(x2), sd, rm7);
       str = finiteToString(x2, sd <= x2.e || x2.e <= Ctor.toExpNeg, sd);
     }
     return x2.isNeg() && !x2.isZero() ? "-" + str : str;
   };
-  P2.toSignificantDigits = P2.toSD = function(sd, rm6) {
+  P2.toSignificantDigits = P2.toSD = function(sd, rm7) {
     var x2 = this, Ctor = x2.constructor;
     if (sd === undefined) {
       sd = Ctor.precision;
-      rm6 = Ctor.rounding;
+      rm7 = Ctor.rounding;
     } else {
       checkInt32(sd, 1, MAX_DIGITS);
-      if (rm6 === undefined)
-        rm6 = Ctor.rounding;
+      if (rm7 === undefined)
+        rm7 = Ctor.rounding;
       else
-        checkInt32(rm6, 0, 8);
+        checkInt32(rm7, 0, 8);
     }
-    return finalise(new Ctor(x2), sd, rm6);
+    return finalise(new Ctor(x2), sd, rm7);
   };
   P2.toString = function() {
     var x2 = this, Ctor = x2.constructor, str = finiteToString(x2, x2.e <= Ctor.toExpNeg || x2.e >= Ctor.toExpPos);
@@ -38170,7 +38170,7 @@ var init_decimal = __esm(() => {
       for (;!a[0] && a.length > 1; )
         a.shift();
     }
-    return function(x2, y, pr, rm6, dp, base) {
+    return function(x2, y, pr, rm7, dp, base) {
       var cmp, e, i, k2, logBase, more, prod, prodL, q, qd, rem, remL, rem0, sd, t, xi, xL, yd0, yL, yz, Ctor = x2.constructor, sign = x2.s == y.s ? 1 : -1, xd = x2.d, yd = y.d;
       if (!xd || !xd[0] || !yd || !yd[0]) {
         return new Ctor(!x2.s || !y.s || (xd ? yd && xd[0] == yd[0] : !yd) ? NaN : xd && xd[0] == 0 || !yd ? sign * 0 : sign / 0);
@@ -38193,7 +38193,7 @@ var init_decimal = __esm(() => {
         e--;
       if (pr == null) {
         sd = pr = Ctor.precision;
-        rm6 = Ctor.rounding;
+        rm7 = Ctor.rounding;
       } else if (dp) {
         sd = pr + (x2.e - y.e) + 1;
       } else {
@@ -38294,7 +38294,7 @@ var init_decimal = __esm(() => {
         for (i = 1, k2 = qd[0];k2 >= 10; k2 /= 10)
           i++;
         q.e = i + e * logBase - 1;
-        finalise(q, dp ? pr + q.e + 1 : pr, rm6, more);
+        finalise(q, dp ? pr + q.e + 1 : pr, rm7, more);
       }
       return q;
     };
@@ -63077,7 +63077,7 @@ import { existsSync as existsSync9 } from "node:fs";
 import { readdir as readdir6 } from "node:fs/promises";
 import { createRequire as createRequire7 } from "node:module";
 import { join as join12 } from "node:path";
-import { pathToFileURL as pathToFileURL5 } from "node:url";
+import { pathToFileURL as pathToFileURL6 } from "node:url";
 
 // frontend/packages/project-protocol/src/ai.ts
 init_zod();
@@ -68813,9 +68813,10 @@ async function createMockWorkerRuntime(input) {
 // frontend/packages/miniapp-kit/src/typecheck.ts
 import { execFile } from "node:child_process";
 import { existsSync as existsSync8 } from "node:fs";
-import { readdir as readdir5 } from "node:fs/promises";
+import { readdir as readdir5, rm as rm3 } from "node:fs/promises";
 import { createRequire as createRequire6 } from "node:module";
 import { join as join11 } from "node:path";
+import { pathToFileURL as pathToFileURL5 } from "node:url";
 var TSC_LINE = /^(.+?)\((\d+),(\d+)\): error (TS\d+: .*)$/;
 var TSC_GLOBAL = /^error (TS\d+: .*)$/;
 function parseTscOutput(slug, output) {
@@ -68846,6 +68847,16 @@ var defaultTypeCheckDeps = {
       return null;
     }
   },
+  async prepare(appDir) {
+    const routes = join11(appDir, "src", "routes");
+    const tree = join11(appDir, "src", "routeTree.gen.ts");
+    if (!existsSync8(routes) || existsSync8(tree))
+      return async () => {
+        return;
+      };
+    await generateRouteTree(appDir, routes, tree);
+    return async () => rm3(tree, { force: true });
+  },
   run(tsc, appDir) {
     return new Promise((resolve2) => {
       execFile(process.execPath, [tsc, "-b", appDir, "--pretty", "false"], { cwd: appDir, maxBuffer: 16 * 1024 * 1024 }, (error51, stdout, stderr) => {
@@ -68867,7 +68878,8 @@ async function typeCheckApps(root, deps = defaultTypeCheckDeps) {
       missing.push(slug);
       return;
     }
-    const { code, output } = await deps.run(tsc, appDir);
+    const restore = await deps.prepare(appDir);
+    const { code, output } = await deps.run(tsc, appDir).finally(restore);
     if (code === 0)
       return;
     const parsed = parseTscOutput(slug, output);
@@ -68886,6 +68898,25 @@ async function typeCheckApps(root, deps = defaultTypeCheckDeps) {
     }
   ] : [];
   return { findings, skipped };
+}
+async function generateRouteTree(appDir, routes, tree) {
+  let entry;
+  try {
+    const plugin = createRequire6(join11(appDir, "package.json")).resolve("@tanstack/router-plugin/package.json");
+    entry = createRequire6(plugin).resolve("@tanstack/router-generator");
+  } catch {
+    return;
+  }
+  const generator = await import(pathToFileURL5(entry).href);
+  const config2 = generator.getConfig({
+    target: "react",
+    autoCodeSplitting: true,
+    routesDirectory: routes,
+    generatedRouteTree: tree,
+    disableLogging: true,
+    tmpDir: join11(appDir, "node_modules", ".tanstack", "tmp")
+  }, appDir);
+  await new generator.Generator({ config: config2, root: appDir }).run();
 }
 
 // frontend/packages/miniapp-kit/src/check.ts
@@ -68908,7 +68939,7 @@ function projectZModelLoader(root) {
       const fromProject = createRequire7(join12(root, "package.json"));
       const fromCli = createRequire7(fromProject.resolve("@zenstackhq/cli/package.json"));
       const cjs = fromCli.resolve("@zenstackhq/language");
-      return import(pathToFileURL5(cjs.replace(/index\.cjs$/, "index.mjs")).href);
+      return import(pathToFileURL6(cjs.replace(/index\.cjs$/, "index.mjs")).href);
     })();
     const { loadDocument } = await loaded;
     return await loadDocument(entry, [], mergeImports, true);
@@ -69095,13 +69126,13 @@ function openInBrowser(url2) {
 // frontend/packages/miniapp-kit/src/build.ts
 import { spawn as spawn3 } from "node:child_process";
 import { existsSync as existsSync14, readFileSync as readFileSync3 } from "node:fs";
-import { readFile as readFile10, rm as rm6, writeFile as writeFile4 } from "node:fs/promises";
+import { readFile as readFile10, rm as rm7, writeFile as writeFile4 } from "node:fs/promises";
 import { createRequire as createRequire9 } from "node:module";
 import { dirname as dirname5, join as join19 } from "node:path";
 
 // frontend/packages/miniapp-kit/src/generate.ts
 import { existsSync as existsSync11 } from "node:fs";
-import { mkdir as mkdir3, readdir as readdir8, readFile as readFile7, rm as rm4, writeFile as writeFile3 } from "node:fs/promises";
+import { mkdir as mkdir3, readdir as readdir8, readFile as readFile7, rm as rm5, writeFile as writeFile3 } from "node:fs/promises";
 import { dirname as dirname3, join as join14 } from "node:path";
 
 // frontend/packages/miniapp-kit/src/env-types.ts
@@ -69144,7 +69175,7 @@ function renderServerEnvTypes(manifest2) {
 
 // frontend/packages/miniapp-kit/src/vendor.ts
 import { existsSync as existsSync10 } from "node:fs";
-import { cp, mkdir as mkdir2, readdir as readdir7, readFile as readFile6, rm as rm3, writeFile as writeFile2 } from "node:fs/promises";
+import { cp, mkdir as mkdir2, readdir as readdir7, readFile as readFile6, rm as rm4, writeFile as writeFile2 } from "node:fs/promises";
 import { join as join13 } from "node:path";
 var VENDORED_PACKAGES = [
   { name: "@workspace/project-protocol", dir: "project-protocol" },
@@ -69207,7 +69238,7 @@ async function placeTree(source, target) {
   if (existed) {
     for (const entry of await readdir7(target)) {
       if (entry !== "node_modules")
-        await rm3(join13(target, entry), { recursive: true, force: true });
+        await rm4(join13(target, entry), { recursive: true, force: true });
     }
   }
   await cp(source, target, { recursive: true });
@@ -69229,7 +69260,7 @@ async function generateProject(options2) {
     vendored["fdpocket-py"] = await placePythonSdk(root, options2.kitRoot);
   const cli = cliOf(root, options2.resolveCli ?? resolveZenStackCli);
   const sdk = join14(root, PROJECT_PATHS.sdk);
-  await rm4(sdk, { recursive: true, force: true });
+  await rm5(sdk, { recursive: true, force: true });
   await runZen(cli, root, [
     "generate",
     "--schema",
@@ -69417,7 +69448,7 @@ function describeFile(bytes) {
 
 // frontend/packages/miniapp-kit/src/python-build.ts
 import { existsSync as existsSync12 } from "node:fs";
-import { cp as cp2, mkdir as mkdir4, readdir as readdir10, readFile as readFile9, rm as rm5 } from "node:fs/promises";
+import { cp as cp2, mkdir as mkdir4, readdir as readdir10, readFile as readFile9, rm as rm6 } from "node:fs/promises";
 import { basename, join as join16, relative } from "node:path";
 
 class PythonBuildError extends Error {
@@ -69437,7 +69468,7 @@ async function copyPythonApp(input) {
     throw new PythonBuildError(`apps/${input.slug}/src is missing; put the package under src/`);
   }
   const out = join16(input.root, "dist", input.slug);
-  await rm5(out, { recursive: true, force: true });
+  await rm6(out, { recursive: true, force: true });
   await mkdir4(out, { recursive: true });
   for (const name3 of ROOT_FILES) {
     if (existsSync12(join16(appDir, name3)))
@@ -69481,13 +69512,13 @@ async function listPythonAppFiles(input) {
 // frontend/packages/miniapp-kit/src/worker-build.ts
 import { builtinModules } from "node:module";
 import { join as join18 } from "node:path";
-import { pathToFileURL as pathToFileURL7 } from "node:url";
+import { pathToFileURL as pathToFileURL8 } from "node:url";
 
 // frontend/packages/miniapp-kit/src/dev/seed.ts
 import { existsSync as existsSync13, readFileSync as readFileSync2 } from "node:fs";
 import { createRequire as createRequire8 } from "node:module";
 import { dirname as dirname4, join as join17 } from "node:path";
-import { pathToFileURL as pathToFileURL6 } from "node:url";
+import { pathToFileURL as pathToFileURL7 } from "node:url";
 // frontend/packages/logger/redact.ts
 var REDACTED = "[REDACTED]";
 var SENSITIVE_KEY_PARTS = [
@@ -76890,7 +76921,7 @@ class SeedError extends Error {
 }
 function viteImporter(viteEntry, root) {
   return async (path) => {
-    const vite = await import(pathToFileURL6(viteEntry).href);
+    const vite = await import(pathToFileURL7(viteEntry).href);
     const { module } = await vite.runnerImport(path, {
       root,
       configFile: false,
@@ -76988,7 +77019,7 @@ export default {
 // frontend/packages/miniapp-kit/src/worker-build.ts
 var NODE_BUILTINS = [/^node:/, ...builtinModules];
 async function buildWorkerBundle(input) {
-  const vite = await import(pathToFileURL7(resolveViteEntry(input.appDir)).href);
+  const vite = await import(pathToFileURL8(resolveViteEntry(input.appDir)).href);
   const scheduledEntry = join18(input.appDir, "__platform_scheduled__.ts");
   const scheduledModule = "\x00platform-scheduled";
   await vite.build({
@@ -77050,7 +77081,7 @@ async function buildProject(options2) {
     ...options2.install ? { install: options2.install } : {}
   });
   const dist = join19(root, "dist");
-  await rm6(dist, { recursive: true, force: true });
+  await rm7(dist, { recursive: true, force: true });
   const apps = Object.values(manifest2.apps);
   const env = {
     [KIT_BUILD_ENV.projectId]: options2.projectId,
@@ -77249,7 +77280,7 @@ async function diffDatabase(options2) {
 // frontend/packages/miniapp-kit/src/db/finalize.ts
 import { createHash as createHash5 } from "node:crypto";
 import { existsSync as existsSync16 } from "node:fs";
-import { mkdir as mkdir6, readFile as readFile12, rm as rm7, writeFile as writeFile6 } from "node:fs/promises";
+import { mkdir as mkdir6, readFile as readFile12, rm as rm8, writeFile as writeFile6 } from "node:fs/promises";
 import { dirname as dirname7, join as join21 } from "node:path";
 
 // frontend/packages/miniapp-kit/src/db/migration-policy.ts
@@ -77329,9 +77360,9 @@ async function clearPending(root) {
   const generated = join21(root, PENDING_SQL_PATH);
   await mkdir6(dirname7(generated), { recursive: true });
   await writeFile6(generated, PENDING_SQL_HEADER);
-  await rm7(join21(root, PENDING_DATA_PATH), { force: true });
-  await rm7(join21(root, PENDING_INTENT_PATH), { force: true });
-  await rm7(join21(root, PROJECT_PATHS.pending, PENDING_POLICY_FILE), { force: true });
+  await rm8(join21(root, PENDING_DATA_PATH), { force: true });
+  await rm8(join21(root, PENDING_INTENT_PATH), { force: true });
+  await rm8(join21(root, PROJECT_PATHS.pending, PENDING_POLICY_FILE), { force: true });
 }
 async function finalizeMigration(options2) {
   const { root } = options2;
@@ -77410,7 +77441,7 @@ ${data}
 // frontend/packages/miniapp-kit/src/dev/runtime.ts
 import { createHash as createHash7, randomBytes as randomBytes2 } from "node:crypto";
 import { existsSync as existsSync18 } from "node:fs";
-import { mkdir as mkdir8, readFile as readFile15, rm as rm9, writeFile as writeFile8 } from "node:fs/promises";
+import { mkdir as mkdir8, readFile as readFile15, rm as rm10, writeFile as writeFile8 } from "node:fs/promises";
 import { dirname as dirname9, join as join25 } from "node:path";
 
 // frontend/node_modules/@hono/node-server/dist/index.mjs
@@ -78321,7 +78352,7 @@ var upgradeWebSocket = defineWebSocketHelper(async (c2, events, options2) => {
 
 // frontend/packages/project-gateway/src/storage/local-store.ts
 import { createReadStream } from "node:fs";
-import { copyFile, mkdir as mkdir7, readdir as readdir11, readFile as readFile13, rm as rm8, stat, writeFile as writeFile7 } from "node:fs/promises";
+import { copyFile, mkdir as mkdir7, readdir as readdir11, readFile as readFile13, rm as rm9, stat, writeFile as writeFile7 } from "node:fs/promises";
 import { dirname as dirname8, join as join22, resolve as resolve2, sep } from "node:path";
 import { Readable as Readable2 } from "node:stream";
 var encoder6 = new TextEncoder;
@@ -78457,8 +78488,8 @@ function createLocalObjectStore(options2) {
     },
     async remove(location) {
       const path = pathOf(location);
-      await rm8(path, { force: true });
-      await rm8(`${path}.meta.json`, { force: true });
+      await rm9(path, { force: true });
+      await rm9(`${path}.meta.json`, { force: true });
     },
     async list(prefix2, { limit: limit3, startAfter }) {
       const areaRoot = resolve2(root, areaDir(prefix2));
@@ -78510,12 +78541,12 @@ function createLocalObjectStore(options2) {
       const ordered = [...parts].sort((a2, b3) => a2.partNumber - b3.partNumber);
       const chunks = await Promise.all(ordered.map((part) => readFile13(join22(upload.dir, String(part.partNumber)))));
       await writeObject(location, Buffer.concat(chunks), upload.meta.contentType);
-      await rm8(upload.dir, { recursive: true, force: true });
+      await rm9(upload.dir, { recursive: true, force: true });
     },
     async abortMultipart(location, uploadId) {
       const upload = await readUpload(location, uploadId);
       if (upload)
-        await rm8(upload.dir, { recursive: true, force: true });
+        await rm9(upload.dir, { recursive: true, force: true });
     },
     async listMultipartUploads(location) {
       let ids;
@@ -79583,7 +79614,7 @@ async function openDevDatabase(options2) {
   const recreated = current !== stamp || !existsSync18(path);
   if (recreated) {
     for (const file2 of [stampPath, path, `${path}-wal`, `${path}-shm`, `${path}-journal`])
-      await rm9(file2, { force: true });
+      await rm10(file2, { force: true });
     await mkdir8(dirname9(path), { recursive: true });
   }
   const db = options2.createLibsqlClient({ url: `file:${path}` });
@@ -82048,7 +82079,7 @@ function nextStep(error51) {
 
 // frontend/packages/miniapp-kit/src/repo.ts
 import { existsSync as existsSync21 } from "node:fs";
-import { appendFile, mkdir as mkdir11, readFile as readFile20, rm as rm10, writeFile as writeFile11 } from "node:fs/promises";
+import { appendFile, mkdir as mkdir11, readFile as readFile20, rm as rm11, writeFile as writeFile11 } from "node:fs/promises";
 import { join as join31 } from "node:path";
 class RepoError extends Error {
   name = "RepoError";
@@ -82142,7 +82173,7 @@ async function fetchBundles(git, source, pulled, already, download2) {
         `+refs/*:${REMOTE_REFS}/*`
       ]);
     } finally {
-      await rm10(file2, { force: true });
+      await rm11(file2, { force: true });
     }
     fetched.push(bundle2.sha256);
   }
@@ -82261,7 +82292,7 @@ import { join as join35 } from "node:path";
 import { existsSync as existsSync22 } from "node:fs";
 import { createRequire as createRequire11 } from "node:module";
 import { join as join33 } from "node:path";
-import { pathToFileURL as pathToFileURL8 } from "node:url";
+import { pathToFileURL as pathToFileURL9 } from "node:url";
 
 class BrowserUnavailableError extends Error {
   name = "BrowserUnavailableError";
@@ -82280,7 +82311,7 @@ function resolvePlaywright() {
   }
 }
 var launchChromium = async () => {
-  const loaded = await import(pathToFileURL8(resolvePlaywright()).href);
+  const loaded = await import(pathToFileURL9(resolvePlaywright()).href);
   const module = loaded.default ?? loaded;
   const executablePath = process.env.KIT_CHROMIUM_PATH;
   if (executablePath && !existsSync22(executablePath)) {
@@ -82294,7 +82325,7 @@ var launchChromium = async () => {
 
 // frontend/packages/miniapp-kit/src/verify/erase.ts
 import { existsSync as existsSync23 } from "node:fs";
-import { mkdtemp as mkdtemp2, rm as rm11 } from "node:fs/promises";
+import { mkdtemp as mkdtemp2, rm as rm12 } from "node:fs/promises";
 import { tmpdir as tmpdir2 } from "node:os";
 import { join as join34 } from "node:path";
 var failed = (message2) => ({
@@ -82372,7 +82403,7 @@ async function runEraseTest(options2) {
     return { errors: [], warnings: [] };
   } finally {
     db.close();
-    await rm11(dir, { recursive: true, force: true });
+    await rm12(dir, { recursive: true, force: true });
   }
 }
 
