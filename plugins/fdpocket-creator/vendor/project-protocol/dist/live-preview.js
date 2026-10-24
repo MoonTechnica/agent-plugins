@@ -18,6 +18,8 @@ export const LIVE_ACTIVITY_KINDS = ['pointerdown', 'keydown', 'wheel', 'touchsta
 export const KIT_LIVE_ENV = {
     /** `/lp/{token}/`（App ごとの `/<slug>/` は SDK が足す） */
     base: 'MINIAPP_LIVE_BASE',
+    sessionOrigin: 'MINIAPP_SESSION_ORIGIN',
+    token: 'MINIAPP_SESSION_LIVE_TOKEN',
     /** この App の Vite の公開ポートのホスト名（`sb-….vercel.run`） */
     hmrHost: 'MINIAPP_LIVE_HMR_HOST',
 };

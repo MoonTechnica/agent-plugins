@@ -11,19 +11,22 @@ export declare const storageDownloadClaimsSchema: z.ZodObject<{
         app: z.ZodString;
         env: z.ZodEnum<{
             main: "main";
-            branch: "branch";
-            preview: "preview";
+            session: "session";
             prod: "prod";
         }>;
-        br: z.ZodOptional<z.ZodUUID>;
-        pv: z.ZodOptional<z.ZodUUID>;
+        envId: z.ZodUUID;
+        actorId: z.ZodUUID;
+        testIdentity: z.ZodOptional<z.ZodString>;
+        testGrantId: z.ZodOptional<z.ZodUUID>;
         anon: z.ZodBoolean;
         jti: z.ZodUUID;
         iat: z.ZodInt;
         exp: z.ZodInt;
     }, z.core.$strict>;
     fileId: z.ZodUUID;
-    versionId: z.ZodUUID;
+    versionId: z.ZodNullable<z.ZodUUID>;
+    policyVersion: z.ZodOptional<z.ZodString>;
+    schemaRevision: z.ZodOptional<z.ZodString>;
     iat: z.ZodInt;
     exp: z.ZodInt;
 }, z.core.$strict>;

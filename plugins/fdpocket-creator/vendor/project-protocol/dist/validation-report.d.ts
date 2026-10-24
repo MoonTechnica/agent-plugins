@@ -53,8 +53,8 @@ export declare const validationScreenshotSchema: z.ZodObject<{
     app: z.ZodString;
     principal: z.ZodEnum<{
         anonymous: "anonymous";
-        member: "member";
         admin: "admin";
+        member: "member";
     }>;
     purpose: z.ZodEnum<{
         listing: "listing";
@@ -182,6 +182,12 @@ export declare const reportSchema: z.ZodObject<{
             network: z.ZodOptional<z.ZodObject<{
                 egress: z.ZodOptional<z.ZodArray<z.ZodString>>;
                 browser: z.ZodOptional<z.ZodArray<z.ZodString>>;
+                mocks: z.ZodOptional<z.ZodArray<z.ZodObject<{
+                    host: z.ZodString;
+                    status: z.ZodInt;
+                    headers: z.ZodOptional<z.ZodRecord<z.ZodString, z.ZodString>>;
+                    body: z.ZodOptional<z.ZodString>;
+                }, z.core.$strict>>>;
             }, z.core.$strict>>;
             secrets: z.ZodOptional<z.ZodArray<z.ZodObject<{
                 name: z.ZodString;
@@ -324,8 +330,8 @@ export declare const reportSchema: z.ZodObject<{
         app: z.ZodString;
         principal: z.ZodEnum<{
             anonymous: "anonymous";
-            member: "member";
             admin: "admin";
+            member: "member";
         }>;
         purpose: z.ZodEnum<{
             listing: "listing";

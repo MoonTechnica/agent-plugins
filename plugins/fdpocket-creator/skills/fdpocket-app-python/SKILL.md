@@ -176,8 +176,8 @@ export default {
 
 - **途中から続きを渡す**ときは `ctx.jobs.schedule("batch", "progressed", {...}, idempotency_key=f"progressed:{ctx.run_id}")`。
   失敗では呼ばれないので、終わりの通知の代わりにしない。payload は JSON で 64 KiB まで（大きいものは DB か Storage に置き id を渡す）。
-- 配備した環境で届くのは main / prod だけ（branch / preview では jobs が動かない）。`kit dev` は手元の CPU でも、ライブプレビューの
-  本物の GPU でも、終わりを手元の jobs に渡す。本物の GPU の開発中のタスクの中では `ctx.jobs` は `ctx.db` / `ctx.storage` と同じく使えない。
+- 定期 jobs は main / prod で動く。セッション環境では開発者パネルから手動実行する。Python の `onFinish` は実行を受け付けた環境の jobs に渡る。
+  手元の `kit dev` は CPU タスクの終わりを手元の jobs に渡す。接続したセッションでは通常の認証済み Gateway と同じ DB / Storage / jobs を使う。
 - 受け手の書き方は `$fdpocket-app-integrations` の「登録されたジョブ」（`queue(job, env, ctx)` と `job.handler`）。
 
 ## 6. 依存と確かめ方
@@ -185,9 +185,9 @@ export default {
 - `apps/<slug>/pyproject.toml` に依存を書き、`uv lock` で `uv.lock` を作って commit する（`httpx` は消さない）。
   `kit check` が pyproject・uv.lock・handler・依存・宣言していない secret と宛先を確かめる。
 - `kit dev` の既定: 手元は CPU で `uv run` がタスクとサーバーを動かす（費用は引かない。uv が要る）。
-  ライブプレビューと `--python modal` は**タスクを Platform の本物の GPU で動かす**（チャットの持ち主のクレジット）。
-  本物の GPU のタスクの中では `ctx.db` / `ctx.storage` / `ctx.client` は使えない（手元の DB は Platform に無い。呼ぶと `NOT_AVAILABLE_IN_DEVELOPMENT`）ので、
-  入力（`input`）と結果（戻り値）だけで確かめる。サーバーは手元の CPU のまま。
+  本物の GPU は `$fdpocket-dev` の `kit.mjs dev --connect`、生成ターンでは Platform の `kit dev --live` で確かめる。
+  通常の Project Gateway を通して自分のセッションの DB / Storage と連携し、チャット所有者のクレジットを使う。
+  古い転送用の鍵・OAuth token を設定ファイルやブラウザーへ渡さない。
 - 自己テストの繰り返しは CPU（小さなモデル。GPU の有無を torch で確かめて device を切り替える）で、
   GPU でしか確かめられないこと（速度・メモリ・大きなモデル）だけを本物で試す。
 - 宣言（`project.yaml`）と依存は版に固定される。Image は依存が変わった版の初回だけ作り直す（数分かかる）。

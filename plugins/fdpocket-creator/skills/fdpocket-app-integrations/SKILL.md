@@ -45,7 +45,8 @@ export default {
 python のタスクの終わりは `project.yaml` の `onFinish`（Platform が登録する。中身は `{ runId, app, task, status, error }` で
 `pythonRunFinishedSchema` で確かめ、出力は `server.forJob(job).python.get(runId)` で読む）、途中からは `ctx.jobs.schedule(...)`
 （`$fdpocket-app-python`）。payload は JSON で 64 KiB まで、`runAt` は 30 日先まで。
-ジョブは main / prod でだけ動く（branch / preview では登録も `FORBIDDEN`）。
+ジョブは main / prod と本人のセッション環境で動く。セッションの schedule は自動の時刻実行ではなく、
+開発者パネルの手動実行で確かめる。利用者・テスト主体の範囲を保ち、セッションの AI・GPU の費用はチャットの持ち主が払う。
 
 web からAPIを呼ぶときはapiPathでAPI Appを明示する。現在の画面のBASE_URLではなくProject共通prefixを使い、ライブプレビューのtokenも維持する。
 
@@ -60,4 +61,12 @@ const response = await client.fetch(apiPath('partner-api', '/example'))
 
 外部 API は `AbortSignal.timeout(5000)` などで期限を設ける。再試行は回数を制限し、429 / 一時的な 5xx だけをバックオフ付きで扱う。課金・送信などの操作には相手サービスの冪等キーを使う。Webhook はサービス公式の署名検証と時刻の検査を行い、検証前に DB の変更や通知をしない。受信本文をログに出さない。
 
-手元だけの値は `.kit/dev.vars` に置く（git に入れない）。`kit dev` の外部通信は宣言した宛先への 200 モックであり、本物のサービスを呼ばない。ライブプレビューと検証では手元の値を読まない。開発パネルで外部通信・拒否・通知を見る。`kit dev --trigger <app:handler>` は宣言した schedule を 1 回実行して終了する。
+手元だけの値は `.kit/dev.vars` に置く（git に入れない）。通常の `kit dev` の外部通信は、`network.mocks` に宣言した
+host / status / headers / body の固定応答を使う。未宣言の応答を 200 の成功にせず **501** にするので、試す外部 API に必要な応答を用意する。
+利用者の live は本物の環境で、権限に応じた `dev` secrets を Platform が渡す。手元の `.kit/dev.vars` は読まない。
+外部参加者の権限を manifest やクライアントのヘッダーで昇格させない。
+
+決済・メール・Push などの外部への副作用がある API は、E2E でも `network.mocks` で代えるのが既定。
+本物でしか分からない読み取りだけを選び、先に `design/test-plan.md` に宛先・理由・副作用・期待結果・費用を書く（`$fdpocket-app-testing`）。
+AI・GPU の実際の利用料はチャットの持ち主が払う。開発者パネルで外部通信・拒否・通知を確認し、秘密の値やテスト許可証をログに出さない。
+`kit dev --trigger <app:handler>` は通常ローカルで宣言した schedule を 1 回実行して終了する。

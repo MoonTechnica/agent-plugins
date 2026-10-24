@@ -1,21 +1,22 @@
-// 試用データ（lifecycle.md §2.5）。kit dev・Platform の影の DB・動的検証が、DB を作ったときに 1 回だけ流す。本番には流れない。
-// db はポリシーの無い client（User も作れる）。import は型だけ（@workspace/sdk の実体は実行時に読めない）。
-import type { SchemaType } from "@workspace/sdk"
-import type { ClientContract } from "@zenstackhq/orm"
+// 初期化計画。DB client は受け取らず、モデルの create/createMany/upsert だけを返す。
+// testIdentities の slot は admin/member/anonymous 以外。利用者とロールは Platform が作る。
+import type { SchemaType, SeedContext, SeedPlan, TestIdentity } from "@workspace/sdk"
 
-export default async function seed(db: ClientContract<SchemaType>) {
-  const [alice, bob] = await Promise.all(
-    ["alice", "bob"].map((name) =>
-      db.user.create({
-        data: { id: crypto.randomUUID(), globalUserId: `seed:${name}`, displayName: name },
-      })
-    )
-  )
-  const team = await db.workspace.create({ data: { name: "サンプルのチーム" } })
-  await db.membership.createMany({
-    data: [
-      { workspaceId: team.id, userId: alice.id, role: "owner" },
-      { workspaceId: team.id, userId: bob.id, role: "editor" },
+export const testIdentities = [
+  { slot: "alice", roles: [], displayName: "Alice" },
+  { slot: "bob", roles: [], displayName: "Bob" },
+] satisfies TestIdentity[]
+
+export default async function seed(context: SeedContext): Promise<SeedPlan<SchemaType>> {
+  const workspaceId = await context.id("sample-workspace")
+  return {
+    version: 1,
+    operations: [
+      { model: "workspace", operation: "create", args: { data: { id: workspaceId, name: "サンプルのチーム" } } },
+      { model: "membership", operation: "createMany", args: { data: [
+        { workspaceId, userId: context.users.alice!.id, role: "owner" },
+        { workspaceId, userId: context.users.bob!.id, role: "editor" },
+      ] } },
     ],
-  })
+  }
 }

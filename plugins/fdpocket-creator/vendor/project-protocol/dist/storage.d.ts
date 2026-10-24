@@ -118,8 +118,8 @@ export declare const storageFileSchema: z.ZodObject<{
     status: z.ZodEnum<{
         failed: "failed";
         active: "active";
-        initiated: "initiated";
         uploading: "uploading";
+        initiated: "initiated";
         validating: "validating";
         deleting: "deleting";
         deleted: "deleted";
@@ -146,8 +146,8 @@ export declare const storageCompleteResponseSchema: z.ZodObject<{
         status: z.ZodEnum<{
             failed: "failed";
             active: "active";
-            initiated: "initiated";
             uploading: "uploading";
+            initiated: "initiated";
             validating: "validating";
             deleting: "deleting";
             deleted: "deleted";

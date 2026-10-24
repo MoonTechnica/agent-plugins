@@ -1,3 +1,4 @@
+import { type OutboundPolicy } from './network-mocks.ts';
 /**
  * Project オリジン（Cloudflare）→ dispatch Worker の転送に付ける Platform の署名（integrations.md §3.1）。
  *
@@ -9,30 +10,23 @@
  *
  * 葉のモジュール（Web Crypto だけ。Node・Vercel・Workers・Deno で動く）。
  */
+export declare const API_EXECUTION_MODE_HEADER = "x-platform-execution-mode";
 export declare const DISPATCH_HEADER = "x-platform-dispatch";
 export declare const DISPATCH_SIGNATURE_HEADER = "x-platform-signature";
+/** Cloudflare permits 128KiB total headers; leave half for ordinary request headers. */
+export declare const DISPATCH_HEADERS_MAX_BYTES: number;
 /** 署名の時刻の許容幅（秒）。再送の窓 */
 export declare const DISPATCH_MAX_SKEW_SECONDS = 60;
 /** HMAC の鍵の最短の長さ（文字） */
 export declare const DISPATCH_SECRET_MIN_LENGTH = 32;
-export type DispatchEnvironment = 'main' | 'branch' | 'preview' | 'prod';
+export type DispatchEnvironment = 'main' | 'session' | 'prod';
 export interface UserWorkerTarget {
     projectId: string;
     environment: DispatchEnvironment;
-    /** environment = branch のチャット */
-    sessionId?: string;
-    /** environment = preview のプレビュー */
-    previewSessionId?: string;
-    /** Recreated temporary environment identity; omitted only for legacy environments. */
     resourceGeneration?: string;
     app: string;
 }
-/** manifest.ts の APP_SLUG_PATTERN と同じ（zod を引かないよう写す。manifest.test.ts が一致を確かめる） */
 export declare const USER_WORKER_SLUG = "[a-z][a-z0-9-]{1,31}";
-/**
- * dispatch namespace の中の user Worker の名前（`p-{project}-{env}-{slug}`。project-runtime.md §6）。
- * branch・preview は環境がチャット / プレビューごとなので ID を挟む（`b-{session}` / `pv-{id}`。preview.md §1.1 の接尾辞と同じ）。
- */
 export declare function userWorkerName(target: UserWorkerTarget): string;
 export declare function isUserWorkerName(name: string): boolean;
 export declare function userWorkerApp(name: string): string | null;
@@ -42,7 +36,7 @@ export interface DispatchLimits {
 }
 export interface DispatchStorage {
     namespace: string;
-    tier: 'dev' | 'preview' | 'prod';
+    tier: 'dev' | 'prod';
 }
 /** Defense in depth: trusted DB storage metadata must describe this exact Worker environment. */
 export declare function workerStorageScope(worker: string): DispatchStorage | null;
@@ -59,6 +53,7 @@ export interface DispatchEnvelope {
     bodySha256: string;
     /** user Worker の `network.egress`（outbound Worker に渡す） */
     egress: string[];
+    policy: OutboundPolicy;
     /** 顧客別の上限（dispatch の custom limits） */
     limits?: DispatchLimits;
     storage?: DispatchStorage;
@@ -80,6 +75,7 @@ export declare function signDispatch(input: {
     url: string;
     body: Uint8Array | null;
     egress: readonly string[];
+    policy: OutboundPolicy;
     limits?: DispatchLimits;
     storage?: DispatchStorage;
     now?: Date;
@@ -93,3 +89,4 @@ export declare function verifyDispatch(input: {
     body: Uint8Array;
     now?: Date;
 }): Promise<DispatchVerification>;
+export declare function isWorkerOutboundPolicy(worker: string, value: unknown): value is OutboundPolicy;

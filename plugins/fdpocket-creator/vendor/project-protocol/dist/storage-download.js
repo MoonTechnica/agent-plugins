@@ -8,11 +8,17 @@ export const storageDownloadClaimsSchema = z
     typ: z.literal('storage-download'),
     project: projectTokenClaimsSchema,
     fileId: z.uuid(),
-    versionId: z.uuid(),
+    versionId: z.uuid().nullable(),
+    policyVersion: z.string().min(1).optional(),
+    schemaRevision: z
+        .string()
+        .regex(/^[a-f0-9]{64}$/)
+        .optional(),
     iat: z.int().nonnegative(),
     exp: z.int().positive(),
 })
-    .refine((c) => c.exp > c.iat &&
+    .refine((c) => (c.versionId !== null || (c.project.env === 'session' && c.schemaRevision !== undefined)) &&
+    c.exp > c.iat &&
     c.exp - c.iat <= STORAGE_DOWNLOAD_URL_TTL_MAX_SECONDS &&
     c.exp <= c.project.exp &&
     c.iat >= c.project.iat, { message: 'invalid file ticket lifetime' });

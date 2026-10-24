@@ -154,7 +154,7 @@ ai:                                          # ミニアプリ内 AI を使う P
 | `secrets` | api / jobs / python だけ。名前は `[A-Z][A-Z0-9_]` で 50 個まで。`GATEWAY_URL` と `PLATFORM_` で始まる名前は予約。値はコード・manifest・`listing/` に書かない（取り込みの検証が落とす） |
 | `servicePermissions` | api / jobs / python だけ。`notifications.send`（通知を送る）・`jobs.schedule`（jobs へ仕事を予約する）・`jobs.consume`（予約を受ける jobs 側）・`ai.chat`（api は利用者として、jobs は実行中のジョブとして AI を呼ぶ。§3.8）・`python.run`（python の App のタスクを依頼する） |
 | `ai` | AI を使う版だけ書く（書くと利用者の初回の同意に「AI の利用」が加わり、既に同意した人にも出し直す）。`instructions` / `schemas` は宣言した名前のファイルだけが版に固定される（実行時にファイルを読み直さない） |
-| `schedules` | jobs だけ。UTC の 5 フィールドの cron と handler 名。main / prod だけで動く（branch / preview では動かない） |
+| `schedules` | jobs だけ。UTC の 5 フィールドの cron と handler 名。main / prod は時刻実行、本人のセッションは開発者パネルから手動実行する |
 | `routes` | api だけ。`["/api/*"]` だけ |
 | `notifications` | テンプレートは 50 個まで。文中の `{{名前}}` はすべて `params` に宣言する。パスワード・金額・個人情報を文面とパラメータに入れない（ロック画面に出る） |
 
@@ -211,7 +211,7 @@ apps:
 | python | `python` と、`tasks` か `server` の 1 つ以上が要る。タスク名は `[a-z][a-z0-9_]` で 32 個まで。`handler` は `module.path:attr` |
 | `compute` | GPU は `T4` / `L4` / `A10` / `L40S` / `A100-40GB` / `A100-80GB` / `RTX-PRO-6000` / `H100` / `H200` / `B200`（枚数は 8 まで。A10 は 4）。CPU は 0.25〜16 コア、メモリは 512〜131072 MiB。タスク・サーバーで上書きできる |
 | 時間 | タスクは 10〜86400 秒（既定 600）。サーバーは要求が無い時間が `idleTimeoutSeconds`（60〜3600。既定 300）を超えると止まる |
-| `onFinish` | タスクが終わったら（成功・失敗・時間切れ・キャンセル・停止。途中停止のやり直しは除く）Platform が宛先の jobs の App にジョブを 1 つ登録する。宛先は `jobs.consume` のある jobs の App、python の App に `jobs.schedule` が要る。中身は `{ runId, app, task, status, error }`（出力は載せない。`forJob(job).python.get(runId)` で読む）。払う人は実行の払う人。配備した環境では main / prod だけ（branch / preview では届かない）。`kit dev`（手元の CPU・ライブプレビューの本物の GPU）は手元の jobs に渡す |
+| `onFinish` | タスクが終わったら（成功・失敗・時間切れ・キャンセル・停止。途中停止のやり直しは除く）Platform が宛先の jobs の App にジョブを 1 つ登録する。宛先は `jobs.consume` のある jobs の App、python の App に `jobs.schedule` が要る。中身は `{ runId, app, task, status, error }`（出力は載せない。`forJob(job).python.get(runId)` で読む）。払う人は実行の払う人。配備した main / prod / session の同じ環境の jobs に渡す。通常の `kit dev` のローカル CPU 確認はローカルの jobs に渡す |
 | 台数 | サーバーは `maxInstances`（1〜10。既定 1）台まで。1 台あたりの同時の要求の平均が `targetConcurrency`（1〜1000。既定 4）を超えると Platform が足し、空いた台は止まる。どの台も持ち主が払う。`kit dev` は 1 台 |
 | `secrets` | python でも書ける。`MODAL_` で始まる名前は予約 |
 
@@ -510,7 +510,7 @@ def caption(ctx, input):
 - **途中から続きを渡す**: `ctx.jobs.schedule`（引数は `app`・`handler`・`payload` と、キーワードの `idempotency_key`・`run_at`）。
   終わりの通知には使わない（失敗では呼ばれない）。そのジョブの中の AI・python も**このタスクの払う人**が払う。payload は
   64 KiB まで（大きい結果は DB か Storage に置き、id を渡す）。冪等キーは `f"<用途>:{ctx.run_id}"`（途中停止でやり直しても
-  1 回だけ。`python-finish:` で始まるキーは Platform 用）。main / prod でだけ動き、branch / preview では `FORBIDDEN`。
+  1 回だけ。`python-finish:` で始まるキーは Platform 用）。main / prod と本人の session 環境で動く。セッションのテスト利用者・ターンの範囲を保つ。
 - サーバー（`server`）は ASGI の `app`（FastAPI など）。`/api/<slug>/*` で受け、利用者のトークンは `X-Fdpocket-Authorization`
   （`fdpocket.asgi` の `user_token` で取り出し、`Client` の `as_user` に渡して本人として呼ぶ）。
 - 依存は `apps/<slug>/pyproject.toml` に書いて `uv lock`、`uv.lock` を commit する（httpx は SDK が使う。サーバーなら uvicorn）。
@@ -584,15 +584,25 @@ ZModel を変えたら `kit generate` → `kit db diff` → `pending/` と `pack
 変える変更は 2 段に分ける: 今回は新しい列を足して両方に書く（expand。`data.sql` で埋める）、古い列は `contract` で予約する。
 
 ```ts
-// packages/db-schema/seed.ts（型だけを import する。db はポリシーの無い client）
-import type { ClientContract } from '@zenstackhq/orm'
-import type { SchemaType } from '@workspace/sdk'
+// packages/db-schema/seed.ts（DB client を受け取らず、初期化計画を返す）
+import type { SchemaType, SeedContext, SeedPlan, TestIdentity } from '@workspace/sdk'
 
-export default async function seed(db: ClientContract<SchemaType>) {
-  const alice = await db.user.create({ data: { id: crypto.randomUUID(), globalUserId: 'seed:alice', displayName: 'Alice' } })
-  // …
+export const testIdentities = [{ slot: 'alice', roles: [], displayName: 'Alice' }] satisfies TestIdentity[]
+export default async function seed(context: SeedContext): Promise<SeedPlan<SchemaType>> {
+  return { version: 1, operations: [
+    { model: 'workspace', operation: 'create', args: { data: { id: await context.id('sample-team'), name: 'Sample' } } },
+  ] }
 }
+
 ```
+
+
+`SeedOperation<SchemaType>` は一つの型付きモデル操作、`SeedPlan<SchemaType>` はその一覧。
+`SeedContext.environmentId` と `SeedContext.resourceGeneration` は対象セッションの固定世代、
+`SeedContext.initializationId` は再試行で変わらない初期化 ID、`SeedContext.source` は実在する Git commit または内容で固定した作業ツリー、
+`SeedContext.initializedAt` は固定時刻。`SeedContext.id` は初期化 ID を使う安定 ID 生成、
+`SeedContext.users` は `admin`・`member`・`anonymous` と追加 slot の正規試用 User。
+`TestIdentity.roles` は project.yaml に宣言された Role の名前だけ。
 
 ## 7. 上限
 

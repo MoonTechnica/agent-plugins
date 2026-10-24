@@ -33,7 +33,20 @@ declare const activeSchema: z.ZodObject<{
         }, z.core.$strict>>>;
     }, z.core.$strict>>;
     status: z.ZodLiteral<"active">;
-    versionId: z.ZodUUID;
+    environmentId: z.ZodUUID;
+    actorId: z.ZodUUID;
+    testGrantId: z.ZodNullable<z.ZodUUID>;
+    liveOrigin: z.ZodNullable<z.ZodString>;
+    testIdentityAllowed: z.ZodBoolean;
+    testIdentity: z.ZodNullable<z.ZodObject<{
+        slot: z.ZodString;
+        roles: z.ZodArray<z.ZodString>;
+        displayName: z.ZodString;
+        globalUserId: z.ZodString;
+        isAnonymous: z.ZodBoolean;
+    }, z.core.$strict>>;
+    versionId: z.ZodNullable<z.ZodUUID>;
+    schemaRevision: z.ZodOptional<z.ZodString>;
     schemaKey: z.ZodString;
     schemaVersion: z.ZodString;
     policyVersion: z.ZodString;
@@ -188,7 +201,20 @@ export declare const gatewayResolveResultSchema: z.ZodDiscriminatedUnion<[z.ZodO
         }, z.core.$strict>>>;
     }, z.core.$strict>>;
     status: z.ZodLiteral<"active">;
-    versionId: z.ZodUUID;
+    environmentId: z.ZodUUID;
+    actorId: z.ZodUUID;
+    testGrantId: z.ZodNullable<z.ZodUUID>;
+    liveOrigin: z.ZodNullable<z.ZodString>;
+    testIdentityAllowed: z.ZodBoolean;
+    testIdentity: z.ZodNullable<z.ZodObject<{
+        slot: z.ZodString;
+        roles: z.ZodArray<z.ZodString>;
+        displayName: z.ZodString;
+        globalUserId: z.ZodString;
+        isAnonymous: z.ZodBoolean;
+    }, z.core.$strict>>;
+    versionId: z.ZodNullable<z.ZodUUID>;
+    schemaRevision: z.ZodOptional<z.ZodString>;
     schemaKey: z.ZodString;
     schemaVersion: z.ZodString;
     policyVersion: z.ZodString;
@@ -347,12 +373,10 @@ export declare const originResolveResultSchema: z.ZodDiscriminatedUnion<[z.ZodOb
     projectId: z.ZodUUID;
     environment: z.ZodEnum<{
         main: "main";
-        branch: "branch";
-        preview: "preview";
+        session: "session";
         prod: "prod";
     }>;
-    branchSessionId: z.ZodOptional<z.ZodNullable<z.ZodUUID>>;
-    previewSessionId: z.ZodOptional<z.ZodNullable<z.ZodUUID>>;
+    environmentId: z.ZodUUID;
     versionId: z.ZodUUID;
     noindex: z.ZodBoolean;
     apps: z.ZodArray<z.ZodObject<{

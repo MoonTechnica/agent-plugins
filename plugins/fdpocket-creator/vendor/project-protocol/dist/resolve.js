@@ -47,7 +47,25 @@ export const dbTargetSchema = z.strictObject({
 const activeSchema = z.strictObject({
     realtime: realtimeManifestSchema.optional(),
     status: z.literal('active'),
-    versionId: z.uuid(),
+    environmentId: z.uuid(),
+    actorId: z.uuid(),
+    testGrantId: z.uuid().nullable(),
+    liveOrigin: z.string().nullable(),
+    testIdentityAllowed: z.boolean(),
+    testIdentity: z
+        .strictObject({
+        slot: z.string().regex(/^[a-z][a-z0-9_-]{0,31}$/),
+        roles: z.array(z.string()),
+        displayName: z.string(),
+        globalUserId: z.string().min(1),
+        isAnonymous: z.boolean(),
+    })
+        .nullable(),
+    versionId: z.uuid().nullable(),
+    schemaRevision: z
+        .string()
+        .regex(/^[a-f0-9]{64}$/)
+        .optional(),
     /** `project-registry` 内のスキーマ JSON のキー */
     schemaKey: z.string().min(1),
     schemaVersion: z.string().min(1),
@@ -70,7 +88,7 @@ const activeSchema = z.strictObject({
         capabilities: capabilitiesSchema,
         anonymous: z.strictObject({ allowed: z.boolean(), write: z.boolean() }),
         /**
-         * CORS で許す Project 専用オリジンのホスト名のラベル（`{slug}-{id}[--main|--b-{s}|--pv-{p}]`。
+         * CORS で許す Project 専用オリジンのホスト名のラベル（`{slug}-{id}[--main|--s-{gen12}]`。
          * preview.md §1.1）。アプリ用ドメインは Gateway の設定が持つ（DB に焼き込まない）。
          */
         originHost: z.string().regex(ORIGIN_HOST_PATTERN),
@@ -178,9 +196,8 @@ export const originResolveResultSchema = z.discriminatedUnion('status', [
     z.strictObject({
         status: z.literal('active'),
         projectId: z.uuid(),
-        environment: z.enum(['main', 'branch', 'preview', 'prod']),
-        branchSessionId: z.uuid().nullable().optional(),
-        previewSessionId: z.uuid().nullable().optional(),
+        environment: z.enum(['main', 'session', 'prod']),
+        environmentId: z.uuid(),
         versionId: z.uuid(),
         /** prod 以外は検索に載せない */
         noindex: z.boolean(),

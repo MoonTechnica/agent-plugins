@@ -133,14 +133,24 @@ SDKの `useLocale()` / `client.ui.locale()` で利用者のロケールを取得
 2. `source/` で `bun install` → `node <kit>/scripts/kit.mjs generate`。
 3. テンプレートのまま一度 commit してから、§3 の工程で作る。テンプレートの構成（spec §1）は崩さない。
 
-## 6. `kit dev` で確かめる
+## 6. ローカルと本物の環境を分けて確かめる
 
-`node <kit>/scripts/kit.mjs dev` は本番と同じ Gateway を Node で起動し、ローカルの DB（`.kit/dev.db`）・ファイル置き場と各 App の Vite で全 App を動かす。
-Node は 22.12 以上が要る。起動時に `kit db diff` を回し、DB を作ったときだけ `seed.ts` を流す（失敗したら起動しない）。
-使い方の詳細は `$fdpocket-app-testing`。
+手元の接続には `$fdpocket-dev`。`kit dev` はローカルのモック、`kit dev --connect` は自分のセッション環境を使う。
+接続中の未 commit の作業ツリー、push 済みの built、main、公開版は別。接続しても main / prod の DB は変更しない。
 
-手元では `kit.mjs dev` を起動したまま、開発用 Host ページ（`http://localhost:4320`）をブラウザで開き、App と主体（member / admin / anonymous）を
-切り替えて確かめる。利用者にもこの URL を示してよい。止めるときは Ctrl-C。
+純ロジックは Vitest、画面が開くこと・権限の違い・主要な操作の smoke は通常の `kit dev` を使う。
+通常の `kit dev` はローカル DB とファイル置き場・モックで動く。本物の Gateway のポリシー、Worker、Storage、Realtime、
+AI・GPU のように本物でしか分からないことだけ、本物のセッション環境で確認する。判断の表と手順は `$fdpocket-app-testing`。
+実行前に `design/test-plan.md` へ必要な確認、その方法を選ぶ理由、外部への副作用とモック、費用を書く。
+
+手元の通常 `kit dev` はローカルだけで動く。開発用 Host ページの URL をブラウザで開き、App とテスト主体を切り替える。
+利用者にもこのローカル URL を示してよい。止めるときは Ctrl-C。テスト許可証が無い状態では本物の E2E を実行できない。
+ログインや本人のトークンで代替しない。
+
+本物の E2E はテスト利用者として実行する。`KIT_TEST_GRANT` はターンに束縛されたプロセスの環境だけで扱い、
+ファイル・ログ・最終返答に残さない。本人のトークンや `KIT_LIVE` の値をテスト認証の代わりに使わない。
+副作用のある外部 API は `network.mocks` の固定応答を使う。本物の読み取りを選ぶ理由と結果は `design/test-plan.md` に残す。
+AI・GPU を実際に使った費用はチャットの持ち主が払う。詳細は `$fdpocket-app-testing`。
 
 ## 7. 迷ったとき
 

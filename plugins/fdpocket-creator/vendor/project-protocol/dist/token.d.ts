@@ -1,19 +1,20 @@
 import { z } from 'zod';
 /**
  * Project の環境（lifecycle.md §1.1）。環境 = Turso DB の単位。
- * 区画（tier）は資格情報の境界で、main と branch は同じ dev 区画。
+ * 区画（tier）は資格情報の境界で、main と session は同じ dev 区画。
  */
-export declare const ENVIRONMENTS: readonly ["main", "branch", "preview", "prod"];
+export declare const ENVIRONMENTS: readonly ["main", "session", "prod"];
 export declare const environmentSchema: z.ZodEnum<{
     main: "main";
-    branch: "branch";
-    preview: "preview";
+    session: "session";
     prod: "prod";
 }>;
 export type Environment = z.infer<typeof environmentSchema>;
-export declare const TIERS: readonly ["dev", "preview", "prod"];
+export declare const TIERS: readonly ["dev", "prod"];
 export type Tier = (typeof TIERS)[number];
 export declare function tierOf(environment: Environment): Tier;
+export declare const testIdentitySlotSchema: z.ZodString;
+export type TestIdentitySlot = z.infer<typeof testIdentitySlotSchema>;
 export declare const appSlugSchema: z.ZodString;
 /** Project トークンの発行者（`iss`） */
 export declare const PROJECT_TOKEN_ISSUER = "project-gateway";
@@ -30,12 +31,13 @@ export declare const projectTokenClaimsSchema: z.ZodObject<{
     app: z.ZodString;
     env: z.ZodEnum<{
         main: "main";
-        branch: "branch";
-        preview: "preview";
+        session: "session";
         prod: "prod";
     }>;
-    br: z.ZodOptional<z.ZodUUID>;
-    pv: z.ZodOptional<z.ZodUUID>;
+    envId: z.ZodUUID;
+    actorId: z.ZodUUID;
+    testIdentity: z.ZodOptional<z.ZodString>;
+    testGrantId: z.ZodOptional<z.ZodUUID>;
     anon: z.ZodBoolean;
     jti: z.ZodUUID;
     iat: z.ZodInt;
@@ -63,12 +65,10 @@ export declare const serviceTokenClaimsSchema: z.ZodObject<{
     app: z.ZodString;
     env: z.ZodEnum<{
         main: "main";
-        branch: "branch";
-        preview: "preview";
+        session: "session";
         prod: "prod";
     }>;
-    br: z.ZodOptional<z.ZodUUID>;
-    pv: z.ZodOptional<z.ZodUUID>;
+    envId: z.ZodUUID;
     cid: z.ZodUUID;
     permissions: z.ZodArray<z.ZodString>;
     jti: z.ZodUUID;
@@ -88,12 +88,10 @@ export declare const serviceCredentialSchema: z.ZodObject<{
     projectId: z.ZodUUID;
     environment: z.ZodEnum<{
         main: "main";
-        branch: "branch";
-        preview: "preview";
+        session: "session";
         prod: "prod";
     }>;
-    sessionId: z.ZodNullable<z.ZodUUID>;
-    previewSessionId: z.ZodNullable<z.ZodUUID>;
+    environmentId: z.ZodUUID;
     appSlug: z.ZodString;
     servicePermissions: z.ZodArray<z.ZodString>;
 }, z.core.$strict>;
@@ -104,12 +102,11 @@ export declare const tokenExchangeRequestSchema: z.ZodObject<{
     app: z.ZodString;
     environment: z.ZodEnum<{
         main: "main";
-        branch: "branch";
-        preview: "preview";
+        session: "session";
         prod: "prod";
     }>;
-    previewSessionId: z.ZodOptional<z.ZodUUID>;
-    branchSessionId: z.ZodOptional<z.ZodUUID>;
+    environmentId: z.ZodOptional<z.ZodUUID>;
+    testIdentity: z.ZodOptional<z.ZodString>;
 }, z.core.$strict>;
 export type TokenExchangeRequest = z.infer<typeof tokenExchangeRequestSchema>;
 /** 本人が開ける（または一覧に出る）同じ Project の App */

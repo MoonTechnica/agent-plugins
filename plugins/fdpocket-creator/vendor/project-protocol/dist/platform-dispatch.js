@@ -1,3 +1,4 @@
+import { outboundPolicySchema } from "./network-mocks.js";
 /**
  * Project オリジン（Cloudflare）→ dispatch Worker の転送に付ける Platform の署名（integrations.md §3.1）。
  *
@@ -9,46 +10,31 @@
  *
  * 葉のモジュール（Web Crypto だけ。Node・Vercel・Workers・Deno で動く）。
  */
+export const API_EXECUTION_MODE_HEADER = 'x-platform-execution-mode';
 export const DISPATCH_HEADER = 'x-platform-dispatch';
 export const DISPATCH_SIGNATURE_HEADER = 'x-platform-signature';
+/** Cloudflare permits 128KiB total headers; leave half for ordinary request headers. */
+export const DISPATCH_HEADERS_MAX_BYTES = 64 * 1024;
 /** 署名の時刻の許容幅（秒）。再送の窓 */
 export const DISPATCH_MAX_SKEW_SECONDS = 60;
 /** HMAC の鍵の最短の長さ（文字） */
 export const DISPATCH_SECRET_MIN_LENGTH = 32;
 const UUID = '[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}';
-/** manifest.ts の APP_SLUG_PATTERN と同じ（zod を引かないよう写す。manifest.test.ts が一致を確かめる） */
 export const USER_WORKER_SLUG = '[a-z][a-z0-9-]{1,31}';
-const SLUG = USER_WORKER_SLUG;
 const EXACT_UUID = new RegExp(`^${UUID}$`);
-const EXACT_SLUG = new RegExp(`^${SLUG}$`);
-const WORKER_NAME_PATTERN = new RegExp(`^p-${UUID}-(?:main|prod|b-(?:g-)?${UUID}|pv-(?:g-)?${UUID})-(${SLUG})$`);
-/**
- * dispatch namespace の中の user Worker の名前（`p-{project}-{env}-{slug}`。project-runtime.md §6）。
- * branch・preview は環境がチャット / プレビューごとなので ID を挟む（`b-{session}` / `pv-{id}`。preview.md §1.1 の接尾辞と同じ）。
- */
+const EXACT_SLUG = new RegExp(`^${USER_WORKER_SLUG}$`);
+const WORKER_NAME_PATTERN = new RegExp(`^(?:p-${UUID}-(?:main|prod)|p-s-[0-9a-f]{12})-(${USER_WORKER_SLUG})$`);
 export function userWorkerName(target) {
-    if (target.resourceGeneration !== undefined &&
-        !['branch', 'preview'].includes(target.environment))
-        throw new Error('resource generation requires a temporary Worker environment');
-    const identifier = target.resourceGeneration ??
-        (target.environment === 'branch' ? target.sessionId : target.previewSessionId);
-    const temporary = target.environment === 'branch' || target.environment === 'preview';
-    if (!EXACT_UUID.test(target.projectId) ||
-        !EXACT_SLUG.test(target.app) ||
-        !['main', 'prod', 'branch', 'preview'].includes(target.environment) ||
-        (temporary && !EXACT_UUID.test(identifier ?? ''))) {
+    if (!EXACT_UUID.test(target.projectId) || !EXACT_SLUG.test(target.app))
         throw new Error('invalid user worker target');
+    if (target.environment === 'session') {
+        if (!EXACT_UUID.test(target.resourceGeneration ?? ''))
+            throw new Error('session Worker requires a resource generation');
+        return `p-s-${target.resourceGeneration.replaceAll('-', '').slice(0, 12)}-${target.app}`;
     }
-    const scope = target.resourceGeneration === undefined ? identifier : `g-${target.resourceGeneration}`;
-    const env = target.environment === 'branch'
-        ? `b-${scope}`
-        : target.environment === 'preview'
-            ? `pv-${scope}`
-            : target.environment;
-    const name = `p-${target.projectId}-${env}-${target.app}`;
-    if (!WORKER_NAME_PATTERN.test(name))
-        throw new Error(`invalid user worker target: ${name}`);
-    return name;
+    if (!['main', 'prod'].includes(target.environment) || target.resourceGeneration !== undefined)
+        throw new Error('invalid user worker environment');
+    return `p-${target.projectId}-${target.environment}-${target.app}`;
 }
 export function isUserWorkerName(name) {
     return WORKER_NAME_PATTERN.test(name);
@@ -60,29 +46,26 @@ export function userWorkerApp(name) {
 export function workerStorageScope(worker) {
     if (!isUserWorkerName(worker))
         return null;
-    const match = new RegExp(`^p-(${UUID})-(main|prod|b-(?:g-)?${UUID}|pv-(?:g-)?${UUID})-`).exec(worker);
+    const match = new RegExp(`^p-(${UUID})-(main|prod)-`).exec(worker);
     if (!match)
         return null;
-    const project = match[1];
-    const scope = match[2];
-    if (scope.startsWith('b-g-') || scope.startsWith('pv-g-')) {
-        const generation = scope.slice(scope.startsWith('b-g-') ? 4 : 5);
-        return {
-            namespace: `projects/${project}/environments/${generation}`,
-            tier: scope.startsWith('b-g-') ? 'dev' : 'preview',
-        };
-    }
-    if (scope.startsWith('b-'))
-        return { namespace: `projects/${project}/branch/${scope.slice(2)}`, tier: 'dev' };
-    if (scope.startsWith('pv-'))
-        return { namespace: `projects/${project}/preview/${scope.slice(3)}`, tier: 'preview' };
-    return { namespace: `projects/${project}/${scope}`, tier: scope === 'prod' ? 'prod' : 'dev' };
+    return {
+        namespace: `projects/${match[1]}/${match[2]}`,
+        tier: match[2] === 'prod' ? 'prod' : 'dev',
+    };
 }
 export function isWorkerStorageScope(worker, value) {
     if (typeof value !== 'object' || value === null)
         return false;
-    const expected = workerStorageScope(worker);
     const actual = value;
+    const session = /^p-s-([0-9a-f]{12})-/.exec(worker);
+    if (session && isUserWorkerName(worker)) {
+        if (actual.tier !== 'dev' || typeof actual.namespace !== 'string')
+            return false;
+        const scope = new RegExp(`^projects/(${UUID})/environments/(${UUID})$`).exec(actual.namespace);
+        return scope !== null && scope[2].replaceAll('-', '').slice(0, 12) === session[1];
+    }
+    const expected = workerStorageScope(worker);
     return (expected !== null && expected.namespace === actual.namespace && expected.tier === actual.tier);
 }
 const encoder = new TextEncoder();
@@ -119,6 +102,8 @@ export async function signDispatch(input) {
         throw new Error(`invalid user worker: ${input.worker}`);
     if (input.storage && !isWorkerStorageScope(input.worker, input.storage))
         throw new Error('invalid Worker storage scope');
+    if (!isWorkerOutboundPolicy(input.worker, input.policy))
+        throw new Error('invalid Worker outbound scope');
     const envelope = {
         v: 1,
         worker: input.worker,
@@ -127,10 +112,13 @@ export async function signDispatch(input) {
         ts: Math.floor((input.now ?? new Date()).getTime() / 1000),
         bodySha256: await sha256Hex(input.body ?? new Uint8Array()),
         egress: [...input.egress],
+        policy: input.policy,
         ...(input.limits ? { limits: input.limits } : {}),
         ...(input.storage ? { storage: input.storage } : {}),
     };
     const encoded = bytesToBase64(encoder.encode(JSON.stringify(envelope)));
+    if (!dispatchHeadersFit(encoded, 'x'.repeat(43)))
+        throw new Error('dispatch header budget exceeded');
     const key = await hmacKey(input.secret, 'sign');
     const signature = new Uint8Array(await crypto.subtle.sign('HMAC', key, encoder.encode(encoded)));
     return {
@@ -140,6 +128,15 @@ export async function signDispatch(input) {
             .replaceAll('/', '_')
             .replace(/=+$/, ''),
     };
+}
+function dispatchHeadersFit(encoded, signature) {
+    // Include names, colon-space separators and CRLF, not only the base64 value.
+    return (encoder.encode(encoded).byteLength +
+        encoder.encode(signature).byteLength +
+        DISPATCH_HEADER.length +
+        DISPATCH_SIGNATURE_HEADER.length +
+        8 <=
+        DISPATCH_HEADERS_MAX_BYTES);
 }
 function parseEnvelope(encoded) {
     try {
@@ -157,6 +154,7 @@ function parseEnvelope(encoded) {
             Number.isInteger(e.ts) &&
             typeof e.bodySha256 === 'string' &&
             /^[0-9a-f]{64}$/.test(e.bodySha256) &&
+            isWorkerOutboundPolicy(e.worker, e.policy) &&
             Array.isArray(e.egress) &&
             e.egress.every((host) => typeof host === 'string') &&
             (e.storage === undefined || isWorkerStorageScope(e.worker, e.storage)) &&
@@ -175,6 +173,8 @@ export async function verifyDispatch(input) {
     const signature = input.headers.get(DISPATCH_SIGNATURE_HEADER);
     if (!encoded || !signature)
         return { ok: false, reason: 'missing' };
+    if (!dispatchHeadersFit(encoded, signature))
+        return { ok: false, reason: 'malformed' };
     const signatureBytes = base64UrlToBytes(signature);
     if (!signatureBytes)
         return { ok: false, reason: 'malformed' };
@@ -195,4 +195,16 @@ export async function verifyDispatch(input) {
     if (envelope.bodySha256 !== (await sha256Hex(input.body)))
         return { ok: false, reason: 'body' };
     return { ok: true, envelope };
+}
+export function isWorkerOutboundPolicy(worker, value) {
+    if (!isUserWorkerName(worker))
+        return false;
+    const parsed = outboundPolicySchema.safeParse(value);
+    if (!parsed.success)
+        return false;
+    const generation = /^p-s-([a-f0-9]{12})-/.exec(worker);
+    return generation
+        ? parsed.data.resourceGeneration !== null &&
+            parsed.data.resourceGeneration.replaceAll('-', '').slice(0, 12) === generation[1]
+        : parsed.data.mode === 'real' && parsed.data.resourceGeneration === null;
 }

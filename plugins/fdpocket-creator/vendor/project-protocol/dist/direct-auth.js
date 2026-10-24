@@ -41,21 +41,18 @@ export const directAuthRequestSchema = z
     projectId: z.uuid(),
     app: appSlugSchema,
     environment: environmentSchema,
-    branchSessionId: z.uuid().optional(),
-    previewSessionId: z.uuid().optional(),
+    environmentId: z.uuid().optional(),
     origin: directAuthOriginSchema,
     path: directAuthPathSchema,
     state: directAuthOpaqueSchema,
     codeChallenge: directAuthOpaqueSchema,
 })
     .superRefine((value, ctx) => {
-    if ((value.environment === 'branch') !== Boolean(value.branchSessionId))
-        ctx.addIssue({ code: 'custom', path: ['branchSessionId'], message: 'branch scope mismatch' });
-    if ((value.environment === 'preview') !== Boolean(value.previewSessionId))
+    if (value.environment === 'session' && value.environmentId === undefined)
         ctx.addIssue({
             code: 'custom',
-            path: ['previewSessionId'],
-            message: 'preview scope mismatch',
+            path: ['environmentId'],
+            message: 'session environment is required',
         });
 });
 export const directAuthExchangeSchema = z.strictObject({

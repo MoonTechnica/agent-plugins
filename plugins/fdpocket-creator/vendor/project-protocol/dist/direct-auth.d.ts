@@ -12,12 +12,10 @@ export declare const directAuthRequestSchema: z.ZodObject<{
     app: z.ZodString;
     environment: z.ZodEnum<{
         main: "main";
-        branch: "branch";
-        preview: "preview";
+        session: "session";
         prod: "prod";
     }>;
-    branchSessionId: z.ZodOptional<z.ZodUUID>;
-    previewSessionId: z.ZodOptional<z.ZodUUID>;
+    environmentId: z.ZodOptional<z.ZodUUID>;
     origin: z.ZodString;
     path: z.ZodString;
     state: z.ZodString;

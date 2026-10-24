@@ -3,14 +3,15 @@ import { PROJECT_TOKEN_TTL_SECONDS } from "./limits.js";
 import { APP_ACCESSES, APP_KINDS, APP_SLUG_PATTERN, localizedNameSchema } from "./manifest.js";
 /**
  * Project の環境（lifecycle.md §1.1）。環境 = Turso DB の単位。
- * 区画（tier）は資格情報の境界で、main と branch は同じ dev 区画。
+ * 区画（tier）は資格情報の境界で、main と session は同じ dev 区画。
  */
-export const ENVIRONMENTS = ['main', 'branch', 'preview', 'prod'];
+export const ENVIRONMENTS = ['main', 'session', 'prod'];
 export const environmentSchema = z.enum(ENVIRONMENTS);
-export const TIERS = ['dev', 'preview', 'prod'];
+export const TIERS = ['dev', 'prod'];
 export function tierOf(environment) {
-    return environment === 'main' || environment === 'branch' ? 'dev' : environment;
+    return environment === 'main' || environment === 'session' ? 'dev' : environment;
 }
+export const testIdentitySlotSchema = z.string().regex(/^[a-z][a-z0-9_-]{0,31}$/);
 export const appSlugSchema = z.string().regex(APP_SLUG_PATTERN);
 /** Project トークンの発行者（`iss`） */
 export const PROJECT_TOKEN_ISSUER = 'project-gateway';
@@ -29,22 +30,44 @@ export const projectTokenClaimsSchema = z
     aud: z.uuid(),
     app: appSlugSchema,
     env: environmentSchema,
-    /** env = branch のときのチャット（generation_session）の ID */
-    br: z.uuid().optional(),
-    /** env = preview のときのプレビューセッションの ID */
-    pv: z.uuid().optional(),
+    /** Concrete physical environment, including main and prod. */
+    envId: z.uuid(),
+    /** Real Platform principal; gid may be a session-local synthetic identity. */
+    actorId: z.uuid(),
+    testIdentity: testIdentitySlotSchema.optional(),
+    testGrantId: z.uuid().optional(),
     anon: z.boolean(),
     jti: z.uuid(),
     iat: z.int().nonnegative(),
     exp: z.int().positive(),
 })
     .superRefine((c, ctx) => {
-    if ((c.env === 'branch') !== (c.br !== undefined)) {
-        ctx.addIssue({ code: 'custom', path: ['br'], message: 'br is required only for branch' });
+    if (c.gid.startsWith('test:') && c.testIdentity === undefined)
+        ctx.addIssue({
+            code: 'custom',
+            path: ['testIdentity'],
+            message: 'synthetic identity requires a test slot',
+        });
+    if (c.testIdentity !== undefined) {
+        if (c.env !== 'session' || c.gid !== `test:${c.envId}:${c.testIdentity}`)
+            ctx.addIssue({
+                code: 'custom',
+                path: ['testIdentity'],
+                message: 'test identity scope mismatch',
+            });
+        if (c.anon !== (c.testIdentity === 'anonymous'))
+            ctx.addIssue({
+                code: 'custom',
+                path: ['anon'],
+                message: 'test identity anonymity mismatch',
+            });
     }
-    if ((c.env === 'preview') !== (c.pv !== undefined)) {
-        ctx.addIssue({ code: 'custom', path: ['pv'], message: 'pv is required only for preview' });
-    }
+    if (c.testGrantId !== undefined && (c.env !== 'session' || c.testIdentity === undefined))
+        ctx.addIssue({
+            code: 'custom',
+            path: ['testGrantId'],
+            message: 'grant requires a session test identity',
+        });
     const ttl = c.exp - c.iat;
     if (ttl <= 0 || ttl > PROJECT_TOKEN_TTL_SECONDS) {
         ctx.addIssue({ code: 'custom', path: ['exp'], message: 'token lifetime out of range' });
@@ -73,8 +96,7 @@ export const serviceTokenClaimsSchema = z
     aud: z.uuid(),
     app: appSlugSchema,
     env: environmentSchema,
-    br: z.uuid().optional(),
-    pv: z.uuid().optional(),
+    envId: z.uuid(),
     cid: z.uuid(),
     /** 発行時の写し。認可には現在の manifest を照会する。 */
     permissions: z.array(z.string()),
@@ -85,12 +107,6 @@ export const serviceTokenClaimsSchema = z
     .superRefine((c, ctx) => {
     if (c.sub !== `service:${c.aud}:${c.app}`) {
         ctx.addIssue({ code: 'custom', path: ['sub'], message: 'sub must be service:{aud}:{app}' });
-    }
-    if ((c.env === 'branch') !== (c.br !== undefined)) {
-        ctx.addIssue({ code: 'custom', path: ['br'], message: 'br is required only for branch' });
-    }
-    if ((c.env === 'preview') !== (c.pv !== undefined)) {
-        ctx.addIssue({ code: 'custom', path: ['pv'], message: 'pv is required only for preview' });
     }
     const ttl = c.exp - c.iat;
     if (ttl <= 0 || ttl > SERVICE_TOKEN_TTL_SECONDS) {
@@ -107,8 +123,7 @@ export const serviceCredentialSchema = z.strictObject({
     credentialId: z.uuid(),
     projectId: z.uuid(),
     environment: environmentSchema,
-    sessionId: z.uuid().nullable(),
-    previewSessionId: z.uuid().nullable(),
+    environmentId: z.uuid(),
     appSlug: appSlugSchema,
     servicePermissions: z.array(z.string()),
 });
@@ -118,24 +133,22 @@ export const tokenExchangeRequestSchema = z
     projectId: z.uuid(),
     app: appSlugSchema,
     environment: environmentSchema,
-    previewSessionId: z.uuid().optional(),
-    branchSessionId: z.uuid().optional(),
+    environmentId: z.uuid().optional(),
+    testIdentity: testIdentitySlotSchema.optional(),
 })
     .superRefine((r, ctx) => {
-    if ((r.environment === 'branch') !== (r.branchSessionId !== undefined)) {
+    if (r.environment === 'session' && r.environmentId === undefined)
         ctx.addIssue({
             code: 'custom',
-            path: ['branchSessionId'],
-            message: 'required only for branch',
+            path: ['environmentId'],
+            message: 'session requires environmentId',
         });
-    }
-    if ((r.environment === 'preview') !== (r.previewSessionId !== undefined)) {
+    if (r.testIdentity !== undefined && r.environment !== 'session')
         ctx.addIssue({
             code: 'custom',
-            path: ['previewSessionId'],
-            message: 'required only for preview',
+            path: ['testIdentity'],
+            message: 'test identity requires session',
         });
-    }
 });
 /** 本人が開ける（または一覧に出る）同じ Project の App */
 export const sessionAppSchema = z.strictObject({

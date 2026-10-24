@@ -27,6 +27,8 @@ export type LiveMessage = {
 export declare const KIT_LIVE_ENV: {
     /** `/lp/{token}/`（App ごとの `/<slug>/` は SDK が足す） */
     readonly base: "MINIAPP_LIVE_BASE";
+    readonly sessionOrigin: "MINIAPP_SESSION_ORIGIN";
+    readonly token: "MINIAPP_SESSION_LIVE_TOKEN";
     /** この App の Vite の公開ポートのホスト名（`sb-….vercel.run`） */
     readonly hmrHost: "MINIAPP_LIVE_HMR_HOST";
 };

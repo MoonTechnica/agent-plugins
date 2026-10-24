@@ -117,24 +117,21 @@ export function createAppConfig(slug, appRoot, env = process.env) {
             ? {
                 ...(port === undefined ? {} : { port, strictPort: true }),
                 // ライブプレビュー（preview.md §2.1）: Sandbox の公開ポートで待ち受ける。token の照合は
-                // livePreviewPlugin（base の外は 404）。HMR は公開ポートのホスト（https）へ wss でつなぐ
+                // livePreviewPlugin（base の外は 404）。HMR は cloud の wss または手元の ws へつなぐ
                 host: '0.0.0.0',
-                allowedHosts: [live.hmrHost],
-                ws: { protocol: 'wss', clientPort: 443, host: live.hmrHost, path: '__hmr' },
+                allowedHosts: [live.ws.host],
+                ws: { ...live.ws, path: '__hmr' },
                 // 中継先には Host ヘッダーを書き換えて渡す（ほかの App の Vite の allowedHosts に当たらないように）
                 ...(slug === primaryApp
                     ? {
                         proxy: {
                             ...otherAppProxies(root, appPorts, slug, true),
-                            ...(env.KIT_DEV_API_URL
-                                ? {
-                                    [`${root}api/`]: {
-                                        target: env.KIT_DEV_API_URL,
-                                        changeOrigin: true,
-                                        rewrite: (path) => `/${path.slice(root.length)}`,
-                                    },
-                                }
-                                : {}),
+                            [`${root}api/`]: {
+                                target: live.sessionOrigin,
+                                headers: { 'X-Session-Live': live.token },
+                                changeOrigin: true,
+                                rewrite: (path) => `/${path.slice(root.length)}`,
+                            },
                         },
                     }
                     : {}),
@@ -170,7 +167,24 @@ function otherAppProxies(root, appPorts, currentSlug, changeOrigin) {
     ]));
 }
 const LIVE_BASE_PATTERN = /^\/lp\/[A-Za-z0-9_-]{32,128}\/$/;
-const HOSTNAME_PATTERN = /^[a-z0-9]([a-z0-9.-]*[a-z0-9])?$/;
+const HOSTNAME_PATTERN = /^(?:[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?\.)*[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?$/;
+const LOOPBACK_PATTERN = /^(?:localhost|127\.0\.0\.1|(?:[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?\.)+localhost)$/;
+function liveWebSocket(value) {
+    const invalid = () => new Error(`${KIT_LIVE_ENV.hmrHost} must be a public host or exact loopback host:port`);
+    if (!value)
+        throw invalid();
+    const local = /^([^:]+):([1-9][0-9]{0,4})$/.exec(value);
+    if (local) {
+        const host = local[1] ?? '';
+        const clientPort = Number(local[2]);
+        if (!LOOPBACK_PATTERN.test(host) || clientPort > 65535 || clientPort === 80)
+            throw invalid();
+        return { host, protocol: 'ws', clientPort };
+    }
+    if (!HOSTNAME_PATTERN.test(value) || LOOPBACK_PATTERN.test(value))
+        throw invalid();
+    return { host: value, protocol: 'wss', clientPort: 443 };
+}
 /** `kit dev --live` が渡す設定。片方だけ・形が違うときは断る（token を照合しない設定を作らない） */
 function liveOf(env) {
     const base = env[KIT_LIVE_ENV.base];
@@ -180,10 +194,19 @@ function liveOf(env) {
     if (!base || !LIVE_BASE_PATTERN.test(base)) {
         throw new Error(`${KIT_LIVE_ENV.base} must be /lp/{token}/`);
     }
-    if (!hmrHost || !HOSTNAME_PATTERN.test(hmrHost)) {
-        throw new Error(`${KIT_LIVE_ENV.hmrHost} must be a host name`);
-    }
-    return { base, hmrHost };
+    const ws = liveWebSocket(hmrHost);
+    const sessionOrigin = env[KIT_LIVE_ENV.sessionOrigin];
+    const token = env[KIT_LIVE_ENV.token];
+    if (!sessionOrigin || !token || base !== `/lp/${token}/`)
+        throw new Error('live requires the session origin and matching live token');
+    const target = new URL(sessionOrigin);
+    if (target.origin !== sessionOrigin ||
+        target.protocol !== 'https:' ||
+        target.username ||
+        target.password ||
+        target.hostname.includes('*'))
+        throw new Error('live session origin must be an exact https origin');
+    return { base, ws, sessionOrigin, token };
 }
 /**
  * ライブプレビューの前段（preview.md §2.1・§2.2）: base（`/lp/{token}/…`）の外は 404（`/@fs/` なども通さない）、

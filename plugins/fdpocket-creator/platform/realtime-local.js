@@ -15315,9 +15315,38 @@ async function invoke(env, method, args) {
 var RealtimeRoom = createRealtimeRoom((bindings) => {
   const env = bindings;
   return {
-    authorize: (session, action2, peer, payload) => invoke(env, "authorize", [session, action2, peer, payload]),
-    initialize: (session) => invoke(env, "initialize", [session]),
-    drain: (session, cursor, state) => invoke(env, "drain", [session, cursor, state])
+    authorize: async (session, action2, peer, payload) => {
+      const value = await invoke(env, "authorize", [
+        session,
+        action2,
+        peer,
+        payload
+      ]);
+      if (!value || typeof value !== "object" || !("presenceKey" in value) || typeof value.presenceKey !== "string")
+        throw new Error("Invalid realtime authorization callback");
+      return { presenceKey: value.presenceKey };
+    },
+    initialize: async (session) => {
+      const value = await invoke(env, "initialize", [session]);
+      if (!value || typeof value !== "object" || !("cursor" in value) || !("state" in value) || !("snapshot" in value) || !Array.isArray(value.snapshot))
+        throw new Error("Invalid realtime initialization callback");
+      return {
+        cursor: value.cursor,
+        state: value.state,
+        snapshot: value.snapshot
+      };
+    },
+    drain: async (session, cursor, state) => {
+      const value = await invoke(env, "drain", [session, cursor, state]);
+      if (!value || typeof value !== "object" || !("cursor" in value) || !("state" in value) || !("events" in value) || !Array.isArray(value.events) || "hasMore" in value && typeof value.hasMore !== "boolean")
+        throw new Error("Invalid realtime drain callback");
+      return {
+        cursor: value.cursor,
+        state: value.state,
+        events: value.events,
+        ..."hasMore" in value ? { hasMore: value.hasMore } : {}
+      };
+    }
   };
 });
 var local_default = {

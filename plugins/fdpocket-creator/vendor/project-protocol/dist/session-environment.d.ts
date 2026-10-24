@@ -1,0 +1,113 @@
+import { z } from 'zod';
+export declare const sessionEnvironmentViewSchema: z.ZodObject<{
+    environmentId: z.ZodString;
+    status: z.ZodString;
+    testIdentities: z.ZodDefault<z.ZodOptional<z.ZodArray<z.ZodObject<{
+        slot: z.ZodString;
+        displayName: z.ZodString;
+    }, z.core.$strip>>>>;
+    events: z.ZodDefault<z.ZodOptional<z.ZodArray<z.ZodObject<{
+        id: z.ZodUUID;
+        kind: z.ZodString;
+        payload: z.ZodUnknown;
+        created_at: z.ZodString;
+    }, z.core.$strip>>>>;
+    jobs: z.ZodDefault<z.ZodOptional<z.ZodArray<z.ZodObject<{
+        app: z.ZodString;
+        handler: z.ZodString;
+        cron: z.ZodString;
+    }, z.core.$strict>>>>;
+    jobRuns: z.ZodDefault<z.ZodOptional<z.ZodArray<z.ZodObject<{
+        id: z.ZodUUID;
+        app: z.ZodString;
+        handler: z.ZodString;
+        status: z.ZodString;
+        attempts: z.ZodInt;
+        lastError: z.ZodNullable<z.ZodString>;
+        createdAt: z.ZodString;
+    }, z.core.$strict>>>>;
+    built: z.ZodObject<{
+        originHost: z.ZodNullable<z.ZodString>;
+        versionId: z.ZodNullable<z.ZodString>;
+        canOpen: z.ZodBoolean;
+        deployment: z.ZodNullable<z.ZodObject<{
+            id: z.ZodString;
+            status: z.ZodEnum<{
+                failed: "failed";
+                pending: "pending";
+                active: "active";
+                staged: "staged";
+                migrating: "migrating";
+                publishing_assets: "publishing_assets";
+                deploying_workers: "deploying_workers";
+                registering: "registering";
+                awaiting_review: "awaiting_review";
+                superseded: "superseded";
+            }>;
+            errorCode: z.ZodNullable<z.ZodString>;
+            versionId: z.ZodString;
+        }, z.core.$strip>>;
+    }, z.core.$strip>;
+    live: z.ZodObject<{
+        kind: z.ZodNullable<z.ZodEnum<{
+            sandbox: "sandbox";
+            connect: "connect";
+        }>>;
+        status: z.ZodNullable<z.ZodEnum<{
+            starting: "starting";
+            running: "running";
+            failed: "failed";
+            stopped: "stopped";
+        }>>;
+        url: z.ZodNullable<z.ZodString>;
+    }, z.core.$strip>;
+}, z.core.$strip>;
+export declare const sessionEventsPageSchema: z.ZodObject<{
+    items: z.ZodArray<z.ZodObject<{
+        id: z.ZodUUID;
+        kind: z.ZodString;
+        payload: z.ZodUnknown;
+        createdAt: z.ZodString;
+    }, z.core.$strict>>;
+    nextCursor: z.ZodNullable<z.ZodString>;
+}, z.core.$strict>;
+export declare const sessionRunsPageSchema: z.ZodObject<{
+    items: z.ZodArray<z.ZodObject<{
+        id: z.ZodUUID;
+        app: z.ZodString;
+        handler: z.ZodString;
+        status: z.ZodString;
+        attempts: z.ZodInt;
+        lastError: z.ZodNullable<z.ZodString>;
+        createdAt: z.ZodString;
+    }, z.core.$strict>>;
+    nextCursor: z.ZodNullable<z.ZodString>;
+}, z.core.$strict>;
+export type SessionEnvironmentView = z.infer<typeof sessionEnvironmentViewSchema>;
+/** Current private-session catalog for the trusted standalone connected Host. */
+export declare const connectedSessionInspectionSchema: z.ZodObject<{
+    jobRuns: z.ZodOptional<z.ZodArray<z.ZodObject<{
+        id: z.ZodUUID;
+        app: z.ZodString;
+        handler: z.ZodString;
+        status: z.ZodString;
+        attempts: z.ZodInt;
+        lastError: z.ZodNullable<z.ZodString>;
+        createdAt: z.ZodString;
+    }, z.core.$strict>>>;
+    events: z.ZodArray<z.ZodObject<{
+        id: z.ZodUUID;
+        kind: z.ZodString;
+        payload: z.ZodUnknown;
+        createdAt: z.ZodString;
+    }, z.core.$strict>>;
+    jobs: z.ZodArray<z.ZodObject<{
+        app: z.ZodString;
+        handler: z.ZodString;
+        cron: z.ZodString;
+    }, z.core.$strict>>;
+    identities: z.ZodArray<z.ZodObject<{
+        slot: z.ZodString;
+        displayName: z.ZodString;
+    }, z.core.$strip>>;
+}, z.core.$strict>;

@@ -1,7 +1,8 @@
 import { z } from 'zod';
 import { isAppPath } from "./app-path.js";
 import { PROJECT_BUCKETS_MAX, STORAGE_FILE_MAX_BYTES } from "./limits.js";
-import { browserOriginIssue, egressDeclarationIssue } from "./network.js";
+import { browserOriginIssue, checkEgress, egressDeclarationIssue } from "./network.js";
+import { networkMocksSchema } from "./network-mocks.js";
 import { PYTHON_RESERVED_SECRET_PREFIX, PYTHON_SERVER_IDLE_DEFAULT, PYTHON_SERVER_INSTANCES_DEFAULT, PYTHON_SERVER_TARGET_CONCURRENCY_DEFAULT, PYTHON_TASK_NAME_PATTERN, PYTHON_TASK_TIMEOUT_DEFAULT, PYTHON_TASKS_MAX, PYTHON_VERSIONS, pythonComputeSchema, pythonServerSchema, pythonTaskSchema, resolvePythonCompute, } from "./python.js";
 import { realtimeManifestSchema } from "./realtime.js";
 import { validateSchedule } from "./schedules.js";
@@ -118,6 +119,7 @@ const appSchema = z.strictObject({
         .strictObject({
         egress: uniqueList(z.string()).max(NETWORK_HOSTS_MAX).optional(),
         browser: uniqueList(z.string()).max(NETWORK_HOSTS_MAX).optional(),
+        mocks: networkMocksSchema.optional(),
     })
         .optional(),
     secrets: z.array(secretSchema).min(1).max(SECRETS_PER_APP_MAX).optional(),
@@ -283,6 +285,13 @@ function pythonDataOnly(app) {
 function refineServerFields(ctx, slug, app) {
     const server = SERVER_APP_KINDS.includes(app.kind);
     const path = ['apps', slug];
+    if (app.network?.mocks) {
+        if (!server)
+            report(ctx, [...path, 'network', 'mocks'], 'not_allowed', 'only server apps declare egress mocks');
+        for (const [index, mock] of app.network.mocks.entries())
+            if (!checkEgress(`https://${mock.host}/`, { egress: app.network.egress ?? [] }).allowed)
+                report(ctx, [...path, 'network', 'mocks', index, 'host'], 'invalid_network_mock', 'mock destination must be declared in egress');
+    }
     if (app.schedules !== undefined && app.kind !== 'jobs')
         report(ctx, [...path, 'schedules'], 'not_allowed', 'only jobs apps declare schedules');
     if (app.routes !== undefined && app.kind !== 'api') {
@@ -654,6 +663,9 @@ export function normalizeProjectManifest(manifest) {
             anonymous: app.anonymous ?? { allowed: false, write: false },
             network: {
                 egress: sorted(app.network?.egress),
+                ...(app.network?.mocks
+                    ? { mocks: [...app.network.mocks].sort((a, b) => a.host.localeCompare(b.host)) }
+                    : {}),
                 browser: sorted(app.network?.browser),
             },
             secrets: [...(app.secrets ?? [])]

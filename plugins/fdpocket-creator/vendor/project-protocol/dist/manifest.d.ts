@@ -1,4 +1,5 @@
 import { z } from 'zod';
+import { type NetworkMock } from './network-mocks.ts';
 import { type NormalizedPythonApp } from './python.ts';
 /**
  * `infra/project.yaml`（project-runtime.md §2）の正本。
@@ -54,7 +55,7 @@ export type BucketOperation = (typeof BUCKET_OPERATIONS)[number];
  */
 export declare const FORBIDDEN_MODEL_OPERATIONS: Readonly<Record<string, readonly ModelOperation[]>>;
 /** 取り込みを止めずに作者・Agent へ返す注意 */
-export type ProjectManifestIssueCode = 'invalid_slug' | 'reserved_slug' | 'invalid_bucket_name' | 'invalid_role_name' | 'invalid_model_name' | 'required' | 'not_allowed' | 'too_many_buckets' | 'unknown_bucket' | 'unknown_role' | 'reserved_permission' | 'forbidden_operation' | 'anonymous_write_without_access' | 'duplicate' | 'invalid_template_key' | 'invalid_notification_path' | 'undeclared_notification_param' | 'unknown_notification_template' | 'notification_params_mismatch' | 'invalid_trigger_value' | 'invalid_host' | 'invalid_origin' | 'ip_literal' | 'internal_host' | 'platform_host' | 'invalid_secret_name' | 'reserved_secret_name' | 'invalid_task_name' | 'unknown_python_task' | 'unknown_finish_target' | 'missing_permission';
+export type ProjectManifestIssueCode = 'invalid_network_mock' | 'invalid_slug' | 'reserved_slug' | 'invalid_bucket_name' | 'invalid_role_name' | 'invalid_model_name' | 'required' | 'not_allowed' | 'too_many_buckets' | 'unknown_bucket' | 'unknown_role' | 'reserved_permission' | 'forbidden_operation' | 'anonymous_write_without_access' | 'duplicate' | 'invalid_template_key' | 'invalid_notification_path' | 'undeclared_notification_param' | 'unknown_notification_template' | 'notification_params_mismatch' | 'invalid_trigger_value' | 'invalid_host' | 'invalid_origin' | 'ip_literal' | 'internal_host' | 'platform_host' | 'invalid_secret_name' | 'reserved_secret_name' | 'invalid_task_name' | 'unknown_python_task' | 'unknown_finish_target' | 'missing_permission';
 export type ProjectManifestWarningCode = 'anonymous_write' | 'sensitive_notification_param';
 /** App の表示名（Platform が返すときは長さを問わない。宣言の検証は appSchema が持つ） */
 export declare const localizedNameSchema: z.ZodObject<{
@@ -145,6 +146,12 @@ declare const baseSchema: z.ZodObject<{
         network: z.ZodOptional<z.ZodObject<{
             egress: z.ZodOptional<z.ZodArray<z.ZodString>>;
             browser: z.ZodOptional<z.ZodArray<z.ZodString>>;
+            mocks: z.ZodOptional<z.ZodArray<z.ZodObject<{
+                host: z.ZodString;
+                status: z.ZodInt;
+                headers: z.ZodOptional<z.ZodRecord<z.ZodString, z.ZodString>>;
+                body: z.ZodOptional<z.ZodString>;
+            }, z.core.$strict>>>;
         }, z.core.$strict>>;
         secrets: z.ZodOptional<z.ZodArray<z.ZodObject<{
             name: z.ZodString;
@@ -325,6 +332,12 @@ export declare const projectManifestSchema: z.ZodObject<{
         network: z.ZodOptional<z.ZodObject<{
             egress: z.ZodOptional<z.ZodArray<z.ZodString>>;
             browser: z.ZodOptional<z.ZodArray<z.ZodString>>;
+            mocks: z.ZodOptional<z.ZodArray<z.ZodObject<{
+                host: z.ZodString;
+                status: z.ZodInt;
+                headers: z.ZodOptional<z.ZodRecord<z.ZodString, z.ZodString>>;
+                body: z.ZodOptional<z.ZodString>;
+            }, z.core.$strict>>>;
         }, z.core.$strict>>;
         secrets: z.ZodOptional<z.ZodArray<z.ZodObject<{
             name: z.ZodString;
@@ -520,6 +533,7 @@ export interface NormalizedProjectApp {
     network: {
         egress: string[];
         browser: string[];
+        mocks?: NetworkMock[];
     };
     /** 名前順。値は project_secrets（Vault）。tasks/0479 */
     secrets: NormalizedSecret[];

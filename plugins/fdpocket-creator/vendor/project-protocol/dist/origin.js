@@ -1,5 +1,5 @@
 import { z } from 'zod';
-export const ORIGIN_HOST_PATTERN = /^[a-z0-9]+(?:-[a-z0-9]+)*-[0-9a-f]{10}(?:--(?:main|b-[0-9a-f]{12}|pv-[0-9a-f]{12}))?$/;
+export const ORIGIN_HOST_PATTERN = /^[a-z0-9]+(?:-[a-z0-9]+)*-[0-9a-f]{10}(?:--(?:main|s-[0-9a-f]{12}))?$/;
 /** Only canonical, HTTPS hosting origins; never accept credentials, paths or suffix tricks. */
 export const providerOriginSchema = z
     .string()

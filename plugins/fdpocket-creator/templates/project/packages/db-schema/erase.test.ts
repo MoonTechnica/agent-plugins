@@ -15,8 +15,8 @@ export default async function eraseTest({
   db: ClientContract<SchemaType>
   erase: (userId: string) => Promise<void>
 }) {
-  const alice = await db.user.findUniqueOrThrow({ where: { globalUserId: "seed:alice" } })
-  const bob = await db.user.findUniqueOrThrow({ where: { globalUserId: "seed:bob" } })
+  const alice = await db.user.findFirstOrThrow({ where: { globalUserId: { endsWith: ":alice" } } })
+  const bob = await db.user.findFirstOrThrow({ where: { globalUserId: { endsWith: ":bob" } } })
 
   await erase(alice.id)
 

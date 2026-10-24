@@ -122,8 +122,8 @@ export default async function eraseTest({ db, erase }: {
   db: ClientContract<SchemaType>
   erase: (userId: string) => Promise<void>
 }) {
-  const alice = await db.user.findUniqueOrThrow({ where: { globalUserId: 'seed:alice' } })
-  const bob = await db.user.findUniqueOrThrow({ where: { globalUserId: 'seed:bob' } })
+  const alice = await db.user.findFirstOrThrow({ where: { globalUserId: { endsWith: ':alice' } } })
+  const bob = await db.user.findFirstOrThrow({ where: { globalUserId: { endsWith: ':bob' } } })
   await erase(alice.id)
   if ((await db.task.count({ where: { ownerId: alice.id } })) !== 0) throw new Error("alice's tasks remain")
   if ((await db.task.count({ where: { ownerId: bob.id } })) === 0) throw new Error("bob's tasks are gone")
@@ -148,7 +148,12 @@ export default async function eraseTest({ db, erase }: {
      （公開中の版が読む列は消せない。その版が公開されてから消す）。
    - NOT NULL・既定値の無い列を既存の表に足すと、行があると落ちる。既定値を付けるか、NULL 可で足して `data.sql` で埋める。
 4. `packages/sdk/src/zenstack/`・`pending/` を commit する。**`migrations/` は Platform だけが書く**（変えると `kit check` が落ちる）。
-5. `kit dev` を起動し直す（ZModel を変えたら必ず。DB は作り直され、`seed.ts` が流れる）。
+5. 通常のローカル `kit dev` で型と主要な操作を確かめる。利用者の `kit dev --live` は watcher が保存を検出し、
+   生成・差分の検証・本物の session DB への反映を行う。反映成功を確かめる。このために利用者の live を再起動しない。
+   説明できる migration は既存の試用データを保って当てる。意図の無い破壊的な変更ではセッションの試用データが作り直されるため、
+   その変更を選ぶ前に試用データが消えることを知らせる。通常の再開や seed の編集だけを理由に、本物の DB を毎回作り直さない。
+   **main / prod の DB はセッションの処理では変更・消去しない**。本物のポリシーの確認が必要なら `$fdpocket-app-testing` に従い、
+   `design/test-plan.md` を書いてテスト利用者で E2E を行う。
 
 `kit check` は `begin_build` の前にも走り、`pending/generated.sql` が古い・`migrations/` を変えた・`platform.zmodel` を変えたときに終了コード 2 で止める。
 
@@ -171,24 +176,27 @@ export default async function eraseTest({ db, erase }: {
 
 ## 8. 試用データ（`packages/db-schema/seed.ts`）
 
-`kit dev`（と Platform の影の DB・ブランチ DB）が、DB を作ったときに 1 回だけ流す。本番には流れない。失敗すると `kit dev` は起動しない。
+`kit dev` とセッション DB の初期作成時に、Sandbox で計画を生成し、信頼側が一つのトランザクションで適用する。本番には流さず、通常の再開では再投入しない。失敗時は全体を取り消し、起動を止める。
 
 ```ts
-import type { ClientContract } from '@zenstackhq/orm'
-import type { SchemaType } from '@workspace/sdk'
+import type { SchemaType, SeedContext, SeedPlan, TestIdentity } from '@workspace/sdk'
 
-export default async function seed(db: ClientContract<SchemaType>) {
-  const alice = await db.user.create({
-    data: { id: crypto.randomUUID(), globalUserId: 'seed:alice', displayName: 'Alice' },
-  })
-  const team = await db.workspace.create({ data: { name: 'サンプルのチーム' } })
-  await db.membership.create({ data: { workspaceId: team.id, userId: alice.id, role: 'owner' } })
-  await db.task.createMany({
-    data: Array.from({ length: 25 }, (_, i) => ({ title: `タスク ${i + 1}`, ownerId: alice.id, workspaceId: team.id })),
-  })
+export const testIdentities = [{ slot: 'alice', roles: [], displayName: 'Alice' }] satisfies TestIdentity[]
+
+export default async function seed(context: SeedContext): Promise<SeedPlan<SchemaType>> {
+  const alice = context.users.alice!
+  const workspaceId = await context.id('sample-team')
+  return { version: 1, operations: [
+    { model: 'workspace', operation: 'create', args: { data: { id: workspaceId, name: 'サンプルのチーム' } } },
+    { model: 'membership', operation: 'create', args: { data: { workspaceId, userId: alice.id, role: 'owner' } } },
+    { model: 'task', operation: 'createMany', args: { data: Array.from({ length: 25 }, (_, i) => ({ title: `タスク ${i + 1}`, ownerId: alice.id, workspaceId })) } },
+  ] }
 }
 ```
 
-- import は**型だけ**（`import type`）。`@workspace/sdk` の実体はビルド時の定数が要るので実行時に読めない。
-- `db` はポリシーの無い client（User も作れる）。基底の `User.id` は既定値が無いので自分で渡す。`globalUserId` は一意な値にする。
-- 一覧のページングが確かめられる件数（20 件以上）と、権限の違う役割の利用者を入れる。`kit dev` の admin の主体は Kit が別に作る。
+- import は型だけ。DB client・DB 資格情報・HTTP・外部副作用を使わず、初期化計画を返す。
+- 操作は `create`・`createMany`・`upsert`。読み取り・削除・任意 SQL・対話的トランザクションは使えない。
+- User・ProjectRole・RolePermission・UserProjectRole は直接・nested create とも書かない。利用者は `testIdentities` と `context.users` を使い、既存の主体への関連は `connect` で表す。
+- `admin`・`member`・`anonymous` は予約済み。匿名主体にも試用 User 行があり、`context.users.anonymous` で参照できる。匿名の書き込みは App の `anonymous.write` が制限する。追加 slot は英小文字始まりの英小文字・数字・`_`・`-`、最大 32 文字。
+- ID は `await context.id('stable-label')`、日時は `context.initializedAt` を使う。同じ初期化の再試行で値を変えない。
+- 計画は最大 100 操作・1,000 行・1 MiB。権限の異なる主体と一覧のページングを確かめられる件数を用意する。
