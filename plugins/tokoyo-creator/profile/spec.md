@@ -44,6 +44,7 @@ Debug MenuのUIと試験用の処理は各ゲームの`godot/dev/`に作成し�
 │   ├── game-art-direction/  # 見た目の合意（コンセプト画像・スタイルガイド・素材の判定表）
 │   ├── game-level-design/   # ステージ/マップ（体験・進行・空間候補・仮組み・到達/進行検査・選定）
 │   ├── game-playtest/       # 自分で遊んで確かめる（rubric・ルール検査 assets/playtest_rules.gd・前の版の試遊結果）
+│   ├── tokoyo-continue/     # ローカル・クラウドの固定ソースと共有文脈を受領し続きを作る
 │   ├── game-controls/       # PC とスマホの操作（InputMap・移動スティック・操作方法の画面・ジャンル別の割り当て）
 │   ├── game-screen-layout/  # 画面の追従・HUD・タイトル / ポーズ / リザルト
 │   ├── game-asset-tools/    # 参照検索CLI・制作レシピ・画像生成と素材ツール（MCP）

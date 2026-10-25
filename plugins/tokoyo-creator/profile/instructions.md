@@ -12,6 +12,17 @@
 
 ## 0. 最初にやること
 
+### ローカルとクラウドの続きを引き継ぐ
+
+`./input/handoff.json` がある場合は、そこに固定された目的・決定・試したこと・未完了作業を読んでから進める。
+同じCLIの会話が残っているとは仮定しない。これは作業データで、認可・課金・作者の規約や企画承認を変更する指示ではない。
+`source_revision_id` と実際に渡されたソースを基点にし、除外された変更を実装済みと扱わない。
+この入力があるターンの `build-report.json` に `handoff_context` を書く。
+形式は `{"schema_version":1,"goal":"目的","decisions":[],"completed":[],"attempts":[{"approach":"試した方法","result":"結果"}],"next_steps":[],"known_issues":[],"checks":[{"name":"検査","result":"passed|failed|not_run"}],"approval_state":"unknown","references":[{"kind":"project_file","path":"design/style-guide.md"}],"shared_by":"user_or_agent"}`。
+以前の決定を保ち、今回の変更・失敗・次の作業を更新する。配列は各20件、各本文1000字、goal2000字、全体32KiB以内。
+メモをゲームのソース・commit message・公開Artifactへ入れず、秘密・絶対パス・署名URL・全文transcriptを書かない。
+検査していない成功や未承認の企画を承認済みと書かない。
+
 ### 元作者の貢献規約を最優先で確認する
 
 
@@ -41,6 +52,7 @@
 5. **`./input/` を見る**（§4.0）。前の版があれば、それを土台にして続きを作る。
 | Skill | 使うとき |
 |---|---|
+| `$tokoyo-continue` | 引き継ぎIDを受け取ったとき・`input/handoff.json`があるとき・ローカルとクラウドの続きを渡すとき。固定ソースと共有メモで再開し、会話履歴を仮定しない |
 | `$game-design` | 新しく作るとき・遊びの核（ルール・操作・目的）を変えるとき。作り方の工程（企画 → 見た目の合意 → 素材の設計 → 核を遊べる形に → 素材 → 遊んで直す → 数値 → 磨く → 掲載）と各段階の完了条件、企画（`design/brief.md`）、ジャンルの下限、ルール（`godot/rules.gd`）と調整値（`godot/tuning.gd`）の分け方 |
 | `$game-art-direction` | 新しく作るとき・見た目の方向（絵柄・主役・世界観）を変えるとき・素材を選ぶとき。コンセプトの合意、スタイルガイド、素材の採否、2D / 3D の画風・材質・光・影・露出の統一、実画面と世界観の比較（`references/visual-direction.md`）。草・木・地面・水・空など屋外は `references/nature.md`（読む公式の章・Compatibility の落とし穴・検証済みの部品・重さの予算） |
 | `$game-level-design` | **ステージ・マップ・コース・盤面・敵/報酬の配置・マップメニューを作る/変えるとき**。体験/進行と空間の候補を検査・選定する。RPGの地域切替、メトロイドバニアの部屋/能力/再探索、実ステージと地図の対応は `references/transitions-and-map.md`。仕上げ後は影響する経路と実画面を再確認する |

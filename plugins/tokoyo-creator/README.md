@@ -236,6 +236,32 @@ node <kit>/scripts/kit.mjs <command> [--flag value]
 | `link` | Re-point `source/`, its git settings and `.tokoyo.json` at a newer Kit (after updating). |
 | `codex-config` | Print the recommended Codex approval settings. |
 
+## Continue between local and cloud
+
+Use the `tokoyo-continue` Skill with the handoff ID from the editor. The equivalent CLI is
+`node <kit>/scripts/kit.mjs continue --handoff-id <id> --directory <new-empty-directory>`.
+It verifies the pinned source, LFS objects, SDK and shared context, accepts the handoff, and checks
+that the writer is still current before enabling edits. Retry the same command after a connection
+failure. Existing unrelated files are never overwritten.
+
+To receive editor requests, keep `node <kit>/scripts/kit.mjs connect --workspace <dedicated-root> --agent codex`
+(or `claude`) running in a terminal, then approve its displayed challenge in the editor. This receives
+work without starting an agent. Add `--allow-agent-run` explicitly to allow dedicated agent children.
+Automatic execution requires macOS, Codex CLI 0.164.0 (or Claude Code 2.1.309 with that sandbox helper),
+and a dedicated workspace outside ancestor `.codex/config.toml` configuration. Other environments
+stay in receive-only mode. No parent OAuth token is passed to the child. Ctrl-C stops the connector and
+its own active child; `disconnect --workspace <dedicated-root>` revokes the registration.
+
+Save a structured shared memo to `outputs/handoff-context.json`, commit changes in `source/`, then run
+`checkpoint --context-file outputs/handoff-context.json` before preparing a return to the cloud.
+In connector-managed workspaces, use the editor to switch; its parent connector performs the checkpoint with the active command identity. The memo carries decisions, attempts, next steps and checks; full provider conversations are not migrated.
+Pinned SDKs and Kit files are copied to a private hash-keyed snapshot under each workspace, so receiving
+a different release cannot replace another workspace's SDK. The child can write source/ and outputs/
+while metadata, the snapshot and parent credentials remain protected. Buildable results are built and
+validated by the parent; failed builds retain a source checkpoint and do not claim a new playable preview.
+Managed workspaces use configuration schema 2 and require Kit revision 9 or newer. Do not edit their
+execution identity by hand. A changed writer or failed checkpoint leaves local changes available for recovery.
+
 ## Troubleshooting
 
 | Symptom | What to do |
