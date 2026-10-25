@@ -61659,14 +61659,14 @@ var ColumnCollector, ExpressionEvaluator = class {
       return ValueNode.createImmediate(null);
     this.ensureCollectionPredicateOperator(expr2.op);
     if (!new schema_utils_exports.MatchingExpressionVisitor((e2) => ExpressionUtils.isThis(e2)).find(expr2.right)) {
-      const value = new ExpressionEvaluator().evaluate(expr2, {
+      const value2 = new ExpressionEvaluator().evaluate(expr2, {
         auth: this.auth,
         thisValue: context.contextValue,
         bindingScope: this.getEvaluationBindingScope(context.bindingScope),
         operation: context.operation,
         thisType: context.thisType
       });
-      return this.transformValue(value, "Boolean");
+      return this.transformValue(value2, "Boolean");
     } else {
       invariant(Array.isArray(receiver), "array value is expected");
       const components = receiver.map((item) => {
@@ -61767,15 +61767,15 @@ var ColumnCollector, ExpressionEvaluator = class {
     }
     return false;
   }
-  transformValue(value, type) {
-    if (value === true)
+  transformValue(value2, type) {
+    if (value2 === true)
       return trueNode(this.dialect);
-    else if (value === false)
+    else if (value2 === false)
       return falseNode(this.dialect);
-    else if (Array.isArray(value))
-      return this.dialect.buildArrayValue(value.map((v3) => new ExpressionWrapper(this.transformValue(v3, type))), type).toOperationNode();
+    else if (Array.isArray(value2))
+      return this.dialect.buildArrayValue(value2.map((v3) => new ExpressionWrapper(this.transformValue(v3, type))), type).toOperationNode();
     else {
-      const transformed = this.dialect.transformInput(value, type, false) ?? null;
+      const transformed = this.dialect.transformInput(value2, type, false) ?? null;
       if (typeof transformed !== "string")
         return ValueNode.createImmediate(transformed);
       else
@@ -62007,9 +62007,9 @@ var ColumnCollector, ExpressionEvaluator = class {
     if (!scope)
       return;
     const result = {};
-    for (const [key, value] of Object.entries(scope))
-      if (value.value !== undefined)
-        result[key] = value.value;
+    for (const [key, value2] of Object.entries(scope))
+      if (value2.value !== undefined)
+        result[key] = value2.value;
     return Object.keys(result).length > 0 ? result : undefined;
   }
   buildDelegateBaseFieldSelect(model, modelAlias, field3, baseModel) {
@@ -62021,8 +62021,8 @@ var ColumnCollector, ExpressionEvaluator = class {
       where: WhereNode.create(conjunction(this.dialect, idFields.map((idField) => BinaryOperationNode.create(ReferenceNode.create(ColumnNode.create(idField), TableNode.create(baseModel)), OperatorNode.create("="), ReferenceNode.create(ColumnNode.create(idField), TableNode.create(modelAlias))))))
     };
   }
-  isAuthCall(value) {
-    return ExpressionUtils.isCall(value) && value.function === "auth";
+  isAuthCall(value2) {
+    return ExpressionUtils.isCall(value2) && value2.function === "auth";
   }
   isAuthMember(expr2) {
     return ExpressionUtils.isMember(expr2) && this.isAuthCall(expr2.receiver);
@@ -62727,21 +62727,21 @@ var init_dist8 = __esm(() => {
             raw: itemNode.value
           });
         } else {
-          let value = item;
+          let value2 = item;
           if (!isImplicitManyToManyJoinTable) {
             const fieldDef = query_utils_exports.requireField(this.client.$schema, model, fields[i2]);
-            value = this.dialect.transformInput(item, fieldDef.type, !!fieldDef.array);
+            value2 = this.dialect.transformInput(item, fieldDef.type, !!fieldDef.array);
           }
-          if (Array.isArray(value)) {
+          if (Array.isArray(value2)) {
             const fieldDef = query_utils_exports.requireField(this.client.$schema, model, fields[i2]);
             result.push({
-              node: this.dialect.buildArrayValue(value, fieldDef.type).toOperationNode(),
-              raw: value
+              node: this.dialect.buildArrayValue(value2, fieldDef.type).toOperationNode(),
+              raw: value2
             });
           } else
             result.push({
-              node: ValueNode.create(value),
-              raw: value
+              node: ValueNode.create(value2),
+              raw: value2
             });
         }
       }
@@ -70774,6 +70774,73 @@ async function createSessionSeedUsers(tx, context, identities, manifest2) {
       throw new Error("session seed user identity collision");
 }
 
+// frontend/packages/project-gateway/src/session-seed-diagnostics.ts
+var stages = new WeakMap;
+function markSessionSeedFailure(error51, stage) {
+  if (error51 !== null && typeof error51 === "object")
+    stages.set(error51, stage);
+}
+var codes = new Set([
+  "SQL_INPUT_ERROR",
+  "SQLITE_ERROR",
+  "SQLITE_AUTH",
+  "SQLITE_BUSY",
+  "SQLITE_LOCKED",
+  "SQLITE_CONSTRAINT",
+  "SQLITE_CONSTRAINT_UNIQUE",
+  "SQLITE_CONSTRAINT_FOREIGNKEY",
+  "SQLITE_CONSTRAINT_NOTNULL",
+  "SQLITE_CONSTRAINT_PRIMARYKEY",
+  "SQLITE_CONSTRAINT_CHECK",
+  "SQLITE_READONLY",
+  "SQLITE_IOERR",
+  "SQLITE_CORRUPT",
+  "SQLITE_FULL",
+  "SQLITE_CANTOPEN",
+  "SQLITE_SCHEMA",
+  "SQLITE_MISMATCH",
+  "SQLITE_MISUSE",
+  "SQLITE_RANGE",
+  "SQLITE_NOTADB",
+  "TRANSACTION_TIMEOUT",
+  "TRANSACTION_CLOSED",
+  "HRANA_PROTO_ERROR",
+  "HRANA_CLOSED_ERROR",
+  "SERVER_ERROR",
+  "PROTOCOL_VERSION_ERROR",
+  "INTERNAL_ERROR"
+]);
+function value(error51, key) {
+  try {
+    return Object.getOwnPropertyDescriptor(error51, key)?.value;
+  } catch {
+    return;
+  }
+}
+function sessionSeedFailureDiagnostic(error51, fallback) {
+  let current = error51;
+  let stage = fallback;
+  let databaseCode = "UNKNOWN";
+  let status;
+  for (let depth = 0;depth < 5 && current !== null && typeof current === "object"; depth++) {
+    stage = stages.get(current) ?? stage;
+    for (const key of ["extendedCode", "dbErrorCode", "code"]) {
+      const candidate2 = value(current, key);
+      if (databaseCode === "UNKNOWN" && typeof candidate2 === "string" && codes.has(candidate2))
+        databaseCode = candidate2;
+    }
+    const candidate = value(current, "status") ?? value(current, "statusCode");
+    if (status === undefined && typeof candidate === "number" && Number.isInteger(candidate) && candidate >= 400 && candidate <= 599)
+      status = candidate;
+    current = value(current, "cause");
+  }
+  return {
+    initialization_stage: stage,
+    database_code: databaseCode,
+    ...status === undefined ? {} : { database_http_status: status }
+  };
+}
+
 // frontend/packages/project-gateway/src/session-seed.ts
 async function sessionSeedDigest(text) {
   return Array.from(new Uint8Array(await crypto.subtle.digest("SHA-256", new TextEncoder().encode(text))), (x3) => x3.toString(16).padStart(2, "0")).join("");
@@ -70824,8 +70891,8 @@ function schemaOf(text) {
   validatePhysicalNames(schema2);
   return schema2;
 }
-function mappedName2(value, attribute) {
-  const attrs = value.attributes ?? [];
+function mappedName2(value2, attribute) {
+  const attrs = value2.attributes ?? [];
   const match = attrs.filter((item) => item.name === attribute);
   if (match.length === 0)
     return null;
@@ -70882,19 +70949,19 @@ function operationsOf2(plan, schema2) {
   });
 }
 function countSeedRows(schema2, model, operation, args) {
-  const object2 = (value) => value !== null && typeof value === "object" && !Array.isArray(value) ? value : {};
-  const list = (value) => Array.isArray(value) ? value : [value];
-  const data = (value) => list(value).reduce((sum2, item) => {
+  const object2 = (value2) => value2 !== null && typeof value2 === "object" && !Array.isArray(value2) ? value2 : {};
+  const list = (value2) => Array.isArray(value2) ? value2 : [value2];
+  const data = (value2) => list(value2).reduce((sum2, item) => {
     let nested = 0;
     for (const [key, payload] of Object.entries(object2(item))) {
       const field3 = schema2.models[model]?.fields[key];
       if (!field3?.relation)
         continue;
-      for (const [action2, value2] of Object.entries(object2(payload))) {
+      for (const [action2, value3] of Object.entries(object2(payload))) {
         if (["delete", "deleteMany", "disconnect", "set", "updateMany"].includes(action2))
           throw new Error("nested session seed destructive operation is not allowed");
         if (["create", "createMany", "upsert", "connectOrCreate", "update"].includes(action2))
-          nested += countSeedRows(schema2, field3.type, action2, value2);
+          nested += countSeedRows(schema2, field3.type, action2, value3);
       }
     }
     return sum2 + 1 + nested;
@@ -70909,64 +70976,76 @@ function countSeedRows(schema2, model, operation, args) {
   return data(record2.data);
 }
 async function applySessionSeed(input) {
-  const context = sessionSeedContextSchema.parse(input.context);
-  const validated = sessionSeedBundleSchema.parse({
-    version: 1,
-    schemaJson: input.schemaJson,
-    identities: input.identities,
-    plan: input.plan
-  });
-  const { identities, plan } = validated;
-  if (!/^[a-f0-9]{64}$/.test(input.artifactHash))
-    throw new Error("invalid session seed artifact hash");
-  const schema2 = schemaOf(input.schemaJson);
-  const operations = operationsOf2(plan, schema2);
-  const receipt = {
-    ...context,
-    artifactHash: input.artifactHash,
-    schemaHash: await sessionSeedDigest(input.schemaJson)
-  };
-  await prepareSessionSeedMetadata(input.db);
-  let transaction;
-  const client = new ZenStackClient(schema2, {
-    dialect: new LibsqlDialect({
-      client: input.db,
-      observeTransaction: (tx) => {
-        transaction = tx;
+  let stage = "schema-validation";
+  try {
+    const context = sessionSeedContextSchema.parse(input.context);
+    const validated = sessionSeedBundleSchema.parse({
+      version: 1,
+      schemaJson: input.schemaJson,
+      identities: input.identities,
+      plan: input.plan
+    });
+    const { identities, plan } = validated;
+    if (!/^[a-f0-9]{64}$/.test(input.artifactHash))
+      throw new Error("invalid session seed artifact hash");
+    const schema2 = schemaOf(input.schemaJson);
+    const operations = operationsOf2(plan, schema2);
+    const receipt = {
+      ...context,
+      artifactHash: input.artifactHash,
+      schemaHash: await sessionSeedDigest(input.schemaJson)
+    };
+    stage = "metadata";
+    await prepareSessionSeedMetadata(input.db);
+    let transaction;
+    const client = new ZenStackClient(schema2, {
+      dialect: new LibsqlDialect({
+        client: input.db,
+        observeTransaction: (tx) => {
+          transaction = tx;
+        }
+      })
+    });
+    const handler = new RPCApiHandler({ schema: schema2 });
+    const started = performance.now();
+    const deadline = () => {
+      if (performance.now() - started > SESSION_SEED_DEADLINE_MS)
+        throw new Error("session seed deadline exceeded");
+    };
+    stage = "transaction";
+    return await client.$transaction(async (tx) => {
+      if (!transaction)
+        throw new Error("session seed transaction is unavailable");
+      stage = "receipt";
+      const saved = await replaySessionSeed(transaction, receipt);
+      if (saved)
+        return saved;
+      stage = "users";
+      await createSessionSeedUsers(transaction, context, identities, input.manifest);
+      stage = "operation";
+      for (const operation of operations) {
+        deadline();
+        const captured = {};
+        const response = await handler.handleRequest({
+          client: capturingErrors(tx, captured),
+          method: "POST",
+          path: `/${operation.model}/${operation.operation}`,
+          query: {},
+          requestBody: withMeta(operation.args)
+        });
+        if (response.status >= 400)
+          throw new Error("session seed model operation failed", { cause: captured.error });
+        deadline();
       }
-    })
-  });
-  const handler = new RPCApiHandler({ schema: schema2 });
-  const started = performance.now();
-  const deadline = () => {
-    if (performance.now() - started > SESSION_SEED_DEADLINE_MS)
-      throw new Error("session seed deadline exceeded");
-  };
-  return client.$transaction(async (tx) => {
-    if (!transaction)
-      throw new Error("session seed transaction is unavailable");
-    const saved = await replaySessionSeed(transaction, receipt);
-    if (saved)
-      return saved;
-    await createSessionSeedUsers(transaction, context, identities, input.manifest);
-    for (const operation of operations) {
+      stage = "receipt";
+      await finishSessionSeed(transaction, receipt);
       deadline();
-      const captured = {};
-      const response = await handler.handleRequest({
-        client: capturingErrors(tx, captured),
-        method: "POST",
-        path: `/${operation.model}/${operation.operation}`,
-        query: {},
-        requestBody: withMeta(operation.args)
-      });
-      if (response.status >= 400)
-        throw new Error("session seed model operation failed");
-      deadline();
-    }
-    await finishSessionSeed(transaction, receipt);
-    deadline();
-    return receipt;
-  });
+      return receipt;
+    });
+  } catch (error51) {
+    markSessionSeedFailure(error51, stage);
+    throw error51;
+  }
 }
 
 // frontend/packages/miniapp-kit/src/dev/session-runtime.ts
@@ -71394,10 +71473,10 @@ import { dirname as dirname7, join as join21 } from "node:path";
 var PENDING_POLICY_FILE = "migration-policy.json";
 var header2 = "-- platform-data-policy: ";
 function parseDeclarations(text) {
-  const value = JSON.parse(text);
-  if (!value || typeof value !== "object" || Array.isArray(value))
+  const value2 = JSON.parse(text);
+  if (!value2 || typeof value2 !== "object" || Array.isArray(value2))
     throw new Error("Invalid migration policy");
-  const object2 = value;
+  const object2 = value2;
   if (Object.keys(object2).sort().join(",") !== "deletions,transforms")
     throw new Error("Invalid migration policy fields");
   const entries = (key) => {
@@ -71578,27 +71657,27 @@ function isSensitiveKey(key) {
   const lowered = key.toLowerCase();
   return SENSITIVE_KEY_PARTS.some((part) => lowered.includes(part));
 }
-function redactText(value) {
-  return value.replace(BEARER_RE, `Bearer ${REDACTED}`).replace(QUERY_SECRET_RE, `$1${REDACTED}`);
+function redactText(value2) {
+  return value2.replace(BEARER_RE, `Bearer ${REDACTED}`).replace(QUERY_SECRET_RE, `$1${REDACTED}`);
 }
-function redactValue(value, depth, seen) {
-  if (typeof value === "string")
-    return redactText(value);
-  if (value === null || typeof value !== "object")
-    return value;
-  if (value instanceof Error || value instanceof Date || value instanceof RegExp)
-    return value;
-  if (depth >= MAX_DEPTH || seen.has(value))
+function redactValue(value2, depth, seen) {
+  if (typeof value2 === "string")
+    return redactText(value2);
+  if (value2 === null || typeof value2 !== "object")
+    return value2;
+  if (value2 instanceof Error || value2 instanceof Date || value2 instanceof RegExp)
+    return value2;
+  if (depth >= MAX_DEPTH || seen.has(value2))
     return REDACTED;
-  seen.add(value);
-  if (Array.isArray(value))
-    return value.map((item) => redactValue(item, depth + 1, seen));
-  return redactRecord(value, depth, seen);
+  seen.add(value2);
+  if (Array.isArray(value2))
+    return value2.map((item) => redactValue(item, depth + 1, seen));
+  return redactRecord(value2, depth, seen);
 }
 function redactRecord(record2, depth, seen) {
   const result = {};
-  for (const [key, value] of Object.entries(record2)) {
-    result[key] = isSensitiveKey(key) ? REDACTED : redactValue(value, depth + 1, seen);
+  for (const [key, value2] of Object.entries(record2)) {
+    result[key] = isSensitiveKey(key) ? REDACTED : redactValue(value2, depth + 1, seen);
   }
   return result;
 }
@@ -71666,33 +71745,33 @@ async function parseFormData(request, options2) {
 function convertFormDataToBodyData(formData, options2) {
   const form = Object.create(null);
   const nestingState = { count: 0 };
-  formData.forEach((value, key) => {
+  formData.forEach((value2, key) => {
     if (!(options2.all || key.endsWith("[]")))
-      form[key] = value;
+      form[key] = value2;
     else
-      handleParsingAllValues(form, key, value);
+      handleParsingAllValues(form, key, value2);
   });
   if (options2.dot)
-    Object.entries(form).forEach(([key, value]) => {
+    Object.entries(form).forEach(([key, value2]) => {
       if (key.includes(".")) {
-        handleParsingNestedValues(form, key, value, nestingState);
+        handleParsingNestedValues(form, key, value2, nestingState);
         delete form[key];
       }
     });
   return form;
 }
-var handleParsingAllValues = (form, key, value) => {
+var handleParsingAllValues = (form, key, value2) => {
   if (form[key] !== undefined) {
     if (Array.isArray(form[key]))
-      form[key].push(value);
+      form[key].push(value2);
     else
-      form[key] = [form[key], value];
+      form[key] = [form[key], value2];
   } else if (!key.endsWith("[]"))
-    form[key] = value;
+    form[key] = value2;
   else
-    form[key] = [value];
+    form[key] = [value2];
 };
-var handleParsingNestedValues = (form, key, value, state) => {
+var handleParsingNestedValues = (form, key, value2, state) => {
   if (/(?:^|\.)__proto__\./.test(key))
     return;
   let nestedForm = form;
@@ -71701,7 +71780,7 @@ var handleParsingNestedValues = (form, key, value, state) => {
     throwNestingLimitExceeded();
   keys.forEach((key2, index) => {
     if (index === keys.length - 1)
-      nestedForm[key2] = value;
+      nestedForm[key2] = value2;
     else {
       if (!nestedForm[key2] || typeof nestedForm[key2] !== "object" || Array.isArray(nestedForm[key2]) || nestedForm[key2] instanceof File) {
         if (state.count++ >= MAX_NESTED_OBJECTS)
@@ -71845,10 +71924,10 @@ var checkOptionalParameter = (path) => {
   return results.filter((v3, i2, a2) => a2.indexOf(v3) === i2);
 };
 var tryDecodeURIComponent = (str) => str.indexOf("%") !== -1 ? tryDecode(str, decodeURIComponent_) : str;
-var _decodeURI = (value) => {
-  if (value.indexOf("+") !== -1)
-    value = value.replace(/\+/g, " ");
-  return tryDecodeURIComponent(value);
+var _decodeURI = (value2) => {
+  if (value2.indexOf("+") !== -1)
+    value2 = value2.replace(/\+/g, " ");
+  return tryDecodeURIComponent(value2);
 };
 var _getQueryParam = (url2, key, multiple) => {
   const hashIndex = url2.indexOf("#", 8);
@@ -71889,20 +71968,20 @@ var _getQueryParam = (url2, key, multiple) => {
     keyIndex = nextKeyIndex;
     if (name3 === "")
       continue;
-    let value;
+    let value2;
     if (valueIndex === -1)
-      value = "";
+      value2 = "";
     else {
-      value = url2.slice(valueIndex + 1, nextKeyIndex === -1 ? undefined : nextKeyIndex);
+      value2 = url2.slice(valueIndex + 1, nextKeyIndex === -1 ? undefined : nextKeyIndex);
       if (encoded)
-        value = _decodeURI(value);
+        value2 = _decodeURI(value2);
     }
     if (multiple) {
       if (!(results[name3] && Array.isArray(results[name3])))
         results[name3] = [];
-      results[name3].push(value);
+      results[name3].push(value2);
     } else
-      results[name3] ??= value;
+      results[name3] ??= value2;
   }
   return key ? results[key] : results;
 };
@@ -71937,9 +72016,9 @@ var HonoRequest = class {
     const decoded = {};
     const keys = Object.keys(this.#matchResult[0][this.routeIndex]?.[1] ?? {});
     for (const key of keys) {
-      const value = this.#getParamValue(this.#matchResult[0][this.routeIndex][1][key]);
-      if (value !== undefined)
-        decoded[key] = tryDecodeURIComponent(value);
+      const value2 = this.#getParamValue(this.#matchResult[0][this.routeIndex][1][key]);
+      if (value2 !== undefined)
+        decoded[key] = tryDecodeURIComponent(value2);
     }
     return decoded;
   }
@@ -71956,8 +72035,8 @@ var HonoRequest = class {
     if (name3)
       return this.raw.headers.get(name3) ?? undefined;
     const headerData = Object.create(null);
-    this.raw.headers.forEach((value, key) => {
-      headerData[key] = value;
+    this.raw.headers.forEach((value2, key) => {
+      headerData[key] = value2;
     });
     return headerData;
   }
@@ -72025,8 +72104,8 @@ var HtmlEscapedCallbackPhase = {
   BeforeStream: 2,
   Stream: 3
 };
-var raw = (value, callbacks) => {
-  const escapedString = new String(value);
+var raw = (value2, callbacks) => {
+  const escapedString = new String(value2);
   escapedString.isEscaped = true;
   escapedString.callbacks = callbacks;
   return escapedString;
@@ -72137,23 +72216,23 @@ var Context = class {
   setRenderer = (renderer) => {
     this.#renderer = renderer;
   };
-  header = (name3, value, options2) => {
+  header = (name3, value2, options2) => {
     if (this.finalized)
       this.#res = createResponseInstance(this.#res.body, this.#res);
     const headers = this.#res ? this.#res.headers : this.#preparedHeaders ??= new Headers;
-    if (value === undefined)
+    if (value2 === undefined)
       headers.delete(name3);
     else if (options2?.append)
-      headers.append(name3, value);
+      headers.append(name3, value2);
     else
-      headers.set(name3, value);
+      headers.set(name3, value2);
   };
   status = (status) => {
     this.#status = status;
   };
-  set = (key, value) => {
+  set = (key, value2) => {
     this.#var ??= /* @__PURE__ */ new Map;
-    this.#var.set(key, value);
+    this.#var.set(key, value2);
   };
   get = (key) => {
     return this.#var ? this.#var.get(key) : undefined;
@@ -72167,11 +72246,11 @@ var Context = class {
     let responseHeaders = this.#res ? new Headers(this.#res.headers) : this.#preparedHeaders;
     if (typeof arg === "object" && arg.headers) {
       responseHeaders ??= new Headers;
-      for (const [key, value] of new Headers(arg.headers))
+      for (const [key, value2] of new Headers(arg.headers))
         if (key === "set-cookie")
-          responseHeaders.append(key, value);
+          responseHeaders.append(key, value2);
         else
-          responseHeaders.set(key, value);
+          responseHeaders.set(key, value2);
     }
     if (headers) {
       if (!responseHeaders) {
@@ -73250,8 +73329,8 @@ function createBearerKeyCheck(key) {
   const expected = digest(`Bearer ${key}`);
   return async (authorization) => equal(await digest(authorization ?? ""), await expected);
 }
-async function digest(value) {
-  return new Uint8Array(await crypto.subtle.digest("SHA-256", new TextEncoder().encode(value)));
+async function digest(value2) {
+  return new Uint8Array(await crypto.subtle.digest("SHA-256", new TextEncoder().encode(value2)));
 }
 function equal(a2, b3) {
   let difference = a2.length ^ b3.length;
@@ -73262,8 +73341,8 @@ function equal(a2, b3) {
 // frontend/packages/project-gateway/src/db/turso-credentials.ts
 init_zod();
 var credentialsSchema = exports_external.strictObject({
-  url: exports_external.url().refine((value) => {
-    const url2 = new URL(value);
+  url: exports_external.url().refine((value2) => {
+    const url2 = new URL(value2);
     return ["libsql:", "https:"].includes(url2.protocol) && url2.hostname.endsWith(".turso.io") && !url2.username && !url2.password;
   }),
   authToken: exports_external.string().min(1),
@@ -73277,12 +73356,12 @@ var TABLE = "_platform_retained_rows";
 var create = `CREATE TABLE IF NOT EXISTS "${TABLE}" ("tableName" TEXT NOT NULL,"rowKey" TEXT NOT NULL,"definition" TEXT NOT NULL,"expiresAt" TEXT NOT NULL,PRIMARY KEY("tableName","rowKey"))`;
 var index = `CREATE INDEX IF NOT EXISTS "_platform_retained_rows_due" ON "${TABLE}"("expiresAt","tableName","rowKey")`;
 var quote = (name3) => `"${name3.replaceAll('"', '""')}"`;
-var object2 = (value) => typeof value === "object" && value !== null ? value : {};
-var list = (value) => Array.isArray(value) ? value : [];
-var attrs = (value) => list(object2(value).attributes).map(object2);
-var literal2 = (value) => object2(object2(value).value).value;
-var mapped = (value, attr, fallback) => {
-  const found = attrs(value).find((a2) => a2.name === attr);
+var object2 = (value2) => typeof value2 === "object" && value2 !== null ? value2 : {};
+var list = (value2) => Array.isArray(value2) ? value2 : [];
+var attrs = (value2) => list(object2(value2).attributes).map(object2);
+var literal2 = (value2) => object2(object2(value2).value).value;
+var mapped = (value2, attr, fallback) => {
+  const found = attrs(value2).find((a2) => a2.name === attr);
   const name3 = literal2(list(found?.args)[0]);
   return typeof name3 === "string" ? name3 : fallback;
 };
@@ -73429,8 +73508,8 @@ async function sweepRetainedRows(db, schema2, at, limit = 100) {
 async function nextRetentionAt(db) {
   await db.execute(create);
   await db.execute(index);
-  const value = (await db.execute(`SELECT min("expiresAt") AS at FROM "${TABLE}"`)).rows[0]?.at;
-  return typeof value === "string" ? value : null;
+  const value2 = (await db.execute(`SELECT min("expiresAt") AS at FROM "${TABLE}"`)).rows[0]?.at;
+  return typeof value2 === "string" ? value2 : null;
 }
 
 // frontend/packages/project-gateway/src/internal/erase.ts
@@ -73656,8 +73735,8 @@ async function findProjectUserByGlobalId(db, globalUserId) {
 }
 
 // frontend/packages/project-gateway/src/realtime/scope.ts
-async function realtimeDigest(value) {
-  const bytes3 = await crypto.subtle.digest("SHA-256", new TextEncoder().encode(JSON.stringify(value)));
+async function realtimeDigest(value2) {
+  const bytes3 = await crypto.subtle.digest("SHA-256", new TextEncoder().encode(JSON.stringify(value2)));
   return [...new Uint8Array(bytes3)].map((byte) => byte.toString(16).padStart(2, "0")).join("");
 }
 function realtimeScopeOf(claims, resolved) {
@@ -73980,10 +74059,10 @@ async function* sseData(stream) {
   const decoder2 = new TextDecoder;
   let buffer = "";
   for (;; ) {
-    const { value, done } = await reader.read();
+    const { value: value2, done } = await reader.read();
     if (done)
       break;
-    buffer += decoder2.decode(value, { stream: true });
+    buffer += decoder2.decode(value2, { stream: true });
     let index2 = buffer.indexOf(`
 `);
     while (index2 >= 0) {
@@ -74037,7 +74116,7 @@ function auditColumnsOf(event) {
     pairs.push(["policyVersion", event.policyVersion]);
   return {
     columns: pairs.map(([name3]) => `"${name3}"`).join(", "),
-    values: pairs.map(([, value]) => value)
+    values: pairs.map(([, value2]) => value2)
   };
 }
 async function writeAuditEvent(db, event) {
@@ -74082,7 +74161,7 @@ function auditStatement(context, action2, fileId, decision, reason) {
   };
 }
 function toRow(row) {
-  const text = (value) => value === null || value === undefined ? null : String(value);
+  const text = (value2) => value2 === null || value2 === undefined ? null : String(value2);
   return {
     id: String(row.id),
     bucket: String(row.bucket),
@@ -74097,8 +74176,8 @@ function toRow(row) {
     createdAt: toIso(String(row.createdAt))
   };
 }
-function toIso(value) {
-  const normalized = /^\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2}$/.test(value) ? `${value.replace(" ", "T")}Z` : value;
+function toIso(value2) {
+  const normalized = /^\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2}$/.test(value2) ? `${value2.replace(" ", "T")}Z` : value2;
   return new Date(normalized).toISOString();
 }
 async function workspaceRoleOf(db, workspaceId, userId) {
@@ -74565,10 +74644,10 @@ function fileRefsOf(message2) {
   });
 }
 function locationOf(part) {
-  const value = part[part.type];
-  if (!value || typeof value !== "object")
+  const value2 = part[part.type];
+  if (!value2 || typeof value2 !== "object")
     return;
-  const location = value.url ?? value.file_data ?? value.data;
+  const location = value2.url ?? value2.file_data ?? value2.data;
   return typeof location === "string" ? location : undefined;
 }
 function partKindsOf(message2) {
@@ -74621,13 +74700,13 @@ var bodyLimit = (options2) => {
     const chunks = [];
     const rawReader = c2.req.raw.body.getReader();
     for (;; ) {
-      const { done, value } = await rawReader.read();
+      const { done, value: value2 } = await rawReader.read();
       if (done)
         break;
-      size += value.length;
+      size += value2.length;
       if (size > maxSize)
         return onError(c2);
-      chunks.push(value);
+      chunks.push(value2);
     }
     const requestInit = {
       body: new ReadableStream({ start(controller) {
@@ -74718,9 +74797,9 @@ function evaluateTrigger(trigger, input) {
     return null;
   if (trigger.exceptActor && recipient === input.actor.id)
     return null;
-  const params = Object.fromEntries(Object.entries(trigger.params).map(([name3, value]) => [
+  const params = Object.fromEntries(Object.entries(trigger.params).map(([name3, value2]) => [
     name3,
-    bound(resolveValue(value, row, input.actor))
+    bound(resolveValue(value2, row, input.actor))
   ]));
   return { recipient, params };
 }
@@ -74736,14 +74815,14 @@ function resolveValue(expression2, row, actor) {
     return textOf(row[expression2.slice("$row.".length)]);
   return expression2;
 }
-function textOf(value) {
-  if (typeof value === "string")
-    return value;
-  if (typeof value === "number" || typeof value === "bigint" || typeof value === "boolean") {
-    return String(value);
+function textOf(value2) {
+  if (typeof value2 === "string")
+    return value2;
+  if (typeof value2 === "number" || typeof value2 === "bigint" || typeof value2 === "boolean") {
+    return String(value2);
   }
-  if (value instanceof Date)
-    return value.toISOString();
+  if (value2 instanceof Date)
+    return value2.toISOString();
   return "";
 }
 function bound(text) {
@@ -74861,8 +74940,8 @@ function denied(cause) {
     ...cause === undefined ? {} : { cause }
   });
 }
-function record2(value) {
-  return value !== null && typeof value === "object" && !Array.isArray(value);
+function record2(value2) {
+  return value2 !== null && typeof value2 === "object" && !Array.isArray(value2);
 }
 function dataOf(body) {
   if (!record2(body) || !Object.hasOwn(body, "data"))
@@ -74874,7 +74953,7 @@ function dataOf(body) {
     throw denied(cause);
   }
 }
-function canonical(value) {
+function canonical(value2) {
   function sorted2(item) {
     if (Array.isArray(item))
       return item.map(sorted2);
@@ -74882,7 +74961,7 @@ function canonical(value) {
       return item;
     return Object.fromEntries(Object.keys(item).sort().map((key) => [key, sorted2(item[key])]));
   }
-  return JSON.stringify(sorted2(serialize2(value)));
+  return JSON.stringify(sorted2(serialize2(value2)));
 }
 async function assertReplayReadable(input) {
   const data = dataOf(input.body);
@@ -75267,7 +75346,7 @@ var STATE_TABLE = "_platform_realtime_state";
 var REALTIME_RESERVED_MODELS = new Set(REALTIME_PLATFORM_MODELS);
 var reservedNames = new Set([...REALTIME_RESERVED_MODELS].map((name3) => name3.toLowerCase()));
 var quote2 = (name3) => `"${name3.replaceAll('"', '""')}"`;
-var literal3 = (value) => `'${value.replaceAll("'", "''")}'`;
+var literal3 = (value2) => `'${value2.replaceAll("'", "''")}'`;
 var byteCutoff = () => `coalesce((SELECT max(sequence) FROM (SELECT sequence,sum(length(CAST(primary_key_json AS BLOB))+length(CAST(model AS BLOB))+64) OVER (ORDER BY sequence DESC) AS cumulative_bytes FROM ${CHANGES_TABLE}) WHERE cumulative_bytes > ${REALTIME_LIMITS.captureBytes}),0)`;
 function captureOptionsOf(schema2, resolved) {
   const models = (resolved.realtime?.models ?? []).map((name3) => {
@@ -75280,12 +75359,12 @@ function captureOptionsOf(schema2, resolved) {
 }
 function mappedName3(definition, fallback) {
   const map2 = definition?.attributes?.find((a2) => a2.name === "@map" || a2.name === "@@map");
-  const value = map2?.args?.[0]?.value;
+  const value2 = map2?.args?.[0]?.value;
   if (!map2)
     return fallback;
-  if (value?.kind !== "literal" || typeof value.value !== "string" || value.value.length === 0)
+  if (value2?.kind !== "literal" || typeof value2.value !== "string" || value2.value.length === 0)
     throw new Error("Invalid Realtime mapped name");
-  return value.value;
+  return value2.value;
 }
 async function ensureRealtimeCapture(db, options2) {
   if (options2.models.length === 0) {
@@ -75588,7 +75667,7 @@ function registerDeliveryRoutes(app, adapters, config3) {
 }
 
 // frontend/packages/project-gateway/src/direct-auth/routes.ts
-var hash2 = (value) => sha256Hex2(new TextEncoder().encode(value));
+var hash2 = (value2) => sha256Hex2(new TextEncoder().encode(value2));
 
 class UpstreamResponseError extends Error {
   response;
@@ -75948,7 +76027,7 @@ function registerServerNotificationRoutes(app, adapters) {
       environmentId: claims.envId,
       templateKey: request.template,
       userIds,
-      params: Object.fromEntries(Object.entries(request.params).map(([key, value]) => [key, String(value)])),
+      params: Object.fromEntries(Object.entries(request.params).map(([key, value2]) => [key, String(value2)])),
       sourceKey: `service:${crypto.randomUUID()}`,
       actorId: null,
       dedupeKey: request.dedupeKey ?? null
@@ -76000,8 +76079,8 @@ var limit = (maxSize) => bodyLimit({
     throw new GatewayError("PAYLOAD_TOO_LARGE", "request too large");
   }
 });
-function parse7(schema2, value) {
-  const result = schema2.safeParse(value);
+function parse7(schema2, value2) {
+  const result = schema2.safeParse(value2);
   if (!result.success)
     throw new GatewayError("VALIDATION_FAILED", "invalid dev python request");
   return result.data;
@@ -76371,8 +76450,8 @@ var scalarTypes = new Set([
 ]);
 var modelOf = (schema2, name3) => Object.keys(schema2.models).find((key) => capabilityKeyOf(key) === name3);
 var forbidden = () => new GatewayError("FORBIDDEN", "Realtime operation not allowed");
-function assertSize(value, max2) {
-  if (new TextEncoder().encode(JSON.stringify(value)).byteLength > max2)
+function assertSize(value2, max2) {
+  if (new TextEncoder().encode(JSON.stringify(value2)).byteLength > max2)
     throw new GatewayError("VALIDATION_FAILED", "Realtime result is too large; use a narrower filter or select");
 }
 function createRealtimeService(adapters, config3, runtime) {
@@ -76419,18 +76498,18 @@ function createRealtimeService(adapters, config3, runtime) {
     });
   }
   function delegate(policy, model) {
-    const value = policy[capabilityKeyOf(model)];
-    if (!value || typeof value.findMany !== "function")
+    const value2 = policy[capabilityKeyOf(model)];
+    if (!value2 || typeof value2.findMany !== "function")
       throw forbidden();
-    return value;
+    return value2;
   }
   function readableField(schema2, model, name3) {
-    const value = schema2.models[model]?.fields[name3];
-    return !!value && !value.array && !value.relation && scalarTypes.has(value.type) && !value.attributes?.some((a2) => ["@allow", "@deny", "@omit"].includes(a2.name));
+    const value2 = schema2.models[model]?.fields[name3];
+    return !!value2 && !value2.array && !value2.relation && scalarTypes.has(value2.type) && !value2.attributes?.some((a2) => ["@allow", "@deny", "@omit"].includes(a2.name));
   }
   function primaryKeys(schema2, model) {
-    const value = schema2.models[model];
-    const keys = value.idFields ?? Object.keys(value.fields).filter((key) => value.fields[key]?.id);
+    const value2 = schema2.models[model];
+    const keys = value2.idFields ?? Object.keys(value2.fields).filter((key) => value2.fields[key]?.id);
     if (!keys.length || keys.some((key) => !readableField(schema2, model, key) || !["String", "Int"].includes(schema2.models[model]?.fields[key]?.type ?? "")))
       throw forbidden();
     return keys;
@@ -76447,7 +76526,7 @@ function createRealtimeService(adapters, config3, runtime) {
     const select = sub2.select ? Object.fromEntries([...new Set([...sub2.select, ...keys])].map((field3) => [field3, true])) : undefined;
     let where = {};
     if (sub2.filter) {
-      const { field: field3, op, value } = sub2.filter;
+      const { field: field3, op, value: value2 } = sub2.filter;
       const operation = {
         eq: "equals",
         neq: "not",
@@ -76458,10 +76537,10 @@ function createRealtimeService(adapters, config3, runtime) {
         in: "in"
       }[op];
       const type = scope.schema.models[model]?.fields[field3]?.type;
-      const values = Array.isArray(value) ? value : [value];
+      const values = Array.isArray(value2) ? value2 : [value2];
       if (values.some((v3) => v3 !== null && (type === "String" || type === "DateTime" ? typeof v3 !== "string" : type === "Boolean" ? typeof v3 !== "boolean" : ["Int", "Float", "Decimal", "BigInt"].includes(type ?? "") ? typeof v3 !== "number" : true)))
         throw new GatewayError("VALIDATION_FAILED", "invalid Realtime filter type");
-      where = { [field3]: { [operation]: value } };
+      where = { [field3]: { [operation]: value2 } };
     }
     return { model, keys, select, where };
   }
@@ -76709,15 +76788,15 @@ async function rawArtifact(c2) {
   let text = "";
   try {
     while (true) {
-      const { done, value } = await reader.read();
+      const { done, value: value2 } = await reader.read();
       if (done)
         break;
-      size += value.byteLength;
+      size += value2.byteLength;
       if (size > limit3) {
         await reader.cancel();
         throw new GatewayError("PAYLOAD_TOO_LARGE", "initialization artifact is too large");
       }
-      text += decoder2.decode(value, { stream: true });
+      text += decoder2.decode(value2, { stream: true });
     }
     return text + decoder2.decode();
   } catch (error51) {
@@ -76788,32 +76867,59 @@ function registerSessionInitializationRoute(app, adapters, logger) {
       if (!expectedPrompts.has(`${prompt.kind}:${prompt.key}`) || await sessionSeedDigest(prompt.content) !== prompt.sha256)
         throw new GatewayError("VALIDATION_FAILED", "invalid initialization prompt");
       if (prompt.kind === "schema") {
-        let value;
+        let value2;
         try {
-          value = JSON.parse(prompt.content);
+          value2 = JSON.parse(prompt.content);
         } catch {
           throw new GatewayError("VALIDATION_FAILED", "invalid initialization AI schema");
         }
-        if (!value || typeof value !== "object" || Array.isArray(value))
+        if (!value2 || typeof value2 !== "object" || Array.isArray(value2))
           throw new GatewayError("VALIDATION_FAILED", "invalid initialization AI schema");
       }
     }
     if (manifest2.ai)
       manifest2.ai.prompts = data.aiPrompts;
+    let stage = "connect";
     try {
-      const db = await adapters.turso.connect(target2.db);
-      const receipt = await applySessionSeed({
-        db,
-        ...bundle.data,
-        context: target2.context,
-        manifest: manifest2,
-        artifactHash
-      });
-      return c2.json({ ...receipt, manifest: manifest2, runtimeVersion: RUNTIME_VERSION });
-    } catch {
+      if (!adapters.turso.connectInitialization)
+        throw new GatewayError("GATEWAY_UNAVAILABLE", "initialization connector is unavailable");
+      const proof = {
+        environmentId: target2.context.environmentId,
+        resourceGeneration: target2.context.resourceGeneration,
+        initializationId: target2.context.initializationId,
+        artifactHash,
+        credentialHash: await sessionSeedDigest(credential)
+      };
+      const db = await adapters.turso.connectInitialization(target2.db, proof);
+      try {
+        stage = "authority";
+        const current = await adapters.registry.resolveSessionInitialization({
+          environmentId: proof.environmentId,
+          credentialHash: proof.credentialHash,
+          artifactHash
+        });
+        if (!current || !sessionSeedContextMatches(current.context, target2.context) || current.artifactHash !== artifactHash || current.schemaHash !== target2.schemaHash || current.db.name !== target2.db.name || current.db.group !== target2.db.group)
+          throw new GatewayError("FORBIDDEN", "initialization authority expired");
+        stage = "apply";
+        const receipt = await applySessionSeed({
+          db,
+          ...bundle.data,
+          context: target2.context,
+          manifest: manifest2,
+          artifactHash
+        });
+        return c2.json({ ...receipt, manifest: manifest2, runtimeVersion: RUNTIME_VERSION });
+      } finally {
+        stage = "cleanup";
+        db.close();
+      }
+    } catch (error51) {
+      if (error51 instanceof GatewayError)
+        throw error51;
       logger.log("warn", "session.initialization.failed", {
         code: "INITIALIZATION_FAILED",
-        environment_id: environmentId.data
+        environment_id: environmentId.data,
+        ...sessionSeedFailureDiagnostic(error51, stage)
       });
       throw new GatewayError("GATEWAY_UNAVAILABLE", "session initialization could not be applied");
     }
@@ -76826,8 +76932,8 @@ function stagingKeyOf(objectKey) {
 }
 
 // frontend/packages/project-gateway/src/storage/range.ts
-function byteRange(value, size) {
-  const match2 = /^bytes=(\d*)-(\d*)$/.exec(value);
+function byteRange(value2, size) {
+  const match2 = /^bytes=(\d*)-(\d*)$/.exec(value2);
   if (!match2 || !match2[1] && !match2[2] || size <= 0)
     return null;
   const first = match2[1] ? Number(match2[1]) : null;
@@ -77337,7 +77443,7 @@ function contentTypeMatches(pattern, contentType) {
   return p3.endsWith("/*") ? t2.startsWith(p3.slice(0, -1)) : p3 === t2;
 }
 function sameMediaType(stored, declared) {
-  const base = (value) => value.split(";")[0]?.trim().toLowerCase() ?? "";
+  const base = (value2) => value2.split(";")[0]?.trim().toLowerCase() ?? "";
   return base(stored) === base(declared);
 }
 function toStorageFile(file2, adapters, tier) {
@@ -78555,16 +78661,16 @@ var nonJoinedHeaders = new Set([
 ]);
 var validHeaderName = /^[!#$%&'*+\-.^_`|~\dA-Za-z]+$/;
 var isHttpWhitespace = (code) => code === 9 || code === 10 || code === 13 || code === 32;
-var normalizeHeaderValue = (value) => {
-  if (!isHttpWhitespace(value.charCodeAt(0)) && !isHttpWhitespace(value.charCodeAt(value.length - 1)))
-    return value;
+var normalizeHeaderValue = (value2) => {
+  if (!isHttpWhitespace(value2.charCodeAt(0)) && !isHttpWhitespace(value2.charCodeAt(value2.length - 1)))
+    return value2;
   let start = 0;
-  let end = value.length;
-  while (start < end && isHttpWhitespace(value.charCodeAt(start)))
+  let end = value2.length;
+  while (start < end && isHttpWhitespace(value2.charCodeAt(start)))
     start++;
-  while (end > start && isHttpWhitespace(value.charCodeAt(end - 1)))
+  while (end > start && isHttpWhitespace(value2.charCodeAt(end - 1)))
     end--;
-  return value.slice(start, end);
+  return value2.slice(start, end);
 };
 var forbiddenHeaderValue = /[\0\r\n]/;
 var GlobalHeaders = globalThis.Headers;
@@ -78612,13 +78718,13 @@ var RequestHeaders = class {
       return null;
     const rawValue = headers[lowerName];
     if (typeof rawValue === "string") {
-      const value = normalizeHeaderValue(rawValue);
-      return forbiddenHeaderValue.test(value) ? undefined : value;
+      const value2 = normalizeHeaderValue(rawValue);
+      return forbiddenHeaderValue.test(value2) ? undefined : value2;
     }
   }
   #lookup(rawHeaders, lowerName) {
     const separator = lowerName === "cookie" ? "; " : ", ";
-    let value = null;
+    let value2 = null;
     for (let i2 = 0;i2 < rawHeaders.length; i2 += 2) {
       const rawName = rawHeaders[i2];
       if (rawName.length === lowerName.length && rawName.toLowerCase() === lowerName) {
@@ -78627,13 +78733,13 @@ var RequestHeaders = class {
           this.#invalidValue = true;
           return;
         }
-        value = value === null ? rawValue : value + separator + rawValue;
+        value2 = value2 === null ? rawValue : value2 + separator + rawValue;
       }
     }
-    return value;
+    return value2;
   }
-  append(name3, value) {
-    this.#native.append(name3, value);
+  append(name3, value2) {
+    this.#native.append(name3, value2);
   }
   delete(name3) {
     this.#native.delete(name3);
@@ -78644,9 +78750,9 @@ var RequestHeaders = class {
       const http1Value = this.#lookupHttp1(lowerName);
       if (http1Value !== undefined)
         return http1Value;
-      const value = this.#lookup(this.#lazyRawHeaders, lowerName);
-      if (value !== undefined)
-        return value;
+      const value2 = this.#lookup(this.#lazyRawHeaders, lowerName);
+      if (value2 !== undefined)
+        return value2;
     }
     return this.#native.get(name3);
   }
@@ -78656,14 +78762,14 @@ var RequestHeaders = class {
       const http1Value = this.#lookupHttp1(lowerName);
       if (http1Value !== undefined)
         return http1Value !== null;
-      const value = this.#lookup(this.#lazyRawHeaders, lowerName);
-      if (value !== undefined)
-        return value !== null;
+      const value2 = this.#lookup(this.#lazyRawHeaders, lowerName);
+      if (value2 !== undefined)
+        return value2 !== null;
     }
     return this.#native.has(name3);
   }
-  set(name3, value) {
-    this.#native.set(name3, value);
+  set(name3, value2) {
+    this.#native.set(name3, value2);
   }
   getSetCookie() {
     return this.#native.getSetCookie();
@@ -78678,8 +78784,8 @@ var RequestHeaders = class {
     return this.#native.entries();
   }
   forEach(callback, thisArg) {
-    this.#native.forEach((value, key) => {
-      callback.call(thisArg, value, key, this);
+    this.#native.forEach((value2, key) => {
+      callback.call(thisArg, value2, key, this);
     });
   }
   [Symbol.iterator]() {
@@ -78791,11 +78897,11 @@ var newRequestFromIncoming = (method, url2, headers, incoming, abortController) 
             }
           }
           reader ||= Readable.toWeb(incoming).getReader();
-          const { done, value } = await reader.read();
+          const { done, value: value2 } = await reader.read();
           if (done)
             controller.close();
           else
-            controller.enqueue(value);
+            controller.enqueue(value2);
         } catch (error51) {
           controller.error(error51);
         }
@@ -79418,8 +79524,8 @@ function createLocalObjectStore(options2) {
     const exp2 = String(Math.floor(clock().getTime() / 1000) + expiresIn);
     const url2 = new URL(`${base}/signed/${areaDir(location)}/${location.key}`);
     url2.searchParams.set("exp", exp2);
-    for (const [name3, value] of Object.entries(extra))
-      url2.searchParams.set(name3, value);
+    for (const [name3, value2] of Object.entries(extra))
+      url2.searchParams.set(name3, value2);
     url2.searchParams.set("sig", await signature([method, url2.pathname, exp2, ...Object.values(extra)]));
     return url2.toString();
   }
@@ -79630,8 +79736,8 @@ function createLocalObjectStore(options2) {
           tier: match2[1],
           key: decodeURIComponent(match2[2])
         });
-        for (const [name3, value] of Object.entries(cors))
-          response.headers.set(name3, value);
+        for (const [name3, value2] of Object.entries(cors))
+          response.headers.set(name3, value2);
         return response;
       }
       const location = url2.pathname.startsWith("/signed/") ? locationFromPath(url2.pathname, "/signed/") : null;
@@ -79653,8 +79759,8 @@ function createLocalObjectStore(options2) {
       if (method === "GET") {
         const dn = url2.searchParams.get("dn");
         const response = await serveFile(location, dn === null ? undefined : `attachment; filename*=UTF-8''${encodeURIComponent(dn)}`);
-        for (const [name3, value] of Object.entries(cors))
-          response.headers.set(name3, value);
+        for (const [name3, value2] of Object.entries(cors))
+          response.headers.set(name3, value2);
         return response;
       }
       if (isPart) {
@@ -80753,16 +80859,16 @@ function createDevRegistry(input) {
 // frontend/packages/miniapp-kit/src/dev/live.ts
 var KIT_LIVE_CONFIG_ENV = "KIT_LIVE";
 var UUID4 = /^[a-f0-9]{8}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{12}$/i;
-function record3(value) {
-  return typeof value === "object" && value !== null && !Array.isArray(value);
+function record3(value2) {
+  return typeof value2 === "object" && value2 !== null && !Array.isArray(value2);
 }
-function exactOrigin2(value, local) {
-  if (typeof value !== "string")
+function exactOrigin2(value2, local) {
+  if (typeof value2 !== "string")
     return false;
   try {
-    const url2 = new URL(value);
+    const url2 = new URL(value2);
     const localhost = url2.hostname === "localhost" || url2.hostname.endsWith(".localhost") || url2.hostname === "127.0.0.1";
-    return url2.origin === value && !url2.username && !url2.password && !url2.hostname.includes("*") && (url2.protocol === "https:" || local && localhost && url2.protocol === "http:");
+    return url2.origin === value2 && !url2.username && !url2.password && !url2.hostname.includes("*") && (url2.protocol === "https:" || local && localhost && url2.protocol === "http:");
   } catch {
     return false;
   }
@@ -80771,17 +80877,17 @@ function invalid() {
   throw new DevError("KIT_LIVE must contain exact session, Gateway, Storage and screen origins");
 }
 function parseLiveConfig(raw2) {
-  let value;
+  let value2;
   try {
-    value = JSON.parse(raw2);
+    value2 = JSON.parse(raw2);
   } catch {
     throw new DevError("KIT_LIVE must be JSON");
   }
-  if (!record3(value) || typeof value.token !== "string" || !LIVE_TOKEN_PATTERN.test(value.token) || typeof value.environmentId !== "string" || !UUID4.test(value.environmentId))
+  if (!record3(value2) || typeof value2.token !== "string" || !LIVE_TOKEN_PATTERN.test(value2.token) || typeof value2.environmentId !== "string" || !UUID4.test(value2.environmentId))
     return invalid();
-  if (!exactOrigin2(value.sessionOrigin, false) || !exactOrigin2(value.gatewayUrl, false) || !Array.isArray(value.platformOrigins) || value.platformOrigins.length === 0 || !value.platformOrigins.every((origin2) => exactOrigin2(origin2, true)) || !Array.isArray(value.storageOrigins) || !value.storageOrigins.every((origin2) => exactOrigin2(origin2, false)))
+  if (!exactOrigin2(value2.sessionOrigin, false) || !exactOrigin2(value2.gatewayUrl, false) || !Array.isArray(value2.platformOrigins) || value2.platformOrigins.length === 0 || !value2.platformOrigins.every((origin2) => exactOrigin2(origin2, true)) || !Array.isArray(value2.storageOrigins) || !value2.storageOrigins.every((origin2) => exactOrigin2(origin2, false)))
     return invalid();
-  const origins = value.origins;
+  const origins = value2.origins;
   if (!record3(origins) || Object.keys(origins).some((key) => key !== "host" && key !== "apps") || !exactOrigin2(origins.host, true) || !record3(origins.apps) || !Object.keys(origins.apps).length)
     return invalid();
   const apps = {};
@@ -80791,12 +80897,12 @@ function parseLiveConfig(raw2) {
     apps[slug] = origin2;
   }
   return {
-    token: value.token,
-    environmentId: value.environmentId,
-    sessionOrigin: value.sessionOrigin,
-    gatewayUrl: value.gatewayUrl,
-    platformOrigins: [...value.platformOrigins],
-    storageOrigins: [...value.storageOrigins],
+    token: value2.token,
+    environmentId: value2.environmentId,
+    sessionOrigin: value2.sessionOrigin,
+    gatewayUrl: value2.gatewayUrl,
+    platformOrigins: [...value2.platformOrigins],
+    storageOrigins: [...value2.storageOrigins],
     origins: { host: origins.host, apps }
   };
 }
@@ -80843,8 +80949,8 @@ var wireSchema = exports_external.object({
   }).strict(),
   notify: exports_external.object({ url: exports_external.string().max(2048), key: exports_external.string().regex(/^[a-f0-9]{64}$/) }).strict()
 }).strict();
-function parseConnectedSession(value, scope) {
-  const parsed = wireSchema.safeParse(value);
+function parseConnectedSession(value2, scope) {
+  const parsed = wireSchema.safeParse(value2);
   if (!parsed.success || parsed.data.projectId !== scope.projectId || parsed.data.sessionId !== scope.sessionId)
     throw new DevError("Connected session does not match this workdir");
   const wire = parsed.data;
@@ -80892,11 +80998,11 @@ async function connectSession(options2) {
     return callTool(mcp, tool, args, timeoutMs, signal ? AbortSignal.any([lifetime.signal, signal]) : lifetime.signal);
   };
   const ensure = async () => {
-    const value = await call("ensure_session", {
+    const value2 = await call("ensure_session", {
       environment_id: live2.environmentId,
       connection_token: live2.token
     });
-    if (!value || typeof value !== "object" || !("environmentId" in value) || value.environmentId !== live2.environmentId)
+    if (!value2 || typeof value2 !== "object" || !("environmentId" in value2) || value2.environmentId !== live2.environmentId)
       throw new DevError("Session connection was not renewed");
   };
   const stopHeartbeat = () => {
@@ -80912,10 +81018,10 @@ async function connectSession(options2) {
     ensure,
     async view(signal) {
       const raw3 = await call("session_view", { environment_id: live2.environmentId }, signal);
-      const value = sessionEnvironmentViewSchema.safeParse(raw3);
-      if (!value.success || value.data.environmentId !== live2.environmentId)
+      const value2 = sessionEnvironmentViewSchema.safeParse(raw3);
+      if (!value2.success || value2.data.environmentId !== live2.environmentId)
         throw new DevError("Invalid connected session view");
-      return value.data;
+      return value2.data;
     },
     startHeartbeat(onLost) {
       if (closed || lost || heartbeat !== undefined)
@@ -80997,10 +81103,10 @@ async function writeSchemaPlan(options2) {
   const raw2 = await readFile16(options2.contextFile, "utf8");
   if (Buffer.byteLength(raw2) > 4 * 1024 * 1024)
     throw new DevError("Schema baseline exceeds size limit");
-  const value = JSON.parse(raw2);
-  if (!value || typeof value !== "object" || Array.isArray(value))
+  const value2 = JSON.parse(raw2);
+  if (!value2 || typeof value2 !== "object" || Array.isArray(value2))
     throw new DevError("Invalid schema baseline");
-  const record4 = value;
+  const record4 = value2;
   if (Object.keys(record4).some((key) => !["revision", "schemaSql"].includes(key)) || !(record4.revision === null || typeof record4.revision === "string" && /^[a-f0-9]{64}$/.test(record4.revision)) || typeof record4.schemaSql !== "string")
     throw new DevError("Invalid schema baseline");
   const baseline = { revision: record4.revision, schemaSql: record4.schemaSql };
@@ -81301,8 +81407,8 @@ var hostMessages = {
 };
 
 // frontend/packages/miniapp-kit/src/dev/host-page.ts
-function scriptJson(value) {
-  return JSON.stringify(value).replace(/</g, "\\u003c");
+function scriptJson(value2) {
+  return JSON.stringify(value2).replace(/</g, "\\u003c");
 }
 function renderHostPage(config3) {
   const en2 = hostMessages.en;
@@ -81707,8 +81813,8 @@ void open()
 // frontend/packages/miniapp-kit/src/dev/connected-host.ts
 var MAX_BODY = 4096;
 var MAX_RESPONSE = 1024 * 1024;
-function json3(value, status = 200) {
-  return Response.json(value, {
+function json3(value2, status = 200) {
+  return Response.json(value2, {
     status,
     headers: {
       "cache-control": "no-store",
@@ -81720,13 +81826,13 @@ function json3(value, status = 200) {
 function failure(code, status) {
   return json3({ error: { code } }, status);
 }
-function object3(value) {
-  return !!value && typeof value === "object" && !Array.isArray(value);
+function object3(value2) {
+  return !!value2 && typeof value2 === "object" && !Array.isArray(value2);
 }
-function bounded(value) {
-  if (Buffer.byteLength(JSON.stringify(value), "utf8") > MAX_RESPONSE)
+function bounded(value2) {
+  if (Buffer.byteLength(JSON.stringify(value2), "utf8") > MAX_RESPONSE)
     throw new Error("Invalid connected Host response");
-  return value;
+  return value2;
 }
 async function body(request) {
   if (request.headers.get("content-type")?.split(";")[0] !== "application/json")
@@ -81982,7 +82088,7 @@ async function respond(req, res, hostname3, handle, maxBodyBytes) {
     const hasBody = req.method !== "GET" && req.method !== "HEAD";
     const request = new Request(`http://${req.headers.host ?? hostname3}${req.url ?? "/"}`, {
       method: req.method ?? "GET",
-      headers: Object.entries(req.headers).flatMap(([key, value]) => value === undefined ? [] : [[key, Array.isArray(value) ? value.join(", ") : value]]),
+      headers: Object.entries(req.headers).flatMap(([key, value2]) => value2 === undefined ? [] : [[key, Array.isArray(value2) ? value2.join(", ") : value2]]),
       ...hasBody ? { body: Buffer.concat(chunks) } : {}
     });
     const response = await handle(request);
@@ -82138,7 +82244,7 @@ async function startRealtimeGateway(options2) {
     const wrap = (name3) => {
       const namespace = bindings[name3];
       return {
-        idFromName: (value) => namespace.idFromName(value),
+        idFromName: (value2) => namespace.idFromName(value2),
         get: (id) => ({
           fetch: async (request2) => namespace.get(id).fetch(request2.url, {
             method: request2.method,
@@ -82230,8 +82336,8 @@ async function gitOk(git, cwd, args, input) {
 async function gitTest(git, cwd, args) {
   return (await git(args, { cwd })).code === 0;
 }
-function shellQuote(value) {
-  return `'${value.replaceAll("'", "'\\''")}'`;
+function shellQuote(value2) {
+  return `'${value2.replaceAll("'", "'\\''")}'`;
 }
 
 // frontend/packages/miniapp-kit/src/dev/vars.ts
@@ -82241,9 +82347,9 @@ async function readDevVars(root, hosted) {
   try {
     const values = parseEnv(await readFile18(join28(root, ".kit/dev.vars"), "utf8"));
     const result = {};
-    for (const [name3, value] of Object.entries(values)) {
-      if (value !== undefined && name3 !== "GATEWAY_URL" && !name3.startsWith("PLATFORM_"))
-        result[name3] = value;
+    for (const [name3, value2] of Object.entries(values)) {
+      if (value2 !== undefined && name3 !== "GATEWAY_URL" && !name3.startsWith("PLATFORM_"))
+        result[name3] = value2;
     }
     return result;
   } catch (error51) {
@@ -82475,18 +82581,18 @@ function createSessionSyncTransport(url2, key, request2, signal) {
     return response;
   };
   const parseJob = async (response) => {
-    const value = await response.json();
-    const parsed = jobSchema.safeParse(value);
+    const value2 = await response.json();
+    const parsed = jobSchema.safeParse(value2);
     if (!parsed.success)
       throw new SyncFailure("Live synchronization job response is invalid", false);
     return parsed.data;
   };
   return {
     async context() {
-      const value = await (await call("/context")).json();
-      if (!value || typeof value !== "object" || !("revision" in value) || value.revision !== null && typeof value.revision !== "string" || !("schemaSql" in value) || typeof value.schemaSql !== "string")
+      const value2 = await (await call("/context")).json();
+      if (!value2 || typeof value2 !== "object" || !("revision" in value2) || value2.revision !== null && typeof value2.revision !== "string" || !("schemaSql" in value2) || typeof value2.schemaSql !== "string")
         throw new SyncFailure("Live synchronization baseline is invalid", false);
-      return { revision: value.revision, schemaSql: value.schemaSql };
+      return { revision: value2.revision, schemaSql: value2.schemaSql };
     },
     async send(event) {
       const body2 = JSON.stringify(event.notification);
@@ -82531,8 +82637,8 @@ function createSessionSyncTransport(url2, key, request2, signal) {
     }
   };
 }
-function safeCode(value) {
-  return typeof value === "string" && /^[A-Z0-9_]{1,80}$/.test(value) ? value : "EXECUTION_FAILED";
+function safeCode(value2) {
+  return typeof value2 === "string" && /^[A-Z0-9_]{1,80}$/.test(value2) ? value2 : "EXECUTION_FAILED";
 }
 async function requireResponse(response, upload = false) {
   if (response.ok)
@@ -83497,11 +83603,11 @@ async function exchange2(request2, options2, send, secrets) {
     const raw2 = await response.text();
     if (Buffer.byteLength(raw2) > 1024 * 1024)
       throw new LiveE2EError("Oversized exchange response");
-    const value = tokenExchangeResponseSchema.parse(JSON.parse(raw2));
-    if (value.session.globalUserId !== `test:${options2.live.environmentId}:${options2.identity}` || value.session.isAnonymous !== (options2.identity === "anonymous"))
+    const value2 = tokenExchangeResponseSchema.parse(JSON.parse(raw2));
+    if (value2.session.globalUserId !== `test:${options2.live.environmentId}:${options2.identity}` || value2.session.isAnonymous !== (options2.identity === "anonymous"))
       throw new LiveE2EError("The Gateway did not return the requested test identity");
-    secrets.add(value.token);
-    return Response.json(value, { headers: { "cache-control": "no-store" } });
+    secrets.add(value2.token);
+    return Response.json(value2, { headers: { "cache-control": "no-store" } });
   } catch {
     return Response.json({ error: { code: "E2E_EXCHANGE_FAILED" } }, { status: 502 });
   }
@@ -83709,10 +83815,10 @@ async function getJson(fetch2, url2) {
   return await response.json();
 }
 function endpoint(metadata2, key) {
-  const value = metadata2[key];
-  if (typeof value !== "string")
+  const value2 = metadata2[key];
+  if (typeof value2 !== "string")
     throw new LoginError(`the authorization server has no ${key}`);
-  return value;
+  return value2;
 }
 async function discover(fetch2, mcpUrl) {
   const resource = new URL(mcpUrl);
@@ -84337,20 +84443,20 @@ var OID = /^[0-9a-f]{40}(?:[0-9a-f]{24})?$/;
 var SHA256 = /^[0-9a-f]{64}$/;
 var THREAD_REF = /^refs\/heads\/thread\/[0-9A-Za-z][0-9A-Za-z_-]*$/;
 var LOCAL_HOSTS2 = new Set(["localhost", "127.0.0.1", "[::1]"]);
-var isObject5 = (value) => typeof value === "object" && value !== null && !Array.isArray(value);
+var isObject5 = (value2) => typeof value2 === "object" && value2 !== null && !Array.isArray(value2);
 function string4(record4, key, pattern) {
-  const value = record4[key];
-  if (typeof value !== "string" || value === "" || pattern && !pattern.test(value)) {
+  const value2 = record4[key];
+  if (typeof value2 !== "string" || value2 === "" || pattern && !pattern.test(value2)) {
     throw new PulledError(`get_git_bundles: "${key}" is missing or malformed`);
   }
-  return value;
+  return value2;
 }
-function url2(value, what) {
-  if (typeof value !== "string")
+function url2(value2, what) {
+  if (typeof value2 !== "string")
     throw new PulledError(`get_git_bundles: ${what} is not a URL`);
   let parsed;
   try {
-    parsed = new URL(value);
+    parsed = new URL(value2);
   } catch {
     throw new PulledError(`get_git_bundles: ${what} is not a URL`);
   }
@@ -84358,24 +84464,24 @@ function url2(value, what) {
   if (parsed.protocol !== "https:" && !local) {
     throw new PulledError(`get_git_bundles: ${what} must be https (or http on localhost)`);
   }
-  return value;
+  return value2;
 }
-function head(value) {
-  if (value === null || value === undefined)
+function head(value2) {
+  if (value2 === null || value2 === undefined)
     return null;
-  if (!isObject5(value))
+  if (!isObject5(value2))
     throw new PulledError('get_git_bundles: "head" is malformed');
-  return { commit_oid: string4(value, "commit_oid", OID) };
+  return { commit_oid: string4(value2, "commit_oid", OID) };
 }
-function bundle(value) {
-  if (!isObject5(value) || !Number.isInteger(value.seq)) {
+function bundle(value2) {
+  if (!isObject5(value2) || !Number.isInteger(value2.seq)) {
     throw new PulledError("get_git_bundles: a bundle is malformed");
   }
   return {
-    seq: value.seq,
-    kind: string4(value, "kind"),
-    sha256: string4(value, "sha256", SHA256),
-    url: url2(value.url, `bundle ${value.seq}`)
+    seq: value2.seq,
+    kind: string4(value2, "kind"),
+    sha256: string4(value2, "sha256", SHA256),
+    url: url2(value2.url, `bundle ${value2.seq}`)
   };
 }
 function parsePulled(text) {
@@ -84558,8 +84664,8 @@ function kitCommand(kitRoot, ...args) {
   ].join(" ");
 }
 var EXCLUDES = ["node_modules/", "/dist/", ".DS_Store"];
-async function set2(git, source, key, value) {
-  await gitOk(git, source, ["config", key, value]);
+async function set2(git, source, key, value2) {
+  await gitOk(git, source, ["config", key, value2]);
 }
 async function configureRepo(git, source, config3, author) {
   if (author) {
@@ -85268,11 +85374,11 @@ function parseConfig(text) {
   const record4 = raw2;
   const config3 = {};
   for (const key of REQUIRED2) {
-    const value = record4[key];
-    if (typeof value !== "string" || value === "") {
+    const value2 = record4[key];
+    if (typeof value2 !== "string" || value2 === "") {
       throw new ConfigError(`${CONFIG_FILE}: "${key}" must be a non-empty string (a working directory from before git: clone it again)`);
     }
-    config3[key] = value;
+    config3[key] = value2;
   }
   for (const key of OPTIONAL) {
     if (record4[key] === undefined)
@@ -85282,18 +85388,18 @@ function parseConfig(text) {
     config3[key] = record4[key];
   }
   for (const key of NULLABLE) {
-    const value = record4[key] ?? null;
-    if (value !== null && typeof value !== "string") {
+    const value2 = record4[key] ?? null;
+    if (value2 !== null && typeof value2 !== "string") {
       throw new ConfigError(`${CONFIG_FILE}: "${key}" must be a string or null`);
     }
-    config3[key] = value;
+    config3[key] = value2;
   }
   for (const key of LISTS) {
-    const value = record4[key] ?? [];
-    if (!Array.isArray(value) || value.some((item) => typeof item !== "string")) {
+    const value2 = record4[key] ?? [];
+    if (!Array.isArray(value2) || value2.some((item) => typeof item !== "string")) {
       throw new ConfigError(`${CONFIG_FILE}: "${key}" must be a list of strings`);
     }
-    config3[key] = value;
+    config3[key] = value2;
   }
   return config3;
 }
@@ -85482,7 +85588,7 @@ async function runCommand(args, context) {
     throw error51;
   }
 }
-var print = (context, value) => context.stdout(JSON.stringify(value, null, 2));
+var print = (context, value2) => context.stdout(JSON.stringify(value2, null, 2));
 var mcpUrlOf = (flag) => flag ?? process.env.CREATOR_MCP_URL ?? DEFAULT_MCP_URL;
 async function kitVersion(kitRoot) {
   const manifest2 = join40(kitRoot, ".claude-plugin", "plugin.json");
