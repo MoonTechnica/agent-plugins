@@ -82368,7 +82368,13 @@ async function prepareSessionChanges(options2, changes, signal, baseline = { rev
     events.push({
       notification: {
         kind: "schema",
-        payload: { hash: digest3(JSON.stringify(desired)), ...payload }
+        payload: {
+          hash: digest3(JSON.stringify({
+            ...desired,
+            ...baseline.revision === null && source ? { sourceHash: source.hash } : {}
+          })),
+          ...payload
+        }
       },
       ...source ? { bundle: source.bytes } : {}
     });
