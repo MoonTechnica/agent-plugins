@@ -21188,6 +21188,7 @@ var commerceProductListOptionsSchema = strictObject({
 });
 var commerceProductSchema = strictObject({
   product_id: uuid2(),
+  entitlement_id: uuid2().optional(),
   product_name: string2().min(1).max(200),
   creator_name: string2().min(1).max(200),
   kind: _enum(["durable", "consumable"]),
@@ -21196,6 +21197,22 @@ var commerceProductSchema = strictObject({
 var commerceProductPageSchema = strictObject({
   items: array(commerceProductSchema).max(50),
   nextCursor: uuid2().nullable()
+});
+var commercePurchaseStateSchema = commerceReceiptSchema.extend({
+  entitlement_id: uuid2(),
+  product_name: string2().min(1).max(200),
+  kind: _enum(["durable", "consumable"]),
+  status: _enum(["available", "consumed", "refunded", "refund_pending"]),
+  consumed_at: exports_iso.datetime({ offset: true }).nullable()
+});
+var commercePurchasePageSchema = strictObject({
+  items: array(commercePurchaseStateSchema).max(50),
+  nextCursor: uuid2().nullable()
+});
+var commerceConsumptionSchema = strictObject({
+  receipt_id: uuid2(),
+  request_key: uuid2(),
+  consumed_at: exports_iso.datetime({ offset: true })
 });
 // frontend/packages/app-protocol/src/debug.ts
 var DEBUG_CATALOG_PATH = "debug/catalog.json";

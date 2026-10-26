@@ -65,7 +65,7 @@ Keep the starter's `tokoyo_documents.gd`, `tokoyo_leaderboard.gd`, `tokoyo_ai.gd
 | `documents` | `documents.read` / `documents.write` + `documentSchema` | `create`, `join_open`, `fetch`, `list`, `update(record_id, patch, expected_revision)`, `finish`, `leave`, `subscribe` / `unsubscribe`, `launch_record_id`; signal `changed(record_id, revision, kind)` while subscribed |
 | `leaderboard` | `leaderboard.read` / `leaderboard.write` + `leaderboards` | `submit(board, score, options)`, `list`, `around_me`, `me` |
 | `ai` | `ai.chat` + `manifest.ai` | `chat({conversation, message, instructions?, schema?, stream?})` returns the request id; signal `token(request_id, text)` for streamed deltas; `cancel`, `reset`, `balance`. `QUOTA_EXCEEDED` means the player is out of coins |
-| `commerce` | `commerce.purchase` | `list_products`, `request_purchase(product_id, request_key)` (the Host shows the confirmation; the result carries the server receipt), `get_receipt` |
+| `commerce` | `commerce.purchase` | `list_products`, `request_purchase(product_id, request_key)` (Host confirmation and server receipt), `get_receipt`, `list_purchases`, `consume_purchase(receipt_id, request_key)` |
 | `ui` | `share.capture`, `ui.openInvite`, `ui.openShare`; `open_credits` follows `ai.chat` | `capture(image)` / `capture_viewport(viewport)` encode a JPEG (long edge 1600px) and return `{captureId}`; `open_invite(record_id)`, `open_share({captureId, text})`, `open_credits()` |
 | `debug` | none (development launches only) | see the development preview section below |
 
