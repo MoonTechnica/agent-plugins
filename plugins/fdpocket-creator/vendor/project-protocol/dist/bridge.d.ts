@@ -113,12 +113,13 @@ export declare const contextUpdateMessageSchema: z.ZodObject<{
     }, z.core.$strict>>;
 }, z.core.$strict>;
 export type ContextUpdateMessage = z.infer<typeof contextUpdateMessageSchema>;
-export declare const BRIDGE_OPS: readonly ["ui.openShare", "ui.close", "ui.navigate", "ui.openCredits", "notifications.requestPermission", "notifications.status", "notifications.openSettings", "safety.report"];
+export declare const BRIDGE_OPS: readonly ["ui.openShare", "ui.close", "ui.navigate", "ui.openCredits", "connections.requestPermission", "notifications.requestPermission", "notifications.status", "notifications.openSettings", "safety.report"];
 export declare const bridgeOpNameSchema: z.ZodEnum<{
     "ui.openShare": "ui.openShare";
     "ui.close": "ui.close";
     "ui.navigate": "ui.navigate";
     "ui.openCredits": "ui.openCredits";
+    "connections.requestPermission": "connections.requestPermission";
     "notifications.requestPermission": "notifications.requestPermission";
     "notifications.status": "notifications.status";
     "notifications.openSettings": "notifications.openSettings";
@@ -136,6 +137,18 @@ export declare const BRIDGE_OP_PAYLOAD_SCHEMAS: {
         path: z.ZodString;
     }, z.core.$strict>;
     readonly 'ui.openCredits': z.ZodUndefined;
+    readonly 'connections.requestPermission': z.ZodObject<{
+        provider: z.ZodEnum<{
+            "google-drive": "google-drive";
+            "google-mail": "google-mail";
+            "google-calendar": "google-calendar";
+            "google-contacts": "google-contacts";
+            "microsoft-files": "microsoft-files";
+            "microsoft-mail": "microsoft-mail";
+            "microsoft-calendar": "microsoft-calendar";
+            "microsoft-contacts": "microsoft-contacts";
+        }>;
+    }, z.core.$strict>;
     readonly 'notifications.requestPermission': z.ZodObject<{
         reason: z.ZodString;
     }, z.core.$strict>;
@@ -156,6 +169,7 @@ export declare const bridgeOpMessageSchema: z.ZodObject<{
         "ui.close": "ui.close";
         "ui.navigate": "ui.navigate";
         "ui.openCredits": "ui.openCredits";
+        "connections.requestPermission": "connections.requestPermission";
         "notifications.requestPermission": "notifications.requestPermission";
         "notifications.status": "notifications.status";
         "notifications.openSettings": "notifications.openSettings";

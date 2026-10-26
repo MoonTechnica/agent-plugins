@@ -516,6 +516,35 @@ def caption(ctx, input):
 - 依存は `apps/<slug>/pyproject.toml` に書いて `uv lock`、`uv.lock` を commit する（httpx は SDK が使う。サーバーなら uvicorn）。
 - 作り方（GPU の選び方・重みの置き場・`kit dev` の CPU 実行）は `$fdpocket-app-python`。
 
+### 3.10 `client.connections` — 外部アカウントの読み取り（`Connections`）
+
+OAuthはFDPocketの接続画面で行う。Provider token・Nango APIキー・実行セッションtokenをミニアプリのコードへ持ち込まない。
+
+画面Appの `capabilities.connections` にサービスと `fdpocket-read` を明示する。サービスは `google-drive` / `google-mail` / `google-calendar` / `google-contacts` / `microsoft-files` / `microsoft-mail` / `microsoft-calendar` / `microsoft-contacts`。例:
+
+```yaml
+capabilities:
+  connections:
+    google-calendar: [fdpocket-read]
+```
+
+`Connections.request(provider)` はタップから呼び、Hostで接続選択と本人の許可を求める。取消ならnull、許可なら `{ grantId }`。`Connections.read(grantId, input)` は許可した読み取りだけを実行する。
+
+```ts
+// ボタンのonClick/onPress内で実行する。OAuthのURLやscopeは生成コードで作らない。
+const grant = await client.connections.request('google-calendar')
+if (grant) {
+  const page = await client.connections.read(grant.grantId, { operation: 'list', limit: 25 })
+  // pageは {items,nextCursor}。次ページは同じ入力にcursorを指定する。
+}
+```
+
+`input.operation` は `list` / `get`。必要な `id` / `container` / `query` / `start` / `end` とページング `limit`（1〜100）/ `cursor` を渡す。Google Driveは `document`（id）/ `sheet`（id,range）も扱う。Microsoft ExcelセルAPI・送信・書き込み・削除は提供しない。任意URL・headers・Provider tokenは入力にできない。
+
+APIの `ServerUserClient.connections.read` は `asUser(request)` で本人の有効な起動を引き継いだ場合だけ使用できる。`ServerClient` 単独やjobs/cronに個人接続への権限はない。許可ダイアログは画面からだけ開く。
+
+接続と許可は本人・App・物理環境に固定される。grantIdを他人へ渡したり、公開・採用で別環境へコピーしない。実データを制作Agentのプロンプトやログへ自動投入しない。接続未設定・再接続必要・取消を成功と扱わず、利用者が復帰できる表示を用意する。
+
 ## 4. エラー（`SdkError`）
 
 SDK は失敗を `null` / `[]` で隠さず `SdkError` を投げる。メンバーは `code`（`SdkErrorCode`）/ `retryable` / `requestId` /

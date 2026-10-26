@@ -63168,6 +63168,85 @@ function hasControlCharacter(value) {
   return Array.from(value).some((char) => char.charCodeAt(0) < 32 || char.charCodeAt(0) === 127);
 }
 
+// frontend/packages/project-protocol/src/connections.ts
+init_zod();
+var CONNECTION_SERVICES = [
+  {
+    id: "google-drive",
+    provider: "google",
+    label: { ja: "Google ドライブ・ドキュメント", en: "Google Drive and documents" }
+  },
+  { id: "google-mail", provider: "google", label: { ja: "Gmail", en: "Gmail" } },
+  {
+    id: "google-calendar",
+    provider: "google",
+    label: { ja: "Google カレンダー", en: "Google Calendar" }
+  },
+  {
+    id: "google-contacts",
+    provider: "google",
+    label: { ja: "Google コンタクト", en: "Google Contacts" }
+  },
+  {
+    id: "microsoft-files",
+    provider: "microsoft",
+    label: { ja: "OneDrive", en: "OneDrive" }
+  },
+  {
+    id: "microsoft-mail",
+    provider: "microsoft",
+    label: { ja: "Outlook メール", en: "Outlook Mail" }
+  },
+  {
+    id: "microsoft-calendar",
+    provider: "microsoft",
+    label: { ja: "Outlook カレンダー", en: "Outlook Calendar" }
+  },
+  {
+    id: "microsoft-contacts",
+    provider: "microsoft",
+    label: { ja: "Outlook 連絡先", en: "Outlook Contacts" }
+  }
+];
+var CONNECTION_SERVICE_IDS = CONNECTION_SERVICES.map((service) => service.id);
+var connectionServiceSchema = exports_external.enum(CONNECTION_SERVICE_IDS);
+var CONNECTION_READ_TOOL = "fdpocket-read";
+var connectionToolsSchema = exports_external.array(exports_external.literal(CONNECTION_READ_TOOL)).length(1);
+var connectionCapabilitiesSchema = exports_external.partialRecord(connectionServiceSchema, connectionToolsSchema);
+var connectionRequestSchema = exports_external.strictObject({ provider: connectionServiceSchema });
+var connectionRequestResultSchema = exports_external.object({
+  requestId: exports_external.uuid(),
+  tools: connectionToolsSchema,
+  expiresAt: exports_external.iso.datetime()
+});
+var connectionPermissionRequestResultSchema = exports_external.union([
+  connectionRequestResultSchema,
+  exports_external.object({ grantId: exports_external.uuid(), status: exports_external.literal("approved") })
+]);
+var connectionGrantResultSchema = exports_external.strictObject({ grantId: exports_external.uuid() });
+var connectionCallSchema = exports_external.strictObject({
+  grantId: exports_external.uuid(),
+  tool: exports_external.literal(CONNECTION_READ_TOOL),
+  input: exports_external.record(exports_external.string(), exports_external.unknown())
+});
+var connectionCallResultSchema = exports_external.strictObject({ result: exports_external.unknown() });
+var connectionScopeSchema = exports_external.strictObject({
+  userId: exports_external.uuid(),
+  projectId: exports_external.uuid(),
+  environmentId: exports_external.uuid(),
+  appSlug: exports_external.string().regex(/^[a-z][a-z0-9-]{1,31}$/),
+  jti: exports_external.uuid()
+});
+var connectionAuthorizationSchema = exports_external.object({
+  grantId: exports_external.uuid(),
+  provider: connectionServiceSchema,
+  integrationId: exports_external.string().min(1).max(128),
+  connectionId: exports_external.string().min(1).max(256),
+  generation: exports_external.int().positive(),
+  contractHash: exports_external.string().min(1),
+  tools: connectionToolsSchema
+});
+
 // frontend/packages/project-protocol/src/limits.ts
 var DB_TAKE_MAX = 200;
 var DB_INCLUDE_DEPTH_MAX = 3;
@@ -64454,6 +64533,7 @@ var appSchema = exports_external.strictObject({
     buckets: exports_external.record(exports_external.string(), uniqueList(exports_external.enum(BUCKET_OPERATIONS))).optional(),
     realtime: exports_external.record(exports_external.string(), uniqueList(exports_external.enum(["broadcastReceive", "broadcastSend", "presenceRead", "presenceTrack"]))).optional(),
     ai: exports_external.strictObject({ chat: exports_external.boolean() }).optional(),
+    connections: connectionCapabilitiesSchema.optional(),
     python: exports_external.record(exports_external.string(), uniqueList(exports_external.string())).optional()
   }).optional(),
   anonymous: exports_external.strictObject({ allowed: exports_external.boolean(), write: exports_external.boolean() }).optional(),
@@ -64911,6 +64991,9 @@ function normalizeProjectManifest(manifest) {
       capabilities: {
         models: sortedRecord(app.capabilities?.models, sorted),
         buckets: sortedRecord(app.capabilities?.buckets, sorted),
+        ...app.capabilities?.connections ? {
+          connections: sortedRecord(app.capabilities.connections, sorted)
+        } : {},
         ...app.capabilities?.realtime ? { realtime: sortedRecord(app.capabilities.realtime, sorted) } : {},
         ...app.capabilities?.ai ? { ai: { chat: app.capabilities.ai.chat } } : {},
         ...app.capabilities?.python ? { python: sortedRecord(app.capabilities.python, sorted) } : {}
@@ -65410,6 +65493,7 @@ var BRIDGE_OPS = [
   "ui.close",
   "ui.navigate",
   "ui.openCredits",
+  "connections.requestPermission",
   "notifications.requestPermission",
   "notifications.status",
   "notifications.openSettings",
@@ -65421,6 +65505,7 @@ var BRIDGE_OP_PAYLOAD_SCHEMAS = {
   "ui.close": exports_external.undefined(),
   "ui.navigate": exports_external.strictObject({ app: appSlugSchema, path: appPathSchema }),
   "ui.openCredits": exports_external.undefined(),
+  "connections.requestPermission": exports_external.strictObject({ provider: connectionServiceSchema }),
   "notifications.requestPermission": exports_external.strictObject({ reason: exports_external.string().min(1).max(200) }),
   "notifications.status": exports_external.undefined(),
   "notifications.openSettings": exports_external.undefined(),
@@ -65862,7 +65947,8 @@ var capabilitiesSchema = exports_external.strictObject({
   models: exports_external.record(exports_external.string(), exports_external.array(exports_external.enum(MODEL_OPERATIONS))),
   buckets: exports_external.record(exports_external.string(), exports_external.array(exports_external.enum(BUCKET_OPERATIONS))),
   realtime: exports_external.record(exports_external.string(), exports_external.array(exports_external.enum(["broadcastReceive", "broadcastSend", "presenceRead", "presenceTrack"]))).optional(),
-  ai: exports_external.strictObject({ chat: exports_external.boolean() }).optional()
+  ai: exports_external.strictObject({ chat: exports_external.boolean() }).optional(),
+  connections: connectionCapabilitiesSchema.optional()
 });
 var resolvedBucketSchema = exports_external.strictObject({
   public: exports_external.boolean(),
@@ -74785,6 +74871,50 @@ function registerApiAuthorizationRoutes(app, adapters, config3) {
   });
 }
 
+// frontend/packages/project-gateway/src/connections/routes.ts
+function registerConnectionRoutes(app, adapters, config3) {
+  async function scopeOf(c2, actAs = false) {
+    const { claims, resolved } = await verifyProjectToken(c2, adapters, config3, 2, { actAs });
+    if (claims.anon || claims.testIdentity || claims.envId !== resolved.environmentId) {
+      throw new GatewayError("FORBIDDEN", "personal connection requires the real account");
+    }
+    const db = await adapters.turso.connect(resolved.db);
+    const actor = await loadProjectActor(db, claims.sub, [], resolved.user.bootstrap);
+    if (!actor || actor.globalUserId !== claims.gid)
+      throw new GatewayError("UNAUTHENTICATED", "project user not found");
+    assertAppAccess(resolved, actor.permissions);
+    if (!adapters.connections)
+      throw new GatewayError("GATEWAY_UNAVAILABLE", "connections unavailable");
+    const scope = {
+      userId: claims.actorId,
+      projectId: claims.aud,
+      environmentId: claims.envId,
+      appSlug: claims.app,
+      jti: claims.jti
+    };
+    return { scope, connections: adapters.connections, resolved };
+  }
+  app.post("/v1/connections/requests", async (c2) => {
+    const { scope, connections: connections3, resolved } = await scopeOf(c2);
+    const parsed = connectionRequestSchema.safeParse(await jsonBody(c2));
+    if (!parsed.success)
+      throw new GatewayError("VALIDATION_FAILED", "invalid connection request");
+    if (!resolved.app.capabilities.connections?.[parsed.data.provider]?.includes("fdpocket-read")) {
+      throw new GatewayError("FORBIDDEN", "connection is not declared by this App");
+    }
+    c2.header("Cache-Control", "private, no-store");
+    return c2.json(await connections3.request(scope, parsed.data.provider));
+  });
+  app.post("/v1/connections/call", async (c2) => {
+    const { scope, connections: connections3 } = await scopeOf(c2, true);
+    const parsed = connectionCallSchema.safeParse(await jsonBody(c2));
+    if (!parsed.success)
+      throw new GatewayError("VALIDATION_FAILED", "invalid connection operation");
+    c2.header("Cache-Control", "private, no-store");
+    return c2.json(await connections3.call(scope, parsed.data));
+  });
+}
+
 // frontend/packages/project-gateway/src/notifications/triggers.ts
 var TRIGGER_PARAM_MAX_LENGTH = 200;
 var SINGLE_ROW_OPS = NOTIFICATION_TRIGGER_OPS;
@@ -77980,6 +78110,7 @@ function createGateway(adapters, config3, logger = consoleLogger, realtimeTransp
   registerDeliveryRoutes(app, adapters, config3);
   registerDirectAuthRoutes(app, adapters, config3);
   registerProfileRoutes(app, adapters, config3);
+  registerConnectionRoutes(app, adapters, config3);
   registerApiAuthorizationRoutes(app, adapters, config3);
   registerPythonRoutes(app, adapters, config3);
   registerPythonDevRoutes(app, adapters, config3);

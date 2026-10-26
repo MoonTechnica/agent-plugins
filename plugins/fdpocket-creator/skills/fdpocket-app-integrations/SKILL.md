@@ -5,6 +5,12 @@ description: api / jobs の外部 API、秘密の名前、サーバー SDK、開
 
 # 外部サービス
 
+## 外部アカウントのデータを使う場合
+
+Google/Microsoftの本人データは `client.connections` を使う（spec.md §3.10）。`capabilities.connections` に対象サービスと `fdpocket-read` を宣言し、画面のタップから `request` → 許可後に `read`。OAuthフロー・Nangoキー・Provider tokenを生成コードで管理しない。APIからは本人の起動を引き継ぐ `server.asUser(request).connections.read` だけを使う。無人jobs/cronには個人接続を渡さない。一覧はcursorでページングし、実データを生成Agentやログへ自動投入しない。
+
+## 独自の外部APIを使う場合
+
 `infra/project.yaml` の api / jobs に `network.egress`（HTTPS のホスト名）、`secrets`（名前・説明・required）を宣言する。値は作者がアプリ管理画面で設定する。秘密をコードや manifest に書かない。ブラウザで使ってよい公開 API だけ web の `network.browser` に HTTPS オリジンを宣言する。
 
 api は `src/index.ts` で `export default { fetch(request, env, ctx) {} }`（Worker は `nodejs_compat` で動き、`node:async_hooks`・`node:crypto` などの Node の組み込みも使える。動的 import も 1 ファイルにまとまる）、jobs は `export default { scheduled(controller, env, ctx) {} }` を公開する。jobs の `schedules` は UTC cron と handler 名を持つ。

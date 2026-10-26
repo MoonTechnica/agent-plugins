@@ -1,5 +1,6 @@
 import { z } from 'zod';
 import { isAppPath } from "./app-path.js";
+import { connectionCapabilitiesSchema } from "./connections.js";
 import { PROJECT_BUCKETS_MAX, STORAGE_FILE_MAX_BYTES } from "./limits.js";
 import { browserOriginIssue, checkEgress, egressDeclarationIssue } from "./network.js";
 import { networkMocksSchema } from "./network-mocks.js";
@@ -109,6 +110,7 @@ const appSchema = z.strictObject({
             .optional(),
         /** ミニアプリ内 AI（project-ai.md §4）。費用は使った利用者本人 */
         ai: z.strictObject({ chat: z.boolean() }).optional(),
+        connections: connectionCapabilitiesSchema.optional(),
         /** 画面から依頼できる python の App のタスク（App → タスク名。python-backend.md §3）。費用は本人 */
         python: z.record(z.string(), uniqueList(z.string())).optional(),
     })
@@ -652,6 +654,11 @@ export function normalizeProjectManifest(manifest) {
             capabilities: {
                 models: sortedRecord(app.capabilities?.models, sorted),
                 buckets: sortedRecord(app.capabilities?.buckets, sorted),
+                ...(app.capabilities?.connections
+                    ? {
+                        connections: sortedRecord(app.capabilities.connections, sorted),
+                    }
+                    : {}),
                 ...(app.capabilities?.realtime
                     ? { realtime: sortedRecord(app.capabilities.realtime, sorted) }
                     : {}),

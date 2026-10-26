@@ -5,6 +5,7 @@ export * from './app-serving.ts';
 export * from './apple-app-site-association.ts';
 export * from './artifact.ts';
 export * from './bridge.ts';
+export * from './connections.ts';
 export * from './csp.ts';
 export * from './db-batch.ts';
 export * from './delivery.ts';

@@ -2,6 +2,7 @@ import './zod-jitless.ts';
 import { type Session } from '@workspace/project-protocol';
 import type { SchemaDef } from '@zenstackhq/schema';
 import { type Ai } from './ai/client.ts';
+import { type Connections } from './connections/client.ts';
 import type { DbClient } from './db/types.ts';
 import { type Notifications } from './notifications/client.ts';
 import { type Profile } from './profile/client.ts';
@@ -59,6 +60,7 @@ export interface ProjectClient<S extends SchemaDef = SchemaDef> {
     /** スーパーアプリの最新の本人の表示名・アバター（Project の User とは別） */
     readonly realtime: Realtime;
     readonly profile: Profile;
+    readonly connections: Connections;
     /** Project の DB（ZenStack の query 契約。可否は Gateway が毎回判定する。sdk.md §3.2） */
     readonly db: DbClient<S>;
     /** 書き込みに `Idempotency-Key` を付ける（同じ key の 2 回目は 1 回目の応答。10 分） */

@@ -1,5 +1,6 @@
 import { z } from 'zod';
 import { isAppPath } from "./app-path.js";
+import { connectionServiceSchema } from "./connections.js";
 import { sdkErrorCodeSchema } from "./errors.js";
 import { safetyReportTargetSchema } from "./safety.js";
 import { appSlugSchema, sessionSchema } from "./token.js";
@@ -57,6 +58,7 @@ export const BRIDGE_OPS = [
     'ui.close',
     'ui.navigate',
     'ui.openCredits',
+    'connections.requestPermission',
     'notifications.requestPermission',
     'notifications.status',
     'notifications.openSettings',
@@ -68,6 +70,7 @@ export const BRIDGE_OP_PAYLOAD_SCHEMAS = {
     'ui.close': z.undefined(),
     'ui.navigate': z.strictObject({ app: appSlugSchema, path: appPathSchema }),
     'ui.openCredits': z.undefined(),
+    'connections.requestPermission': z.strictObject({ provider: connectionServiceSchema }),
     'notifications.requestPermission': z.strictObject({ reason: z.string().min(1).max(200) }),
     'notifications.status': z.undefined(),
     'notifications.openSettings': z.undefined(),

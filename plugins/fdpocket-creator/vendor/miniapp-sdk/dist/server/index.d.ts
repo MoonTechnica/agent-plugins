@@ -2,6 +2,7 @@ import '../zod-jitless.ts';
 import { type NotificationSendRequest, type NotificationSendResponse } from '@workspace/project-protocol';
 import type { SchemaDef } from '@zenstackhq/schema';
 import { type Ai, type OpenAiCompatible } from '../ai/client.ts';
+import { type Connections } from '../connections/client.ts';
 import type { DbClient } from '../db/types.ts';
 import { type Python } from '../python/client.ts';
 import { type Storage } from '../storage/client.ts';
@@ -44,6 +45,7 @@ export interface JobRun {
     readonly cron?: string;
 }
 export interface ServerUserClient<S extends SchemaDef = SchemaDef> extends ServerDataClient<S> {
+    readonly connections: Pick<Connections, 'read'>;
     /**
      * その利用者としてミニアプリ内 AI を呼ぶ（その利用者のクレジットから引く。project-ai.md §2）。
      * App の `servicePermissions` に `ai.chat` が要る

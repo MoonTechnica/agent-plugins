@@ -3,6 +3,7 @@ export type { AiFinishReason, AiTurnResult, PlatformProfile, SdkErrorCode, Sessi
 export type { Ai, AiChatInput, OpenAiCompatible } from './ai/client.ts';
 export { apiPath } from './api-path.ts';
 export { type Auth, type ClientOptions, createClient, type HostWindow, type ProjectClient, } from './client.ts';
+export type { Connections } from './connections/client.ts';
 export { type AppDbClient, DB_OPERATIONS, type DbBatchOperation, type DbBatchResults, type DbClient, type DbOperation, type ModelCapabilities, } from './db/types.ts';
 export { SdkError } from './errors.ts';
 export type { Notifications } from './notifications/client.ts';

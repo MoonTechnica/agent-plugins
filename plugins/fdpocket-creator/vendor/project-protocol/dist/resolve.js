@@ -1,4 +1,5 @@
 import { z } from 'zod';
+import { connectionCapabilitiesSchema } from "./connections.js";
 import { APP_ACCESSES, APP_KINDS, APP_SLUG_PATTERN, BUCKET_OPERATIONS, localizedNameSchema, MODEL_OPERATIONS, NOTIFICATION_LIMITS, normalizedNotificationTriggerSchema, PERMISSION_PATTERN, } from "./manifest.js";
 import { notificationStatusSchema } from "./notifications.js";
 import { ORIGIN_HOST_PATTERN, providerOriginSchema } from "./origin.js";
@@ -29,6 +30,7 @@ const capabilitiesSchema = z.strictObject({
         .record(z.string(), z.array(z.enum(['broadcastReceive', 'broadcastSend', 'presenceRead', 'presenceTrack'])))
         .optional(),
     ai: z.strictObject({ chat: z.boolean() }).optional(),
+    connections: connectionCapabilitiesSchema.optional(),
 });
 const resolvedBucketSchema = z.strictObject({
     public: z.boolean(),

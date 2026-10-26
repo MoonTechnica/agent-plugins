@@ -1,6 +1,7 @@
 import "./zod-jitless.js";
 import { contextMessageSchema, contextUpdateMessageSchema, DIRECT_AUTH_START_PATH, initMessageSchema, PROTOCOL_VERSION, projectTokenClaimsSchema, RUNTIME_VERSION, tokenExchangeResponseSchema, } from '@workspace/project-protocol';
 import { createAi } from "./ai/client.js";
+import { createConnections } from "./connections/client.js";
 import { createDbClient } from "./db/client.js";
 import { SdkError } from "./errors.js";
 import { createNotifications } from "./notifications/client.js";
@@ -253,6 +254,7 @@ export function createClient(options) {
         app: options.app,
         auth,
         profile: createProfile(transport),
+        connections: createConnections(transport, bridge),
         db: createDbClient(transport),
         idempotent: (key) => ({
             db: createDbClient(transport, { idempotencyKey: key }),

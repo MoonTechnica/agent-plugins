@@ -1,4 +1,5 @@
 import { z } from 'zod';
+import { type ConnectionCapabilities } from './connections.ts';
 import { type NetworkMock } from './network-mocks.ts';
 import { type NormalizedPythonApp } from './python.ts';
 /**
@@ -137,6 +138,16 @@ declare const baseSchema: z.ZodObject<{
             ai: z.ZodOptional<z.ZodObject<{
                 chat: z.ZodBoolean;
             }, z.core.$strict>>;
+            connections: z.ZodOptional<z.ZodRecord<z.ZodEnum<{
+                "google-drive": "google-drive";
+                "google-mail": "google-mail";
+                "google-calendar": "google-calendar";
+                "google-contacts": "google-contacts";
+                "microsoft-files": "microsoft-files";
+                "microsoft-mail": "microsoft-mail";
+                "microsoft-calendar": "microsoft-calendar";
+                "microsoft-contacts": "microsoft-contacts";
+            }> & z.core.$partial, z.ZodArray<z.ZodLiteral<"fdpocket-read">>>>;
             python: z.ZodOptional<z.ZodRecord<z.ZodString, z.ZodArray<z.ZodString>>>;
         }, z.core.$strict>>;
         anonymous: z.ZodOptional<z.ZodObject<{
@@ -323,6 +334,16 @@ export declare const projectManifestSchema: z.ZodObject<{
             ai: z.ZodOptional<z.ZodObject<{
                 chat: z.ZodBoolean;
             }, z.core.$strict>>;
+            connections: z.ZodOptional<z.ZodRecord<z.ZodEnum<{
+                "google-drive": "google-drive";
+                "google-mail": "google-mail";
+                "google-calendar": "google-calendar";
+                "google-contacts": "google-contacts";
+                "microsoft-files": "microsoft-files";
+                "microsoft-mail": "microsoft-mail";
+                "microsoft-calendar": "microsoft-calendar";
+                "microsoft-contacts": "microsoft-contacts";
+            }> & z.core.$partial, z.ZodArray<z.ZodLiteral<"fdpocket-read">>>>;
             python: z.ZodOptional<z.ZodRecord<z.ZodString, z.ZodArray<z.ZodString>>>;
         }, z.core.$strict>>;
         anonymous: z.ZodOptional<z.ZodObject<{
@@ -501,6 +522,7 @@ export interface NormalizedAppCapabilities {
     ai?: {
         chat: boolean;
     };
+    connections?: ConnectionCapabilities;
     /** python の App → 依頼できるタスク（名前順） */
     python?: Record<string, string[]>;
     realtime?: Record<string, ('broadcastReceive' | 'broadcastSend' | 'presenceRead' | 'presenceTrack')[]>;
