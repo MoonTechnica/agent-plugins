@@ -73318,7 +73318,8 @@ var HOST_ONLY_PATHS = new Set([
   "/v1/apps",
   "/v1/token/exchange",
   "/v1/delivery/open",
-  "/v1/auth/direct/issue"
+  "/v1/auth/direct/issue",
+  "/v1/connections/requests"
 ]);
 var PROJECT_ALLOW_HEADERS = `authorization, content-type, idempotency-key, range, if-range, ${REQUEST_ID_HEADER}`;
 var PROJECT_ALLOW_METHODS = "GET, HEAD, POST, PUT, PATCH, DELETE, OPTIONS";
@@ -74885,8 +74886,11 @@ function registerApiAuthorizationRoutes(app, adapters, config3) {
 
 // frontend/packages/project-gateway/src/connections/routes.ts
 function registerConnectionRoutes(app, adapters, config3) {
-  async function scopeOf(c2, actAs = false) {
-    const { claims, resolved } = await verifyProjectToken(c2, adapters, config3, 2, { actAs });
+  async function scopeOf(c2, options2 = {}) {
+    const { claims, resolved } = await verifyProjectToken(c2, adapters, config3, 2, {
+      actAs: options2.actAs ?? false,
+      hostOrigin: options2.hostOrigin ?? false
+    });
     if (claims.anon || claims.testIdentity || claims.envId !== resolved.environmentId) {
       throw new GatewayError("FORBIDDEN", "personal connection requires the real account");
     }
@@ -74907,7 +74911,7 @@ function registerConnectionRoutes(app, adapters, config3) {
     return { scope, connections: adapters.connections, resolved };
   }
   app.post("/v1/connections/requests", async (c2) => {
-    const { scope, connections: connections3, resolved } = await scopeOf(c2);
+    const { scope, connections: connections3, resolved } = await scopeOf(c2, { hostOrigin: true });
     const parsed = connectionRequestSchema.safeParse(await jsonBody(c2));
     if (!parsed.success)
       throw new GatewayError("VALIDATION_FAILED", "invalid connection request");
@@ -74918,7 +74922,7 @@ function registerConnectionRoutes(app, adapters, config3) {
     return c2.json(await connections3.request(scope, parsed.data.provider));
   });
   app.post("/v1/connections/call", async (c2) => {
-    const { scope, connections: connections3 } = await scopeOf(c2, true);
+    const { scope, connections: connections3 } = await scopeOf(c2, { actAs: true });
     const parsed = connectionCallSchema.safeParse(await jsonBody(c2));
     if (!parsed.success)
       throw new GatewayError("VALIDATION_FAILED", "invalid connection operation");
