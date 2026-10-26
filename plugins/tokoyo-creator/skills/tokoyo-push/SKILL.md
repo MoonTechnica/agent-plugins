@@ -13,11 +13,13 @@ description: 手元で作った TOKOYO.games のゲームを Platform に送る�
 その `revision` を `begin_build` / `submit_build` の `policy_revision` に渡す。
 `CONTRIBUTION_POLICY_CHANGED` は規約を取り直して遵守を再確認する。規約の取得失敗では送信しない。
 
+設定済みSDKをこの作業の固定版として使う。推薦SDKの更新だけを理由に `get_sdk()` / `setup` を再実行しない。失効・撤回された版だけは、返された復旧手順で新しい版を取得して再ビルドする。
+
 1. `source/` の変更を `git commit` する（未 commit の変更があると `pack` が断る。作者は `kit.mjs clone` が設定した本人のまま）。
 2. `node <kit>/scripts/kit.mjs build` で `source/dist/` を作り（`build.mjs` を直接実行しない。§4.1）、`outputs/build-report.json` を書く（§2）。
-3. `node <kit>/scripts/kit.mjs pack` → 出力の JSON（`session_id` / `files` / `commit_oid` / `base_commit_oid` / `kit_version` / `kit_revision`）。
+3. `node <kit>/scripts/kit.mjs pack` → 出力の JSON（`session_id` / `files` / `commit_oid` / `base_commit_oid` / `kit_version` / `kit_revision` / `sdk_release_id` / `sdk_archive_hash`）。
 4. `node <kit>/scripts/kit.mjs check` が通るまで直す（commit して `pack` からやり直す）。
-5. `begin_build`（元ゲームのapp_idとpackのsession_idが必須。`message` は利用者向けの 1 行、`request_key` は新しい UUID、`commit_oid` / `base_commit_oid` / `files` は `pack` の出力のまま）
+5. `begin_build`（元ゲームのapp_idとpackのsession_idが必須。`message` は利用者向けの 1 行、`request_key` は新しい UUID、`commit_oid` / `base_commit_oid` / `files` / `sdk_release_id` / `sdk_archive_hash` は `pack` の出力のまま）
    → `kit.mjs upload --urls '<upload_urls の JSON>'`（LFS の実体を先に上げる。資格情報が無いと言われたら `kit.mjs login`）
    → `submit_build` → `get_build` を 3 秒ごとに終わるまで。
 6. `ready` なら **`node <kit>/scripts/kit.mjs open --url <editor_url>` で制作画面をブラウザに開く**（この会話で最初の `ready` のときだけ。

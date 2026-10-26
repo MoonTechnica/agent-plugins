@@ -8,7 +8,7 @@ description: TOKOYO.games のミニゲームを手元の Coding Agent で新し�
 `<kit>` は Creator Kit の置き場で、この Skill のディレクトリの 2 つ上（`skills/tokoyo-new/` の上の上）。
 分からなければ利用者に Kit の場所を聞く。git と Git LFS（`git lfs version`）が要る。無ければ入れてもらう。
 
-1. **SDK を用意する**: `get_sdk()` → `node <kit>/scripts/kit.mjs setup --sdk-url <url> --sha256 <sha256>`（展開して、Kitの固定lockfileどおりに`npm ci`でSDKとサーバー物理の依存を入れる。npmとネットワークが要る）
+1. **SDK を用意する**: `get_sdk()` → `node <kit>/scripts/kit.mjs setup --sdk-url <url> --sha256 <sha256> --release-id <release_id>`（展開して、Kitの固定lockfileどおりに`npm ci`でSDKとサーバー物理の依存を入れる。npmとネットワークが要る）
    （同じ版なら何もしないので毎回呼んでよい）。
 2. **持ち主を決める**: `whoami()` の `accounts` がチームを含むなら、どのアカウント（個人かチーム）の
    ゲームにするかを利用者に聞く。個人なら `owner_account_id` は省く。

@@ -420,6 +420,7 @@ LFS の実体を上げ下ろしするので、最初に一度 `node <kit>/script
    （§4.1 の 4. の `kit build` と同じもの。ゲームの `build.mjs` は使われない）。依存は足さない（§3）。区切りごとに `git commit` する。
 3. **出力**: 変更を `git commit` し、`kit.mjs build` で `source/dist/` を作り、`source/listing/` の掲載情報を用意し（`$game-listing`。今の値は `get_app` の `listing`）、
    `outputs/build-report.json` を書き（§2）、`kit.mjs pack` を実行する。
+   作業中は `.tokoyo.json` の `kit_root` に固定したKit/SDKを使う。pushごとに `get_sdk()` / `setup` で最新版へ切り替えない。推薦版が変わっても固定した版で送信できる。更新は明示的に行い、SDKのrelease IDとarchive hashを一緒に保持する。
    `pack` は `outputs/source.bundle`（取り込んだ head からの新しい commit だけ）と `outputs/dist.tar.gz` を作り、`begin_build` に渡す引数
    （`files`・`commit_oid`・`base_commit_oid` ほか）を JSON で出す。未 commit の変更・新しい commit が無いときは断る。
 4. **検査**: `kit.mjs check`（取り込み + 静的検証。Platform と同じ検証器）。落ちたら直して 3. からやり直す。
@@ -448,6 +449,10 @@ LFS の実体を上げ下ろしするので、最初に一度 `node <kit>/script
 
 | エラー | すること |
 |---|---|
+| `SDK_VERSION_DEPRECATED`（`sdk_build_inputs_changed`） | 作業に固定したSDKが撤回済み・非対応、または修復対象の固定版と異なる。通常の推薦版変更だけではこのエラーにならない。返された `sdk_release_id` がある場合は `get_sdk({release_id})`、それ以外は `get_sdk()` で対応版を取得し、`setup --release-id <release_id> --sdk-url <url> --sha256 <sha256>` → `link` → 依存同期 → `build` → `pack` で復旧する。`pack` の `sdk_release_id` と `sdk_archive_hash` を `begin_build` へそのまま渡す。撤回・非対応版を迂回して送らない |
+| `SDK_VERSION_DEPRECATED`（`sdk_release_unavailable` / `sdk_contract_unsupported`） | 固定版が撤回済み、または契約のサポートが終了。ソースを保持し、`get_sdk()` → `setup --release-id <release_id> --sdk-url <url> --sha256 <sha256>` → `link` → 依存同期 → 再ビルドする。通常の推薦版変更だけでは発生しない |
+| `SDK_VERSION_DEPRECATED`（`sdk_release_identity_ambiguous` / `sdk_build_identity_required`） | 旧Kitのhashだけでは検証器を特定できない。Kitを更新し、SDKのrelease IDも固定して再ビルドする。同じhashのリリースを推測で選ばない |
+| `SDK_RELEASE_UNAVAILABLE` | 受付後に固定版が撤回された。別の検証器へ自動で切り替えず、そのジョブを終了する。ソースを保持して対応版で再ビルドする |
 | `SDK_VERSION_DEPRECATED`（`kit_outdated`） | Kit が古い。利用者に Kit の更新（Claude Code: `/plugin marketplace update`、Codex: プラグインの更新）を頼む。更新後は新しい Kit の `scripts/kit.mjs` で `get_sdk` → `setup` → `link`（`.tokoyo.json`・git のフィルタと資格情報・`package.json` の参照を新しい Kit へ向ける）をやり直す |
 | `BUNDLE_REJECTED`（`author_mismatch`） | 本人以外の作者・コミッターの commit がある。`git rebase --exec 'git commit --amend --no-edit --reset-author' <base_commit_oid>` で本人に直して 3. から |
 | `BUNDLE_REJECTED`（ほか） | bundle が Platform の保存済みのリポジトリに載らない。`pull` で取り込み直してから 3. から |

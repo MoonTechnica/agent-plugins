@@ -8,7 +8,7 @@ description: Platform にある TOKOYO.games のゲームを手元に取り込�
 `<kit>` は作業ディレクトリの `.tokoyo.json` の `kit_root`。まだ作業ディレクトリが無ければ、この Skill の
 ディレクトリの 2 つ上（分からなければ利用者に Kit の場所を聞く）。git と Git LFS が要る。
 
-1. **SDK を用意する**: `get_sdk()` → `node <kit>/scripts/kit.mjs setup --sdk-url <url> --sha256 <sha256>`（展開して Kit の lockfile どおりに `npm ci`。同じ版なら何もしない）。
+1. **SDK を用意する**: 既存の作業ディレクトリでは設定済みの固定SDKを使い続ける。通常の pull/push のたびに推薦版を取り直さない。SDK未設定の初回か明示的な更新時だけ `get_sdk()` → `node <kit>/scripts/kit.mjs setup --sdk-url <url> --sha256 <sha256> --release-id <release_id>`（展開して Kit の lockfile どおりに `npm ci`。同じ版なら何もしない）。
 2. **App を決める**: 渡された `app_id`（制作画面の URL なら `/create/<app_id>` の部分）。分からなければ
    `list_apps()` の一覧から利用者に選んでもらう。
 3. `.tokoyo.json` または `get_app` で自分のsession_idを確認し、`get_git_bundles({ app_id, session_id })` を呼ぶ（署名 URL は短命なので、すぐ次へ渡す）。
