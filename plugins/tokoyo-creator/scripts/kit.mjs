@@ -20781,6 +20781,10 @@ function superRefine(fn, params) {
 }
 // frontend/node_modules/zod/v4/classic/external.js
 config(en_default());
+// frontend/packages/app-protocol/src/ai-budget.ts
+var aiBudgetDecisionSchema = strictObject({
+  status: _enum(["allowed", "cancelled"])
+});
 // frontend/packages/app-protocol/src/limits.ts
 var ARTIFACT_ARCHIVE_MAX_BYTES = 200 * 1024 * 1024;
 var ARTIFACT_MAX_BYTES = 4 * 1024 * 1024 * 1024;
@@ -21159,7 +21163,10 @@ function ownInitialSize(files, godot) {
 var coins = string2().regex(/^[0-9]{1,14}(\.[0-9]{1,6})?$/);
 var commercePurchasePayloadSchema = strictObject({
   productId: uuid2(),
-  requestKey: uuid2()
+  requestKey: uuid2().optional(),
+  previousReceiptId: uuid2().optional()
+}).refine((value) => !(value.requestKey && value.previousReceiptId), {
+  message: "Conflicting purchase identity"
 });
 var commerceReceiptSchema = strictObject({
   receipt_id: uuid2(),
@@ -21639,6 +21646,7 @@ var OP_NAMES = [
   "ui.openInvite",
   "ui.openShare",
   "ui.openCredits",
+  "ui.openAiBudget",
   "commerce.requestPurchase",
   "device.start",
   "device.stop"
@@ -21656,6 +21664,7 @@ var OP_PAYLOAD_SCHEMAS = {
   "ui.openInvite": openInviteDocumentPayloadSchema.optional(),
   "ui.openShare": openSharePayloadSchema.optional(),
   "ui.openCredits": _undefined3(),
+  "ui.openAiBudget": _undefined3(),
   "commerce.requestPurchase": commercePurchasePayloadSchema,
   "device.start": deviceStartPayloadSchema,
   "device.stop": deviceStopPayloadSchema

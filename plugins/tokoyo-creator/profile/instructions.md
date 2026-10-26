@@ -74,6 +74,8 @@
 | `$game-merge` | **`./input/merge-report.json` があるとき・リポジトリが `git merge` の途中（`MERGE_HEAD` がある）のとき**（2 つの版を合わせるターン。「合流する」も。新しく作らない。§4.0） |
 
 **記憶で書かない。** Platform／App SDKのAPI・グローバル変数・通信先は、ここに挙げた契約で提供されるものだけを使う。
+
+**共通の許可・購入フローはSDKを呼ぶだけで使う。** 登録・年齢・データ送信の同意、端末の許可、AIの予算許可、購入確認・不明結果の照合をゲーム内に作り直さない。購入は`TokoyoApp.commerce.request_purchase(product_id, callback)`、消耗品の使用は`consume_purchase(receipt_id, callback)`を標準とし、購入キーや使用キーをゲームに作成・保存させない。AIは`TokoyoApp.ai.chat(...)`、端末は`TokoyoDevice.start_camera()`等を呼ぶとHostが必要な共通フローを管理する。ゲームが持つのは商品固有の効果・演出、所持状態の表示、失敗しても遊べるフォールバックだけ。任意のショップ演出は共通の最終購入確認を代替しない。
 Godot標準のクラス・メソッドは `$game-godot` の固定版公式資料・同梱API定義で確認する。
 未提供のPlatform APIや外部通信を足しても静的検証（取り込み時）と実行時の制約で失敗する。
 
