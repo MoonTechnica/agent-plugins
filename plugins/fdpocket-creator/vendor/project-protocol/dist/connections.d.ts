@@ -3,6 +3,7 @@ import { z } from 'zod';
 export declare const CONNECTION_SERVICES: readonly [{
     readonly id: "google-drive";
     readonly provider: "google";
+    readonly nangoProvider: "google-drive";
     readonly label: {
         readonly ja: "Google ドライブ・ドキュメント";
         readonly en: "Google Drive and documents";
@@ -10,6 +11,7 @@ export declare const CONNECTION_SERVICES: readonly [{
 }, {
     readonly id: "google-mail";
     readonly provider: "google";
+    readonly nangoProvider: "google-mail";
     readonly label: {
         readonly ja: "Gmail";
         readonly en: "Gmail";
@@ -17,6 +19,7 @@ export declare const CONNECTION_SERVICES: readonly [{
 }, {
     readonly id: "google-calendar";
     readonly provider: "google";
+    readonly nangoProvider: "google-calendar";
     readonly label: {
         readonly ja: "Google カレンダー";
         readonly en: "Google Calendar";
@@ -24,6 +27,7 @@ export declare const CONNECTION_SERVICES: readonly [{
 }, {
     readonly id: "google-contacts";
     readonly provider: "google";
+    readonly nangoProvider: "google-contacts";
     readonly label: {
         readonly ja: "Google コンタクト";
         readonly en: "Google Contacts";
@@ -31,6 +35,7 @@ export declare const CONNECTION_SERVICES: readonly [{
 }, {
     readonly id: "microsoft-files";
     readonly provider: "microsoft";
+    readonly nangoProvider: "microsoft";
     readonly label: {
         readonly ja: "OneDrive";
         readonly en: "OneDrive";
@@ -38,6 +43,7 @@ export declare const CONNECTION_SERVICES: readonly [{
 }, {
     readonly id: "microsoft-mail";
     readonly provider: "microsoft";
+    readonly nangoProvider: "microsoft";
     readonly label: {
         readonly ja: "Outlook メール";
         readonly en: "Outlook Mail";
@@ -45,6 +51,7 @@ export declare const CONNECTION_SERVICES: readonly [{
 }, {
     readonly id: "microsoft-calendar";
     readonly provider: "microsoft";
+    readonly nangoProvider: "microsoft";
     readonly label: {
         readonly ja: "Outlook カレンダー";
         readonly en: "Outlook Calendar";
@@ -52,6 +59,7 @@ export declare const CONNECTION_SERVICES: readonly [{
 }, {
     readonly id: "microsoft-contacts";
     readonly provider: "microsoft";
+    readonly nangoProvider: "microsoft";
     readonly label: {
         readonly ja: "Outlook 連絡先";
         readonly en: "Outlook Contacts";

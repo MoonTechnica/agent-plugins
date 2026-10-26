@@ -4,37 +4,49 @@ export const CONNECTION_SERVICES = [
     {
         id: 'google-drive',
         provider: 'google',
+        nangoProvider: 'google-drive',
         label: { ja: 'Google ドライブ・ドキュメント', en: 'Google Drive and documents' },
     },
-    { id: 'google-mail', provider: 'google', label: { ja: 'Gmail', en: 'Gmail' } },
+    {
+        id: 'google-mail',
+        provider: 'google',
+        nangoProvider: 'google-mail',
+        label: { ja: 'Gmail', en: 'Gmail' },
+    },
     {
         id: 'google-calendar',
         provider: 'google',
+        nangoProvider: 'google-calendar',
         label: { ja: 'Google カレンダー', en: 'Google Calendar' },
     },
     {
         id: 'google-contacts',
         provider: 'google',
+        nangoProvider: 'google-contacts',
         label: { ja: 'Google コンタクト', en: 'Google Contacts' },
     },
     {
         id: 'microsoft-files',
         provider: 'microsoft',
+        nangoProvider: 'microsoft',
         label: { ja: 'OneDrive', en: 'OneDrive' },
     },
     {
         id: 'microsoft-mail',
         provider: 'microsoft',
+        nangoProvider: 'microsoft',
         label: { ja: 'Outlook メール', en: 'Outlook Mail' },
     },
     {
         id: 'microsoft-calendar',
         provider: 'microsoft',
+        nangoProvider: 'microsoft',
         label: { ja: 'Outlook カレンダー', en: 'Outlook Calendar' },
     },
     {
         id: 'microsoft-contacts',
         provider: 'microsoft',
+        nangoProvider: 'microsoft',
         label: { ja: 'Outlook 連絡先', en: 'Outlook Contacts' },
     },
 ];
