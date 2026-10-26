@@ -66094,6 +66094,15 @@ init_zod();
 var sessionEnvironmentViewSchema = exports_external.object({
   environmentId: exports_external.string(),
   status: exports_external.string(),
+  reconciliation: exports_external.object({
+    desiredRevision: exports_external.number().int().nonnegative(),
+    observedRevision: exports_external.number().int().nonnegative(),
+    desiredMode: exports_external.enum(["working", "built", "cooled", "absent"]).nullable(),
+    desiredReason: exports_external.enum(["capacity", "idle", "retention", "user"]).nullable(),
+    status: exports_external.enum(["queued", "running", "retrying", "complete", "blocked", "failed", "superseded"]).nullable(),
+    errorCode: exports_external.string().nullable(),
+    phase: exports_external.string().nullable()
+  }).nullable().optional(),
   testIdentities: exports_external.array(exports_external.object({
     slot: exports_external.string().regex(/^[a-z][a-z0-9_-]{0,31}$/),
     displayName: exports_external.string().min(1).max(100)
@@ -69769,8 +69778,8 @@ import { dirname as dirname5, join as join19 } from "node:path";
 
 // frontend/packages/miniapp-kit/src/generate.ts
 import { existsSync as existsSync11 } from "node:fs";
-import { mkdir as mkdir3, readdir as readdir8, readFile as readFile7, rm as rm5, writeFile as writeFile3 } from "node:fs/promises";
-import { dirname as dirname3, join as join14 } from "node:path";
+import { mkdir as mkdir3, mkdtemp as mkdtemp2, readdir as readdir8, readFile as readFile7, rename, rm as rm5, writeFile as writeFile3 } from "node:fs/promises";
+import { dirname as dirname3, join as join14, relative } from "node:path";
 
 // frontend/packages/miniapp-kit/src/env-types.ts
 var SERVER_ENV_TYPES_PATH = "packages/sdk/src/env.ts";
@@ -69897,23 +69906,43 @@ async function generateProject(options2) {
     vendored["fdpocket-py"] = await placePythonSdk(root, options2.kitRoot);
   const cli = cliOf(root, options2.resolveCli ?? resolveZenStackCli);
   const sdk = join14(root, PROJECT_PATHS.sdk);
-  await rm5(sdk, { recursive: true, force: true });
-  await runZen(cli, root, [
-    "generate",
-    "--schema",
-    PROJECT_PATHS.schema,
-    "--output",
-    PROJECT_PATHS.sdk,
-    "--no-version-check",
-    "--no-tips",
-    "--silent"
-  ], fail3);
   const generated = join14(root, PROJECT_PATHS.generated);
   await mkdir3(generated, { recursive: true });
-  await writeFile3(join14(generated, "project.json"), stableJson(manifest2));
-  await writeFile3(join14(generated, "schema.json"), stableJson(await loadSchema(root, sdk, fail3)));
-  await writeFile3(join14(root, SERVER_ENV_TYPES_PATH), renderServerEnvTypes(manifest2));
-  const sdkFiles = (await readdir8(sdk)).sort().map((name3) => `${PROJECT_PATHS.sdk}/${name3}`);
+  const staging = await mkdtemp2(join14(generated, "zenstack-"));
+  let sdkFiles;
+  try {
+    await runZen(cli, root, [
+      "generate",
+      "--schema",
+      PROJECT_PATHS.schema,
+      "--output",
+      relative(root, staging),
+      "--no-version-check",
+      "--no-tips",
+      "--silent"
+    ], fail3);
+    const schema = stableJson(await loadSchema(root, staging, fail3));
+    const names = (await readdir8(staging)).sort();
+    await mkdir3(sdk, { recursive: true });
+    for (const name3 of names)
+      await publishGeneratedFile(join14(staging, name3), join14(sdk, name3));
+    for (const name3 of await readdir8(sdk)) {
+      if (!names.includes(name3))
+        await rm5(join14(sdk, name3), { recursive: true, force: true });
+    }
+    for (const [name3, target2, content] of [
+      ["project.json", join14(generated, "project.json"), stableJson(manifest2)],
+      ["schema.json", join14(generated, "schema.json"), schema],
+      ["env.ts", join14(root, SERVER_ENV_TYPES_PATH), renderServerEnvTypes(manifest2)]
+    ]) {
+      const staged = join14(staging, name3);
+      await writeFile3(staged, content);
+      await publishGeneratedFile(staged, target2);
+    }
+    sdkFiles = names.map((name3) => `${PROJECT_PATHS.sdk}/${name3}`);
+  } finally {
+    await rm5(staging, { recursive: true, force: true });
+  }
   return {
     platform,
     vendored,
@@ -69926,6 +69955,18 @@ async function generateProject(options2) {
     ],
     warnings
   };
+}
+async function publishGeneratedFile(staged, target2) {
+  const bytes3 = await readFile7(staged);
+  try {
+    if (bytes3.equals(await readFile7(target2)))
+      return;
+  } catch (error51) {
+    if (error51.code !== "ENOENT")
+      throw error51;
+  }
+  await mkdir3(dirname3(target2), { recursive: true });
+  await rename(staged, target2);
 }
 async function readManifestSource(root) {
   const path = join14(root, PROJECT_PATHS.manifest);
@@ -70042,10 +70083,10 @@ class PackError extends Error {
 async function collectFiles(root, options2 = {}) {
   let size = 0;
   const files = [];
-  const walk = async (relative) => {
-    const entries = await readdir9(join15(root, relative), { withFileTypes: true });
+  const walk = async (relative2) => {
+    const entries = await readdir9(join15(root, relative2), { withFileTypes: true });
     for (const entry of entries) {
-      const path = relative === "" ? entry.name : `${relative}/${entry.name}`;
+      const path = relative2 === "" ? entry.name : `${relative2}/${entry.name}`;
       if (options2.include && !options2.include(path, entry.isDirectory()))
         continue;
       const info = await lstat(join15(root, path));
@@ -71487,10 +71528,10 @@ function resolveViteBin(appDir) {
   try {
     const manifestPath = createRequire9(join19(appDir, "package.json")).resolve("vite/package.json");
     const declared = JSON.parse(readFileSync3(manifestPath, "utf8")).bin;
-    const relative = typeof declared === "string" ? declared : declared?.vite;
-    if (typeof relative !== "string")
+    const relative2 = typeof declared === "string" ? declared : declared?.vite;
+    if (typeof relative2 !== "string")
       throw new Error('vite has no "vite" bin');
-    return join19(dirname5(manifestPath), relative);
+    return join19(dirname5(manifestPath), relative2);
   } catch (error51) {
     throw new BuildError(`vite is not installed for ${appDir}; run bun install (${error51 instanceof Error ? error51.message : String(error51)})`);
   }
@@ -81861,11 +81902,7 @@ function reply(target, op) {
 
 frame.addEventListener('load', () => {
   if (!session || !frame.getAttribute('src')) return
-  // The nested page can be shown immediately; SDK/HMR handshakes must not delay it.
-  if (config.live) {
-    const message = { type: 'kit-live', event: 'ready' }
-    notifyStudio(message)
-  }
+  // Plain HTML remains visible; SDK-ready is only acknowledged after its nonce-bound hello.
   const channel = new MessageChannel()
   nonce = Array.from(crypto.getRandomValues(new Uint8Array(16)), (b) => b.toString(16).padStart(2, '0')).join('')
   channel.port1.onmessage = (event) => {
@@ -81883,6 +81920,7 @@ frame.addEventListener('load', () => {
         locale,
         safeArea: { top: 0, right: 0, bottom: 0, left: 0 },
       })
+      if (config.live) notifyStudio({ type: 'kit-live', event: 'ready' })
     } else if (message?.type === 'op') {
       reply(channel.port1, message)
     }
@@ -82538,7 +82576,7 @@ async function assertNoDevVarsInHistory(git, root, tip, base) {
 
 // frontend/packages/miniapp-kit/src/dev/watcher.ts
 import { watch as watchFiles } from "node:fs";
-import { relative, sep as sep2 } from "node:path";
+import { relative as relative2, sep as sep2 } from "node:path";
 
 // frontend/packages/miniapp-kit/src/dev/watcher-build.ts
 import { createHash as createHash9 } from "node:crypto";
@@ -83078,7 +83116,7 @@ function classifyChange(path, changes) {
   return false;
 }
 function watchRoot(root, changed, failed) {
-  const watcher = watchFiles(root, { recursive: true }, (_event, path) => changed(path ? relative(root, `${root}/${path}`) : null));
+  const watcher = watchFiles(root, { recursive: true }, (_event, path) => changed(path ? relative2(root, `${root}/${path}`) : null));
   watcher.on("error", failed);
   return watcher;
 }
@@ -83650,7 +83688,7 @@ var execCommand = (command, args) => new Promise((resolve3, reject) => {
 import { randomBytes as randomBytes4 } from "node:crypto";
 import { existsSync as existsSync20 } from "node:fs";
 import { readFile as readFile20, realpath } from "node:fs/promises";
-import { relative as relative2, resolve as resolve3, sep as sep3 } from "node:path";
+import { relative as relative3, resolve as resolve3, sep as sep3 } from "node:path";
 
 // frontend/packages/miniapp-kit/src/verify/browser.ts
 import { existsSync as existsSync19 } from "node:fs";
@@ -83863,7 +83901,7 @@ async function checkBrowser(options2, input, app, hostUrl, redact2, importer) {
 async function scenarioPath(root, path) {
   const base = await realpath(root);
   const file2 = await realpath(resolve3(root, path));
-  const rel = relative2(base, file2);
+  const rel = relative3(base, file2);
   if (rel === ".." || rel.startsWith(".." + sep3) || !/\.(?:ts|js|mjs)$/.test(file2))
     throw new LiveE2EError("E2E scenario must be a source-relative JS/TS module");
   return file2;
@@ -83937,7 +83975,7 @@ async function checkKitUpdate(input) {
 // frontend/packages/miniapp-kit/src/login.ts
 import { createHash as createHash10, randomBytes as randomBytes5 } from "node:crypto";
 import { existsSync as existsSync21 } from "node:fs";
-import { chmod, mkdir as mkdir9, readFile as readFile21, rename, writeFile as writeFile11 } from "node:fs/promises";
+import { chmod, mkdir as mkdir9, readFile as readFile21, rename as rename2, writeFile as writeFile11 } from "node:fs/promises";
 import { createServer as createServer4 } from "node:http";
 import { join as join32 } from "node:path";
 var DEFAULT_MCP_URL = "https://fdpocket.dev/mcp/creator";
@@ -83971,7 +84009,7 @@ async function writeLogin(configDir, mcpUrl, login) {
   await writeFile11(temporary, `${JSON.stringify({ logins }, null, 2)}
 `, { mode: 384 });
   await chmod(temporary, 384);
-  await rename(temporary, path);
+  await rename2(temporary, path);
 }
 async function getJson(fetch2, url2) {
   const response = await fetch2(url2);
@@ -84406,7 +84444,7 @@ async function serveMcpStdio(proxy, io) {
 // frontend/packages/miniapp-kit/src/new.ts
 import { existsSync as existsSync22 } from "node:fs";
 import { mkdir as mkdir10, readdir as readdir11, readFile as readFile22, writeFile as writeFile12 } from "node:fs/promises";
-import { dirname as dirname10, join as join33, relative as relative3 } from "node:path";
+import { dirname as dirname10, join as join33, relative as relative4 } from "node:path";
 var TEMPLATE_DIR = "templates/project";
 var DEFAULT_APP_SPECS = ["web", "admin"];
 var NAME_PATTERN = /^[a-z][a-z0-9-]{0,63}$/;
@@ -84569,7 +84607,7 @@ async function listFiles(root) {
       if (entry.isDirectory())
         await walk(path);
       else if (entry.isFile())
-        files.push(relative3(root, path).split("\\").join("/"));
+        files.push(relative4(root, path).split("\\").join("/"));
     }
   };
   await walk(root);
@@ -84954,11 +84992,11 @@ async function integrate(git, source, threadRef) {
 // frontend/packages/miniapp-kit/src/sdk-fingerprint.ts
 import { createHash as createHash11 } from "node:crypto";
 import { readdir as readdir12, readFile as readFile24 } from "node:fs/promises";
-import { join as join35, relative as relative4, sep as sep4 } from "node:path";
+import { join as join35, relative as relative5, sep as sep4 } from "node:path";
 async function sdkVendorHash(kitRoot) {
   const root = join35(kitRoot, "vendor");
   const entries = await readdir12(root, { recursive: true, withFileTypes: true });
-  const files = entries.filter((entry) => entry.isFile()).map((entry) => relative4(root, join35(entry.parentPath, entry.name)).split(sep4).join("/")).sort();
+  const files = entries.filter((entry) => entry.isFile()).map((entry) => relative5(root, join35(entry.parentPath, entry.name)).split(sep4).join("/")).sort();
   const digest4 = createHash11("sha256");
   for (const path of files) {
     const content = await readFile24(join35(root, path));
@@ -85027,7 +85065,7 @@ import { join as join37 } from "node:path";
 
 // frontend/packages/miniapp-kit/src/verify/erase.ts
 import { existsSync as existsSync24 } from "node:fs";
-import { mkdtemp as mkdtemp2, rm as rm12 } from "node:fs/promises";
+import { mkdtemp as mkdtemp3, rm as rm12 } from "node:fs/promises";
 import { tmpdir as tmpdir2 } from "node:os";
 import { join as join36 } from "node:path";
 var failed = (message2) => ({
@@ -85053,7 +85091,7 @@ async function runEraseTest(options2) {
   const manifest2 = JSON.parse(await readGenerated(root, "project.json"));
   const schema2 = JSON.parse(await readGenerated(root, "schema.json"));
   const importModule = options2.importModule ?? defaultImporter(root, manifest2);
-  const dir = await mkdtemp2(join36(tmpdir2(), "kit-erase-"));
+  const dir = await mkdtemp3(join36(tmpdir2(), "kit-erase-"));
   const db = options2.createLibsqlClient({ url: `file:${join36(dir, "erase.db")}` });
   try {
     for (const part of await devDatabaseSql(root))

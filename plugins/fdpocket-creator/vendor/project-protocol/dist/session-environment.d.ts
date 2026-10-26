@@ -2,6 +2,33 @@ import { z } from 'zod';
 export declare const sessionEnvironmentViewSchema: z.ZodObject<{
     environmentId: z.ZodString;
     status: z.ZodString;
+    reconciliation: z.ZodOptional<z.ZodNullable<z.ZodObject<{
+        desiredRevision: z.ZodNumber;
+        observedRevision: z.ZodNumber;
+        desiredMode: z.ZodNullable<z.ZodEnum<{
+            working: "working";
+            built: "built";
+            cooled: "cooled";
+            absent: "absent";
+        }>>;
+        desiredReason: z.ZodNullable<z.ZodEnum<{
+            user: "user";
+            capacity: "capacity";
+            idle: "idle";
+            retention: "retention";
+        }>>;
+        status: z.ZodNullable<z.ZodEnum<{
+            queued: "queued";
+            running: "running";
+            failed: "failed";
+            retrying: "retrying";
+            complete: "complete";
+            blocked: "blocked";
+            superseded: "superseded";
+        }>>;
+        errorCode: z.ZodNullable<z.ZodString>;
+        phase: z.ZodNullable<z.ZodString>;
+    }, z.core.$strip>>>;
     testIdentities: z.ZodDefault<z.ZodOptional<z.ZodArray<z.ZodObject<{
         slot: z.ZodString;
         displayName: z.ZodString;
@@ -36,13 +63,13 @@ export declare const sessionEnvironmentViewSchema: z.ZodObject<{
                 failed: "failed";
                 pending: "pending";
                 active: "active";
+                superseded: "superseded";
                 staged: "staged";
                 migrating: "migrating";
                 publishing_assets: "publishing_assets";
                 deploying_workers: "deploying_workers";
                 registering: "registering";
                 awaiting_review: "awaiting_review";
-                superseded: "superseded";
             }>;
             errorCode: z.ZodNullable<z.ZodString>;
             versionId: z.ZodString;

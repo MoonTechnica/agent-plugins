@@ -3,6 +3,20 @@ import { liveJobRunsSchema, liveSessionInspectionSchema } from "./live-bridge.js
 export const sessionEnvironmentViewSchema = z.object({
     environmentId: z.string(),
     status: z.string(),
+    reconciliation: z
+        .object({
+        desiredRevision: z.number().int().nonnegative(),
+        observedRevision: z.number().int().nonnegative(),
+        desiredMode: z.enum(['working', 'built', 'cooled', 'absent']).nullable(),
+        desiredReason: z.enum(['capacity', 'idle', 'retention', 'user']).nullable(),
+        status: z
+            .enum(['queued', 'running', 'retrying', 'complete', 'blocked', 'failed', 'superseded'])
+            .nullable(),
+        errorCode: z.string().nullable(),
+        phase: z.string().nullable(),
+    })
+        .nullable()
+        .optional(),
     testIdentities: z
         .array(z.object({
         slot: z.string().regex(/^[a-z][a-z0-9_-]{0,31}$/),
