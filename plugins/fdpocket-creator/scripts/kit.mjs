@@ -65737,6 +65737,19 @@ var liveHostWaitingSchema = exports_external.object({
 // frontend/packages/project-protocol/src/live-preview.ts
 var LIVE_TOKEN_PATTERN = /^[A-Za-z0-9_-]{32,128}$/;
 var LIVE_ACTIVITY_KINDS = ["pointerdown", "keydown", "wheel", "touchstart"];
+function parseLivePreviewDiagnostic(data) {
+  if (typeof data !== "object" || data === null)
+    return null;
+  const { category, code } = data;
+  if (category === "runtime" && (code === "RUNTIME_ERROR" || code === "UNHANDLED_REJECTION")) {
+    return { category, code };
+  }
+  if (category === "build" && code === "BUILD_ERROR")
+    return { category, code };
+  if (category === "unknown" && code === "PREVIEW_FAILED")
+    return { category, code };
+  return null;
+}
 var KIT_LIVE_ENV = {
   base: "MINIAPP_LIVE_BASE",
   sessionOrigin: "MINIAPP_SESSION_ORIGIN",
@@ -81477,6 +81490,7 @@ function renderHostPage(config3) {
 <script type="application/json" id="kit-dev-config">${scriptJson(config3)}</script>
 <script type="module">
 const config = JSON.parse(document.getElementById('kit-dev-config').textContent)
+const parseLivePreviewDiagnostic = ${parseLivePreviewDiagnostic.toString()}
 const appSelect = document.getElementById('app')
 const asSelect = document.getElementById('as')
 const frame = document.getElementById('frame')
@@ -81748,7 +81762,11 @@ if (config.live) {
     if (event.source !== frame.contentWindow || event.origin !== new URL(frame.src).origin || event.data?.type !== 'kit-live') return
     const { event: name, kind } = event.data
     if (name === 'activity' && kinds.includes(kind)) activity(kind)
-    else if (name === 'connected' || name === 'disconnected') toStudio({ type: 'kit-live', event: name })
+    else if (name === 'connected' || name === 'disconnected' || name === 'ready') toStudio({ type: 'kit-live', event: name })
+    else if (name === 'error') {
+      const diagnostic = parseLivePreviewDiagnostic(event.data.diagnostic)
+      if (diagnostic) toStudio({ type: 'kit-live', event: 'error', diagnostic })
+    }
   })
 
 }

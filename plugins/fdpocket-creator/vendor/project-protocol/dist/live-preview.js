@@ -11,6 +11,19 @@ export const LIVE_TOKEN_PATTERN = /^[A-Za-z0-9_-]{32,128}$/;
 export const LIVE_MESSAGE_TYPE = 'kit-live';
 /** 延長の理由として数える操作（preview.md §2.2） */
 export const LIVE_ACTIVITY_KINDS = ['pointerdown', 'keydown', 'wheel', 'touchstart'];
+export function parseLivePreviewDiagnostic(data) {
+    if (typeof data !== 'object' || data === null)
+        return null;
+    const { category, code } = data;
+    if (category === 'runtime' && (code === 'RUNTIME_ERROR' || code === 'UNHANDLED_REJECTION')) {
+        return { category, code };
+    }
+    if (category === 'build' && code === 'BUILD_ERROR')
+        return { category, code };
+    if (category === 'unknown' && code === 'PREVIEW_FAILED')
+        return { category, code };
+    return null;
+}
 /**
  * `kit dev --live` が App の Vite に渡す環境変数。Vite の `base` を `/lp/{token}/` の下にし、
  * HMR の WebSocket を Sandbox の公開ポート（wss・443）でつなぐ。
@@ -45,6 +58,10 @@ export function parseLiveMessage(data) {
         return null;
     if (event === 'connected' || event === 'disconnected' || event === 'ready')
         return { type, event };
+    if (event === 'error') {
+        const diagnostic = parseLivePreviewDiagnostic(data.diagnostic);
+        return diagnostic ? { type, event, diagnostic } : null;
+    }
     if (event === 'activity' && LIVE_ACTIVITY_KINDS.includes(kind)) {
         return { type, event, kind: kind };
     }

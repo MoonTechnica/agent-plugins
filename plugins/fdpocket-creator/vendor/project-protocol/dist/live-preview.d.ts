@@ -12,10 +12,26 @@ export declare const LIVE_MESSAGE_TYPE = "kit-live";
 /** 延長の理由として数える操作（preview.md §2.2） */
 export declare const LIVE_ACTIVITY_KINDS: readonly ["pointerdown", "keydown", "wheel", "touchstart"];
 export type LiveActivityKind = (typeof LIVE_ACTIVITY_KINDS)[number];
+/** Fixed categories only: raw errors, source paths and capability URLs never cross the frame. */
+export type LivePreviewDiagnostic = {
+    category: 'runtime';
+    code: 'RUNTIME_ERROR' | 'UNHANDLED_REJECTION';
+} | {
+    category: 'build';
+    code: 'BUILD_ERROR';
+} | {
+    category: 'unknown';
+    code: 'PREVIEW_FAILED';
+};
+export declare function parseLivePreviewDiagnostic(data: unknown): LivePreviewDiagnostic | null;
 export type LiveMessage = {
     type: typeof LIVE_MESSAGE_TYPE;
     event: 'activity';
     kind: LiveActivityKind;
+} | {
+    type: typeof LIVE_MESSAGE_TYPE;
+    event: 'error';
+    diagnostic: LivePreviewDiagnostic;
 } | {
     type: typeof LIVE_MESSAGE_TYPE;
     event: 'connected' | 'disconnected' | 'ready';

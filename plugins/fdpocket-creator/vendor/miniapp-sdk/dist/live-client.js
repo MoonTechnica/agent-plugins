@@ -14,6 +14,17 @@ export function installLiveClient(win, hot) {
     const last = {};
     // 親は kit dev の Host ページ（別オリジン）。送るのは種類だけなので相手を限らない
     const post = (message) => win.parent.postMessage(message, '*');
+    const errors = new Set();
+    const diagnostic = (category, code) => {
+        if (errors.has(code))
+            return;
+        errors.add(code);
+        post({ type: 'kit-live', event: 'error', diagnostic: { category, code } });
+    };
+    // Do not inspect ErrorEvent/PromiseRejectionEvent payloads: messages and stacks
+    // may include application data and capability URLs.
+    win.addEventListener('error', () => diagnostic('runtime', 'RUNTIME_ERROR'));
+    win.addEventListener('unhandledrejection', () => diagnostic('runtime', 'UNHANDLED_REJECTION'));
     for (const kind of kinds) {
         win.addEventListener(kind, () => {
             const now = win.Date.now();
@@ -25,6 +36,11 @@ export function installLiveClient(win, hot) {
     }
     hot?.on('vite:ws:disconnect', () => post({ type: 'kit-live', event: 'disconnected' }));
     hot?.on('vite:ws:connect', () => post({ type: 'kit-live', event: 'connected' }));
+    hot?.on('vite:error', () => diagnostic('build', 'BUILD_ERROR'));
+    hot?.on('vite:afterUpdate', () => {
+        errors.clear();
+        post({ type: 'kit-live', event: 'ready' });
+    });
 }
 /** HTML に差し込む本文（Vite が inline の module を変換するので `import.meta.hot` が使える） */
 export function liveClientScript() {
