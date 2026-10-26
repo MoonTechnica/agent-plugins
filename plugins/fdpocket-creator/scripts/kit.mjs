@@ -69908,7 +69908,8 @@ async function generateProject(options2) {
   const sdk = join14(root, PROJECT_PATHS.sdk);
   const generated = join14(root, PROJECT_PATHS.generated);
   await mkdir3(generated, { recursive: true });
-  const staging = await mkdtemp2(join14(generated, "zenstack-"));
+  await mkdir3(dirname3(sdk), { recursive: true });
+  const staging = await mkdtemp2(join14(dirname3(sdk), ".zenstack-"));
   let sdkFiles;
   try {
     await runZen(cli, root, [
