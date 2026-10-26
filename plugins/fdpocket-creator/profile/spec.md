@@ -653,6 +653,8 @@ export default async function seed(context: SeedContext): Promise<SeedPlan<Schem
 - **git・URL・`file:` の依存は不可**（`kit build` が install の前に落とす）。`bun.lock` は npm レジストリの版 + integrity と `workspace:` だけ。
 - **`bunfig.toml` を変えない**（`minimumReleaseAge`: 公開 7 日未満の版を解決しない / `ignoreScripts`: 依存の install スクリプトを動かさない）。
   `kit build` は `--frozen-lockfile --ignore-scripts` で入れるので、書き換えても効かない。
+- SDKの依存宣言が変わる更新時は、元のアプリ依存とlockの整合を確認してからSDK差分をlockへ反映し、
+  その後に固定インストールする。ローカルで更新されたSDK宣言と`bun.lock`は通常の編集と一緒にcommitする。
 - `packages/miniapp-sdk/` と `packages/project-protocol/` は Kit が置く。編集しても Kit の版に戻る。
 - ビルドは必ず `kit build`（`dist/<slug>/` と `dist/.artifact-index.json`）。Vite を直接動かした `dist/` は送れない。
 

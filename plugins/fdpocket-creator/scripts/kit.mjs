@@ -69497,7 +69497,7 @@ ${untracked.code === 0 ? untracked.stdout : ""}`.split(`
 // frontend/packages/miniapp-kit/src/commands.ts
 import { createHash as createHash12, randomUUID as randomUUID4 } from "node:crypto";
 import { existsSync as existsSync26 } from "node:fs";
-import { mkdir as mkdir14, readdir as readdir13, readFile as readFile26, writeFile as writeFile17 } from "node:fs/promises";
+import { mkdir as mkdir15, readdir as readdir13, readFile as readFile26, writeFile as writeFile17 } from "node:fs/promises";
 import { homedir } from "node:os";
 import { dirname as dirname12, join as join40, resolve as resolve4 } from "node:path";
 import { createInterface } from "node:readline";
@@ -69772,7 +69772,7 @@ function openInBrowser(url2) {
 // frontend/packages/miniapp-kit/src/build.ts
 import { spawn as spawn3 } from "node:child_process";
 import { existsSync as existsSync14, readFileSync as readFileSync3 } from "node:fs";
-import { readFile as readFile10, rm as rm7, writeFile as writeFile5 } from "node:fs/promises";
+import { lstat as lstat2, mkdir as mkdir5, readFile as readFile10, rm as rm7, writeFile as writeFile5 } from "node:fs/promises";
 import { createRequire as createRequire9 } from "node:module";
 import { dirname as dirname5, join as join19 } from "node:path";
 
@@ -71458,8 +71458,9 @@ async function prepareProject(options2) {
   const { root, kitRoot } = options2;
   await checkLockfile2(root);
   await ensureKitRuntimeDependencies(kitRoot);
+  await restoreSdkDeclaration(root, kitRoot);
   await placeVendoredPackages(root, kitRoot);
-  await (options2.install ?? bunInstall)(root);
+  await (options2.install ?? ((directory) => bunInstall(directory, kitRoot)))(root);
   const generate = await generateProject({ root, kitRoot });
   const manifest2 = JSON.parse(await readFile10(join19(root, PROJECT_PATHS.generated, "project.json"), "utf8"));
   return { generate, manifest: manifest2 };
@@ -71522,7 +71523,25 @@ async function ensureKitRuntimeDependencies(kitRoot) {
   }
   await run("bun", ["install", "--frozen-lockfile", "--ignore-scripts"], kitRoot, {});
 }
-async function bunInstall(root) {
+async function restoreSdkDeclaration(root, kitRoot) {
+  const target2 = join19(root, "packages/sdk/package.json");
+  for (const path of [join19(root, "packages"), dirname5(target2), target2]) {
+    try {
+      if ((await lstat2(path)).isSymbolicLink())
+        throw new BuildError("SDK package path is a symlink");
+    } catch (error51) {
+      if (!(error51 instanceof Error && ("code" in error51) && error51.code === "ENOENT"))
+        throw error51;
+    }
+  }
+  const bytes3 = await readFile10(join19(kitRoot, "templates/project/packages/sdk/package.json"));
+  if (existsSync14(target2) && (await readFile10(target2)).equals(bytes3))
+    return;
+  await mkdir5(dirname5(target2), { recursive: true });
+  await writeFile5(target2, bytes3);
+}
+async function bunInstall(root, kitRoot) {
+  await run("bun", [join19(kitRoot, "scripts/sdk-dependencies.mjs"), root], root, {});
   await run("bun", ["install", "--frozen-lockfile", "--ignore-scripts"], root, {});
 }
 function resolveViteBin(appDir) {
@@ -71593,7 +71612,7 @@ var CREDENTIAL_USERNAME = "fdpocket-kit";
 
 // frontend/packages/miniapp-kit/src/db/diff.ts
 import { existsSync as existsSync15 } from "node:fs";
-import { mkdir as mkdir5, readFile as readFile11, writeFile as writeFile6 } from "node:fs/promises";
+import { mkdir as mkdir6, readFile as readFile11, writeFile as writeFile6 } from "node:fs/promises";
 import { dirname as dirname6, join as join20 } from "node:path";
 var fail4 = (message2) => new DbError(message2);
 async function diffDatabase(options2) {
@@ -71603,7 +71622,7 @@ async function diffDatabase(options2) {
   const path = join20(root, PENDING_SQL_PATH);
   const current = existsSync15(path) ? await readFile11(path, "utf8") : null;
   if (current !== pending.sql) {
-    await mkdir5(dirname6(path), { recursive: true });
+    await mkdir6(dirname6(path), { recursive: true });
     await writeFile6(path, pending.sql);
   }
   const changes = await classifyPending(pending, options2.createLibsqlClient ?? await loadProjectLibsql(root, fail4));
@@ -71619,7 +71638,7 @@ async function diffDatabase(options2) {
 // frontend/packages/miniapp-kit/src/db/finalize.ts
 import { createHash as createHash5 } from "node:crypto";
 import { existsSync as existsSync16 } from "node:fs";
-import { mkdir as mkdir6, readFile as readFile12, rm as rm8, writeFile as writeFile7 } from "node:fs/promises";
+import { mkdir as mkdir7, readFile as readFile12, rm as rm8, writeFile as writeFile7 } from "node:fs/promises";
 import { dirname as dirname7, join as join21 } from "node:path";
 
 // frontend/packages/miniapp-kit/src/db/migration-policy.ts
@@ -71697,7 +71716,7 @@ async function readIfPresent(path) {
 }
 async function clearPending(root) {
   const generated = join21(root, PENDING_SQL_PATH);
-  await mkdir6(dirname7(generated), { recursive: true });
+  await mkdir7(dirname7(generated), { recursive: true });
   await writeFile7(generated, PENDING_SQL_HEADER);
   await rm8(join21(root, PENDING_DATA_PATH), { force: true });
   await rm8(join21(root, PENDING_INTENT_PATH), { force: true });
@@ -71761,7 +71780,7 @@ ${data}
   const number4 = String((last ? Number(last) : 0) + 1).padStart(4, "0");
   const name3 = `${number4}_${migrationSlug(options2.slug)}`;
   const dir = join21(root, PROJECT_PATHS.migrations, name3);
-  await mkdir6(dir, { recursive: true });
+  await mkdir7(dir, { recursive: true });
   await writeFile7(join21(dir, "migration.sql"), sql3);
   const meta3 = {
     author: options2.author,
@@ -71784,7 +71803,7 @@ init_zod();
 // frontend/packages/miniapp-kit/src/dev/runtime.ts
 import { createHash as createHash6, randomBytes as randomBytes2 } from "node:crypto";
 import { existsSync as existsSync18 } from "node:fs";
-import { mkdir as mkdir8, readFile as readFile15, rm as rm10, writeFile as writeFile9 } from "node:fs/promises";
+import { mkdir as mkdir9, readFile as readFile15, rm as rm10, writeFile as writeFile9 } from "node:fs/promises";
 import { dirname as dirname9, join as join25 } from "node:path";
 // frontend/packages/logger/redact.ts
 var REDACTED = "[REDACTED]";
@@ -79699,7 +79718,7 @@ var upgradeWebSocket = defineWebSocketHelper(async (c2, events, options2) => {
 
 // frontend/packages/project-gateway/src/storage/local-store.ts
 import { createReadStream } from "node:fs";
-import { copyFile, mkdir as mkdir7, readdir as readdir10, readFile as readFile13, rm as rm9, stat, writeFile as writeFile8 } from "node:fs/promises";
+import { copyFile, mkdir as mkdir8, readdir as readdir10, readFile as readFile13, rm as rm9, stat, writeFile as writeFile8 } from "node:fs/promises";
 import { dirname as dirname8, join as join22, resolve as resolve2, sep } from "node:path";
 import { Readable as Readable2 } from "node:stream";
 var encoder6 = new TextEncoder;
@@ -79767,7 +79786,7 @@ function createLocalObjectStore(options2) {
   }
   async function writeObject(location, body, contentType2) {
     const path = pathOf(location);
-    await mkdir7(dirname8(path), { recursive: true });
+    await mkdir8(dirname8(path), { recursive: true });
     await writeFile8(path, body);
     await writeFile8(`${path}.meta.json`, JSON.stringify({ contentType: contentType2 }));
   }
@@ -79829,7 +79848,7 @@ function createLocalObjectStore(options2) {
       if (!meta3)
         throw new Error("copy source not found");
       const target2 = pathOf(to);
-      await mkdir7(dirname8(target2), { recursive: true });
+      await mkdir8(dirname8(target2), { recursive: true });
       await copyFile(source, target2);
       await writeFile8(`${target2}.meta.json`, JSON.stringify(meta3));
     },
@@ -79865,7 +79884,7 @@ function createLocalObjectStore(options2) {
       pathOf(location);
       const uploadId = crypto.randomUUID();
       const dir = uploadDir(uploadId);
-      await mkdir7(dir, { recursive: true });
+      await mkdir8(dir, { recursive: true });
       const meta3 = { ...location, contentType: contentType2 };
       await writeFile8(join22(dir, "meta.json"), JSON.stringify(meta3));
       return uploadId;
@@ -80857,7 +80876,7 @@ async function openDevDatabase(options2) {
   if (recreated) {
     for (const file2 of [stampPath, path, `${path}-wal`, `${path}-shm`, `${path}-journal`])
       await rm10(file2, { force: true });
-    await mkdir8(dirname9(path), { recursive: true });
+    await mkdir9(dirname9(path), { recursive: true });
   }
   const db = options2.createLibsqlClient({ url: `file:${path}` });
   if (!recreated)
@@ -83976,7 +83995,7 @@ async function checkKitUpdate(input) {
 // frontend/packages/miniapp-kit/src/login.ts
 import { createHash as createHash10, randomBytes as randomBytes5 } from "node:crypto";
 import { existsSync as existsSync21 } from "node:fs";
-import { chmod, mkdir as mkdir9, readFile as readFile21, rename as rename2, writeFile as writeFile11 } from "node:fs/promises";
+import { chmod, mkdir as mkdir10, readFile as readFile21, rename as rename2, writeFile as writeFile11 } from "node:fs/promises";
 import { createServer as createServer4 } from "node:http";
 import { join as join32 } from "node:path";
 var DEFAULT_MCP_URL = "https://fdpocket.dev/mcp/creator";
@@ -84004,7 +84023,7 @@ async function writeLogin(configDir, mcpUrl, login) {
     delete logins[mcpUrl];
   else
     logins[mcpUrl] = login;
-  await mkdir9(configDir, { recursive: true, mode: 448 });
+  await mkdir10(configDir, { recursive: true, mode: 448 });
   const path = join32(configDir, CREDENTIALS_FILE);
   const temporary = `${path}.${process.pid}.tmp`;
   await writeFile11(temporary, `${JSON.stringify({ logins }, null, 2)}
@@ -84444,7 +84463,7 @@ async function serveMcpStdio(proxy, io) {
 
 // frontend/packages/miniapp-kit/src/new.ts
 import { existsSync as existsSync22 } from "node:fs";
-import { mkdir as mkdir10, readdir as readdir11, readFile as readFile22, writeFile as writeFile12 } from "node:fs/promises";
+import { mkdir as mkdir11, readdir as readdir11, readFile as readFile22, writeFile as writeFile12 } from "node:fs/promises";
 import { dirname as dirname10, join as join33, relative as relative4 } from "node:path";
 var TEMPLATE_DIR = "templates/project";
 var DEFAULT_APP_SPECS = ["web", "admin"];
@@ -84483,7 +84502,7 @@ async function newProject(options2) {
   const files = [];
   const sources = await listFiles(template);
   const put = async (target2, text) => {
-    await mkdir10(dirname10(join33(root, target2)), { recursive: true });
+    await mkdir11(dirname10(join33(root, target2)), { recursive: true });
     await writeFile12(join33(root, target2), text);
     files.push(target2);
   };
@@ -84855,7 +84874,7 @@ function nextStep(error51) {
 
 // frontend/packages/miniapp-kit/src/repo.ts
 import { existsSync as existsSync23 } from "node:fs";
-import { appendFile, mkdir as mkdir11, readFile as readFile23, rm as rm11, writeFile as writeFile13 } from "node:fs/promises";
+import { appendFile, mkdir as mkdir12, readFile as readFile23, rm as rm11, writeFile as writeFile13 } from "node:fs/promises";
 import { join as join34 } from "node:path";
 class RepoError extends Error {
   name = "RepoError";
@@ -84900,7 +84919,7 @@ async function configureRepo(git, source, config3, author) {
   await set2(git, source, `branch.${branch}.merge`, trackingRef(config3.thread_ref));
   await set2(git, source, `branch.${branch}.rebase`, "true");
   const info = join34(source, ".git", "info");
-  await mkdir11(info, { recursive: true });
+  await mkdir12(info, { recursive: true });
   const excludePath = join34(info, "exclude");
   const excluded = existsSync23(excludePath) ? (await readFile23(excludePath, "utf8")).split(`
 `) : [];
@@ -84932,7 +84951,7 @@ async function fetchBundles(git, source, pulled, already, download2) {
   const listed = new Set(pulled.bundles.map((bundle2) => bundle2.sha256));
   const fetched = already.filter((sha) => listed.has(sha));
   const dir = join34(source, ".git", "fdpocket-bundles");
-  await mkdir11(dir, { recursive: true });
+  await mkdir12(dir, { recursive: true });
   for (const bundle2 of fetchOrder(pulled.bundles)) {
     if (fetched.includes(bundle2.sha256))
       continue;
@@ -85057,11 +85076,11 @@ class ValidationFailed extends Error {
 }
 
 // frontend/packages/miniapp-kit/src/verify/validate.ts
-import { mkdir as mkdir13, writeFile as writeFile15 } from "node:fs/promises";
+import { mkdir as mkdir14, writeFile as writeFile15 } from "node:fs/promises";
 import { join as join38 } from "node:path";
 
 // frontend/packages/miniapp-kit/src/verify/dynamic.ts
-import { mkdir as mkdir12, writeFile as writeFile14 } from "node:fs/promises";
+import { mkdir as mkdir13, writeFile as writeFile14 } from "node:fs/promises";
 import { join as join37 } from "node:path";
 
 // frontend/packages/miniapp-kit/src/verify/erase.ts
@@ -85334,7 +85353,7 @@ async function runDynamicChecks(options2) {
   });
   const browser = await (options2.launch ?? launchChromium)();
   try {
-    await mkdir12(join37(options2.outDir, "screenshots"), { recursive: true });
+    await mkdir13(join37(options2.outDir, "screenshots"), { recursive: true });
     const observations = [];
     const at = (app) => ({
       hostUrl: dev.hostUrl,
@@ -85530,7 +85549,7 @@ async function validateVersion(options2) {
     })
   });
   const report2 = reportSchema.parse(result.report);
-  await mkdir13(options2.outDir, { recursive: true });
+  await mkdir14(options2.outDir, { recursive: true });
   await writeFile15(join38(options2.outDir, "report.json"), `${JSON.stringify(report2, null, 2)}
 `);
   if (result.schemaJson !== undefined) {
@@ -85858,7 +85877,7 @@ async function clone4(context, flags) {
   }
   await requireGitLfs(context.git, workdir);
   for (const dir of Object.values(WORKDIR_DIRS))
-    await mkdir14(join40(workdir, dir), { recursive: true });
+    await mkdir15(join40(workdir, dir), { recursive: true });
   const branch = threadBranch(pulled.thread_ref);
   await gitOk(context.git, workdir, ["init", "-q", "-b", branch, source]);
   await gitOk(context.git, source, ["lfs", "install", "--local"]);
@@ -86011,7 +86030,7 @@ async function writeBuildReport(workdir, built, policyRevision) {
     pendingFiles: existsSync26(pending) ? (await readdir13(pending)).filter((name3) => name3.endsWith(".sql")).sort() : [],
     ...policyRevision === undefined ? {} : { policyRevision }
   });
-  await mkdir14(dirname12(path), { recursive: true });
+  await mkdir15(dirname12(path), { recursive: true });
   await writeFile17(path, `${JSON.stringify(report2, null, 2)}
 `);
 }
@@ -86407,7 +86426,7 @@ async function pack(context) {
   const dist = join40(source, "dist");
   if (!existsSync26(dist))
     throw new CommandError("source/dist is missing; kit.mjs build first");
-  await mkdir14(outputs, { recursive: true });
+  await mkdir15(outputs, { recursive: true });
   const bundlePath = join40(outputs, "source.bundle");
   await gitOk(context.git, source, [
     "bundle",
@@ -86539,7 +86558,7 @@ async function addAsset(context, flags) {
   const workdir = await findWorkdir(context.cwd);
   const bytes3 = await fetchVerified(context, path, flags.url, flags.sha256);
   const target2 = join40(sourceOf(workdir), ...segments);
-  await mkdir14(dirname12(target2), { recursive: true });
+  await mkdir15(dirname12(target2), { recursive: true });
   await writeFile17(target2, bytes3);
   print(context, {
     path,
@@ -86585,7 +86604,7 @@ async function codexConfig(context, flags) {
   }
   const changed = merged !== existing;
   if (changed) {
-    await mkdir14(context.codexHome, { recursive: true });
+    await mkdir15(context.codexHome, { recursive: true });
     await writeFile17(path, merged);
   }
   print(context, {
