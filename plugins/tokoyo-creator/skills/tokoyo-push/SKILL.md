@@ -28,3 +28,11 @@ description: 手元で作った TOKOYO.games のゲームを Platform に送る�
    `STALE_BASE` は `kit.mjs pull`（= `git pull --rebase`）してから 2. から（§8.4）、ほかのエラーは §8.5。公開・投稿は制作画面で利用者が行う。
    `QUOTA_EXCEEDED`（`generation_already_running`）は、同じ利用者の生成・送信がどれか 1 本動いている合図。返った `running_job_id` を
    `get_build` で終わるまで待ち、同じ `request_key` で 5. からやり直す。ほかのゲーム・会話の送信は止めない（§8.5）。
+
+未公開版の購入動作を確かめる商品は、`ready` の `app_version_id` を固定して Platform MCP の
+`list_test_products` / `register_test_product` / `set_test_product_enabled` で準備できる。
+登録には `app_id`・`app_version_id`・固定の `product_id` UUID・`product_name`・
+`kind`（`durable` / `consumable`）・正の価格文字列 `coins` を渡す。応答が不明でも同じ
+`product_id` と同じ条件で再実行し、別商品を作らない。一覧は `next_cursor` で最後まで確認する。
+ゲームは既存の共通 commerce API と Host 購入画面を使い、独自の模擬残高・確認画面を追加しない。
+これはPreview専用で、実残高・作者売上・公開販売には触れない。公開商品の登録・公開・実購入は代行しない。
