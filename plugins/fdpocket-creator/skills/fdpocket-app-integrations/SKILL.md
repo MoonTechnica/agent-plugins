@@ -7,7 +7,7 @@ description: api / jobs の外部 API、秘密の名前、サーバー SDK、開
 
 ## 外部アカウントのデータを使う場合
 
-Google/Microsoftの本人データは `client.connections` を使う（spec.md §3.10）。`capabilities.connections` に対象サービスと `fdpocket-read` を宣言し、画面のタップから `request` → 許可後に `read`。OAuthフロー・Nangoキー・Provider tokenを生成コードで管理しない。APIからは本人の起動を引き継ぐ `server.asUser(request).connections.read` だけを使う。無人jobs/cronには個人接続を渡さない。一覧はcursorでページングし、実データを生成Agentやログへ自動投入しない。
+Google/Microsoft・Slack・Notion・Dropbox・Box・Salesforce・HubSpotの本人が接続したデータは `client.connections` を使う（spec.md §3.10）。`capabilities.connections` に対象サービスと `fdpocket-read` を宣言し、画面のタップから `request` → 許可後に `read`。OAuthフロー・Nangoキー・Provider tokenを生成コードで管理しない。APIからは本人の起動を引き継ぐ `server.asUser(request).connections.read` だけを使う。無人jobs/cronには個人接続を渡さない。一覧はcursorでページングし、実データを生成Agentやログへ自動投入しない。
 
 ## 独自の外部APIを使う場合
 

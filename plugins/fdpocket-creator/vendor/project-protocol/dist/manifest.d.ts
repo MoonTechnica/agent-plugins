@@ -147,6 +147,12 @@ declare const baseSchema: z.ZodObject<{
                 "microsoft-mail": "microsoft-mail";
                 "microsoft-calendar": "microsoft-calendar";
                 "microsoft-contacts": "microsoft-contacts";
+                slack: "slack";
+                notion: "notion";
+                dropbox: "dropbox";
+                box: "box";
+                salesforce: "salesforce";
+                hubspot: "hubspot";
             }> & z.core.$partial, z.ZodArray<z.ZodLiteral<"fdpocket-read">>>>;
             python: z.ZodOptional<z.ZodRecord<z.ZodString, z.ZodArray<z.ZodString>>>;
         }, z.core.$strict>>;
@@ -343,6 +349,12 @@ export declare const projectManifestSchema: z.ZodObject<{
                 "microsoft-mail": "microsoft-mail";
                 "microsoft-calendar": "microsoft-calendar";
                 "microsoft-contacts": "microsoft-contacts";
+                slack: "slack";
+                notion: "notion";
+                dropbox: "dropbox";
+                box: "box";
+                salesforce: "salesforce";
+                hubspot: "hubspot";
             }> & z.core.$partial, z.ZodArray<z.ZodLiteral<"fdpocket-read">>>>;
             python: z.ZodOptional<z.ZodRecord<z.ZodString, z.ZodArray<z.ZodString>>>;
         }, z.core.$strict>>;

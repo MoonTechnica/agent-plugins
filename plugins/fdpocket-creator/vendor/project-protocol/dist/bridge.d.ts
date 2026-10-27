@@ -147,6 +147,12 @@ export declare const BRIDGE_OP_PAYLOAD_SCHEMAS: {
             "microsoft-mail": "microsoft-mail";
             "microsoft-calendar": "microsoft-calendar";
             "microsoft-contacts": "microsoft-contacts";
+            slack: "slack";
+            notion: "notion";
+            dropbox: "dropbox";
+            box: "box";
+            salesforce: "salesforce";
+            hubspot: "hubspot";
         }>;
     }, z.core.$strict>;
     readonly 'notifications.requestPermission': z.ZodObject<{

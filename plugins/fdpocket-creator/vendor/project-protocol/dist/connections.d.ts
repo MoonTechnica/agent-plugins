@@ -35,7 +35,7 @@ export declare const CONNECTION_SERVICES: readonly [{
 }, {
     readonly id: "microsoft-files";
     readonly provider: "microsoft";
-    readonly nangoProvider: "microsoft";
+    readonly nangoProvider: "microsoft-excel";
     readonly label: {
         readonly ja: "OneDrive";
         readonly en: "OneDrive";
@@ -43,7 +43,7 @@ export declare const CONNECTION_SERVICES: readonly [{
 }, {
     readonly id: "microsoft-mail";
     readonly provider: "microsoft";
-    readonly nangoProvider: "microsoft";
+    readonly nangoProvider: "outlook";
     readonly label: {
         readonly ja: "Outlook メール";
         readonly en: "Outlook Mail";
@@ -51,7 +51,7 @@ export declare const CONNECTION_SERVICES: readonly [{
 }, {
     readonly id: "microsoft-calendar";
     readonly provider: "microsoft";
-    readonly nangoProvider: "microsoft";
+    readonly nangoProvider: "outlook";
     readonly label: {
         readonly ja: "Outlook カレンダー";
         readonly en: "Outlook Calendar";
@@ -59,13 +59,21 @@ export declare const CONNECTION_SERVICES: readonly [{
 }, {
     readonly id: "microsoft-contacts";
     readonly provider: "microsoft";
-    readonly nangoProvider: "microsoft";
+    readonly nangoProvider: "outlook";
     readonly label: {
         readonly ja: "Outlook 連絡先";
         readonly en: "Outlook Contacts";
     };
-}];
-export declare const CONNECTION_SERVICE_IDS: ("google-drive" | "google-mail" | "google-calendar" | "google-contacts" | "microsoft-files" | "microsoft-mail" | "microsoft-calendar" | "microsoft-contacts")[];
+}, ...{
+    id: "slack" | "notion" | "dropbox" | "box" | "salesforce" | "hubspot";
+    provider: "slack" | "notion" | "dropbox" | "box" | "salesforce" | "hubspot";
+    nangoProvider: "slack" | "notion" | "dropbox" | "box" | "salesforce" | "hubspot";
+    label: {
+        ja: "Slack" | "Notion" | "Dropbox" | "Box" | "Salesforce" | "HubSpot";
+        en: "Slack" | "Notion" | "Dropbox" | "Box" | "Salesforce" | "HubSpot";
+    };
+}[]];
+export declare const CONNECTION_SERVICE_IDS: ("google-drive" | "google-mail" | "google-calendar" | "google-contacts" | "microsoft-files" | "microsoft-mail" | "microsoft-calendar" | "microsoft-contacts" | "slack" | "notion" | "dropbox" | "box" | "salesforce" | "hubspot")[];
 export declare const connectionServiceSchema: z.ZodEnum<{
     "google-drive": "google-drive";
     "google-mail": "google-mail";
@@ -75,6 +83,12 @@ export declare const connectionServiceSchema: z.ZodEnum<{
     "microsoft-mail": "microsoft-mail";
     "microsoft-calendar": "microsoft-calendar";
     "microsoft-contacts": "microsoft-contacts";
+    slack: "slack";
+    notion: "notion";
+    dropbox: "dropbox";
+    box: "box";
+    salesforce: "salesforce";
+    hubspot: "hubspot";
 }>;
 export type ConnectionService = z.infer<typeof connectionServiceSchema>;
 export declare const CONNECTION_READ_TOOL: "fdpocket-read";
@@ -88,6 +102,12 @@ export declare const connectionCapabilitiesSchema: z.ZodRecord<z.ZodEnum<{
     "microsoft-mail": "microsoft-mail";
     "microsoft-calendar": "microsoft-calendar";
     "microsoft-contacts": "microsoft-contacts";
+    slack: "slack";
+    notion: "notion";
+    dropbox: "dropbox";
+    box: "box";
+    salesforce: "salesforce";
+    hubspot: "hubspot";
 }> & z.core.$partial, z.ZodArray<z.ZodLiteral<"fdpocket-read">>>;
 export type ConnectionCapabilities = z.infer<typeof connectionCapabilitiesSchema>;
 export declare const connectionRequestSchema: z.ZodObject<{
@@ -100,6 +120,12 @@ export declare const connectionRequestSchema: z.ZodObject<{
         "microsoft-mail": "microsoft-mail";
         "microsoft-calendar": "microsoft-calendar";
         "microsoft-contacts": "microsoft-contacts";
+        slack: "slack";
+        notion: "notion";
+        dropbox: "dropbox";
+        box: "box";
+        salesforce: "salesforce";
+        hubspot: "hubspot";
     }>;
 }, z.core.$strict>;
 export declare const connectionRequestResultSchema: z.ZodObject<{
@@ -145,6 +171,12 @@ export declare const connectionAuthorizationSchema: z.ZodObject<{
         "microsoft-mail": "microsoft-mail";
         "microsoft-calendar": "microsoft-calendar";
         "microsoft-contacts": "microsoft-contacts";
+        slack: "slack";
+        notion: "notion";
+        dropbox: "dropbox";
+        box: "box";
+        salesforce: "salesforce";
+        hubspot: "hubspot";
     }>;
     integrationId: z.ZodString;
     connectionId: z.ZodString;

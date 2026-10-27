@@ -520,7 +520,7 @@ def caption(ctx, input):
 
 OAuthはFDPocketの接続画面で行う。Provider token・Nango APIキー・実行セッションtokenをミニアプリのコードへ持ち込まない。
 
-画面Appの `capabilities.connections` にサービスと `fdpocket-read` を明示する。サービスは `google-drive` / `google-mail` / `google-calendar` / `google-contacts` / `microsoft-files` / `microsoft-mail` / `microsoft-calendar` / `microsoft-contacts`。例:
+画面Appの `capabilities.connections` にサービスと `fdpocket-read` を明示する。サービスは `google-drive` / `google-mail` / `google-calendar` / `microsoft-files` / `microsoft-mail` / `microsoft-calendar` / `microsoft-contacts` / `slack` / `notion` / `dropbox` / `box` / `salesforce` / `hubspot`。Google Contactsは保留。設定済み・実接続可能なサービスだけが接続画面で利用できる。例:
 
 ```yaml
 capabilities:
@@ -542,6 +542,18 @@ if (grant) {
 `input.operation` は `list` / `get`。必要な `id` / `container` / `query` / `start` / `end` とページング `limit`（1〜100）/ `cursor` を渡す。Google Driveは `document`（id）/ `sheet`（id,range）も扱う。Microsoft ExcelセルAPI・送信・書き込み・削除は提供しない。任意URL・headers・Provider tokenは入力にできない。
 
 APIの `ServerUserClient.connections.read` は `asUser(request)` で本人の有効な起動を引き継いだ場合だけ使用できる。`ServerClient` 単独やjobs/cronに個人接続への権限はない。許可ダイアログは画面からだけ開く。
+
+追加サービスの初期読み取り範囲:
+
+| サービス | list | get |
+|---|---|---|
+| Slack | container省略で公開/非公開チャンネル、チャンネルID指定でメッセージ（最大15件/ページ） | チャンネルIDの情報 |
+| Notion | container省略で共有ページ検索（queryはタイトル）、ページ/ブロックID指定で本文ブロックの子要素 | ページのプロパティ |
+| Dropbox | containerにフォルダーパス（省略でルート）、非再帰の一覧 | idにパス/ファイルIDを指定しメタデータを取得 |
+| Box | containerにフォルダーID（省略で0）、一覧 | ファイルIDのメタデータ |
+| Salesforce・HubSpot | containerはcontacts（既定）/companies/dealsのみ | 同じcontainer内のレコードID |
+
+Dropboxの一覧件数はProvider側で近似上限。本文ファイルのダウンロード・添付取得・再帰の全件走査・任意SOQL・任意CRMオブジェクト・送信や更新は追加しない。ページングのcursorは同一サービス・container・検索条件・limitでのみ再利用する。Nango提供アプリのOAuth権限に書き込みが含まれる場合も、SDKから使えるのは固定した読み取り操作だけ。
 
 接続と許可は本人・App・物理環境に固定される。grantIdを他人へ渡したり、公開・採用で別環境へコピーしない。実データを制作Agentのプロンプトやログへ自動投入しない。接続未設定・再接続必要・取消を成功と扱わず、利用者が復帰できる表示を用意する。
 

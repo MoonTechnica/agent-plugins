@@ -234828,27 +234828,40 @@ var CONNECTION_SERVICES = [
   {
     id: "microsoft-files",
     provider: "microsoft",
-    nangoProvider: "microsoft",
+    nangoProvider: "microsoft-excel",
     label: { ja: "OneDrive", en: "OneDrive" }
   },
   {
     id: "microsoft-mail",
     provider: "microsoft",
-    nangoProvider: "microsoft",
+    nangoProvider: "outlook",
     label: { ja: "Outlook メール", en: "Outlook Mail" }
   },
   {
     id: "microsoft-calendar",
     provider: "microsoft",
-    nangoProvider: "microsoft",
+    nangoProvider: "outlook",
     label: { ja: "Outlook カレンダー", en: "Outlook Calendar" }
   },
   {
     id: "microsoft-contacts",
     provider: "microsoft",
-    nangoProvider: "microsoft",
+    nangoProvider: "outlook",
     label: { ja: "Outlook 連絡先", en: "Outlook Contacts" }
-  }
+  },
+  ...[
+    ["slack", "Slack"],
+    ["notion", "Notion"],
+    ["dropbox", "Dropbox"],
+    ["box", "Box"],
+    ["salesforce", "Salesforce"],
+    ["hubspot", "HubSpot"]
+  ].map(([id, name]) => ({
+    id,
+    provider: id,
+    nangoProvider: id,
+    label: { ja: name, en: name }
+  }))
 ];
 var CONNECTION_SERVICE_IDS = CONNECTION_SERVICES.map((service) => service.id);
 var connectionServiceSchema = exports_external.enum(CONNECTION_SERVICE_IDS);
