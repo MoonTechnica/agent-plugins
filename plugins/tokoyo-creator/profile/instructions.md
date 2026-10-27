@@ -75,7 +75,7 @@
 
 **記憶で書かない。** Platform／App SDKのAPI・グローバル変数・通信先は、ここに挙げた契約で提供されるものだけを使う。
 
-**共通の許可・購入フローはSDKを呼ぶだけで使う。** 登録・年齢・データ送信の同意、端末の許可、AI利用の初回許可（必須の金額入力なし・任意上限はHostの詳細設定）、購入確認・不明結果の照合をゲーム内に作り直さない。購入は`TokoyoApp.commerce.request_purchase(product_id, callback)`、消耗品の使用は`consume_purchase(receipt_id, callback)`を標準とし、購入キーや使用キーをゲームに作成・保存させない。AIは`TokoyoApp.ai.chat(...)`、端末は`TokoyoDevice.start_camera()`等を呼ぶとHostが必要な共通フローを管理する。ゲームが持つのは商品固有の効果・演出、所持状態の表示、失敗しても遊べるフォールバックだけ。任意のショップ演出は共通の最終購入確認を代替しない。
+**共通の許可・購入フローはSDKを呼ぶだけで使う。** 登録・年齢・データ送信の同意、端末の許可、購入確認・不明結果の照合をゲーム内に作り直さない。購入は`TokoyoApp.commerce.request_purchase(product_id, callback)`、消耗品の使用は`consume_purchase(receipt_id, callback)`を標準とし、購入キーや使用キーをゲームに作成・保存させない。AIは共有Control `TokoyoAIAction` の `set_action(...)` と `completed`/`failed` signal、端末は`TokoyoDevice.start_camera()`等を呼ぶとHostが必要な共通フローを管理する。ゲームが持つのは商品固有の効果・演出、所持状態の表示、失敗しても遊べるフォールバックだけ。任意のショップ演出は共通の最終購入確認を代替しない。
 Godot標準のクラス・メソッドは `$game-godot` の固定版公式資料・同梱API定義で確認する。
 未提供のPlatform APIや外部通信を足しても静的検証（取り込み時）と実行時の制約で失敗する。
 
@@ -510,3 +510,10 @@ LFS の実体を上げ下ろしするので、最初に一度 `node <kit>/script
 `manifest.json` に `contentRating` を必ず宣言する（`"all"` / 数値 `13` / `16` / `18`）。ゲーム全体の内容に必要な最低年齢を、作者の申告として正直に書く。年齢に合わせて実装した後に申告する。省略した版は公開できない。Platform は運営レビューとの厳しい方で閲覧・起動を制限し、`18` は公開しない。
 
 性的な内容、子どもの性的搾取・虐待、過度な暴力や残酷描写、差別や実在人物への攻撃、自傷の助長、違法行為の手引き、他者の知的財産を侵害する複製、金銭を賭けるギャンブル、他のプレイヤーへ送信する自由入力の文字を作らない。該当する依頼は断り、ゲームの内容に含めない。
+
+
+### ゲーム内AIの通常操作
+
+AIの許可画面・予算設定・常設残高HUDは作らない。`res://tokoyo_ai_action.gd` を通常のAI機能の場所へControlとして置き、`set_action({"kind":"hint","conversation":"guide","message":"進行状態のみ"})` を渡す。Hostがその領域にクレジット消費を明示した通常のAIボタンを描き、本人が押した1回だけ実行する。ゲームは `started`, `token(text)`, `completed(result)`, `failed(code)`, `cancelled` を受けて演出と無料フォールバックを管理する。Controlを隠す/解放すると共通操作も解除される。入力変更では旧要求を無効にし、画面回転だけなら実行中の要求を維持する。
+
+ゲームが `pressed` からAIを呼んだり、操作済みフラグを送って課金を開始してはいけない。旧 `TokoyoApp.ai.chat` は `FORBIDDEN`（`host_ai_action_required`）、旧 `open_ai_budget` は `RUNTIME_UNSUPPORTED`。JWTや決済キーはゲームに渡らず、通常操作の後に追加の確認クリックも要求しない。`ai.chat` capabilityとmanifestのAI設定・検証済み指示文は引き続き必要。

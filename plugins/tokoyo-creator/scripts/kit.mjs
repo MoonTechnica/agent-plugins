@@ -20985,6 +20985,65 @@ function superRefine(fn, params) {
 }
 // frontend/node_modules/zod/v4/classic/external.js
 config(en_default());
+// frontend/packages/app-protocol/src/errors.ts
+var ERROR_CODES = [
+  "UNAUTHORIZED",
+  "FORBIDDEN",
+  "SAFETY_ONBOARDING_REQUIRED",
+  "SESSION_EXPIRED",
+  "VERSION_DISABLED",
+  "RUNTIME_UNSUPPORTED",
+  "SDK_VERSION_DEPRECATED",
+  "SCHEMA_UPGRADE_REQUIRED",
+  "REVISION_CONFLICT",
+  "INVALID_ACTION",
+  "CONTENT_REJECTED",
+  "CONTENT_REVIEW_REQUIRED",
+  "CONTENT_AGE_RESTRICTED",
+  "CONTENT_CHECK_FAILED",
+  "RATE_LIMITED",
+  "QUOTA_EXCEEDED",
+  "SPACE_UNAVAILABLE",
+  "SPACE_FINISHED",
+  "INTERNAL"
+];
+var errorCodeSchema = _enum(ERROR_CODES);
+
+// frontend/packages/app-protocol/src/ai-action.ts
+var key = string2().regex(/^[A-Za-z0-9_.:-]{1,64}$/);
+var aiActionRectSchema = strictObject({
+  x: number2().finite().min(0).max(1),
+  y: number2().finite().min(0).max(1),
+  width: number2().finite().positive().max(1),
+  height: number2().finite().positive().max(1)
+}).refine((r) => r.x + r.width <= 1.000001 && r.y + r.height <= 1.000001, "action must fit the game viewport");
+var aiActionMountSchema = strictObject({
+  controlId: key,
+  revision: int().positive(),
+  kind: _enum(["hint", "chat"]),
+  conversation: key,
+  message: string2().min(1).max(2000),
+  instructions: string2().regex(/^[A-Za-z0-9_-]{1,32}$/).optional(),
+  schema: string2().regex(/^[A-Za-z0-9_.-]{1,64}$/).optional(),
+  rect: aiActionRectSchema
+});
+var aiActionUnmountSchema = strictObject({ controlId: key });
+var aiActionResultSchema = strictObject({
+  text: string2(),
+  json: unknown().optional(),
+  credits: number2().finite().nonnegative(),
+  responseId: string2(),
+  incomplete: boolean2(),
+  usagePending: boolean2().optional()
+});
+var event = { type: literal("aiAction"), controlId: key, runId: uuid2() };
+var aiActionEventSchema = discriminatedUnion("event", [
+  strictObject({ ...event, event: literal("started") }),
+  strictObject({ ...event, event: literal("token"), text: string2() }),
+  strictObject({ ...event, event: literal("done"), result: aiActionResultSchema }),
+  strictObject({ ...event, event: literal("error"), code: errorCodeSchema }),
+  strictObject({ ...event, event: literal("cancelled") })
+]);
 // frontend/packages/app-protocol/src/ai-budget.ts
 var aiBudgetDecisionSchema = strictObject({
   status: _enum(["allowed", "cancelled"])
@@ -21582,29 +21641,6 @@ var debugActionResultMessageSchema = strictObject({
 function requiresDevelopmentArtifact(manifest) {
   return !manifest.capabilities.some((value) => value === "documents.read" || value === "documents.write");
 }
-// frontend/packages/app-protocol/src/errors.ts
-var ERROR_CODES = [
-  "UNAUTHORIZED",
-  "FORBIDDEN",
-  "SAFETY_ONBOARDING_REQUIRED",
-  "SESSION_EXPIRED",
-  "VERSION_DISABLED",
-  "RUNTIME_UNSUPPORTED",
-  "SDK_VERSION_DEPRECATED",
-  "SCHEMA_UPGRADE_REQUIRED",
-  "REVISION_CONFLICT",
-  "INVALID_ACTION",
-  "CONTENT_REJECTED",
-  "CONTENT_REVIEW_REQUIRED",
-  "CONTENT_AGE_RESTRICTED",
-  "CONTENT_CHECK_FAILED",
-  "RATE_LIMITED",
-  "QUOTA_EXCEEDED",
-  "SPACE_UNAVAILABLE",
-  "SPACE_FINISHED",
-  "INTERNAL"
-];
-var errorCodeSchema = _enum(ERROR_CODES);
 // frontend/packages/app-protocol/src/game-assets.ts
 var GAME_ASSET_CATALOG_PATH = "design/game-assets.json";
 var GAME_ASSET_CATALOG_MAX_BYTES = 256 * 1024;
@@ -21852,6 +21888,9 @@ var OP_NAMES = [
   "ui.openCredits",
   "ui.openAiBudget",
   "commerce.requestPurchase",
+  "ai.action.mount",
+  "ai.action.update",
+  "ai.action.unmount",
   "device.start",
   "device.stop"
 ];
@@ -21870,6 +21909,9 @@ var OP_PAYLOAD_SCHEMAS = {
   "ui.openCredits": _undefined3(),
   "ui.openAiBudget": _undefined3(),
   "commerce.requestPurchase": commercePurchasePayloadSchema,
+  "ai.action.mount": aiActionMountSchema,
+  "ai.action.update": aiActionMountSchema,
+  "ai.action.unmount": aiActionUnmountSchema,
   "device.start": deviceStartPayloadSchema,
   "device.stop": deviceStopPayloadSchema
 };
@@ -21910,6 +21952,7 @@ var lifecycleMessageSchema = strictObject({
   event: _enum(["pause", "resume"])
 });
 var hostToShellMessageSchema = union([
+  aiActionEventSchema,
   debugActionResultMessageSchema,
   debugCommandMessageSchema,
   contextMessageSchema,
@@ -22770,12 +22813,12 @@ function buildArtifactIndex(files, input) {
   });
 }
 // frontend/packages/app-validator/src/observation.ts
-var key = string2().trim().min(1).max(64);
+var key2 = string2().trim().min(1).max(64);
 var duration3 = number2().int().min(0).max(30000);
 var point = { x: number2().finite().min(0), y: number2().finite().min(0) };
 var stepSchema = discriminatedUnion("type", [
-  object({ type: literal("press"), key }).strict(),
-  object({ type: literal("hold"), keys: array(key).min(1).max(8), ms: duration3 }).strict(),
+  object({ type: literal("press"), key: key2 }).strict(),
+  object({ type: literal("hold"), keys: array(key2).min(1).max(8), ms: duration3 }).strict(),
   object({ type: literal("click"), ...point }).strict(),
   object({ type: literal("tap"), ...point }).strict(),
   object({ type: literal("wait"), ms: duration3 }).strict(),
