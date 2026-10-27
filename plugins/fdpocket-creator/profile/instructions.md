@@ -254,7 +254,7 @@ main の参照権限がある場合は、同じ `session_id` の `get_git_bundle
 1. `resolve_project({ reference })` で元の Project・作者・参加可否・自分のブランチを確認する。外部参加は `contribution.allowed` を確認し、既存の `my_branches` を再開するか
    `create_branch({ project_id, request_key })` で公開済みの版（main の参照を許可されていれば最新の main）からブランチを作る。
 2. 元の `project_id` と自分の `session_id` で §8.3 の取得・変更・検証・push を行う。
-3. 自分のブランチの検証済みの head を `open_proposal({ project_id, session_id, title, body })` で提出する。続きの push で提案は自動で差し替わらないので、`update_proposal` で明示的に更新する。
+3. 自分のブランチの送信完了したビルド済み head を `open_proposal({ project_id, session_id, title, body })` で提出する。続きの push で提案は自動で差し替わらないので、`update_proposal` で明示的に更新する。
 4. 編集者は `get_proposal_inputs({ proposal_id })` の結果を `kit.mjs fetch-review --inputs '<JSON>'` に渡し、`git diff <base> <theirs>` で差分を読む。
    `merge_proposal` は合流候補を作って検証する操作で、main への反映は制作画面で利用者が確定する。
 5. main への取り込み後も公開版は維持する。公開は制作画面で明示的に行う。
@@ -262,7 +262,7 @@ main の参照権限がある場合は、同じ `session_id` の `get_git_bundle
 | エラー | すること |
 |---|---|
 | `FORBIDDEN`（`remix_not_allowed` / `proposals_closed` / `not_upstream_editor`） | 作者の設定か立場の問題。利用者に伝えて止まる |
-| `INVALID_ACTION`（`no_validated_version` / `version_not_validated`） | 検証を通っていない版。push して `ready` を待つ |
+| `INVALID_ACTION`（`no_validated_version` / `version_not_validated`） | 送信が完了していない、または利用できない版。push して `ready` を待つ。合流結果の検証は取り込み時に行う |
 | `INVALID_ACTION`（`proposal_already_open`） | `update_proposal` で版を差し替える |
 | `RATE_LIMITED` | 提案は 1 日 20 件、コメントは 1 日 200 件まで。待つ |
 
