@@ -21424,6 +21424,20 @@ function ownInitialSize(files, godot) {
 }
 // frontend/packages/app-protocol/src/commerce.ts
 var coins = string2().regex(/^[0-9]{1,14}(\.[0-9]{1,6})?$/);
+var commerceContextSchema = discriminatedUnion("mode", [
+  strictObject({
+    mode: literal("live"),
+    scope_id: _null3(),
+    generation: _null3(),
+    test_balance: _null3()
+  }),
+  strictObject({
+    mode: literal("test"),
+    scope_id: uuid2(),
+    generation: number2().int().nonnegative(),
+    test_balance: coins
+  })
+]);
 var commercePurchasePayloadSchema = strictObject({
   productId: uuid2(),
   requestKey: uuid2().optional(),
