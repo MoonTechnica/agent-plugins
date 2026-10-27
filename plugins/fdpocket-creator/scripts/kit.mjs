@@ -195111,10 +195111,10 @@ var init_query_node = __esm(() => {
         where: node.where ? WhereNode.cloneWithOperation(node.where, "And", operation) : WhereNode.create(operation)
       });
     },
-    cloneWithJoin(node, join18) {
+    cloneWithJoin(node, join19) {
       return freeze({
         ...node,
-        joins: node.joins ? freeze([...node.joins, join18]) : freeze([join18])
+        joins: node.joins ? freeze([...node.joins, join19]) : freeze([join19])
       });
     },
     cloneWithReturning(node, selections) {
@@ -197873,8 +197873,8 @@ var init_with_schema_transformer = __esm(() => {
         this.#collectSchemableIdsFromTableExpr(node.table, schemableIds);
       }
       if ("joins" in node && node.joins) {
-        for (const join18 of node.joins) {
-          this.#collectSchemableIdsFromTableExpr(join18.table, schemableIds);
+        for (const join19 of node.joins) {
+          this.#collectSchemableIdsFromTableExpr(join19.table, schemableIds);
         }
       }
       if ("using" in node && node.using) {
@@ -206747,7 +206747,7 @@ class MssqlIntrospector {
     return await this.#db.selectFrom("sys.schemas").select("name").execute();
   }
   async getTables(options2 = { withInternalKyselyTables: false }) {
-    const rawColumns = await this.#db.selectFrom("sys.tables as tables").leftJoin("sys.schemas as table_schemas", "table_schemas.schema_id", "tables.schema_id").innerJoin("sys.columns as columns", "columns.object_id", "tables.object_id").innerJoin("sys.types as types", "types.user_type_id", "columns.user_type_id").leftJoin("sys.schemas as type_schemas", "type_schemas.schema_id", "types.schema_id").leftJoin("sys.extended_properties as comments", (join18) => join18.onRef("comments.major_id", "=", "tables.object_id").onRef("comments.minor_id", "=", "columns.column_id").on("comments.name", "=", "MS_Description")).$if(!options2.withInternalKyselyTables, (qb) => qb.where("tables.name", "!=", DEFAULT_MIGRATION_TABLE).where("tables.name", "!=", DEFAULT_MIGRATION_LOCK_TABLE)).select([
+    const rawColumns = await this.#db.selectFrom("sys.tables as tables").leftJoin("sys.schemas as table_schemas", "table_schemas.schema_id", "tables.schema_id").innerJoin("sys.columns as columns", "columns.object_id", "tables.object_id").innerJoin("sys.types as types", "types.user_type_id", "columns.user_type_id").leftJoin("sys.schemas as type_schemas", "type_schemas.schema_id", "types.schema_id").leftJoin("sys.extended_properties as comments", (join19) => join19.onRef("comments.major_id", "=", "tables.object_id").onRef("comments.minor_id", "=", "columns.column_id").on("comments.name", "=", "MS_Description")).$if(!options2.withInternalKyselyTables, (qb) => qb.where("tables.name", "!=", DEFAULT_MIGRATION_TABLE).where("tables.name", "!=", DEFAULT_MIGRATION_LOCK_TABLE)).select([
       "tables.name as table_name",
       (eb) => eb.ref("tables.type").$castTo().as("table_type"),
       "table_schemas.name as table_schema_name",
@@ -206762,7 +206762,7 @@ class MssqlIntrospector {
       "types.name as type_name",
       "type_schemas.name as type_schema_name",
       "comments.value as column_comment"
-    ]).unionAll(this.#db.selectFrom("sys.views as views").leftJoin("sys.schemas as view_schemas", "view_schemas.schema_id", "views.schema_id").innerJoin("sys.columns as columns", "columns.object_id", "views.object_id").innerJoin("sys.types as types", "types.user_type_id", "columns.user_type_id").leftJoin("sys.schemas as type_schemas", "type_schemas.schema_id", "types.schema_id").leftJoin("sys.extended_properties as comments", (join18) => join18.onRef("comments.major_id", "=", "views.object_id").onRef("comments.minor_id", "=", "columns.column_id").on("comments.name", "=", "MS_Description")).select([
+    ]).unionAll(this.#db.selectFrom("sys.views as views").leftJoin("sys.schemas as view_schemas", "view_schemas.schema_id", "views.schema_id").innerJoin("sys.columns as columns", "columns.object_id", "views.object_id").innerJoin("sys.types as types", "types.user_type_id", "columns.user_type_id").leftJoin("sys.schemas as type_schemas", "type_schemas.schema_id", "types.schema_id").leftJoin("sys.extended_properties as comments", (join19) => join19.onRef("comments.major_id", "=", "views.object_id").onRef("comments.minor_id", "=", "columns.column_id").on("comments.name", "=", "MS_Description")).select([
       "views.name as table_name",
       "views.type as table_type",
       "view_schemas.name as table_schema_name",
@@ -209185,7 +209185,7 @@ function checkInt32(i2, min, max) {
     throw Error(invalidArgument + i2);
   }
 }
-function checkRoundingDigits(d2, i2, rm8, repeating) {
+function checkRoundingDigits(d2, i2, rm9, repeating) {
   var di, k3, r2, rd;
   for (k3 = d2[0];k3 >= 10; k3 /= 10)
     --i2;
@@ -209204,9 +209204,9 @@ function checkRoundingDigits(d2, i2, rm8, repeating) {
         rd = rd / 100 | 0;
       else if (i2 == 1)
         rd = rd / 10 | 0;
-      r2 = rm8 < 4 && rd == 99999 || rm8 > 3 && rd == 49999 || rd == 50000 || rd == 0;
+      r2 = rm9 < 4 && rd == 99999 || rm9 > 3 && rd == 49999 || rd == 50000 || rd == 0;
     } else {
-      r2 = (rm8 < 4 && rd + 1 == k3 || rm8 > 3 && rd + 1 == k3 / 2) && (d2[di + 1] / k3 / 100 | 0) == mathpow(10, i2 - 2) - 1 || (rd == k3 / 2 || rd == 0) && (d2[di + 1] / k3 / 100 | 0) == 0;
+      r2 = (rm9 < 4 && rd + 1 == k3 || rm9 > 3 && rd + 1 == k3 / 2) && (d2[di + 1] / k3 / 100 | 0) == mathpow(10, i2 - 2) - 1 || (rd == k3 / 2 || rd == 0) && (d2[di + 1] / k3 / 100 | 0) == 0;
     }
   } else {
     if (i2 < 4) {
@@ -209216,9 +209216,9 @@ function checkRoundingDigits(d2, i2, rm8, repeating) {
         rd = rd / 100 | 0;
       else if (i2 == 2)
         rd = rd / 10 | 0;
-      r2 = (repeating || rm8 < 4) && rd == 9999 || !repeating && rm8 > 3 && rd == 4999;
+      r2 = (repeating || rm9 < 4) && rd == 9999 || !repeating && rm9 > 3 && rd == 4999;
     } else {
-      r2 = ((repeating || rm8 < 4) && rd + 1 == k3 || !repeating && rm8 > 3 && rd + 1 == k3 / 2) && (d2[di + 1] / k3 / 1000 | 0) == mathpow(10, i2 - 3) - 1;
+      r2 = ((repeating || rm9 < 4) && rd + 1 == k3 || !repeating && rm9 > 3 && rd + 1 == k3 / 2) && (d2[di + 1] / k3 / 1000 | 0) == mathpow(10, i2 - 3) - 1;
     }
   }
   return r2;
@@ -209261,7 +209261,7 @@ function cosine(Ctor, x3) {
   Ctor.precision -= k3;
   return x3;
 }
-function finalise(x3, sd, rm8, isTruncated) {
+function finalise(x3, sd, rm9, isTruncated) {
   var digits, i2, j2, k3, rd, roundUp, w3, xd, xdi, Ctor = x3.constructor;
   out:
     if (sd != null) {
@@ -209300,7 +209300,7 @@ function finalise(x3, sd, rm8, isTruncated) {
         }
       }
       isTruncated = isTruncated || sd < 0 || xd[xdi + 1] !== undefined || (j2 < 0 ? w3 : w3 % mathpow(10, digits - j2 - 1));
-      roundUp = rm8 < 4 ? (rd || isTruncated) && (rm8 == 0 || rm8 == (x3.s < 0 ? 3 : 2)) : rd > 5 || rd == 5 && (rm8 == 4 || isTruncated || rm8 == 6 && (i2 > 0 ? j2 > 0 ? w3 / mathpow(10, digits - j2) : 0 : xd[xdi - 1]) % 10 & 1 || rm8 == (x3.s < 0 ? 8 : 7));
+      roundUp = rm9 < 4 ? (rd || isTruncated) && (rm9 == 0 || rm9 == (x3.s < 0 ? 3 : 2)) : rd > 5 || rd == 5 && (rm9 == 4 || isTruncated || rm9 == 6 && (i2 > 0 ? j2 > 0 ? w3 / mathpow(10, digits - j2) : 0 : xd[xdi - 1]) % 10 & 1 || rm9 == (x3.s < 0 ? 8 : 7));
       if (sd < 1 || !xd[0]) {
         xd.length = 0;
         if (roundUp) {
@@ -209403,10 +209403,10 @@ function getLn10(Ctor, sd, pr) {
   }
   return finalise(new Ctor(LN10), sd, 1, true);
 }
-function getPi(Ctor, sd, rm8) {
+function getPi(Ctor, sd, rm9) {
   if (sd > PI_PRECISION)
     throw Error(precisionLimitExceeded);
-  return finalise(new Ctor(PI), sd, rm8, true);
+  return finalise(new Ctor(PI), sd, rm9, true);
 }
 function getPrecision(digits) {
   var w3 = digits.length - 1, len = w3 * LOG_BASE + 1;
@@ -209466,7 +209466,7 @@ function maxOrMin(Ctor, args, n2) {
   return x3;
 }
 function naturalExponential(x3, sd) {
-  var denominator, guard, j2, pow, sum, t2, wpr, rep = 0, i2 = 0, k3 = 0, Ctor = x3.constructor, rm8 = Ctor.rounding, pr = Ctor.precision;
+  var denominator, guard, j2, pow, sum, t2, wpr, rep = 0, i2 = 0, k3 = 0, Ctor = x3.constructor, rm9 = Ctor.rounding, pr = Ctor.precision;
   if (!x3.d || !x3.d[0] || x3.e > 17) {
     return new Ctor(x3.d ? !x3.d[0] ? 1 : x3.s < 0 ? 0 : 1 / 0 : x3.s ? x3.s < 0 ? 0 : x3 : 0 / 0);
   }
@@ -209494,13 +209494,13 @@ function naturalExponential(x3, sd) {
       while (j2--)
         sum = finalise(sum.times(sum), wpr, 1);
       if (sd == null) {
-        if (rep < 3 && checkRoundingDigits(sum.d, wpr - guard, rm8, rep)) {
+        if (rep < 3 && checkRoundingDigits(sum.d, wpr - guard, rm9, rep)) {
           Ctor.precision = wpr += 10;
           denominator = pow = t2 = new Ctor(1);
           i2 = 0;
           rep++;
         } else {
-          return finalise(sum, Ctor.precision = pr, rm8, external2 = true);
+          return finalise(sum, Ctor.precision = pr, rm9, external2 = true);
         }
       } else {
         Ctor.precision = pr;
@@ -209511,7 +209511,7 @@ function naturalExponential(x3, sd) {
   }
 }
 function naturalLogarithm(y2, sd) {
-  var c2, c0, denominator, e2, numerator, rep, sum, t2, wpr, x1, x22, n2 = 1, guard = 10, x3 = y2, xd = x3.d, Ctor = x3.constructor, rm8 = Ctor.rounding, pr = Ctor.precision;
+  var c2, c0, denominator, e2, numerator, rep, sum, t2, wpr, x1, x22, n2 = 1, guard = 10, x3 = y2, xd = x3.d, Ctor = x3.constructor, rm9 = Ctor.rounding, pr = Ctor.precision;
   if (x3.s < 0 || !xd || !xd[0] || !x3.e && xd[0] == 1 && xd.length == 1) {
     return new Ctor(xd && !xd[0] ? -1 / 0 : x3.s != 1 ? NaN : xd ? 0 : x3);
   }
@@ -209542,7 +209542,7 @@ function naturalLogarithm(y2, sd) {
     t2 = getLn10(Ctor, wpr + 2, pr).times(e2 + "");
     x3 = naturalLogarithm(new Ctor(c0 + "." + c2.slice(1)), wpr - guard).plus(t2);
     Ctor.precision = pr;
-    return sd == null ? finalise(x3, pr, rm8, external2 = true) : x3;
+    return sd == null ? finalise(x3, pr, rm9, external2 = true) : x3;
   }
   x1 = x3;
   sum = numerator = x3 = divide(x3.minus(1), x3.plus(1), wpr, 1);
@@ -209557,13 +209557,13 @@ function naturalLogarithm(y2, sd) {
         sum = sum.plus(getLn10(Ctor, wpr + 2, pr).times(e2 + ""));
       sum = divide(sum, new Ctor(n2), wpr, 1);
       if (sd == null) {
-        if (checkRoundingDigits(sum.d, wpr - guard, rm8, rep)) {
+        if (checkRoundingDigits(sum.d, wpr - guard, rm9, rep)) {
           Ctor.precision = wpr += guard;
           t2 = numerator = x3 = divide(x1.minus(1), x1.plus(1), wpr, 1);
           x22 = finalise(x3.times(x3), wpr, 1);
           denominator = rep = 1;
         } else {
-          return finalise(sum, Ctor.precision = pr, rm8, external2 = true);
+          return finalise(sum, Ctor.precision = pr, rm9, external2 = true);
         }
       } else {
         Ctor.precision = pr;
@@ -209752,17 +209752,17 @@ function toLessThanHalfPi(Ctor, x3) {
   }
   return x3.minus(pi).abs();
 }
-function toStringBinary(x3, baseOut, sd, rm8) {
+function toStringBinary(x3, baseOut, sd, rm9) {
   var base, e2, i2, k3, len, roundUp, str, xd, y2, Ctor = x3.constructor, isExp = sd !== undefined;
   if (isExp) {
     checkInt32(sd, 1, MAX_DIGITS);
-    if (rm8 === undefined)
-      rm8 = Ctor.rounding;
+    if (rm9 === undefined)
+      rm9 = Ctor.rounding;
     else
-      checkInt32(rm8, 0, 8);
+      checkInt32(rm9, 0, 8);
   } else {
     sd = Ctor.precision;
-    rm8 = Ctor.rounding;
+    rm9 = Ctor.rounding;
   }
   if (!x3.isFinite()) {
     str = nonFiniteToString(x3);
@@ -209799,7 +209799,7 @@ function toStringBinary(x3, baseOut, sd, rm8) {
         x3 = new Ctor(x3);
         x3.d = xd;
         x3.e = e2;
-        x3 = divide(x3, y2, sd, rm8, 0, base);
+        x3 = divide(x3, y2, sd, rm9, 0, base);
         xd = x3.d;
         e2 = x3.e;
         roundUp = inexact;
@@ -209807,7 +209807,7 @@ function toStringBinary(x3, baseOut, sd, rm8) {
       i2 = xd[sd];
       k3 = base / 2;
       roundUp = roundUp || xd[sd + 1] !== undefined;
-      roundUp = rm8 < 4 ? (i2 !== undefined || roundUp) && (rm8 === 0 || rm8 === (x3.s < 0 ? 3 : 2)) : i2 > k3 || i2 === k3 && (rm8 === 4 || roundUp || rm8 === 6 && xd[sd - 1] & 1 || rm8 === (x3.s < 0 ? 8 : 7));
+      roundUp = rm9 < 4 ? (i2 !== undefined || roundUp) && (rm9 === 0 || rm9 === (x3.s < 0 ? 3 : 2)) : i2 > k3 || i2 === k3 && (rm9 === 4 || roundUp || rm9 === 6 && xd[sd - 1] & 1 || rm9 === (x3.s < 0 ? 8 : 7));
       xd.length = sd;
       if (roundUp) {
         for (;++xd[--sd] > base - 1; ) {
@@ -209887,14 +209887,14 @@ function atanh(x3) {
 function atan2(y2, x3) {
   y2 = new this(y2);
   x3 = new this(x3);
-  var r2, pr = this.precision, rm8 = this.rounding, wpr = pr + 4;
+  var r2, pr = this.precision, rm9 = this.rounding, wpr = pr + 4;
   if (!y2.s || !x3.s) {
     r2 = new this(NaN);
   } else if (!y2.d && !x3.d) {
     r2 = getPi(this, wpr, 1).times(x3.s > 0 ? 0.25 : 0.75);
     r2.s = y2.s;
   } else if (!x3.d || y2.isZero()) {
-    r2 = x3.s < 0 ? getPi(this, pr, rm8) : new this(0);
+    r2 = x3.s < 0 ? getPi(this, pr, rm9) : new this(0);
     r2.s = y2.s;
   } else if (!y2.d || x3.isZero()) {
     r2 = getPi(this, wpr, 1).times(0.5);
@@ -209905,7 +209905,7 @@ function atan2(y2, x3) {
     r2 = this.atan(divide(y2, x3, wpr, 1));
     x3 = getPi(this, wpr, 1);
     this.precision = pr;
-    this.rounding = rm8;
+    this.rounding = rm9;
     r2 = y2.s < 0 ? r2.minus(x3) : r2.plus(x3);
   } else {
     r2 = this.atan(divide(y2, x3, wpr, 1));
@@ -210361,19 +210361,19 @@ var init_decimal = __esm(() => {
     return xdL === ydL ? 0 : xdL > ydL ^ xs < 0 ? 1 : -1;
   };
   P3.cosine = P3.cos = function() {
-    var pr, rm8, x3 = this, Ctor = x3.constructor;
+    var pr, rm9, x3 = this, Ctor = x3.constructor;
     if (!x3.d)
       return new Ctor(NaN);
     if (!x3.d[0])
       return new Ctor(1);
     pr = Ctor.precision;
-    rm8 = Ctor.rounding;
+    rm9 = Ctor.rounding;
     Ctor.precision = pr + Math.max(x3.e, x3.sd()) + LOG_BASE;
     Ctor.rounding = 1;
     x3 = cosine(Ctor, toLessThanHalfPi(Ctor, x3));
     Ctor.precision = pr;
-    Ctor.rounding = rm8;
-    return finalise(quadrant == 2 || quadrant == 3 ? x3.neg() : x3, pr, rm8, true);
+    Ctor.rounding = rm9;
+    return finalise(quadrant == 2 || quadrant == 3 ? x3.neg() : x3, pr, rm9, true);
   };
   P3.cubeRoot = P3.cbrt = function() {
     var e2, m3, n2, r2, rep, s3, sd, t2, t3, t3plusx, x3 = this, Ctor = x3.constructor;
@@ -210464,13 +210464,13 @@ var init_decimal = __esm(() => {
     return k3 == 1 || k3 === 0;
   };
   P3.hyperbolicCosine = P3.cosh = function() {
-    var k3, n2, pr, rm8, len, x3 = this, Ctor = x3.constructor, one = new Ctor(1);
+    var k3, n2, pr, rm9, len, x3 = this, Ctor = x3.constructor, one = new Ctor(1);
     if (!x3.isFinite())
       return new Ctor(x3.s ? 1 / 0 : NaN);
     if (x3.isZero())
       return one;
     pr = Ctor.precision;
-    rm8 = Ctor.rounding;
+    rm9 = Ctor.rounding;
     Ctor.precision = pr + Math.max(x3.e, x3.sd()) + 4;
     Ctor.rounding = 1;
     len = x3.d.length;
@@ -210487,14 +210487,14 @@ var init_decimal = __esm(() => {
       cosh2_x = x3.times(x3);
       x3 = one.minus(cosh2_x.times(d8.minus(cosh2_x.times(d8))));
     }
-    return finalise(x3, Ctor.precision = pr, Ctor.rounding = rm8, true);
+    return finalise(x3, Ctor.precision = pr, Ctor.rounding = rm9, true);
   };
   P3.hyperbolicSine = P3.sinh = function() {
-    var k3, pr, rm8, len, x3 = this, Ctor = x3.constructor;
+    var k3, pr, rm9, len, x3 = this, Ctor = x3.constructor;
     if (!x3.isFinite() || x3.isZero())
       return new Ctor(x3);
     pr = Ctor.precision;
-    rm8 = Ctor.rounding;
+    rm9 = Ctor.rounding;
     Ctor.precision = pr + Math.max(x3.e, x3.sd()) + 4;
     Ctor.rounding = 1;
     len = x3.d.length;
@@ -210512,97 +210512,97 @@ var init_decimal = __esm(() => {
       }
     }
     Ctor.precision = pr;
-    Ctor.rounding = rm8;
-    return finalise(x3, pr, rm8, true);
+    Ctor.rounding = rm9;
+    return finalise(x3, pr, rm9, true);
   };
   P3.hyperbolicTangent = P3.tanh = function() {
-    var pr, rm8, x3 = this, Ctor = x3.constructor;
+    var pr, rm9, x3 = this, Ctor = x3.constructor;
     if (!x3.isFinite())
       return new Ctor(x3.s);
     if (x3.isZero())
       return new Ctor(x3);
     pr = Ctor.precision;
-    rm8 = Ctor.rounding;
+    rm9 = Ctor.rounding;
     Ctor.precision = pr + 7;
     Ctor.rounding = 1;
-    return divide(x3.sinh(), x3.cosh(), Ctor.precision = pr, Ctor.rounding = rm8);
+    return divide(x3.sinh(), x3.cosh(), Ctor.precision = pr, Ctor.rounding = rm9);
   };
   P3.inverseCosine = P3.acos = function() {
-    var x3 = this, Ctor = x3.constructor, k3 = x3.abs().cmp(1), pr = Ctor.precision, rm8 = Ctor.rounding;
+    var x3 = this, Ctor = x3.constructor, k3 = x3.abs().cmp(1), pr = Ctor.precision, rm9 = Ctor.rounding;
     if (k3 !== -1) {
-      return k3 === 0 ? x3.isNeg() ? getPi(Ctor, pr, rm8) : new Ctor(0) : new Ctor(NaN);
+      return k3 === 0 ? x3.isNeg() ? getPi(Ctor, pr, rm9) : new Ctor(0) : new Ctor(NaN);
     }
     if (x3.isZero())
-      return getPi(Ctor, pr + 4, rm8).times(0.5);
+      return getPi(Ctor, pr + 4, rm9).times(0.5);
     Ctor.precision = pr + 6;
     Ctor.rounding = 1;
     x3 = new Ctor(1).minus(x3).div(x3.plus(1)).sqrt().atan();
     Ctor.precision = pr;
-    Ctor.rounding = rm8;
+    Ctor.rounding = rm9;
     return x3.times(2);
   };
   P3.inverseHyperbolicCosine = P3.acosh = function() {
-    var pr, rm8, x3 = this, Ctor = x3.constructor;
+    var pr, rm9, x3 = this, Ctor = x3.constructor;
     if (x3.lte(1))
       return new Ctor(x3.eq(1) ? 0 : NaN);
     if (!x3.isFinite())
       return new Ctor(x3);
     pr = Ctor.precision;
-    rm8 = Ctor.rounding;
+    rm9 = Ctor.rounding;
     Ctor.precision = pr + Math.max(Math.abs(x3.e), x3.sd()) + 4;
     Ctor.rounding = 1;
     external2 = false;
     x3 = x3.times(x3).minus(1).sqrt().plus(x3);
     external2 = true;
     Ctor.precision = pr;
-    Ctor.rounding = rm8;
+    Ctor.rounding = rm9;
     return x3.ln();
   };
   P3.inverseHyperbolicSine = P3.asinh = function() {
-    var pr, rm8, x3 = this, Ctor = x3.constructor;
+    var pr, rm9, x3 = this, Ctor = x3.constructor;
     if (!x3.isFinite() || x3.isZero())
       return new Ctor(x3);
     pr = Ctor.precision;
-    rm8 = Ctor.rounding;
+    rm9 = Ctor.rounding;
     Ctor.precision = pr + 2 * Math.max(Math.abs(x3.e), x3.sd()) + 6;
     Ctor.rounding = 1;
     external2 = false;
     x3 = x3.times(x3).plus(1).sqrt().plus(x3);
     external2 = true;
     Ctor.precision = pr;
-    Ctor.rounding = rm8;
+    Ctor.rounding = rm9;
     return x3.ln();
   };
   P3.inverseHyperbolicTangent = P3.atanh = function() {
-    var pr, rm8, wpr, xsd, x3 = this, Ctor = x3.constructor;
+    var pr, rm9, wpr, xsd, x3 = this, Ctor = x3.constructor;
     if (!x3.isFinite())
       return new Ctor(NaN);
     if (x3.e >= 0)
       return new Ctor(x3.abs().eq(1) ? x3.s / 0 : x3.isZero() ? x3 : NaN);
     pr = Ctor.precision;
-    rm8 = Ctor.rounding;
+    rm9 = Ctor.rounding;
     xsd = x3.sd();
     if (Math.max(xsd, pr) < 2 * -x3.e - 1)
-      return finalise(new Ctor(x3), pr, rm8, true);
+      return finalise(new Ctor(x3), pr, rm9, true);
     Ctor.precision = wpr = xsd - x3.e;
     x3 = divide(x3.plus(1), new Ctor(1).minus(x3), wpr + pr, 1);
     Ctor.precision = pr + 4;
     Ctor.rounding = 1;
     x3 = x3.ln();
     Ctor.precision = pr;
-    Ctor.rounding = rm8;
+    Ctor.rounding = rm9;
     return x3.times(0.5);
   };
   P3.inverseSine = P3.asin = function() {
-    var halfPi, k3, pr, rm8, x3 = this, Ctor = x3.constructor;
+    var halfPi, k3, pr, rm9, x3 = this, Ctor = x3.constructor;
     if (x3.isZero())
       return new Ctor(x3);
     k3 = x3.abs().cmp(1);
     pr = Ctor.precision;
-    rm8 = Ctor.rounding;
+    rm9 = Ctor.rounding;
     if (k3 !== -1) {
       if (k3 === 0) {
-        halfPi = getPi(Ctor, pr + 4, rm8).times(0.5);
+        halfPi = getPi(Ctor, pr + 4, rm9).times(0.5);
         halfPi.s = x3.s;
         return halfPi;
       }
@@ -210612,23 +210612,23 @@ var init_decimal = __esm(() => {
     Ctor.rounding = 1;
     x3 = x3.div(new Ctor(1).minus(x3.times(x3)).sqrt().plus(1)).atan();
     Ctor.precision = pr;
-    Ctor.rounding = rm8;
+    Ctor.rounding = rm9;
     return x3.times(2);
   };
   P3.inverseTangent = P3.atan = function() {
-    var i2, j2, k3, n2, px, t2, r2, wpr, x22, x3 = this, Ctor = x3.constructor, pr = Ctor.precision, rm8 = Ctor.rounding;
+    var i2, j2, k3, n2, px, t2, r2, wpr, x22, x3 = this, Ctor = x3.constructor, pr = Ctor.precision, rm9 = Ctor.rounding;
     if (!x3.isFinite()) {
       if (!x3.s)
         return new Ctor(NaN);
       if (pr + 4 <= PI_PRECISION) {
-        r2 = getPi(Ctor, pr + 4, rm8).times(0.5);
+        r2 = getPi(Ctor, pr + 4, rm9).times(0.5);
         r2.s = x3.s;
         return r2;
       }
     } else if (x3.isZero()) {
       return new Ctor(x3);
     } else if (x3.abs().eq(1) && pr + 4 <= PI_PRECISION) {
-      r2 = getPi(Ctor, pr + 4, rm8).times(0.25);
+      r2 = getPi(Ctor, pr + 4, rm9).times(0.25);
       r2.s = x3.s;
       return r2;
     }
@@ -210655,7 +210655,7 @@ var init_decimal = __esm(() => {
     if (k3)
       r2 = r2.times(2 << k3 - 1);
     external2 = true;
-    return finalise(r2, Ctor.precision = pr, Ctor.rounding = rm8, true);
+    return finalise(r2, Ctor.precision = pr, Ctor.rounding = rm9, true);
   };
   P3.isFinite = function() {
     return !!this.d;
@@ -210682,7 +210682,7 @@ var init_decimal = __esm(() => {
     return this.cmp(y2) < 1;
   };
   P3.logarithm = P3.log = function(base) {
-    var isBase10, d2, denominator, k3, inf, num, sd, r2, arg = this, Ctor = arg.constructor, pr = Ctor.precision, rm8 = Ctor.rounding, guard = 5;
+    var isBase10, d2, denominator, k3, inf, num, sd, r2, arg = this, Ctor = arg.constructor, pr = Ctor.precision, rm9 = Ctor.rounding, guard = 5;
     if (base == null) {
       base = new Ctor(10);
       isBase10 = true;
@@ -210711,7 +210711,7 @@ var init_decimal = __esm(() => {
     num = naturalLogarithm(arg, sd);
     denominator = isBase10 ? getLn10(Ctor, sd + 10) : naturalLogarithm(base, sd);
     r2 = divide(num, denominator, sd, 1);
-    if (checkRoundingDigits(r2.d, k3 = pr, rm8)) {
+    if (checkRoundingDigits(r2.d, k3 = pr, rm9)) {
       do {
         sd += 10;
         num = naturalLogarithm(arg, sd);
@@ -210723,13 +210723,13 @@ var init_decimal = __esm(() => {
           }
           break;
         }
-      } while (checkRoundingDigits(r2.d, k3 += 10, rm8));
+      } while (checkRoundingDigits(r2.d, k3 += 10, rm9));
     }
     external2 = true;
-    return finalise(r2, pr, rm8);
+    return finalise(r2, pr, rm9);
   };
   P3.minus = P3.sub = function(y2) {
-    var d2, e2, i2, j2, k3, len, pr, rm8, xd, xe, xLTy, yd, x3 = this, Ctor = x3.constructor;
+    var d2, e2, i2, j2, k3, len, pr, rm9, xd, xe, xLTy, yd, x3 = this, Ctor = x3.constructor;
     y2 = new Ctor(y2);
     if (!x3.d || !y2.d) {
       if (!x3.s || !y2.s)
@@ -210747,15 +210747,15 @@ var init_decimal = __esm(() => {
     xd = x3.d;
     yd = y2.d;
     pr = Ctor.precision;
-    rm8 = Ctor.rounding;
+    rm9 = Ctor.rounding;
     if (!xd[0] || !yd[0]) {
       if (yd[0])
         y2.s = -y2.s;
       else if (xd[0])
         y2 = new Ctor(x3);
       else
-        return new Ctor(rm8 === 3 ? -0 : 0);
-      return external2 ? finalise(y2, pr, rm8) : y2;
+        return new Ctor(rm9 === 3 ? -0 : 0);
+      return external2 ? finalise(y2, pr, rm9) : y2;
     }
     e2 = mathfloor(y2.e / LOG_BASE);
     xe = mathfloor(x3.e / LOG_BASE);
@@ -210818,10 +210818,10 @@ var init_decimal = __esm(() => {
     for (;xd[0] === 0; xd.shift())
       --e2;
     if (!xd[0])
-      return new Ctor(rm8 === 3 ? -0 : 0);
+      return new Ctor(rm9 === 3 ? -0 : 0);
     y2.d = xd;
     y2.e = getBase10Exponent(xd, e2);
-    return external2 ? finalise(y2, pr, rm8) : y2;
+    return external2 ? finalise(y2, pr, rm9) : y2;
   };
   P3.modulo = P3.mod = function(y2) {
     var q, x3 = this, Ctor = x3.constructor;
@@ -210854,7 +210854,7 @@ var init_decimal = __esm(() => {
     return finalise(x3);
   };
   P3.plus = P3.add = function(y2) {
-    var carry, d2, e2, i2, k3, len, pr, rm8, xd, yd, x3 = this, Ctor = x3.constructor;
+    var carry, d2, e2, i2, k3, len, pr, rm9, xd, yd, x3 = this, Ctor = x3.constructor;
     y2 = new Ctor(y2);
     if (!x3.d || !y2.d) {
       if (!x3.s || !y2.s)
@@ -210870,11 +210870,11 @@ var init_decimal = __esm(() => {
     xd = x3.d;
     yd = y2.d;
     pr = Ctor.precision;
-    rm8 = Ctor.rounding;
+    rm9 = Ctor.rounding;
     if (!xd[0] || !yd[0]) {
       if (!yd[0])
         y2 = new Ctor(x3);
-      return external2 ? finalise(y2, pr, rm8) : y2;
+      return external2 ? finalise(y2, pr, rm9) : y2;
     }
     k3 = mathfloor(x3.e / LOG_BASE);
     e2 = mathfloor(y2.e / LOG_BASE);
@@ -210921,7 +210921,7 @@ var init_decimal = __esm(() => {
       xd.pop();
     y2.d = xd;
     y2.e = getBase10Exponent(xd, e2);
-    return external2 ? finalise(y2, pr, rm8) : y2;
+    return external2 ? finalise(y2, pr, rm9) : y2;
   };
   P3.precision = P3.sd = function(z3) {
     var k3, x3 = this;
@@ -210941,19 +210941,19 @@ var init_decimal = __esm(() => {
     return finalise(new Ctor(x3), x3.e + 1, Ctor.rounding);
   };
   P3.sine = P3.sin = function() {
-    var pr, rm8, x3 = this, Ctor = x3.constructor;
+    var pr, rm9, x3 = this, Ctor = x3.constructor;
     if (!x3.isFinite())
       return new Ctor(NaN);
     if (x3.isZero())
       return new Ctor(x3);
     pr = Ctor.precision;
-    rm8 = Ctor.rounding;
+    rm9 = Ctor.rounding;
     Ctor.precision = pr + Math.max(x3.e, x3.sd()) + LOG_BASE;
     Ctor.rounding = 1;
     x3 = sine(Ctor, toLessThanHalfPi(Ctor, x3));
     Ctor.precision = pr;
-    Ctor.rounding = rm8;
-    return finalise(quadrant > 2 ? x3.neg() : x3, pr, rm8, true);
+    Ctor.rounding = rm9;
+    return finalise(quadrant > 2 ? x3.neg() : x3, pr, rm9, true);
   };
   P3.squareRoot = P3.sqrt = function() {
     var m3, n2, sd, r2, rep, t2, x3 = this, d2 = x3.d, e2 = x3.e, s3 = x3.s, Ctor = x3.constructor;
@@ -211007,21 +211007,21 @@ var init_decimal = __esm(() => {
     return finalise(r2, e2, Ctor.rounding, m3);
   };
   P3.tangent = P3.tan = function() {
-    var pr, rm8, x3 = this, Ctor = x3.constructor;
+    var pr, rm9, x3 = this, Ctor = x3.constructor;
     if (!x3.isFinite())
       return new Ctor(NaN);
     if (x3.isZero())
       return new Ctor(x3);
     pr = Ctor.precision;
-    rm8 = Ctor.rounding;
+    rm9 = Ctor.rounding;
     Ctor.precision = pr + 10;
     Ctor.rounding = 1;
     x3 = x3.sin();
     x3.s = 1;
     x3 = divide(x3, new Ctor(1).minus(x3.times(x3)).sqrt(), pr + 10, 0);
     Ctor.precision = pr;
-    Ctor.rounding = rm8;
-    return finalise(quadrant == 2 || quadrant == 4 ? x3.neg() : x3, pr, rm8, true);
+    Ctor.rounding = rm9;
+    return finalise(quadrant == 2 || quadrant == 4 ? x3.neg() : x3, pr, rm9, true);
   };
   P3.times = P3.mul = function(y2) {
     var carry, e2, i2, k3, r2, rL, t2, xdL, ydL, x3 = this, Ctor = x3.constructor, xd = x3.d, yd = (y2 = new Ctor(y2)).d;
@@ -211063,47 +211063,47 @@ var init_decimal = __esm(() => {
     y2.e = getBase10Exponent(r2, e2);
     return external2 ? finalise(y2, Ctor.precision, Ctor.rounding) : y2;
   };
-  P3.toBinary = function(sd, rm8) {
-    return toStringBinary(this, 2, sd, rm8);
+  P3.toBinary = function(sd, rm9) {
+    return toStringBinary(this, 2, sd, rm9);
   };
-  P3.toDecimalPlaces = P3.toDP = function(dp, rm8) {
+  P3.toDecimalPlaces = P3.toDP = function(dp, rm9) {
     var x3 = this, Ctor = x3.constructor;
     x3 = new Ctor(x3);
     if (dp === undefined)
       return x3;
     checkInt32(dp, 0, MAX_DIGITS);
-    if (rm8 === undefined)
-      rm8 = Ctor.rounding;
+    if (rm9 === undefined)
+      rm9 = Ctor.rounding;
     else
-      checkInt32(rm8, 0, 8);
-    return finalise(x3, dp + x3.e + 1, rm8);
+      checkInt32(rm9, 0, 8);
+    return finalise(x3, dp + x3.e + 1, rm9);
   };
-  P3.toExponential = function(dp, rm8) {
+  P3.toExponential = function(dp, rm9) {
     var str, x3 = this, Ctor = x3.constructor;
     if (dp === undefined) {
       str = finiteToString(x3, true);
     } else {
       checkInt32(dp, 0, MAX_DIGITS);
-      if (rm8 === undefined)
-        rm8 = Ctor.rounding;
+      if (rm9 === undefined)
+        rm9 = Ctor.rounding;
       else
-        checkInt32(rm8, 0, 8);
-      x3 = finalise(new Ctor(x3), dp + 1, rm8);
+        checkInt32(rm9, 0, 8);
+      x3 = finalise(new Ctor(x3), dp + 1, rm9);
       str = finiteToString(x3, true, dp + 1);
     }
     return x3.isNeg() && !x3.isZero() ? "-" + str : str;
   };
-  P3.toFixed = function(dp, rm8) {
+  P3.toFixed = function(dp, rm9) {
     var str, y2, x3 = this, Ctor = x3.constructor;
     if (dp === undefined) {
       str = finiteToString(x3);
     } else {
       checkInt32(dp, 0, MAX_DIGITS);
-      if (rm8 === undefined)
-        rm8 = Ctor.rounding;
+      if (rm9 === undefined)
+        rm9 = Ctor.rounding;
       else
-        checkInt32(rm8, 0, 8);
-      y2 = finalise(new Ctor(x3), dp + x3.e + 1, rm8);
+        checkInt32(rm9, 0, 8);
+      y2 = finalise(new Ctor(x3), dp + x3.e + 1, rm9);
       str = finiteToString(y2, false, dp + y2.e + 1);
     }
     return x3.isNeg() && !x3.isZero() ? "-" + str : str;
@@ -211153,23 +211153,23 @@ var init_decimal = __esm(() => {
     external2 = true;
     return r2;
   };
-  P3.toHexadecimal = P3.toHex = function(sd, rm8) {
-    return toStringBinary(this, 16, sd, rm8);
+  P3.toHexadecimal = P3.toHex = function(sd, rm9) {
+    return toStringBinary(this, 16, sd, rm9);
   };
-  P3.toNearest = function(y2, rm8) {
+  P3.toNearest = function(y2, rm9) {
     var x3 = this, Ctor = x3.constructor;
     x3 = new Ctor(x3);
     if (y2 == null) {
       if (!x3.d)
         return x3;
       y2 = new Ctor(1);
-      rm8 = Ctor.rounding;
+      rm9 = Ctor.rounding;
     } else {
       y2 = new Ctor(y2);
-      if (rm8 === undefined) {
-        rm8 = Ctor.rounding;
+      if (rm9 === undefined) {
+        rm9 = Ctor.rounding;
       } else {
-        checkInt32(rm8, 0, 8);
+        checkInt32(rm9, 0, 8);
       }
       if (!x3.d)
         return y2.s ? x3 : y2;
@@ -211181,7 +211181,7 @@ var init_decimal = __esm(() => {
     }
     if (y2.d[0]) {
       external2 = false;
-      x3 = divide(x3, y2, 0, rm8, 1).times(y2);
+      x3 = divide(x3, y2, 0, rm9, 1).times(y2);
       external2 = true;
       finalise(x3);
     } else {
@@ -211193,24 +211193,24 @@ var init_decimal = __esm(() => {
   P3.toNumber = function() {
     return +this;
   };
-  P3.toOctal = function(sd, rm8) {
-    return toStringBinary(this, 8, sd, rm8);
+  P3.toOctal = function(sd, rm9) {
+    return toStringBinary(this, 8, sd, rm9);
   };
   P3.toPower = P3.pow = function(y2) {
-    var e2, k3, pr, r2, rm8, s3, x3 = this, Ctor = x3.constructor, yn = +(y2 = new Ctor(y2));
+    var e2, k3, pr, r2, rm9, s3, x3 = this, Ctor = x3.constructor, yn = +(y2 = new Ctor(y2));
     if (!x3.d || !y2.d || !x3.d[0] || !y2.d[0])
       return new Ctor(mathpow(+x3, yn));
     x3 = new Ctor(x3);
     if (x3.eq(1))
       return x3;
     pr = Ctor.precision;
-    rm8 = Ctor.rounding;
+    rm9 = Ctor.rounding;
     if (y2.eq(1))
-      return finalise(x3, pr, rm8);
+      return finalise(x3, pr, rm9);
     e2 = mathfloor(y2.e / LOG_BASE);
     if (e2 >= y2.d.length - 1 && (k3 = yn < 0 ? -yn : yn) <= MAX_SAFE_INTEGER) {
       r2 = intPow(Ctor, x3, k3, pr);
-      return y2.s < 0 ? new Ctor(1).div(r2) : finalise(r2, pr, rm8);
+      return y2.s < 0 ? new Ctor(1).div(r2) : finalise(r2, pr, rm9);
     }
     s3 = x3.s;
     if (s3 < 0) {
@@ -211233,7 +211233,7 @@ var init_decimal = __esm(() => {
     r2 = naturalExponential(y2.times(naturalLogarithm(x3, pr + k3)), pr);
     if (r2.d) {
       r2 = finalise(r2, pr + 5, 1);
-      if (checkRoundingDigits(r2.d, pr, rm8)) {
+      if (checkRoundingDigits(r2.d, pr, rm9)) {
         e2 = pr + 10;
         r2 = finalise(naturalExponential(y2.times(naturalLogarithm(x3, e2 + k3)), e2), e2 + 5, 1);
         if (+digitsToString(r2.d).slice(pr + 1, pr + 15) + 1 == 100000000000000) {
@@ -211243,37 +211243,37 @@ var init_decimal = __esm(() => {
     }
     r2.s = s3;
     external2 = true;
-    Ctor.rounding = rm8;
-    return finalise(r2, pr, rm8);
+    Ctor.rounding = rm9;
+    return finalise(r2, pr, rm9);
   };
-  P3.toPrecision = function(sd, rm8) {
+  P3.toPrecision = function(sd, rm9) {
     var str, x3 = this, Ctor = x3.constructor;
     if (sd === undefined) {
       str = finiteToString(x3, x3.e <= Ctor.toExpNeg || x3.e >= Ctor.toExpPos);
     } else {
       checkInt32(sd, 1, MAX_DIGITS);
-      if (rm8 === undefined)
-        rm8 = Ctor.rounding;
+      if (rm9 === undefined)
+        rm9 = Ctor.rounding;
       else
-        checkInt32(rm8, 0, 8);
-      x3 = finalise(new Ctor(x3), sd, rm8);
+        checkInt32(rm9, 0, 8);
+      x3 = finalise(new Ctor(x3), sd, rm9);
       str = finiteToString(x3, sd <= x3.e || x3.e <= Ctor.toExpNeg, sd);
     }
     return x3.isNeg() && !x3.isZero() ? "-" + str : str;
   };
-  P3.toSignificantDigits = P3.toSD = function(sd, rm8) {
+  P3.toSignificantDigits = P3.toSD = function(sd, rm9) {
     var x3 = this, Ctor = x3.constructor;
     if (sd === undefined) {
       sd = Ctor.precision;
-      rm8 = Ctor.rounding;
+      rm9 = Ctor.rounding;
     } else {
       checkInt32(sd, 1, MAX_DIGITS);
-      if (rm8 === undefined)
-        rm8 = Ctor.rounding;
+      if (rm9 === undefined)
+        rm9 = Ctor.rounding;
       else
-        checkInt32(rm8, 0, 8);
+        checkInt32(rm9, 0, 8);
     }
-    return finalise(new Ctor(x3), sd, rm8);
+    return finalise(new Ctor(x3), sd, rm9);
   };
   P3.toString = function() {
     var x3 = this, Ctor = x3.constructor, str = finiteToString(x3, x3.e <= Ctor.toExpNeg || x3.e >= Ctor.toExpPos);
@@ -211322,7 +211322,7 @@ var init_decimal = __esm(() => {
       for (;!a2[0] && a2.length > 1; )
         a2.shift();
     }
-    return function(x3, y2, pr, rm8, dp, base) {
+    return function(x3, y2, pr, rm9, dp, base) {
       var cmp, e2, i2, k3, logBase, more, prod, prodL, q, qd, rem, remL, rem0, sd, t2, xi, xL, yd0, yL, yz, Ctor = x3.constructor, sign = x3.s == y2.s ? 1 : -1, xd = x3.d, yd = y2.d;
       if (!xd || !xd[0] || !yd || !yd[0]) {
         return new Ctor(!x3.s || !y2.s || (xd ? yd && xd[0] == yd[0] : !yd) ? NaN : xd && xd[0] == 0 || !yd ? sign * 0 : sign / 0);
@@ -211345,7 +211345,7 @@ var init_decimal = __esm(() => {
         e2--;
       if (pr == null) {
         sd = pr = Ctor.precision;
-        rm8 = Ctor.rounding;
+        rm9 = Ctor.rounding;
       } else if (dp) {
         sd = pr + (x3.e - y2.e) + 1;
       } else {
@@ -211446,7 +211446,7 @@ var init_decimal = __esm(() => {
         for (i2 = 1, k3 = qd[0];k3 >= 10; k3 /= 10)
           i2++;
         q.e = i2 + e2 * logBase - 1;
-        finalise(q, dp ? pr + q.e + 1 : pr, rm8, more);
+        finalise(q, dp ? pr + q.e + 1 : pr, rm9, more);
       }
       return q;
     };
@@ -215114,9 +215114,9 @@ var import_cuid, import_json_stable_stringify, import_toposort, ORMErrorReason, 
       return query;
     }
     const joinAlias = tmpAlias(`${modelAlias}$ob$${index}`);
-    const joined = query.leftJoin(`${relationModel} as ${joinAlias}`, (join18) => {
+    const joined = query.leftJoin(`${relationModel} as ${joinAlias}`, (join19) => {
       const joinPairs = buildJoinPairs(this.schema, model, modelAlias, field3, joinAlias);
-      return join18.on((eb) => this.and(...joinPairs.map(([left, right]) => eb(this.eb.ref(left), "=", this.eb.ref(right)))));
+      return join19.on((eb) => this.and(...joinPairs.map(([left, right]) => eb(this.eb.ref(left), "=", this.eb.ref(right)))));
     });
     return this.buildOrderBy(joined, relationModel, joinAlias, value, negated, take);
   }
@@ -215251,7 +215251,7 @@ var import_cuid, import_json_stable_stringify, import_toposort, ORMErrorReason, 
       const subQueryAlias = tmpAlias(`${parentAlias}$_${field3}$count`);
       const m2m = getManyToManyRelation(this.schema, model, field3);
       if (m2m)
-        fieldCountQuery = this.buildModelSelect(fieldModel, subQueryAlias, value, false).innerJoin(m2m.joinTable, (join18) => join18.onRef(`${m2m.joinTable}.${m2m.otherFkName}`, "=", `${subQueryAlias}.${m2m.otherPKName}`).onRef(`${m2m.joinTable}.${m2m.parentFkName}`, "=", `${parentAlias}.${m2m.parentPKName}`)).select(eb.fn.countAll().as(`_count$${field3}`));
+        fieldCountQuery = this.buildModelSelect(fieldModel, subQueryAlias, value, false).innerJoin(m2m.joinTable, (join19) => join19.onRef(`${m2m.joinTable}.${m2m.otherFkName}`, "=", `${subQueryAlias}.${m2m.otherPKName}`).onRef(`${m2m.joinTable}.${m2m.parentFkName}`, "=", `${parentAlias}.${m2m.parentPKName}`)).select(eb.fn.countAll().as(`_count$${field3}`));
       else {
         fieldCountQuery = this.buildModelSelect(fieldModel, subQueryAlias, value, false).select(eb.fn.countAll().as(`_count$${field3}`));
         const joinPairs = buildJoinPairs(this.schema, model, parentAlias, field3, subQueryAlias);
@@ -219288,7 +219288,7 @@ var init_dist6 = __esm(() => {
         tbl = this.buildRelationObjectSelect(relationModel, relationSelectName, relationFieldDef, tbl, payload, resultName);
         tbl = this.buildRelationJoins(tbl, relationModel, relationSelectName, payload, resultName);
         return tbl.as(resultName);
-      }, (join18) => join18.onTrue());
+      }, (join19) => join19.onTrue());
     }
     buildRelationJoinFilter(query, model, relationField, relationModel, relationModelAlias, parentAlias) {
       const m2m = getManyToManyRelation(this.schema, model, relationField);
@@ -221328,16 +221328,16 @@ var init_dist6 = __esm(() => {
       const processedFroms = node.from.froms.map((from) => this.processSelectTable(from));
       const processedJoins = [];
       const cumulativeScopes = [...processedFroms.map(({ scope }) => scope)];
-      for (const join18 of node.joins ?? []) {
-        const processedJoin = this.withScopes(cumulativeScopes, () => this.processSelectTable(join18.table));
+      for (const join19 of node.joins ?? []) {
+        const processedJoin = this.withScopes(cumulativeScopes, () => this.processSelectTable(join19.table));
         processedJoins.push(processedJoin);
         cumulativeScopes.push(processedJoin.scope);
       }
       return this.withScopes(cumulativeScopes, () => {
-        const joins = node.joins ? node.joins.map((join18, i2) => ({
-          ...join18,
+        const joins = node.joins ? node.joins.map((join19, i2) => ({
+          ...join19,
           table: processedJoins[i2].node,
-          on: this.transformNode(join18.on)
+          on: this.transformNode(join19.on)
         })) : undefined;
         const selections = this.processSelectQuerySelections(node);
         return {
@@ -233624,7 +233624,7 @@ var ColumnCollector, ExpressionEvaluator = class {
   transformManyToManyRelationAccess(m2m, context, relationAlias) {
     const eb = expressionBuilder();
     const joinTableAlias = `${relationAlias}$join`;
-    return eb.selectFrom(`${m2m.otherModel} as ${relationAlias}`).innerJoin(`${m2m.joinTable} as ${joinTableAlias}`, (join23) => join23.onRef(`${relationAlias}.${m2m.otherPKName}`, "=", `${joinTableAlias}.${m2m.otherFkName}`).onRef(`${joinTableAlias}.${m2m.parentFkName}`, "=", `${context.alias ?? context.modelOrType}.${m2m.parentPKName}`)).toOperationNode();
+    return eb.selectFrom(`${m2m.otherModel} as ${relationAlias}`).innerJoin(`${m2m.joinTable} as ${joinTableAlias}`, (join24) => join24.onRef(`${relationAlias}.${m2m.otherPKName}`, "=", `${joinTableAlias}.${m2m.otherFkName}`).onRef(`${joinTableAlias}.${m2m.parentFkName}`, "=", `${context.alias ?? context.modelOrType}.${m2m.parentPKName}`)).toOperationNode();
   }
   createColumnRef(column, context) {
     const tableName = context.alias ?? context.modelOrType;
@@ -233994,8 +233994,8 @@ var init_dist8 = __esm(() => {
         const rows = beforeUpdateInfo.rows.map((r2) => beforeUpdateInfo.fields.map((f3) => r2[f3]));
         beforeUpdateTable = this.dialect.buildValuesTableSelect(fieldDefs, rows).toOperationNode();
       }
-      if (!(await proceed(eb.selectFrom(model).select(() => [eb(eb.fn("COUNT", [eb.lit(1)]), "=", Number(updateResult.numAffectedRows ?? 0)).as("$condition")]).where(() => new ExpressionWrapper(conjunction(this.dialect, [idConditions, postUpdateFilter]))).$if(needsBeforeUpdateJoin, (qb) => qb.leftJoin(() => new ExpressionWrapper(beforeUpdateTable).as("$before"), (join23) => {
-        return query_utils_exports.requireIdFields(this.client.$schema, model).reduce((acc, f3) => acc.onRef(`${model}.${f3}`, "=", `$before.${f3}`), join23);
+      if (!(await proceed(eb.selectFrom(model).select(() => [eb(eb.fn("COUNT", [eb.lit(1)]), "=", Number(updateResult.numAffectedRows ?? 0)).as("$condition")]).where(() => new ExpressionWrapper(conjunction(this.dialect, [idConditions, postUpdateFilter]))).$if(needsBeforeUpdateJoin, (qb) => qb.leftJoin(() => new ExpressionWrapper(beforeUpdateTable).as("$before"), (join24) => {
+        return query_utils_exports.requireIdFields(this.client.$schema, model).reduce((acc, f3) => acc.onRef(`${model}.${f3}`, "=", `$before.${f3}`), join24);
       })).toOperationNode())).rows[0]?.$condition)
         throw createRejectedByPolicyError2(model, RejectedByPolicyReason.NO_ACCESS, "some or all updated rows failed to pass post-update policy check");
     }
@@ -234612,7 +234612,7 @@ var init_dist8 = __esm(() => {
 });
 
 // frontend/packages/miniapp-kit/src/cli.ts
-import { dirname as dirname14, resolve as resolve5 } from "node:path";
+import { dirname as dirname15, resolve as resolve5 } from "node:path";
 import { fileURLToPath } from "node:url";
 
 // frontend/packages/miniapp-kit/src/args.ts
@@ -241175,9 +241175,9 @@ ${untracked.code === 0 ? untracked.stdout : ""}`.split(`
 // frontend/packages/miniapp-kit/src/commands.ts
 import { createHash as createHash12, randomUUID as randomUUID4 } from "node:crypto";
 import { existsSync as existsSync27 } from "node:fs";
-import { mkdir as mkdir15, readdir as readdir13, readFile as readFile26, writeFile as writeFile18 } from "node:fs/promises";
+import { mkdir as mkdir16, readdir as readdir13, readFile as readFile27, writeFile as writeFile19 } from "node:fs/promises";
 import { homedir } from "node:os";
-import { dirname as dirname13, join as join41, resolve as resolve4 } from "node:path";
+import { dirname as dirname14, join as join42, resolve as resolve4 } from "node:path";
 import { createInterface } from "node:readline";
 // frontend/packages/project-host/src/open.ts
 init_zod();
@@ -241450,14 +241450,14 @@ function openInBrowser(url2) {
 // frontend/packages/miniapp-kit/src/build.ts
 import { spawn as spawn3 } from "node:child_process";
 import { existsSync as existsSync15, readFileSync as readFileSync3 } from "node:fs";
-import { lstat as lstat2, mkdir as mkdir5, readFile as readFile10, rm as rm8, writeFile as writeFile6 } from "node:fs/promises";
+import { readFile as readFile11, rm as rm9, writeFile as writeFile7 } from "node:fs/promises";
 import { createRequire as createRequire10 } from "node:module";
-import { dirname as dirname6, join as join20 } from "node:path";
+import { dirname as dirname7, join as join21 } from "node:path";
 
 // frontend/packages/miniapp-kit/src/generate.ts
 import { existsSync as existsSync12 } from "node:fs";
-import { mkdir as mkdir3, mkdtemp as mkdtemp3, readdir as readdir8, readFile as readFile7, rename, rm as rm6, writeFile as writeFile4 } from "node:fs/promises";
-import { dirname as dirname4, join as join15, relative as relative2 } from "node:path";
+import { mkdir as mkdir4, mkdtemp as mkdtemp4, readdir as readdir8, readFile as readFile8, rename as rename2, rm as rm7, writeFile as writeFile5 } from "node:fs/promises";
+import { dirname as dirname5, join as join16, relative as relative2 } from "node:path";
 
 // frontend/packages/miniapp-kit/src/env-types.ts
 var SERVER_ENV_TYPES_PATH = "packages/sdk/src/env.ts";
@@ -241497,10 +241497,62 @@ function renderServerEnvTypes(manifest2) {
 `;
 }
 
+// frontend/packages/miniapp-kit/src/sdk-scaffold.ts
+import { lstat, mkdir as mkdir2, mkdtemp as mkdtemp3, readFile as readFile6, rename, rm as rm5, writeFile as writeFile3 } from "node:fs/promises";
+import { dirname as dirname4, join as join14 } from "node:path";
+var SDK_SCAFFOLD = ["package.json", "tsconfig.json", "src/index.ts", "src/globals.d.ts"];
+async function assertSdkScaffoldPaths(root) {
+  for (const file2 of SDK_SCAFFOLD) {
+    let path = root;
+    for (const part of ["packages", "sdk", ...file2.split("/")]) {
+      path = join14(path, part);
+      try {
+        if ((await lstat(path)).isSymbolicLink())
+          throw new Error("SDK scaffold path is a symlink");
+      } catch (error51) {
+        if (!(error51 instanceof Error && ("code" in error51) && error51.code === "ENOENT"))
+          throw error51;
+      }
+    }
+  }
+}
+async function restoreSdkDeclaration(root, kitRoot) {
+  await restoreFiles(root, kitRoot, ["package.json"]);
+}
+async function restoreSdkScaffold(root, kitRoot) {
+  await restoreFiles(root, kitRoot, SDK_SCAFFOLD);
+}
+async function restoreFiles(root, kitRoot, files) {
+  await assertSdkScaffoldPaths(root);
+  const templates = await Promise.all(files.map(async (file2) => ({
+    file: file2,
+    bytes: await readFile6(join14(kitRoot, "templates/project/packages/sdk", file2))
+  })));
+  for (const { file: file2, bytes: bytes3 } of templates) {
+    const target2 = join14(root, "packages/sdk", file2);
+    try {
+      if ((await readFile6(target2)).equals(bytes3))
+        continue;
+    } catch (error51) {
+      if (!(error51 instanceof Error && ("code" in error51) && error51.code === "ENOENT"))
+        throw error51;
+    }
+    await mkdir2(dirname4(target2), { recursive: true });
+    const temporary = await mkdtemp3(join14(dirname4(target2), ".sdk-scaffold-"));
+    try {
+      const staged = join14(temporary, "replacement");
+      await writeFile3(staged, bytes3);
+      await rename(staged, target2);
+    } finally {
+      await rm5(temporary, { recursive: true, force: true });
+    }
+  }
+}
+
 // frontend/packages/miniapp-kit/src/vendor.ts
 import { existsSync as existsSync11 } from "node:fs";
-import { cp, mkdir as mkdir2, readdir as readdir7, readFile as readFile6, rm as rm5, writeFile as writeFile3 } from "node:fs/promises";
-import { join as join14 } from "node:path";
+import { cp, mkdir as mkdir3, readdir as readdir7, readFile as readFile7, rm as rm6, writeFile as writeFile4 } from "node:fs/promises";
+import { join as join15 } from "node:path";
 var VENDORED_PACKAGES = [
   { name: "@workspace/project-protocol", dir: "project-protocol" },
   { name: "@workspace/miniapp-sdk", dir: "miniapp-sdk" }
@@ -241516,14 +241568,14 @@ async function readTree3(root) {
   if (!existsSync11(root))
     return files;
   const walk = async (relative2) => {
-    for (const entry of await readdir7(join14(root, relative2), { withFileTypes: true })) {
+    for (const entry of await readdir7(join15(root, relative2), { withFileTypes: true })) {
       if (relative2 === "" && entry.name === "node_modules")
         continue;
       const path = relative2 === "" ? entry.name : `${relative2}/${entry.name}`;
       if (entry.isDirectory())
         await walk(path);
       else
-        files.set(path, await readFile6(join14(root, path), "base64"));
+        files.set(path, await readFile7(join15(root, path), "base64"));
     }
   };
   await walk("");
@@ -241540,20 +241592,20 @@ function sameTree2(a, b2) {
 async function placeVendoredPackages(root, kitRoot) {
   const result = {};
   for (const pkg of VENDORED_PACKAGES) {
-    const source = join14(kitRoot, KIT_VENDOR_DIR, pkg.dir);
-    if (!existsSync11(join14(source, "package.json"))) {
+    const source = join15(kitRoot, KIT_VENDOR_DIR, pkg.dir);
+    if (!existsSync11(join15(source, "package.json"))) {
       throw new VendorError(`the Kit has no ${KIT_VENDOR_DIR}/${pkg.dir} (${pkg.name}); the Kit is incomplete, reinstall it`);
     }
-    result[pkg.dir] = await placeTree(source, join14(root, "packages", pkg.dir));
+    result[pkg.dir] = await placeTree(source, join15(root, "packages", pkg.dir));
   }
   return result;
 }
 async function placePythonSdk(root, kitRoot) {
-  const source = join14(kitRoot, KIT_VENDOR_DIR, PYTHON_SDK_DIR);
-  if (!existsSync11(join14(source, "fdpocket/__init__.py"))) {
+  const source = join15(kitRoot, KIT_VENDOR_DIR, PYTHON_SDK_DIR);
+  if (!existsSync11(join15(source, "fdpocket/__init__.py"))) {
     throw new VendorError(`the Kit has no ${KIT_VENDOR_DIR}/${PYTHON_SDK_DIR}; the Kit is incomplete, reinstall it`);
   }
-  return placeTree(source, join14(root, "packages", PYTHON_SDK_DIR));
+  return placeTree(source, join15(root, "packages", PYTHON_SDK_DIR));
 }
 async function placeTree(source, target2) {
   if (sameTree2(await readTree3(source), await readTree3(target2)))
@@ -241562,7 +241614,7 @@ async function placeTree(source, target2) {
   if (existed) {
     for (const entry of await readdir7(target2)) {
       if (entry !== "node_modules")
-        await rm5(join14(target2, entry), { recursive: true, force: true });
+        await rm6(join15(target2, entry), { recursive: true, force: true });
     }
   }
   await cp(source, target2, { recursive: true });
@@ -241583,11 +241635,12 @@ async function generateProject(options2) {
   if (Object.values(manifest2.apps).some((app) => app.kind === "python"))
     vendored["fdpocket-py"] = await placePythonSdk(root, options2.kitRoot);
   const cli = cliOf(root, options2.resolveCli ?? resolveZenStackCli);
-  const sdk = join15(root, PROJECT_PATHS.sdk);
-  const generated = join15(root, PROJECT_PATHS.generated);
-  await mkdir3(generated, { recursive: true });
-  await mkdir3(dirname4(sdk), { recursive: true });
-  const staging = await mkdtemp3(join15(dirname4(sdk), ".zenstack-"));
+  await assertSdkScaffoldPaths(root);
+  const sdk = join16(root, PROJECT_PATHS.sdk);
+  const generated = join16(root, PROJECT_PATHS.generated);
+  await mkdir4(generated, { recursive: true });
+  await mkdir4(dirname5(sdk), { recursive: true });
+  const staging = await mkdtemp4(join16(dirname5(sdk), ".zenstack-"));
   let sdkFiles;
   try {
     await runZen(cli, root, [
@@ -241602,25 +241655,26 @@ async function generateProject(options2) {
     ], fail3);
     const schema = stableJson(await loadSchema(root, staging, fail3));
     const names = (await readdir8(staging)).sort();
-    await mkdir3(sdk, { recursive: true });
+    await restoreSdkScaffold(root, options2.kitRoot);
+    await mkdir4(sdk, { recursive: true });
     for (const name3 of names)
-      await publishGeneratedFile(join15(staging, name3), join15(sdk, name3));
+      await publishGeneratedFile(join16(staging, name3), join16(sdk, name3));
     for (const name3 of await readdir8(sdk)) {
       if (!names.includes(name3))
-        await rm6(join15(sdk, name3), { recursive: true, force: true });
+        await rm7(join16(sdk, name3), { recursive: true, force: true });
     }
     for (const [name3, target2, content] of [
-      ["project.json", join15(generated, "project.json"), stableJson(manifest2)],
-      ["schema.json", join15(generated, "schema.json"), schema],
-      ["env.ts", join15(root, SERVER_ENV_TYPES_PATH), renderServerEnvTypes(manifest2)]
+      ["project.json", join16(generated, "project.json"), stableJson(manifest2)],
+      ["schema.json", join16(generated, "schema.json"), schema],
+      ["env.ts", join16(root, SERVER_ENV_TYPES_PATH), renderServerEnvTypes(manifest2)]
     ]) {
-      const staged = join15(staging, name3);
-      await writeFile4(staged, content);
+      const staged = join16(staging, name3);
+      await writeFile5(staged, content);
       await publishGeneratedFile(staged, target2);
     }
     sdkFiles = names.map((name3) => `${PROJECT_PATHS.sdk}/${name3}`);
   } finally {
-    await rm6(staging, { recursive: true, force: true });
+    await rm7(staging, { recursive: true, force: true });
   }
   return {
     platform,
@@ -241636,23 +241690,23 @@ async function generateProject(options2) {
   };
 }
 async function publishGeneratedFile(staged, target2) {
-  const bytes3 = await readFile7(staged);
+  const bytes3 = await readFile8(staged);
   try {
-    if (bytes3.equals(await readFile7(target2)))
+    if (bytes3.equals(await readFile8(target2)))
       return;
   } catch (error51) {
     if (error51.code !== "ENOENT")
       throw error51;
   }
-  await mkdir3(dirname4(target2), { recursive: true });
-  await rename(staged, target2);
+  await mkdir4(dirname5(target2), { recursive: true });
+  await rename2(staged, target2);
 }
 async function readManifestSource(root) {
-  const path = join15(root, PROJECT_PATHS.manifest);
+  const path = join16(root, PROJECT_PATHS.manifest);
   if (!existsSync12(path))
     throw new GenerateError(`${PROJECT_PATHS.manifest} is missing`);
   try {
-    return $parse(await readFile7(path, "utf8"));
+    return $parse(await readFile8(path, "utf8"));
   } catch (error51) {
     throw new GenerateError(`${PROJECT_PATHS.manifest} is not valid YAML: ${error51 instanceof Error ? error51.message : String(error51)}`);
   }
@@ -241669,13 +241723,13 @@ ${lines.join(`
   return { manifest: normalizeProjectManifest(parsed.manifest).manifest, warnings: parsed.warnings };
 }
 async function placePlatform(root, kitRoot) {
-  const kitCopy = await readFile7(join15(kitRoot, KIT_PLATFORM_ZMODEL), "utf8");
-  const path = join15(root, PROJECT_PATHS.platform);
-  const current = existsSync12(path) ? await readFile7(path, "utf8") : null;
+  const kitCopy = await readFile8(join16(kitRoot, KIT_PLATFORM_ZMODEL), "utf8");
+  const path = join16(root, PROJECT_PATHS.platform);
+  const current = existsSync12(path) ? await readFile8(path, "utf8") : null;
   if (current === kitCopy)
     return "unchanged";
-  await mkdir3(dirname4(path), { recursive: true });
-  await writeFile4(path, kitCopy);
+  await mkdir4(dirname5(path), { recursive: true });
+  await writeFile5(path, kitCopy);
   return current === null ? "created" : "restored";
 }
 function cliOf(root, resolve2) {
@@ -241689,8 +241743,8 @@ var fail3 = (message2) => new GenerateError(message2);
 
 // frontend/packages/miniapp-kit/src/pack.ts
 import { createHash as createHash4 } from "node:crypto";
-import { lstat, readdir as readdir9, readFile as readFile8 } from "node:fs/promises";
-import { join as join16 } from "node:path";
+import { lstat as lstat2, readdir as readdir9, readFile as readFile9 } from "node:fs/promises";
+import { join as join17 } from "node:path";
 
 // frontend/packages/miniapp-kit/src/tar.ts
 import { gzipSync } from "node:zlib";
@@ -241763,12 +241817,12 @@ async function collectFiles(root, options2 = {}) {
   let size = 0;
   const files = [];
   const walk = async (relative3) => {
-    const entries = await readdir9(join16(root, relative3), { withFileTypes: true });
+    const entries = await readdir9(join17(root, relative3), { withFileTypes: true });
     for (const entry of entries) {
       const path = relative3 === "" ? entry.name : `${relative3}/${entry.name}`;
       if (options2.include && !options2.include(path, entry.isDirectory()))
         continue;
-      const info = await lstat(join16(root, path));
+      const info = await lstat2(join17(root, path));
       if (info.isSymbolicLink()) {
         throw new PackError(`${path} is a symbolic link; Platform rejects links, copy the file instead`);
       }
@@ -241777,7 +241831,7 @@ async function collectFiles(root, options2 = {}) {
       else if (info.isFile()) {
         if (files.length >= (options2.maxFiles ?? Infinity) || size + info.size > (options2.maxBytes ?? Infinity))
           throw new PackError("Source collection exceeds the file or byte limit");
-        const bytes3 = new Uint8Array(await readFile8(join16(root, path)));
+        const bytes3 = new Uint8Array(await readFile9(join17(root, path)));
         size += bytes3.byteLength;
         if (size > (options2.maxBytes ?? Infinity))
           throw new PackError("Source collection exceeds the byte limit");
@@ -241814,8 +241868,8 @@ function describeFile(bytes3) {
 
 // frontend/packages/miniapp-kit/src/python-build.ts
 import { existsSync as existsSync13 } from "node:fs";
-import { cp as cp2, mkdir as mkdir4, rm as rm7 } from "node:fs/promises";
-import { basename, join as join17 } from "node:path";
+import { cp as cp2, mkdir as mkdir5, rm as rm8 } from "node:fs/promises";
+import { basename, join as join18 } from "node:path";
 class PythonBuildError extends Error {
   name = "PythonBuildError";
 }
@@ -241823,32 +241877,32 @@ var ROOT_FILES = ["pyproject.toml", "uv.lock", ".python-version"];
 var REQUIRED = ["pyproject.toml", "uv.lock"];
 var SKIPPED = new Set(["__pycache__", ".venv", ".pytest_cache", ".mypy_cache", ".ruff_cache"]);
 async function copyPythonApp(input) {
-  const appDir = join17(input.root, "apps", input.slug);
+  const appDir = join18(input.root, "apps", input.slug);
   for (const name3 of REQUIRED) {
-    if (!existsSync13(join17(appDir, name3))) {
+    if (!existsSync13(join18(appDir, name3))) {
       throw new PythonBuildError(`apps/${input.slug}/${name3} is missing; python apps need pyproject.toml and a committed uv.lock (uv lock)`);
     }
   }
-  if (!existsSync13(join17(appDir, "src"))) {
+  if (!existsSync13(join18(appDir, "src"))) {
     throw new PythonBuildError(`apps/${input.slug}/src is missing; put the package under src/`);
   }
-  const out = join17(input.root, "dist", input.slug);
-  await rm7(out, { recursive: true, force: true });
-  await mkdir4(out, { recursive: true });
+  const out = join18(input.root, "dist", input.slug);
+  await rm8(out, { recursive: true, force: true });
+  await mkdir5(out, { recursive: true });
   for (const name3 of ROOT_FILES) {
-    if (existsSync13(join17(appDir, name3)))
-      await cp2(join17(appDir, name3), join17(out, name3));
+    if (existsSync13(join18(appDir, name3)))
+      await cp2(join18(appDir, name3), join18(out, name3));
   }
-  await cp2(join17(appDir, "src"), join17(out, "src"), {
+  await cp2(join18(appDir, "src"), join18(out, "src"), {
     recursive: true,
     filter: (path) => !SKIPPED.has(basename(path)) && !path.endsWith(".pyc")
   });
   return "";
 }
 async function listPythonAppFiles(input) {
-  const appDir = join17(input.root, "apps", input.slug);
+  const appDir = join18(input.root, "apps", input.slug);
   for (const name3 of [...REQUIRED, "src"]) {
-    if (!existsSync13(join17(appDir, name3)))
+    if (!existsSync13(join18(appDir, name3)))
       throw new PythonBuildError(`apps/${input.slug}/${name3} is missing (uv lock writes uv.lock)`);
   }
   const limits2 = {
@@ -241866,15 +241920,15 @@ async function listPythonAppFiles(input) {
 
 // frontend/packages/miniapp-kit/src/worker-build.ts
 import { builtinModules } from "node:module";
-import { join as join19 } from "node:path";
+import { join as join20 } from "node:path";
 import { pathToFileURL as pathToFileURL8 } from "node:url";
 
 // frontend/packages/miniapp-kit/src/dev/seed.ts
 import { randomUUID as randomUUID2 } from "node:crypto";
 import { existsSync as existsSync14, readFileSync as readFileSync2 } from "node:fs";
-import { readFile as readFile9, writeFile as writeFile5 } from "node:fs/promises";
+import { readFile as readFile10, writeFile as writeFile6 } from "node:fs/promises";
 import { createRequire as createRequire9 } from "node:module";
-import { dirname as dirname5, join as join18 } from "node:path";
+import { dirname as dirname6, join as join19 } from "node:path";
 import { pathToFileURL as pathToFileURL7 } from "node:url";
 
 // frontend/packages/project-gateway/src/session-seed.ts
@@ -242907,19 +242961,19 @@ function viteImporter(viteEntry, root) {
   };
 }
 function resolveViteEntry(appDir) {
-  const manifestPath = createRequire9(join18(appDir, "package.json")).resolve("vite/package.json");
+  const manifestPath = createRequire9(join19(appDir, "package.json")).resolve("vite/package.json");
   const entry = JSON.parse(readFileSync2(manifestPath, "utf8")).exports?.["."];
   const file2 = typeof entry === "string" ? entry : entry?.import?.default ?? entry?.import;
   if (typeof file2 !== "string")
     throw new Error("vite has no ESM entry");
-  return join18(dirname5(manifestPath), file2);
+  return join19(dirname6(manifestPath), file2);
 }
 var LOCAL_SEED_ENVIRONMENT_ID = "00000000-0000-4000-8000-00000000de01";
 async function generateSeedBundle(input) {
-  const schemaJson = await readFile9(join18(input.root, PROJECT_PATHS.generated, "schema.json"), "utf8");
+  const schemaJson = await readFile10(join19(input.root, PROJECT_PATHS.generated, "schema.json"), "utf8");
   const { aiPrompts } = await prepareSessionRuntime(input.root);
   const data = sessionSeedContextSchema.parse(input.context);
-  const path = join18(input.root, PROJECT_PATHS.seed);
+  const path = join19(input.root, PROJECT_PATHS.seed);
   if (!existsSync14(path))
     return sessionSeedBundleSchema.parse({
       version: 1,
@@ -242951,8 +243005,8 @@ async function runSeed(input) {
       kind: "snapshot",
       sha256: await sessionSeedDigest(JSON.stringify({
         manifest: input.manifest,
-        schema: await readFile9(join18(input.root, PROJECT_PATHS.generated, "schema.json"), "utf8"),
-        seed: existsSync14(join18(input.root, PROJECT_PATHS.seed)) ? await readFile9(join18(input.root, PROJECT_PATHS.seed), "utf8") : null
+        schema: await readFile10(join19(input.root, PROJECT_PATHS.generated, "schema.json"), "utf8"),
+        seed: existsSync14(join19(input.root, PROJECT_PATHS.seed)) ? await readFile10(join19(input.root, PROJECT_PATHS.seed), "utf8") : null
       }))
     },
     initializedAt: new Date().toISOString()
@@ -242964,20 +243018,20 @@ async function runSeed(input) {
     db: input.db,
     artifactHash: await sessionSeedDigest(JSON.stringify(artifact2))
   });
-  return existsSync14(join18(input.root, PROJECT_PATHS.seed));
+  return existsSync14(join19(input.root, PROJECT_PATHS.seed));
 }
 async function writeSeedPlan(input) {
-  const context = sessionSeedContextSchema.parse(JSON.parse(await readFile9(input.contextFile, "utf8")));
+  const context = sessionSeedContextSchema.parse(JSON.parse(await readFile10(input.contextFile, "utf8")));
   const importModule = input.importModule ?? await projectSeedImporter(input.root);
   const bundle = await generateSeedBundle({ root: input.root, context, importModule });
-  await writeFile5(input.output, JSON.stringify(bundle), { mode: 384, flag: "wx" });
+  await writeFile6(input.output, JSON.stringify(bundle), { mode: 384, flag: "wx" });
 }
 async function projectSeedImporter(root) {
-  const manifest2 = JSON.parse(await readFile9(join18(root, PROJECT_PATHS.generated, "project.json"), "utf8"));
+  const manifest2 = JSON.parse(await readFile10(join19(root, PROJECT_PATHS.generated, "project.json"), "utf8"));
   const app = Object.values(manifest2.apps).find((app2) => app2.kind === "web") ?? Object.values(manifest2.apps)[0];
   if (!app)
     throw new SeedError("seed planning requires a Project App dependency tree");
-  return viteImporter(resolveViteEntry(join18(root, "apps", app.slug)), root);
+  return viteImporter(resolveViteEntry(join19(root, "apps", app.slug)), root);
 }
 
 // frontend/packages/miniapp-kit/src/scheduled-worker.ts
@@ -243037,7 +243091,7 @@ export default {
 var NODE_BUILTINS = [/^node:/, ...builtinModules];
 async function buildWorkerBundle(input) {
   const vite = await import(pathToFileURL8(resolveViteEntry(input.appDir)).href);
-  const scheduledEntry = join19(input.appDir, "__platform_scheduled__.ts");
+  const scheduledEntry = join20(input.appDir, "__platform_scheduled__.ts");
   const scheduledModule = "\x00platform-scheduled";
   await vite.build({
     root: input.appDir,
@@ -243052,19 +243106,19 @@ async function buildWorkerBundle(input) {
             return id === scheduledEntry ? scheduledModule : undefined;
           },
           load(id) {
-            return id === scheduledModule ? scheduledWorkerSource(join19(input.appDir, "src/index.ts")) : undefined;
+            return id === scheduledModule ? scheduledWorkerSource(join20(input.appDir, "src/index.ts")) : undefined;
           }
         }
       ] : []
     ],
     build: {
       target: "es2022",
-      outDir: join19(input.root, "dist", input.slug),
+      outDir: join20(input.root, "dist", input.slug),
       emptyOutDir: true,
       copyPublicDir: false,
       sourcemap: false,
       lib: {
-        entry: input.kind === "jobs" ? scheduledEntry : join19(input.appDir, "src/index.ts"),
+        entry: input.kind === "jobs" ? scheduledEntry : join20(input.appDir, "src/index.ts"),
         formats: ["es"],
         fileName: () => "index.js"
       },
@@ -243097,8 +243151,8 @@ async function buildProject(options2) {
     kitRoot,
     ...options2.install ? { install: options2.install } : {}
   });
-  const dist = join20(root, "dist");
-  await rm8(dist, { recursive: true, force: true });
+  const dist = join21(root, "dist");
+  await rm9(dist, { recursive: true, force: true });
   const apps = Object.values(manifest2.apps);
   const env = {
     [KIT_BUILD_ENV.projectId]: options2.projectId,
@@ -243108,7 +243162,7 @@ async function buildProject(options2) {
   for (const app of apps) {
     const input = {
       slug: app.slug,
-      appDir: join20(root, "apps", app.slug),
+      appDir: join21(root, "apps", app.slug),
       env
     };
     const output = app.kind === "web" ? await (options2.runVite ?? viteBuild)(input) : app.kind === "python" ? await copyPythonApp({ root, slug: app.slug }) : await (options2.runWorker ?? buildWorkerBundle)({ ...input, root, kind: app.kind });
@@ -243121,9 +243175,9 @@ async function buildProject(options2) {
   } catch (error51) {
     throw new BuildError(error51 instanceof Error ? error51.message : String(error51));
   }
-  await writeFile6(join20(dist, ARTIFACT_INDEX_PATH), `${JSON.stringify(index, null, 1)}
+  await writeFile7(join21(dist, ARTIFACT_INDEX_PATH), `${JSON.stringify(index, null, 1)}
 `);
-  const schemaVersion = schemaVersionOf(await readFile10(join20(root, PROJECT_PATHS.generated, "schema.json"), "utf8"));
+  const schemaVersion = schemaVersionOf(await readFile11(join21(root, PROJECT_PATHS.generated, "schema.json"), "utf8"));
   return {
     artifactHash: index.artifactHash,
     apps: index.apps,
@@ -243144,16 +243198,16 @@ async function prepareProject(options2) {
   if (seedFindings.length)
     throw new BuildError(seedFindings.map((finding) => finding.message).join(`
 `));
-  const manifest2 = JSON.parse(await readFile10(join20(root, PROJECT_PATHS.generated, "project.json"), "utf8"));
+  const manifest2 = JSON.parse(await readFile11(join21(root, PROJECT_PATHS.generated, "project.json"), "utf8"));
   return { generate, manifest: manifest2 };
 }
 async function checkLockfile2(root) {
-  const path = join20(root, "bun.lock");
+  const path = join21(root, "bun.lock");
   if (!existsSync15(path)) {
     throw new BuildError("bun.lock is missing; run bun install in source/ and commit bun.lock");
   }
   try {
-    const violations = checkBunLockfile(await readFile10(path, "utf8"));
+    const violations = checkBunLockfile(await readFile11(path, "utf8"));
     if (violations.length > 0) {
       const lines = violations.map((v3) => `  ${v3.key}: ${v3.reason}`);
       throw new BuildError(`bun.lock may only contain npm registry packages (with sha512 integrity) and workspace packages (sdk.md §5.2):
@@ -243187,15 +243241,15 @@ ${text}`));
   });
 }
 async function ensureKitRuntimeDependencies(kitRoot) {
-  const manifest2 = join20(kitRoot, "package.json");
+  const manifest2 = join21(kitRoot, "package.json");
   if (!existsSync15(manifest2))
     return;
-  const authored = JSON.parse(await readFile10(manifest2, "utf8"));
+  const authored = JSON.parse(await readFile11(manifest2, "utf8"));
   if (authored.name !== "fdpocket-creator-runtime")
     return;
   const require2 = createRequire10(manifest2);
   try {
-    const installed = JSON.parse(await readFile10(require2.resolve("miniflare/package.json"), "utf8"));
+    const installed = JSON.parse(await readFile11(require2.resolve("miniflare/package.json"), "utf8"));
     if (installed.version === authored.dependencies?.miniflare)
       return;
   } catch (error51) {
@@ -243205,35 +243259,18 @@ async function ensureKitRuntimeDependencies(kitRoot) {
   }
   await run("bun", ["install", "--frozen-lockfile", "--ignore-scripts"], kitRoot, {});
 }
-async function restoreSdkDeclaration(root, kitRoot) {
-  const target2 = join20(root, "packages/sdk/package.json");
-  for (const path of [join20(root, "packages"), dirname6(target2), target2]) {
-    try {
-      if ((await lstat2(path)).isSymbolicLink())
-        throw new BuildError("SDK package path is a symlink");
-    } catch (error51) {
-      if (!(error51 instanceof Error && ("code" in error51) && error51.code === "ENOENT"))
-        throw error51;
-    }
-  }
-  const bytes3 = await readFile10(join20(kitRoot, "templates/project/packages/sdk/package.json"));
-  if (existsSync15(target2) && (await readFile10(target2)).equals(bytes3))
-    return;
-  await mkdir5(dirname6(target2), { recursive: true });
-  await writeFile6(target2, bytes3);
-}
 async function bunInstall(root, kitRoot) {
-  await run("bun", [join20(kitRoot, "scripts/sdk-dependencies.mjs"), root], root, {});
+  await run("bun", [join21(kitRoot, "scripts/sdk-dependencies.mjs"), root], root, {});
   await run("bun", ["install", "--frozen-lockfile", "--ignore-scripts"], root, {});
 }
 function resolveViteBin(appDir) {
   try {
-    const manifestPath = createRequire10(join20(appDir, "package.json")).resolve("vite/package.json");
+    const manifestPath = createRequire10(join21(appDir, "package.json")).resolve("vite/package.json");
     const declared = JSON.parse(readFileSync3(manifestPath, "utf8")).bin;
     const relative3 = typeof declared === "string" ? declared : declared?.vite;
     if (typeof relative3 !== "string")
       throw new Error('vite has no "vite" bin');
-    return join20(dirname6(manifestPath), relative3);
+    return join21(dirname7(manifestPath), relative3);
   } catch (error51) {
     throw new BuildError(`vite is not installed for ${appDir}; run bun install (${error51 instanceof Error ? error51.message : String(error51)})`);
   }
@@ -243294,18 +243331,18 @@ var CREDENTIAL_USERNAME = "fdpocket-kit";
 
 // frontend/packages/miniapp-kit/src/db/diff.ts
 import { existsSync as existsSync16 } from "node:fs";
-import { mkdir as mkdir6, readFile as readFile11, writeFile as writeFile7 } from "node:fs/promises";
-import { dirname as dirname7, join as join21 } from "node:path";
+import { mkdir as mkdir7, readFile as readFile12, writeFile as writeFile8 } from "node:fs/promises";
+import { dirname as dirname8, join as join22 } from "node:path";
 var fail4 = (message2) => new DbError(message2);
 async function diffDatabase(options2) {
   const { root } = options2;
   await placePlatform(root, options2.kitRoot);
   const pending = await renderPendingSql(root);
-  const path = join21(root, PENDING_SQL_PATH);
-  const current = existsSync16(path) ? await readFile11(path, "utf8") : null;
+  const path = join22(root, PENDING_SQL_PATH);
+  const current = existsSync16(path) ? await readFile12(path, "utf8") : null;
   if (current !== pending.sql) {
-    await mkdir6(dirname7(path), { recursive: true });
-    await writeFile7(path, pending.sql);
+    await mkdir7(dirname8(path), { recursive: true });
+    await writeFile8(path, pending.sql);
   }
   const changes = await classifyPending(pending, options2.createLibsqlClient ?? await loadProjectLibsql(root, fail4));
   return {
@@ -243320,8 +243357,8 @@ async function diffDatabase(options2) {
 // frontend/packages/miniapp-kit/src/db/finalize.ts
 import { createHash as createHash5 } from "node:crypto";
 import { existsSync as existsSync17 } from "node:fs";
-import { mkdir as mkdir7, readFile as readFile12, rm as rm9, writeFile as writeFile8 } from "node:fs/promises";
-import { dirname as dirname8, join as join22 } from "node:path";
+import { mkdir as mkdir8, readFile as readFile13, rm as rm10, writeFile as writeFile9 } from "node:fs/promises";
+import { dirname as dirname9, join as join23 } from "node:path";
 
 // frontend/packages/miniapp-kit/src/db/migration-policy.ts
 var PENDING_POLICY_FILE = "migration-policy.json";
@@ -243394,28 +243431,28 @@ function migrationSlug(text) {
   return slug === "" ? "merge" : slug;
 }
 async function readIfPresent(path) {
-  return existsSync17(path) ? await readFile12(path, "utf8") : null;
+  return existsSync17(path) ? await readFile13(path, "utf8") : null;
 }
 async function clearPending(root) {
-  const generated = join22(root, PENDING_SQL_PATH);
-  await mkdir7(dirname8(generated), { recursive: true });
-  await writeFile8(generated, PENDING_SQL_HEADER);
-  await rm9(join22(root, PENDING_DATA_PATH), { force: true });
-  await rm9(join22(root, PENDING_INTENT_PATH), { force: true });
-  await rm9(join22(root, PROJECT_PATHS.pending, PENDING_POLICY_FILE), { force: true });
+  const generated = join23(root, PENDING_SQL_PATH);
+  await mkdir8(dirname9(generated), { recursive: true });
+  await writeFile9(generated, PENDING_SQL_HEADER);
+  await rm10(join23(root, PENDING_DATA_PATH), { force: true });
+  await rm10(join23(root, PENDING_INTENT_PATH), { force: true });
+  await rm10(join23(root, PROJECT_PATHS.pending, PENDING_POLICY_FILE), { force: true });
 }
 async function finalizeMigration(options2) {
   const { root } = options2;
   await placePlatform(root, options2.kitRoot);
   const pending = await renderPendingSql(root);
-  const data = (await readIfPresent(join22(root, PENDING_DATA_PATH)))?.trim() ?? "";
+  const data = (await readIfPresent(join23(root, PENDING_DATA_PATH)))?.trim() ?? "";
   if (pending.body === "" && data === "") {
     await clearPending(root);
     return { status: "empty", migration: null, changes: [] };
   }
   const createClient = options2.createLibsqlClient ?? await loadProjectLibsql(root, fail5);
   const changes = await classifyPending(pending, createClient);
-  const parsed = parseIntent(await readIfPresent(join22(root, PENDING_INTENT_PATH)));
+  const parsed = parseIntent(await readIfPresent(join23(root, PENDING_INTENT_PATH)));
   if (parsed.error !== null) {
     return {
       status: "blocked",
@@ -243445,7 +243482,7 @@ async function finalizeMigration(options2) {
   const sql3 = attachMigrationPolicy(data === "" ? body : `${body}
 -- pending/data.sql
 ${data}
-`, intent2, await readIfPresent(join22(root, PROJECT_PATHS.pending, PENDING_POLICY_FILE)), changes);
+`, intent2, await readIfPresent(join23(root, PROJECT_PATHS.pending, PENDING_POLICY_FILE)), changes);
   const shadow = await checkShadow({
     migrations: pending.migrations,
     prodMigrations: options2.prodMigrations ?? null,
@@ -243461,9 +243498,9 @@ ${data}
   const last = pending.migrations.at(-1)?.name.slice(0, 4);
   const number4 = String((last ? Number(last) : 0) + 1).padStart(4, "0");
   const name3 = `${number4}_${migrationSlug(options2.slug)}`;
-  const dir = join22(root, PROJECT_PATHS.migrations, name3);
-  await mkdir7(dir, { recursive: true });
-  await writeFile8(join22(dir, "migration.sql"), sql3);
+  const dir = join23(root, PROJECT_PATHS.migrations, name3);
+  await mkdir8(dir, { recursive: true });
+  await writeFile9(join23(dir, "migration.sql"), sql3);
   const meta3 = {
     author: options2.author,
     changes,
@@ -243472,7 +243509,7 @@ ${data}
     sha256: createHash5("sha256").update(sql3).digest("hex"),
     sourceBranch: options2.branch
   };
-  await writeFile8(join22(dir, "meta.json"), `${JSON.stringify(meta3, null, 2)}
+  await writeFile9(join23(dir, "meta.json"), `${JSON.stringify(meta3, null, 2)}
 `);
   await clearPending(root);
   return { status: "finalized", migration: name3, changes, warnings: shadow.warnings };
@@ -243485,8 +243522,8 @@ init_zod();
 // frontend/packages/miniapp-kit/src/dev/runtime.ts
 import { createHash as createHash6, randomBytes as randomBytes2 } from "node:crypto";
 import { existsSync as existsSync19 } from "node:fs";
-import { mkdir as mkdir9, readFile as readFile15, rm as rm11, writeFile as writeFile10 } from "node:fs/promises";
-import { dirname as dirname10, join as join26 } from "node:path";
+import { mkdir as mkdir10, readFile as readFile16, rm as rm12, writeFile as writeFile11 } from "node:fs/promises";
+import { dirname as dirname11, join as join27 } from "node:path";
 // frontend/packages/logger/redact.ts
 var REDACTED = "[REDACTED]";
 var SENSITIVE_KEY_PARTS = [
@@ -251400,8 +251437,8 @@ var upgradeWebSocket = defineWebSocketHelper(async (c2, events, options2) => {
 
 // frontend/packages/project-gateway/src/storage/local-store.ts
 import { createReadStream } from "node:fs";
-import { copyFile, mkdir as mkdir8, readdir as readdir10, readFile as readFile13, rm as rm10, stat, writeFile as writeFile9 } from "node:fs/promises";
-import { dirname as dirname9, join as join23, resolve as resolve2, sep } from "node:path";
+import { copyFile, mkdir as mkdir9, readdir as readdir10, readFile as readFile14, rm as rm11, stat, writeFile as writeFile10 } from "node:fs/promises";
+import { dirname as dirname10, join as join24, resolve as resolve2, sep } from "node:path";
 import { Readable as Readable2 } from "node:stream";
 var encoder6 = new TextEncoder;
 function createLocalObjectStore(options2) {
@@ -251449,7 +251486,7 @@ function createLocalObjectStore(options2) {
     }
     let meta3;
     try {
-      meta3 = JSON.parse(await readFile13(join23(dir, "meta.json"), "utf8"));
+      meta3 = JSON.parse(await readFile14(join24(dir, "meta.json"), "utf8"));
     } catch (error51) {
       if (error51.code === "ENOENT")
         return null;
@@ -251461,20 +251498,20 @@ function createLocalObjectStore(options2) {
   async function partsOf(dir) {
     const names = (await readdir10(dir)).filter((name3) => /^\d+$/.test(name3));
     const parts = await Promise.all(names.map(async (name3) => {
-      const size = (await stat(join23(dir, name3))).size;
+      const size = (await stat(join24(dir, name3))).size;
       return { partNumber: Number(name3), etag: `"local-${name3}-${size}"`, size };
     }));
     return parts.sort((a2, b3) => a2.partNumber - b3.partNumber);
   }
   async function writeObject(location, body, contentType2) {
     const path = pathOf(location);
-    await mkdir8(dirname9(path), { recursive: true });
-    await writeFile9(path, body);
-    await writeFile9(`${path}.meta.json`, JSON.stringify({ contentType: contentType2 }));
+    await mkdir9(dirname10(path), { recursive: true });
+    await writeFile10(path, body);
+    await writeFile10(`${path}.meta.json`, JSON.stringify({ contentType: contentType2 }));
   }
   async function readMeta(path) {
     try {
-      return JSON.parse(await readFile13(`${path}.meta.json`, "utf8"));
+      return JSON.parse(await readFile14(`${path}.meta.json`, "utf8"));
     } catch (error51) {
       if (error51.code === "ENOENT")
         return null;
@@ -251530,14 +251567,14 @@ function createLocalObjectStore(options2) {
       if (!meta3)
         throw new Error("copy source not found");
       const target2 = pathOf(to);
-      await mkdir8(dirname9(target2), { recursive: true });
+      await mkdir9(dirname10(target2), { recursive: true });
       await copyFile(source, target2);
-      await writeFile9(`${target2}.meta.json`, JSON.stringify(meta3));
+      await writeFile10(`${target2}.meta.json`, JSON.stringify(meta3));
     },
     async remove(location) {
       const path = pathOf(location);
-      await rm10(path, { force: true });
-      await rm10(`${path}.meta.json`, { force: true });
+      await rm11(path, { force: true });
+      await rm11(`${path}.meta.json`, { force: true });
     },
     async list(prefix2, { limit: limit3, startAfter }) {
       const areaRoot = resolve2(root, areaDir(prefix2));
@@ -251566,9 +251603,9 @@ function createLocalObjectStore(options2) {
       pathOf(location);
       const uploadId = crypto.randomUUID();
       const dir = uploadDir(uploadId);
-      await mkdir8(dir, { recursive: true });
+      await mkdir9(dir, { recursive: true });
       const meta3 = { ...location, contentType: contentType2 };
-      await writeFile9(join23(dir, "meta.json"), JSON.stringify(meta3));
+      await writeFile10(join24(dir, "meta.json"), JSON.stringify(meta3));
       return uploadId;
     },
     signUploadPart(location, { uploadId, partNumber, contentLength, expiresIn }) {
@@ -251587,14 +251624,14 @@ function createLocalObjectStore(options2) {
       if (!upload)
         throw new Error("multipart upload not found");
       const ordered = [...parts].sort((a2, b3) => a2.partNumber - b3.partNumber);
-      const chunks = await Promise.all(ordered.map((part) => readFile13(join23(upload.dir, String(part.partNumber)))));
+      const chunks = await Promise.all(ordered.map((part) => readFile14(join24(upload.dir, String(part.partNumber)))));
       await writeObject(location, Buffer.concat(chunks), upload.meta.contentType);
-      await rm10(upload.dir, { recursive: true, force: true });
+      await rm11(upload.dir, { recursive: true, force: true });
     },
     async abortMultipart(location, uploadId) {
       const upload = await readUpload(location, uploadId);
       if (upload)
-        await rm10(upload.dir, { recursive: true, force: true });
+        await rm11(upload.dir, { recursive: true, force: true });
     },
     async listMultipartUploads(location) {
       let ids;
@@ -251612,9 +251649,9 @@ function createLocalObjectStore(options2) {
       const upload = await readUpload(to, uploadId);
       if (!upload)
         throw new Error("multipart upload not found");
-      const source = await readFile13(pathOf(from));
+      const source = await readFile14(pathOf(from));
       const chunk = source.subarray(range.start, range.end + 1);
-      await writeFile9(join23(upload.dir, String(partNumber)), chunk);
+      await writeFile10(join24(upload.dir, String(partNumber)), chunk);
       return `"local-${partNumber}-${chunk.byteLength}"`;
     },
     async handle(request) {
@@ -251674,7 +251711,7 @@ function createLocalObjectStore(options2) {
         if (String(part.byteLength) !== url2.searchParams.get("cl")) {
           return new Response(null, { status: 403, headers: cors });
         }
-        await writeFile9(join23(upload.dir, url2.searchParams.get("partNumber") ?? ""), part);
+        await writeFile10(join24(upload.dir, url2.searchParams.get("partNumber") ?? ""), part);
         return new Response(null, { status: 200, headers: cors });
       }
       const body = new Uint8Array(await request.arrayBuffer());
@@ -251710,8 +251747,8 @@ async function createTestEs256Key(kid) {
 
 // frontend/packages/miniapp-kit/src/dev/ai.ts
 import { existsSync as existsSync18 } from "node:fs";
-import { readFile as readFile14 } from "node:fs/promises";
-import { join as join24 } from "node:path";
+import { readFile as readFile15 } from "node:fs/promises";
+import { join as join25 } from "node:path";
 var JEV_ROUTER = "typesafe/jev-router";
 var ALL_MODALITIES = ["text", "image", "file", "audio", "video"];
 function createDevAi(options2) {
@@ -251722,11 +251759,11 @@ function createDevAi(options2) {
     if (key === null)
       return null;
     const declared = kind === "instructions" ? options2.manifest.ai?.instructions : options2.manifest.ai?.schemas;
-    const path = kind === "instructions" ? join24(options2.root, "ai", `${key}.md`) : join24(options2.root, "ai", "schemas", `${key}.json`);
+    const path = kind === "instructions" ? join25(options2.root, "ai", `${key}.md`) : join25(options2.root, "ai", "schemas", `${key}.json`);
     if (!declared?.includes(key) || !existsSync18(path)) {
       throw new GatewayError("VALIDATION_FAILED", `${kind} "${key}" is not declared in project.yaml`);
     }
-    const content = await readFile14(path, "utf8");
+    const content = await readFile15(path, "utf8");
     return kind === "schema" ? JSON.parse(content) : content;
   }
   const modelOf2 = (requested) => {
@@ -251958,7 +251995,7 @@ function createDevJobs(input) {
 import { spawn as spawn4 } from "node:child_process";
 import { randomBytes } from "node:crypto";
 import { createServer } from "node:net";
-import { join as join25 } from "node:path";
+import { join as join26 } from "node:path";
 function finishedOf(run2) {
   return {
     runId: run2.runId,
@@ -251969,16 +252006,16 @@ function finishedOf(run2) {
   };
 }
 function pythonCommand(root, slug, mode) {
-  const appDir = join25(root, "apps", slug);
+  const appDir = join26(root, "apps", slug);
   return {
     command: "uv",
     args: ["run", "--project", appDir, "--frozen", "python", "-m", "fdpocket.runner", ...mode],
-    pythonPath: `${join25(root, "packages", PYTHON_SDK_DIR)}:${join25(appDir, "src")}`
+    pythonPath: `${join26(root, "packages", PYTHON_SDK_DIR)}:${join26(appDir, "src")}`
   };
 }
 function pythonEnv(options2, slug) {
   const app = options2.manifest.apps[slug];
-  const cache2 = join25(options2.root, ".kit", "python-cache", slug);
+  const cache2 = join26(options2.root, ".kit", "python-cache", slug);
   return {
     ...process.env.PATH ? { PATH: process.env.PATH } : {},
     ...process.env.HOME ? { HOME: process.env.HOME } : {},
@@ -251988,8 +252025,8 @@ function pythonEnv(options2, slug) {
     GATEWAY_URL: options2.gatewayUrl(),
     PLATFORM_SERVICE_CREDENTIAL: options2.credential(slug),
     PLATFORM_CACHE_DIR: cache2,
-    HF_HOME: join25(cache2, "huggingface"),
-    TORCH_HOME: join25(cache2, "torch")
+    HF_HOME: join26(cache2, "huggingface"),
+    TORCH_HOME: join26(cache2, "torch")
   };
 }
 function createDevPython(options2) {
@@ -252338,11 +252375,11 @@ function versionIdOf(hash4) {
   return `${hash4.slice(0, 8)}-${hash4.slice(8, 12)}-4${hash4.slice(13, 16)}-8${hash4.slice(17, 20)}-${hash4.slice(20, 32)}`;
 }
 async function readGenerated(root, file2) {
-  const path = join26(root, PROJECT_PATHS.generated, file2);
+  const path = join27(root, PROJECT_PATHS.generated, file2);
   if (!existsSync19(path)) {
     throw new DevError(`${PROJECT_PATHS.generated}/${file2} is missing; run kit.mjs generate first`);
   }
-  return readFile15(path, "utf8");
+  return readFile16(path, "utf8");
 }
 async function createDevRuntime(options2) {
   const { root, projectId } = options2;
@@ -252361,7 +252398,7 @@ async function createDevRuntime(options2) {
         manifest: manifest2,
         importModule: options2.importModule ?? defaultImporter(root, manifest2)
       });
-      await writeFile10(join26(root, DEV_DB_STAMP), `${stamp}
+      await writeFile11(join27(root, DEV_DB_STAMP), `${stamp}
 `);
     }
   } catch (error51) {
@@ -252372,7 +252409,7 @@ async function createDevRuntime(options2) {
   }
   const key = await createTestEs256Key("kit-dev");
   const objects = createLocalObjectStore({
-    root: join26(root, DEV_OBJECTS_DIR),
+    root: join27(root, DEV_OBJECTS_DIR),
     baseUrl: options2.objectsBaseUrl,
     secret: crypto.randomUUID()
   });
@@ -252548,17 +252585,17 @@ async function openDevDatabase(options2) {
   const hash4 = createHash6("sha256");
   for (const part of sql3)
     hash4.update(`${part.what}\x00${part.sql}\x00`);
-  const seedPath = join26(root, PROJECT_PATHS.seed);
-  hash4.update(`seed\x00${existsSync19(seedPath) ? await readFile15(seedPath, "utf8") : ""}`);
+  const seedPath = join27(root, PROJECT_PATHS.seed);
+  hash4.update(`seed\x00${existsSync19(seedPath) ? await readFile16(seedPath, "utf8") : ""}`);
   const stamp = hash4.digest("hex");
-  const path = join26(root, DEV_DB_PATH);
-  const stampPath = join26(root, DEV_DB_STAMP);
-  const current = existsSync19(stampPath) ? (await readFile15(stampPath, "utf8")).trim() : null;
+  const path = join27(root, DEV_DB_PATH);
+  const stampPath = join27(root, DEV_DB_STAMP);
+  const current = existsSync19(stampPath) ? (await readFile16(stampPath, "utf8")).trim() : null;
   const recreated = current !== stamp || !existsSync19(path);
   if (recreated) {
     for (const file2 of [stampPath, path, `${path}-wal`, `${path}-shm`, `${path}-journal`])
-      await rm11(file2, { force: true });
-    await mkdir9(dirname10(path), { recursive: true });
+      await rm12(file2, { force: true });
+    await mkdir10(dirname11(path), { recursive: true });
   }
   const db = options2.createLibsqlClient({ url: `file:${path}` });
   if (!recreated)
@@ -252582,15 +252619,15 @@ async function devDatabaseSql(root) {
       throw new DevError(error51.message);
     throw error51;
   }
-  const pending = join26(root, PENDING_SQL_PATH);
+  const pending = join27(root, PENDING_SQL_PATH);
   if (!existsSync19(pending)) {
     throw new DevError(`${PENDING_SQL_PATH} is missing; run kit.mjs db diff first`);
   }
-  const data = join26(root, PENDING_DATA_PATH);
+  const data = join27(root, PENDING_DATA_PATH);
   return [
     ...migrations.map((m3) => ({ what: `${PROJECT_PATHS.migrations}/${m3.name}`, sql: m3.sql })),
-    { what: PENDING_SQL_PATH, sql: await readFile15(pending, "utf8") },
-    ...existsSync19(data) ? [{ what: PENDING_DATA_PATH, sql: await readFile15(data, "utf8") }] : []
+    { what: PENDING_SQL_PATH, sql: await readFile16(pending, "utf8") },
+    ...existsSync19(data) ? [{ what: PENDING_DATA_PATH, sql: await readFile16(data, "utf8") }] : []
   ];
 }
 function defaultImporter(root, manifest2) {
@@ -252600,7 +252637,7 @@ function defaultImporter(root, manifest2) {
     for (const slug of slugs) {
       let entry;
       try {
-        entry = resolveViteEntry(join26(root, "apps", slug));
+        entry = resolveViteEntry(join27(root, "apps", slug));
       } catch (error51) {
         reasons.push(`apps/${slug}: ${error51 instanceof Error ? error51.message : String(error51)}`);
         continue;
@@ -252963,18 +253000,18 @@ async function connectSession(options2) {
 
 // frontend/packages/miniapp-kit/src/dev/schema-plan.ts
 import { createHash as createHash7 } from "node:crypto";
-import { readFile as readFile16, writeFile as writeFile11 } from "node:fs/promises";
-import { join as join27 } from "node:path";
+import { readFile as readFile17, writeFile as writeFile12 } from "node:fs/promises";
+import { join as join28 } from "node:path";
 async function prepareSchemaPlan({ root, kitRoot }, baseline, signal = new AbortController().signal) {
   const { manifest: manifest2 } = await prepareSessionRuntime(root);
   const pending = await diffDatabase({ root, kitRoot });
   await generateProject({ root, kitRoot });
   signal.throwIfAborted();
-  const intent2 = parseIntent(await optionalFile(join27(root, PROJECT_PATHS.pending, "intent.yaml")));
+  const intent2 = parseIntent(await optionalFile(join28(root, PROJECT_PATHS.pending, "intent.yaml")));
   if (intent2.error)
     throw new DevError(intent2.error);
   const migrations = await readMigrations(root);
-  const generatedSql = await readFile16(join27(root, PROJECT_PATHS.pending, "generated.sql"), "utf8");
+  const generatedSql = await readFile17(join28(root, PROJECT_PATHS.pending, "generated.sql"), "utf8");
   const rawDelta = await renderSchemaDelta(root, baseline.schemaSql);
   const changes = baseline.revision === null ? pending.changes : await classifyPending({
     body: rawDelta,
@@ -252994,16 +253031,16 @@ async function prepareSchemaPlan({ root, kitRoot }, baseline, signal = new Abort
     migrations,
     manifest: manifest2,
     runtimeVersion: RUNTIME_VERSION,
-    zmodelHash: digest2(await readFile16(join27(root, PROJECT_PATHS.schema))),
+    zmodelHash: digest2(await readFile17(join28(root, PROJECT_PATHS.schema))),
     generatedSql,
-    dataSql: await optionalFile(join27(root, PROJECT_PATHS.pending, "data.sql")),
+    dataSql: await optionalFile(join28(root, PROJECT_PATHS.pending, "data.sql")),
     intent: intent2.intent,
-    schemaJson: await readFile16(join27(root, PROJECT_PATHS.generated, "schema.json"), "utf8")
+    schemaJson: await readFile17(join28(root, PROJECT_PATHS.generated, "schema.json"), "utf8")
   };
   return payload;
 }
 async function writeSchemaPlan(options2) {
-  const raw2 = await readFile16(options2.contextFile, "utf8");
+  const raw2 = await readFile17(options2.contextFile, "utf8");
   if (Buffer.byteLength(raw2) > 4 * 1024 * 1024)
     throw new DevError("Schema baseline exceeds size limit");
   const value2 = JSON.parse(raw2);
@@ -253017,14 +253054,14 @@ async function writeSchemaPlan(options2) {
   const output = JSON.stringify(plan);
   if (Buffer.byteLength(output) > 4 * 1024 * 1024)
     throw new DevError("Schema plan exceeds size limit");
-  await writeFile11(options2.output, output);
+  await writeFile12(options2.output, output);
 }
 function digest2(bytes3) {
   return createHash7("sha256").update(bytes3).digest("hex");
 }
 async function optionalFile(path) {
   try {
-    return await readFile16(path, "utf8");
+    return await readFile17(path, "utf8");
   } catch (error51) {
     if (error51 && typeof error51 === "object" && "code" in error51 && error51.code === "ENOENT")
       return "";
@@ -253035,7 +253072,7 @@ async function optionalFile(path) {
 // frontend/packages/miniapp-kit/src/dev/server.ts
 import { spawn as spawn6 } from "node:child_process";
 import { readFileSync as readFileSync4 } from "node:fs";
-import { join as join31 } from "node:path";
+import { join as join32 } from "node:path";
 
 // frontend/packages/miniapp-kit/src/verify/dist-server.ts
 function createDistHandler(options2) {
@@ -254045,9 +254082,9 @@ function createLiveHostHandler(options2) {
 }
 
 // frontend/packages/miniapp-kit/src/dev/realtime.ts
-import { readFile as readFile17 } from "node:fs/promises";
+import { readFile as readFile18 } from "node:fs/promises";
 import { createRequire as createRequire11 } from "node:module";
-import { join as join28 } from "node:path";
+import { join as join29 } from "node:path";
 
 // infra/workers/gateway/src/realtime.ts
 var MAX_CONNECTIONS = REALTIME_LIMITS.connections;
@@ -254093,7 +254130,7 @@ async function wakeRealtime(scope, env) {
 // frontend/packages/miniapp-kit/src/dev/realtime.ts
 async function startRealtimeGateway(options2) {
   const { Miniflare, Response: WorkerResponse } = requireMiniflare(options2.kitRoot);
-  const source = await readFile17(join28(options2.kitRoot, "platform", "realtime-local.js"), "utf8");
+  const source = await readFile18(join29(options2.kitRoot, "platform", "realtime-local.js"), "utf8");
   const runtime = new Miniflare({
     modules: true,
     script: source,
@@ -254186,7 +254223,7 @@ function requireMiniflare(kitRoot) {
   const roots = [process.env.KIT_TOOL_ROOT, kitRoot, process.cwd()].filter((root) => Boolean(root));
   for (const root of roots) {
     try {
-      return createRequire11(join28(root, "package.json"))("miniflare");
+      return createRequire11(join29(root, "package.json"))("miniflare");
     } catch (error51) {
       if (!(error51 instanceof Error) || !("code" in error51) || error51.code !== "MODULE_NOT_FOUND") {
         throw error51;
@@ -254197,8 +254234,8 @@ function requireMiniflare(kitRoot) {
 }
 
 // frontend/packages/miniapp-kit/src/dev/vars.ts
-import { readFile as readFile18 } from "node:fs/promises";
-import { join as join29 } from "node:path";
+import { readFile as readFile19 } from "node:fs/promises";
+import { join as join30 } from "node:path";
 import { parseEnv } from "node:util";
 
 // frontend/packages/miniapp-kit/src/git.ts
@@ -254250,7 +254287,7 @@ async function readDevVars(root, hosted) {
   if (hosted)
     return {};
   try {
-    const values = parseEnv(await readFile18(join29(root, ".kit/dev.vars"), "utf8"));
+    const values = parseEnv(await readFile19(join30(root, ".kit/dev.vars"), "utf8"));
     const result = {};
     for (const [name3, value2] of Object.entries(values)) {
       if (value2 !== undefined && name3 !== "GATEWAY_URL" && !name3.startsWith("PLATFORM_"))
@@ -254282,8 +254319,8 @@ import { relative as relative3, sep as sep2 } from "node:path";
 
 // frontend/packages/miniapp-kit/src/dev/watcher-build.ts
 import { createHash as createHash9 } from "node:crypto";
-import { readFile as readFile19 } from "node:fs/promises";
-import { join as join30 } from "node:path";
+import { readFile as readFile20 } from "node:fs/promises";
+import { join as join31 } from "node:path";
 
 // frontend/packages/miniapp-kit/src/dev/source-snapshot.ts
 import { createHash as createHash8 } from "node:crypto";
@@ -254411,15 +254448,15 @@ async function prepareSessionChanges(options2, changes, signal, baseline = { rev
   return events;
 }
 async function workerEvent(root, appSlug, kind, manifest2) {
-  const appDir = join30(root, "apps", appSlug);
-  const files = await collectFiles(join30(appDir, "src"));
+  const appDir = join31(root, "apps", appSlug);
+  const files = await collectFiles(join31(appDir, "src"));
   const sources = new Map(files.map((file2) => [`${appSlug}/src/${file2.path}`, new TextDecoder().decode(file2.bytes)]));
   const findings = checkAppNetwork(manifest2, sources);
   if (findings.length)
     throw new DevError(findings.map((finding) => `${finding.path}: ${finding.code}: ${finding.message}`).join(`
 `));
   await buildWorkerBundle({ root, appDir, slug: appSlug, kind });
-  const bundle = new Uint8Array(await readFile19(join30(root, "dist", appSlug, "index.js")));
+  const bundle = new Uint8Array(await readFile20(join31(root, "dist", appSlug, "index.js")));
   const payload = {
     bundleHash: digest3(bundle),
     appSlug,
@@ -254853,7 +254890,7 @@ async function startDev(options2) {
     return startLiveDev(options2, manifest2);
   const createLibsqlClient = options2.createLibsqlClient ?? await loadProjectLibsql(root, (m3) => new DevError(m3));
   await diffDatabase({ root, kitRoot, createLibsqlClient });
-  const projectName = String(JSON.parse(readFileSync4(join31(root, "package.json"), "utf8")).name ?? "");
+  const projectName = String(JSON.parse(readFileSync4(join32(root, "package.json"), "utf8")).name ?? "");
   const offset = process.env[KIT_LIVE_CONFIG_ENV] ? 100 : 0;
   const ports = options2.ports ?? {
     host: DEV_PORTS.host + offset,
@@ -254960,11 +254997,11 @@ async function startDev(options2) {
         if (!dist)
           await buildWorkerBundle({
             root,
-            appDir: join31(root, "apps", app.slug),
+            appDir: join32(root, "apps", app.slug),
             slug: app.slug,
             kind: app.kind
           });
-        const bytes3 = dist ? dist.files.get(`${app.slug}/index.js`) : readFileSync4(join31(root, "dist", app.slug, "index.js"));
+        const bytes3 = dist ? dist.files.get(`${app.slug}/index.js`) : readFileSync4(join32(root, "dist", app.slug, "index.js"));
         if (!bytes3)
           throw new DevError(`missing Worker bundle: ${app.slug}/index.js`);
         return {
@@ -255038,7 +255075,7 @@ async function startDev(options2) {
     for (const slug of dist ? [] : webApps) {
       const vite = await (options2.startVite ?? viteDev)({
         slug,
-        appDir: join31(root, "apps", slug),
+        appDir: join32(root, "apps", slug),
         port: appPorts[slug],
         env
       });
@@ -255165,7 +255202,7 @@ async function startLiveDev(options2, manifest2) {
         throw new DevError("live App configuration is incomplete");
       const vite = await (options2.startVite ?? viteDev)({
         slug,
-        appDir: join31(options2.root, "apps", slug),
+        appDir: join32(options2.root, "apps", slug),
         port,
         env: {
           [KIT_BUILD_ENV.projectId]: options2.projectId,
@@ -255389,13 +255426,13 @@ var execCommand = (command, args) => new Promise((resolve3, reject) => {
 // frontend/packages/miniapp-kit/src/e2e.ts
 import { randomBytes as randomBytes4 } from "node:crypto";
 import { existsSync as existsSync21 } from "node:fs";
-import { readFile as readFile20, realpath } from "node:fs/promises";
+import { readFile as readFile21, realpath } from "node:fs/promises";
 import { relative as relative4, resolve as resolve3, sep as sep3 } from "node:path";
 
 // frontend/packages/miniapp-kit/src/verify/browser.ts
 import { existsSync as existsSync20 } from "node:fs";
 import { createRequire as createRequire12 } from "node:module";
-import { join as join32 } from "node:path";
+import { join as join33 } from "node:path";
 import { pathToFileURL as pathToFileURL9 } from "node:url";
 
 class BrowserUnavailableError extends Error {
@@ -255405,7 +255442,7 @@ function resolvePlaywright() {
   const bases = [process.env.KIT_PLAYWRIGHT_DIR, process.cwd()].filter((base) => Boolean(base));
   for (const base of bases) {
     try {
-      return createRequire12(join32(base, "noop.js")).resolve("playwright-core");
+      return createRequire12(join33(base, "noop.js")).resolve("playwright-core");
     } catch {}
   }
   try {
@@ -255524,7 +255561,7 @@ async function runLiveE2E(options2) {
     grant: env.KIT_TEST_GRANT,
     identity: options2.identity
   });
-  const plan = await readFile20(resolve3(options2.root, "design/test-plan.md"), "utf8");
+  const plan = await readFile21(resolve3(options2.root, "design/test-plan.md"), "utf8");
   if (!plan.trim() || Buffer.byteLength(plan) > 128 * 1024 || plan.includes(input.grant))
     throw new LiveE2EError("Write a bounded, credential-free design/test-plan.md before live E2E");
   const { manifest: manifest2 } = await prepareSessionRuntime(options2.root);
@@ -255677,9 +255714,9 @@ async function checkKitUpdate(input) {
 // frontend/packages/miniapp-kit/src/login.ts
 import { createHash as createHash10, randomBytes as randomBytes5 } from "node:crypto";
 import { existsSync as existsSync22 } from "node:fs";
-import { chmod, mkdir as mkdir10, readFile as readFile21, rename as rename2, writeFile as writeFile12 } from "node:fs/promises";
+import { chmod, mkdir as mkdir11, readFile as readFile22, rename as rename3, writeFile as writeFile13 } from "node:fs/promises";
 import { createServer as createServer4 } from "node:http";
-import { join as join33 } from "node:path";
+import { join as join34 } from "node:path";
 var DEFAULT_MCP_URL = "https://fdpocket.dev/mcp/creator";
 var REDIRECT_URI = "http://127.0.0.1:43126/callback";
 var REFRESH_MARGIN_MS = 60000;
@@ -255693,10 +255730,10 @@ class LoginError extends Error {
 class LoginInProgress extends LoginError {
 }
 async function readLogins(configDir) {
-  const path = join33(configDir, CREDENTIALS_FILE);
+  const path = join34(configDir, CREDENTIALS_FILE);
   if (!existsSync22(path))
     return {};
-  const parsed = JSON.parse(await readFile21(path, "utf8"));
+  const parsed = JSON.parse(await readFile22(path, "utf8"));
   return parsed.logins ?? {};
 }
 async function writeLogin(configDir, mcpUrl, login) {
@@ -255705,13 +255742,13 @@ async function writeLogin(configDir, mcpUrl, login) {
     delete logins[mcpUrl];
   else
     logins[mcpUrl] = login;
-  await mkdir10(configDir, { recursive: true, mode: 448 });
-  const path = join33(configDir, CREDENTIALS_FILE);
+  await mkdir11(configDir, { recursive: true, mode: 448 });
+  const path = join34(configDir, CREDENTIALS_FILE);
   const temporary = `${path}.${process.pid}.tmp`;
-  await writeFile12(temporary, `${JSON.stringify({ logins }, null, 2)}
+  await writeFile13(temporary, `${JSON.stringify({ logins }, null, 2)}
 `, { mode: 384 });
   await chmod(temporary, 384);
-  await rename2(temporary, path);
+  await rename3(temporary, path);
 }
 async function getJson(fetch2, url2) {
   const response = await fetch2(url2);
@@ -256145,8 +256182,8 @@ async function serveMcpStdio(proxy, io) {
 
 // frontend/packages/miniapp-kit/src/new.ts
 import { existsSync as existsSync23 } from "node:fs";
-import { mkdir as mkdir11, readdir as readdir11, readFile as readFile22, writeFile as writeFile13 } from "node:fs/promises";
-import { dirname as dirname11, join as join34, relative as relative5 } from "node:path";
+import { mkdir as mkdir12, readdir as readdir11, readFile as readFile23, writeFile as writeFile14 } from "node:fs/promises";
+import { dirname as dirname12, join as join35, relative as relative5 } from "node:path";
 var TEMPLATE_DIR = "templates/project";
 var DEFAULT_APP_SPECS = ["web", "admin"];
 var NAME_PATTERN = /^[a-z][a-z0-9-]{0,63}$/;
@@ -256180,19 +256217,19 @@ async function newProject(options2) {
   if (existsSync23(root) && (await readdir11(root)).some((entry) => entry !== ".git")) {
     throw new NewProjectError(`${root} is not empty; kit new only fills an empty Project`);
   }
-  const template = join34(options2.kitRoot, TEMPLATE_DIR);
+  const template = join35(options2.kitRoot, TEMPLATE_DIR);
   const files = [];
   const sources = await listFiles(template);
   const put = async (target2, text) => {
-    await mkdir11(dirname11(join34(root, target2)), { recursive: true });
-    await writeFile13(join34(root, target2), text);
+    await mkdir12(dirname12(join35(root, target2)), { recursive: true });
+    await writeFile14(join35(root, target2), text);
     files.push(target2);
   };
   for (const source of sources) {
     if (source.startsWith("apps/"))
       continue;
     const target2 = targetPath(source);
-    let text = fill(await readFile22(join34(template, source), "utf8"), { name: name3, title });
+    let text = fill(await readFile23(join35(template, source), "utf8"), { name: name3, title });
     if (target2 === PROJECT_PATHS.manifest) {
       const document2 = $parseDocument(text);
       const original = document2.toJS().apps;
@@ -256237,7 +256274,7 @@ async function newProject(options2) {
     const prefix2 = `apps/${templateSlug}/`;
     for (const source of sources.filter((path) => path.startsWith(prefix2))) {
       const target2 = `apps/${slug}/${source.slice(prefix2.length)}`;
-      let text = fill(await readFile22(join34(template, source), "utf8"), { name: name3, title });
+      let text = fill(await readFile23(join35(template, source), "utf8"), { name: name3, title });
       if (target2.endsWith("/vite.config.ts"))
         text = text.replace(`createAppConfig("${templateSlug}"`, `createAppConfig("${slug}"`);
       if (target2.endsWith("/package.json")) {
@@ -256305,7 +256342,7 @@ async function listFiles(root) {
   const files = [];
   const walk = async (dir) => {
     for (const entry of await readdir11(dir, { withFileTypes: true })) {
-      const path = join34(dir, entry.name);
+      const path = join35(dir, entry.name);
       if (entry.isDirectory())
         await walk(path);
       else if (entry.isFile())
@@ -256556,15 +256593,15 @@ function nextStep(error51) {
 
 // frontend/packages/miniapp-kit/src/repo.ts
 import { existsSync as existsSync24 } from "node:fs";
-import { appendFile, mkdir as mkdir12, readFile as readFile23, rm as rm12, writeFile as writeFile14 } from "node:fs/promises";
-import { join as join35 } from "node:path";
+import { appendFile, mkdir as mkdir13, readFile as readFile24, rm as rm13, writeFile as writeFile15 } from "node:fs/promises";
+import { join as join36 } from "node:path";
 class RepoError extends Error {
   name = "RepoError";
 }
 function kitCommand(kitRoot, ...args) {
   return [
     shellQuote(process.execPath),
-    shellQuote(join35(kitRoot, "scripts", "kit.mjs")),
+    shellQuote(join36(kitRoot, "scripts", "kit.mjs")),
     ...args
   ].join(" ");
 }
@@ -256600,10 +256637,10 @@ async function configureRepo(git, source, config3, author) {
   await set2(git, source, `branch.${branch}.remote`, ".");
   await set2(git, source, `branch.${branch}.merge`, trackingRef(config3.thread_ref));
   await set2(git, source, `branch.${branch}.rebase`, "true");
-  const info = join35(source, ".git", "info");
-  await mkdir12(info, { recursive: true });
-  const excludePath = join35(info, "exclude");
-  const excluded = existsSync24(excludePath) ? (await readFile23(excludePath, "utf8")).split(`
+  const info = join36(source, ".git", "info");
+  await mkdir13(info, { recursive: true });
+  const excludePath = join36(info, "exclude");
+  const excluded = existsSync24(excludePath) ? (await readFile24(excludePath, "utf8")).split(`
 `) : [];
   const missing = EXCLUDES.filter((line) => !excluded.includes(line));
   if (missing.length > 0)
@@ -256617,12 +256654,12 @@ async function requireGitLfs(git, cwd) {
   }
 }
 function requireRepo(source) {
-  if (!existsSync24(join35(source, ".git"))) {
+  if (!existsSync24(join36(source, ".git"))) {
     throw new RepoError(`${source} is not a git repository; run kit.mjs clone in a new directory`);
   }
 }
 async function requireClean(git, source, what) {
-  if (existsSync24(join35(source, ".git", "rebase-merge")) || existsSync24(join35(source, ".git", "rebase-apply"))) {
+  if (existsSync24(join36(source, ".git", "rebase-merge")) || existsSync24(join36(source, ".git", "rebase-apply"))) {
     throw new RepoError("a git rebase is in progress in source/; finish it (git rebase --continue) first");
   }
   if (await gitOk(git, source, ["status", "--porcelain"]) !== "") {
@@ -256632,14 +256669,14 @@ async function requireClean(git, source, what) {
 async function fetchBundles(git, source, pulled, already, download2) {
   const listed = new Set(pulled.bundles.map((bundle2) => bundle2.sha256));
   const fetched = already.filter((sha) => listed.has(sha));
-  const dir = join35(source, ".git", "fdpocket-bundles");
-  await mkdir12(dir, { recursive: true });
+  const dir = join36(source, ".git", "fdpocket-bundles");
+  await mkdir13(dir, { recursive: true });
   for (const bundle2 of fetchOrder(pulled.bundles)) {
     if (fetched.includes(bundle2.sha256))
       continue;
     const bytes3 = await download2(`bundle ${bundle2.seq}`, bundle2.url, bundle2.sha256);
-    const file2 = join35(dir, `${bundle2.sha256}.bundle`);
-    await writeFile14(file2, bytes3);
+    const file2 = join36(dir, `${bundle2.sha256}.bundle`);
+    await writeFile15(file2, bytes3);
     try {
       await gitOk(git, source, [
         "fetch",
@@ -256650,7 +256687,7 @@ async function fetchBundles(git, source, pulled, already, download2) {
         `+refs/*:${REMOTE_REFS}/*`
       ]);
     } finally {
-      await rm12(file2, { force: true });
+      await rm13(file2, { force: true });
     }
     fetched.push(bundle2.sha256);
   }
@@ -256693,15 +256730,15 @@ async function integrate(git, source, threadRef) {
 
 // frontend/packages/miniapp-kit/src/sdk-fingerprint.ts
 import { createHash as createHash11 } from "node:crypto";
-import { readdir as readdir12, readFile as readFile24 } from "node:fs/promises";
-import { join as join36, relative as relative6, sep as sep4 } from "node:path";
+import { readdir as readdir12, readFile as readFile25 } from "node:fs/promises";
+import { join as join37, relative as relative6, sep as sep4 } from "node:path";
 async function sdkVendorHash(kitRoot) {
-  const root = join36(kitRoot, "vendor");
+  const root = join37(kitRoot, "vendor");
   const entries = await readdir12(root, { recursive: true, withFileTypes: true });
-  const files = entries.filter((entry) => entry.isFile()).map((entry) => relative6(root, join36(entry.parentPath, entry.name)).split(sep4).join("/")).sort();
+  const files = entries.filter((entry) => entry.isFile()).map((entry) => relative6(root, join37(entry.parentPath, entry.name)).split(sep4).join("/")).sort();
   const digest4 = createHash11("sha256");
   for (const path of files) {
-    const content = await readFile24(join36(root, path));
+    const content = await readFile25(join37(root, path));
     digest4.update(`${path}\x00${createHash11("sha256").update(content).digest("hex")}
 `);
   }
@@ -256758,18 +256795,18 @@ class ValidationFailed extends Error {
 }
 
 // frontend/packages/miniapp-kit/src/verify/validate.ts
+import { mkdir as mkdir15, writeFile as writeFile17 } from "node:fs/promises";
+import { join as join40 } from "node:path";
+
+// frontend/packages/miniapp-kit/src/verify/dynamic.ts
 import { mkdir as mkdir14, writeFile as writeFile16 } from "node:fs/promises";
 import { join as join39 } from "node:path";
 
-// frontend/packages/miniapp-kit/src/verify/dynamic.ts
-import { mkdir as mkdir13, writeFile as writeFile15 } from "node:fs/promises";
-import { join as join38 } from "node:path";
-
 // frontend/packages/miniapp-kit/src/verify/erase.ts
 import { existsSync as existsSync25 } from "node:fs";
-import { mkdtemp as mkdtemp4, rm as rm13 } from "node:fs/promises";
+import { mkdtemp as mkdtemp5, rm as rm14 } from "node:fs/promises";
 import { tmpdir as tmpdir2 } from "node:os";
-import { join as join37 } from "node:path";
+import { join as join38 } from "node:path";
 var failed = (message2) => ({
   code: "ERASE_TEST_FAILED",
   path: PROJECT_PATHS.eraseTest,
@@ -256778,7 +256815,7 @@ var failed = (message2) => ({
 var describe4 = (error51) => error51 instanceof Error ? error51.message : String(error51);
 async function runEraseTest(options2) {
   const { root } = options2;
-  if (!existsSync25(join37(root, PROJECT_PATHS.eraseTest))) {
+  if (!existsSync25(join38(root, PROJECT_PATHS.eraseTest))) {
     return {
       errors: [],
       warnings: [
@@ -256793,15 +256830,15 @@ async function runEraseTest(options2) {
   const manifest2 = JSON.parse(await readGenerated(root, "project.json"));
   const schema2 = JSON.parse(await readGenerated(root, "schema.json"));
   const importModule = options2.importModule ?? defaultImporter(root, manifest2);
-  const dir = await mkdtemp4(join37(tmpdir2(), "kit-erase-"));
-  const db = options2.createLibsqlClient({ url: `file:${join37(dir, "erase.db")}` });
+  const dir = await mkdtemp5(join38(tmpdir2(), "kit-erase-"));
+  const db = options2.createLibsqlClient({ url: `file:${join38(dir, "erase.db")}` });
   try {
     for (const part of await devDatabaseSql(root))
       await applySql(db, part.sql);
     await runSeed({ root, db, manifest: manifest2, importModule });
     let test;
     try {
-      test = (await importModule(join37(root, PROJECT_PATHS.eraseTest))).default;
+      test = (await importModule(join38(root, PROJECT_PATHS.eraseTest))).default;
     } catch (error51) {
       return { errors: [failed(`could not be loaded: ${describe4(error51)}`)], warnings: [] };
     }
@@ -256844,7 +256881,7 @@ async function runEraseTest(options2) {
     return { errors: [], warnings: [] };
   } finally {
     db.close();
-    await rm13(dir, { recursive: true, force: true });
+    await rm14(dir, { recursive: true, force: true });
   }
 }
 
@@ -257035,7 +257072,7 @@ async function runDynamicChecks(options2) {
   });
   const browser = await (options2.launch ?? launchChromium)();
   try {
-    await mkdir13(join38(options2.outDir, "screenshots"), { recursive: true });
+    await mkdir14(join39(options2.outDir, "screenshots"), { recursive: true });
     const observations = [];
     const at = (app) => ({
       hostUrl: dev.hostUrl,
@@ -257071,7 +257108,7 @@ async function runDynamicChecks(options2) {
       gatewayUrl: dev.gatewayUrl,
       appsOrigin: dev.appsOrigin
     });
-    await writeFile15(join38(options2.outDir, "permission-matrix.json"), `${JSON.stringify(matrix, null, 1)}
+    await writeFile16(join39(options2.outDir, "permission-matrix.json"), `${JSON.stringify(matrix, null, 1)}
 `);
     const erase = await runEraseTest({
       root: options2.root,
@@ -257079,7 +257116,7 @@ async function runDynamicChecks(options2) {
     });
     const judged = judgeDynamic(options2.manifest, observations);
     const workerResults = await dev.checkWorkers();
-    await writeFile15(join38(options2.outDir, "worker-mocks.json"), `${JSON.stringify({ results: workerResults, events: dev.workerEvents() }, null, 1)}
+    await writeFile16(join39(options2.outDir, "worker-mocks.json"), `${JSON.stringify({ results: workerResults, events: dev.workerEvents() }, null, 1)}
 `);
     const workerErrors = workerResults.filter((result) => result.status >= (result.kind === "jobs" ? 400 : 500)).map((result) => ({
       code: "WORKER_RUNTIME_FAILED",
@@ -257157,7 +257194,7 @@ async function observe(context, visit2, at, shot) {
     if (shot)
       await page.waitForTimeout(shot.settleMs);
     const name3 = shot?.name ?? `screenshots/${visit2.app}-${visit2.principal}.png`;
-    await writeFile15(join38(at.outDir, name3), await page.locator("#frame").screenshot());
+    await writeFile16(join39(at.outDir, name3), await page.locator("#frame").screenshot());
     observation.screenshot = name3;
     return observation;
   } finally {
@@ -257231,19 +257268,19 @@ async function validateVersion(options2) {
     })
   });
   const report2 = reportSchema.parse(result.report);
-  await mkdir14(options2.outDir, { recursive: true });
-  await writeFile16(join39(options2.outDir, "report.json"), `${JSON.stringify(report2, null, 2)}
+  await mkdir15(options2.outDir, { recursive: true });
+  await writeFile17(join40(options2.outDir, "report.json"), `${JSON.stringify(report2, null, 2)}
 `);
   if (result.schemaJson !== undefined) {
-    await writeFile16(join39(options2.outDir, "schema.json"), result.schemaJson);
+    await writeFile17(join40(options2.outDir, "schema.json"), result.schemaJson);
   }
   return report2;
 }
 
 // frontend/packages/miniapp-kit/src/workdir.ts
 import { existsSync as existsSync26 } from "node:fs";
-import { readFile as readFile25, unlink, writeFile as writeFile17 } from "node:fs/promises";
-import { dirname as dirname12, join as join40 } from "node:path";
+import { readFile as readFile26, unlink, writeFile as writeFile18 } from "node:fs/promises";
+import { dirname as dirname13, join as join41 } from "node:path";
 var CONFIG_FILE = ".fdpocket.json";
 var LEGACY_CONFIG_FILE = ".tokoyo.json";
 var WORKDIR_DIRS = {
@@ -257317,10 +257354,10 @@ function locateWorkdir(start) {
   return locateFile(start, CONFIG_FILE);
 }
 function locateFile(start, name3) {
-  for (let current = start;; current = dirname12(current)) {
-    if (existsSync26(join40(current, name3)))
+  for (let current = start;; current = dirname13(current)) {
+    if (existsSync26(join41(current, name3)))
       return current;
-    if (dirname12(current) === current)
+    if (dirname13(current) === current)
       return null;
   }
 }
@@ -257330,9 +257367,9 @@ async function migrateLegacyWorkdir(start) {
   const found = locateFile(start, LEGACY_CONFIG_FILE);
   if (found === null)
     return null;
-  const { app_id, ...rest } = JSON.parse(await readFile25(join40(found, LEGACY_CONFIG_FILE), "utf8"));
-  await writeFile17(join40(found, CONFIG_FILE), serializeConfig(parseConfig(JSON.stringify({ project_id: app_id, ...rest }))));
-  await unlink(join40(found, LEGACY_CONFIG_FILE));
+  const { app_id, ...rest } = JSON.parse(await readFile26(join41(found, LEGACY_CONFIG_FILE), "utf8"));
+  await writeFile18(join41(found, CONFIG_FILE), serializeConfig(parseConfig(JSON.stringify({ project_id: app_id, ...rest }))));
+  await unlink(join41(found, LEGACY_CONFIG_FILE));
   return found;
 }
 async function findWorkdir(start) {
@@ -257392,11 +257429,11 @@ class CommandError extends Error {
 }
 function defaultConfigDir() {
   const xdg = process.env.XDG_CONFIG_HOME;
-  return join41(xdg && xdg !== "" ? xdg : join41(homedir(), ".config"), "fdpocket");
+  return join42(xdg && xdg !== "" ? xdg : join42(homedir(), ".config"), "fdpocket");
 }
 function defaultCodexHome() {
   const home = process.env.CODEX_HOME;
-  return home && home !== "" ? home : join41(homedir(), ".codex");
+  return home && home !== "" ? home : join42(homedir(), ".codex");
 }
 async function readStdin() {
   const chunks = [];
@@ -257496,31 +257533,31 @@ async function runCommand(args, context) {
 var print = (context, value2) => context.stdout(JSON.stringify(value2, null, 2));
 var mcpUrlOf = (flag) => flag ?? process.env.CREATOR_MCP_URL ?? DEFAULT_MCP_URL;
 async function kitVersion(kitRoot) {
-  const manifest2 = join41(kitRoot, ".claude-plugin", "plugin.json");
+  const manifest2 = join42(kitRoot, ".claude-plugin", "plugin.json");
   if (!existsSync27(manifest2))
     throw new CommandError(`${manifest2} is missing; reinstall the Kit`);
-  const version3 = JSON.parse(await readFile26(manifest2, "utf8")).version;
+  const version3 = JSON.parse(await readFile27(manifest2, "utf8")).version;
   if (typeof version3 !== "string")
     throw new CommandError(`${manifest2} has no version`);
   return version3;
 }
 async function readConfig(workdir) {
-  return parseConfig(await readFile26(join41(workdir, CONFIG_FILE), "utf8"));
+  return parseConfig(await readFile27(join42(workdir, CONFIG_FILE), "utf8"));
 }
 async function saveConfig(workdir, config3) {
-  await writeFile18(join41(workdir, CONFIG_FILE), serializeConfig(config3));
+  await writeFile19(join42(workdir, CONFIG_FILE), serializeConfig(config3));
 }
-var sourceOf = (workdir) => join41(workdir, WORKDIR_DIRS.source);
+var sourceOf = (workdir) => join42(workdir, WORKDIR_DIRS.source);
 var AGENTS_TITLE = agentsMd("").split(`
 `)[0];
 async function writeAgentFiles(workdir, kitRoot) {
-  const agents = join41(workdir, "AGENTS.md");
-  if (!existsSync27(agents) || (await readFile26(agents, "utf8")).startsWith(AGENTS_TITLE)) {
-    await writeFile18(agents, agentsMd(kitRoot));
+  const agents = join42(workdir, "AGENTS.md");
+  if (!existsSync27(agents) || (await readFile27(agents, "utf8")).startsWith(AGENTS_TITLE)) {
+    await writeFile19(agents, agentsMd(kitRoot));
   }
-  const claude = join41(workdir, "CLAUDE.md");
+  const claude = join42(workdir, "CLAUDE.md");
   if (!existsSync27(claude))
-    await writeFile18(claude, CLAUDE_MD);
+    await writeFile19(claude, CLAUDE_MD);
 }
 async function fetchVerified(context, name3, url3, sha2562) {
   const bytes3 = await context.download(url3);
@@ -257545,7 +257582,7 @@ async function clone4(context, flags) {
   }
   const pulled = parsePulled(bundles);
   const workdir = context.cwd;
-  const path = join41(workdir, CONFIG_FILE);
+  const path = join42(workdir, CONFIG_FILE);
   if (existsSync27(path)) {
     const existing = await readConfig(workdir);
     if (existing.project_id !== pulled.project_id) {
@@ -257559,7 +257596,7 @@ async function clone4(context, flags) {
   }
   await requireGitLfs(context.git, workdir);
   for (const dir of Object.values(WORKDIR_DIRS))
-    await mkdir15(join41(workdir, dir), { recursive: true });
+    await mkdir16(join42(workdir, dir), { recursive: true });
   const branch = threadBranch(pulled.thread_ref);
   await gitOk(context.git, workdir, ["init", "-q", "-b", branch, source]);
   await gitOk(context.git, source, ["lfs", "install", "--local"]);
@@ -257702,18 +257739,18 @@ async function push(context, flags) {
   print(context, { ...result, ...update.status === "outdated" ? { kit_update: update } : {} });
 }
 async function writeBuildReport(workdir, built, policyRevision) {
-  const path = join41(workdir, WORKDIR_DIRS.outputs, "build-report.json");
-  const pending = join41(sourceOf(workdir), "packages", "db-schema", "pending");
+  const path = join42(workdir, WORKDIR_DIRS.outputs, "build-report.json");
+  const pending = join42(sourceOf(workdir), "packages", "db-schema", "pending");
   const report2 = completeBuildReport({
-    existing: existsSync27(path) ? JSON.parse(await readFile26(path, "utf8")) : null,
-    projectYaml: await readFile26(join41(sourceOf(workdir), "infra", "project.yaml"), "utf8"),
+    existing: existsSync27(path) ? JSON.parse(await readFile27(path, "utf8")) : null,
+    projectYaml: await readFile27(join42(sourceOf(workdir), "infra", "project.yaml"), "utf8"),
     apps: built.apps,
     schemaVersion: built.schema_version,
     pendingFiles: existsSync27(pending) ? (await readdir13(pending)).filter((name3) => name3.endsWith(".sql")).sort() : [],
     ...policyRevision === undefined ? {} : { policyRevision }
   });
-  await mkdir15(dirname13(path), { recursive: true });
-  await writeFile18(path, `${JSON.stringify(report2, null, 2)}
+  await mkdir16(dirname14(path), { recursive: true });
+  await writeFile19(path, `${JSON.stringify(report2, null, 2)}
 `);
 }
 async function mcpServe(context, flags) {
@@ -257751,7 +257788,7 @@ async function doctor(context) {
     throw new CommandError('some checks failed; follow each "fix" above');
 }
 async function kitUpdate(context) {
-  const manifest2 = JSON.parse(await readFile26(join41(context.kitRoot, ".claude-plugin", "plugin.json"), "utf8"));
+  const manifest2 = JSON.parse(await readFile27(join42(context.kitRoot, ".claude-plugin", "plugin.json"), "utf8"));
   const current = typeof manifest2.version === "string" ? manifest2.version : "unknown";
   if (process.env.KIT_TOOL_ROOT)
     return { status: "unknown", current };
@@ -257841,7 +257878,7 @@ async function publishedFlags(flags) {
   }
   if (flags["published-schema"] !== undefined) {
     try {
-      out.publishedSchema = JSON.parse(await readFile26(flags["published-schema"], "utf8"));
+      out.publishedSchema = JSON.parse(await readFile27(flags["published-schema"], "utf8"));
     } catch (error51) {
       throw new CommandError(`--published-schema must be a readable JSON file: ${error51 instanceof Error ? error51.message : String(error51)}`);
     }
@@ -257896,13 +257933,13 @@ async function validate(context, flags) {
     root,
     kitRoot: context.kitRoot,
     git: context.git,
-    archive: new Uint8Array(await readFile26(resolve4(context.cwd, flags.archive))),
+    archive: new Uint8Array(await readFile27(resolve4(context.cwd, flags.archive))),
     outDir: resolve4(context.cwd, flags.out),
     projectId: flags["project-id"],
     gatewayUrl: flags["gateway-url"],
     base: flags.base === undefined ? undefined : flags.base === "none" ? null : flags.base,
     sdkUpdate: flags["sdk-update"] === "true",
-    ...flags.captures ? { captures: parseCaptures(await readFile26(resolve4(context.cwd, flags.captures), "utf8")) } : {}
+    ...flags.captures ? { captures: parseCaptures(await readFile27(resolve4(context.cwd, flags.captures), "utf8")) } : {}
   });
   print(context, {
     passed: report2.passed,
@@ -257971,7 +258008,7 @@ async function connectedDev(context, workdir, config3, as) {
     throw new CommandError("--connect needs at least one web App");
   const appPorts = allocateAppPorts(webSlugs);
   await assertConnectedPorts([4320, ...Object.values(appPorts)]);
-  const projectPackage = JSON.parse(await readFile26(join41(root, "package.json"), "utf8"));
+  const projectPackage = JSON.parse(await readFile27(join42(root, "package.json"), "utf8"));
   const name3 = projectPackage && typeof projectPackage === "object" && "name" in projectPackage && typeof projectPackage.name === "string" ? projectPackage.name : "project";
   const scope = {
     projectId: config3.project_id,
@@ -258100,16 +258137,16 @@ async function pack(context) {
   if (tip === base) {
     throw new CommandError("no new commits since the head kit.mjs pull took (base_commit_oid); git commit first");
   }
-  const outputs = join41(workdir, WORKDIR_DIRS.outputs);
-  const reportPath = join41(outputs, "build-report.json");
+  const outputs = join42(workdir, WORKDIR_DIRS.outputs);
+  const reportPath = join42(outputs, "build-report.json");
   if (!existsSync27(reportPath)) {
     throw new CommandError("outputs/build-report.json is missing; write it first (instructions.md §2)");
   }
-  const dist = join41(source, "dist");
+  const dist = join42(source, "dist");
   if (!existsSync27(dist))
     throw new CommandError("source/dist is missing; kit.mjs build first");
-  await mkdir15(outputs, { recursive: true });
-  const bundlePath = join41(outputs, "source.bundle");
+  await mkdir16(outputs, { recursive: true });
+  const bundlePath = join42(outputs, "source.bundle");
   await gitOk(context.git, source, [
     "bundle",
     "create",
@@ -258119,12 +258156,12 @@ async function pack(context) {
     ...base === null ? [] : [`^${base}`]
   ]);
   const distArchive = buildDistArchive(await collectFiles(dist));
-  await writeFile18(join41(outputs, "dist.tar.gz"), distArchive);
+  await writeFile19(join42(outputs, "dist.tar.gz"), distArchive);
   print(context, {
     files: {
-      "source.bundle": describeFile(new Uint8Array(await readFile26(bundlePath))),
+      "source.bundle": describeFile(new Uint8Array(await readFile27(bundlePath))),
       "dist.tar.gz": describeFile(distArchive),
-      "build-report.json": describeFile(new Uint8Array(await readFile26(reportPath)))
+      "build-report.json": describeFile(new Uint8Array(await readFile27(reportPath)))
     },
     project_id: config3.project_id,
     session_id: config3.session_id,
@@ -258155,7 +258192,7 @@ async function uploadOutputs(context, flags) {
     throw new CommandError(`uploading the LFS files failed: ${lfs.stderr.trim()} (not logged in? run kit.mjs login)`);
   }
   for (const [name3, contentType2] of Object.entries(OUTPUT_FILES)) {
-    const bytes3 = new Uint8Array(await readFile26(join41(workdir, WORKDIR_DIRS.outputs, name3)));
+    const bytes3 = new Uint8Array(await readFile27(join42(workdir, WORKDIR_DIRS.outputs, name3)));
     await upload(name3, urls[name3], bytes3, contentType2, context.fetch);
   }
   print(context, { uploaded: Object.keys(OUTPUT_FILES) });
@@ -258239,9 +258276,9 @@ async function addAsset(context, flags) {
   }
   const workdir = await findWorkdir(context.cwd);
   const bytes3 = await fetchVerified(context, path, flags.url, flags.sha256);
-  const target2 = join41(sourceOf(workdir), ...segments);
-  await mkdir15(dirname13(target2), { recursive: true });
-  await writeFile18(target2, bytes3);
+  const target2 = join42(sourceOf(workdir), ...segments);
+  await mkdir16(dirname14(target2), { recursive: true });
+  await writeFile19(target2, bytes3);
   print(context, {
     path,
     ...describeFile(bytes3),
@@ -258274,8 +258311,8 @@ async function codexConfig(context, flags) {
     context.stdout(codexApprovalToml(pluginId, MCP_SERVER_NAME));
     return;
   }
-  const path = join41(context.codexHome, "config.toml");
-  const existing = existsSync27(path) ? await readFile26(path, "utf8") : "";
+  const path = join42(context.codexHome, "config.toml");
+  const existing = existsSync27(path) ? await readFile27(path, "utf8") : "";
   let merged;
   try {
     merged = mergeCodexApproval(existing, pluginId, MCP_SERVER_NAME);
@@ -258286,8 +258323,8 @@ async function codexConfig(context, flags) {
   }
   const changed = merged !== existing;
   if (changed) {
-    await mkdir15(context.codexHome, { recursive: true });
-    await writeFile18(path, merged);
+    await mkdir16(context.codexHome, { recursive: true });
+    await writeFile19(path, merged);
   }
   print(context, {
     written: path,
@@ -258322,7 +258359,7 @@ async function e2eCommand(context, flags) {
 
 // frontend/packages/miniapp-kit/src/cli.ts
 function kitRootOf(scriptUrl) {
-  return resolve5(dirname14(fileURLToPath(scriptUrl)), "..");
+  return resolve5(dirname15(fileURLToPath(scriptUrl)), "..");
 }
 async function main(argv, scriptUrl) {
   let args;

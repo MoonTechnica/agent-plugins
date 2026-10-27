@@ -189,7 +189,7 @@ export default async function seed(context: SeedContext): Promise<SeedPlan<Schem
   return { version: 1, operations: [
     { model: 'workspace', operation: 'create', args: { data: { id: workspaceId, name: 'サンプルのチーム' } } },
     { model: 'membership', operation: 'create', args: { data: { workspaceId, userId: alice.id, role: 'owner' } } },
-    { model: 'task', operation: 'createMany', args: { data: Array.from({ length: 25 }, (_, i) => ({ title: `タスク ${i + 1}`, ownerId: alice.id, workspaceId })) } },
+    { model: 'task', operation: 'createMany', args: { data: Array.from({ length: 25 }, (_, i) => ({ title: `タスク ${i + 1}`, ownerId: alice.id, workspaceId, createdAt: new Date(context.initializedAt) })) } },
   ] }
 }
 ```
@@ -198,5 +198,5 @@ export default async function seed(context: SeedContext): Promise<SeedPlan<Schem
 - 操作は `create`・`createMany`・`upsert`。読み取り・削除・任意 SQL・対話的トランザクションは使えない。
 - User・ProjectRole・RolePermission・UserProjectRole は直接・nested create とも書かない。利用者は `testIdentities` と `context.users` を使い、既存の主体への関連は `connect` で表す。
 - `admin`・`member`・`anonymous` は予約済み。匿名主体にも試用 User 行があり、`context.users.anonymous` で参照できる。匿名の書き込みは App の `anonymous.write` が制限する。追加 slot は英小文字始まりの英小文字・数字・`_`・`-`、最大 32 文字。
-- ID は `await context.id('stable-label')`、日時は `context.initializedAt` を使う。同じ初期化の再試行で値を変えない。
+- ID は `await context.id('stable-label')` を使う。`context.initializedAt` は固定時刻の ISO 文字列。`DateTime` 列には `createdAt: new Date(context.initializedAt)` のように `Date` へ変換して渡す。文字列を直接代入しない。同じ初期化の再試行で値を変えない。
 - 計画は最大 100 操作・1,000 行・1 MiB。権限の異なる主体と一覧のページングを確かめられる件数を用意する。

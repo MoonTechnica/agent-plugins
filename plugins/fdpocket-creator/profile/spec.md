@@ -629,7 +629,7 @@ export default async function seed(context: SeedContext): Promise<SeedPlan<Schem
 `SeedOperation<SchemaType>` は一つの型付きモデル操作、`SeedPlan<SchemaType>` はその一覧。
 `SeedContext.environmentId` と `SeedContext.resourceGeneration` は対象セッションの固定世代、
 `SeedContext.initializationId` は再試行で変わらない初期化 ID、`SeedContext.source` は実在する Git commit または内容で固定した作業ツリー、
-`SeedContext.initializedAt` は固定時刻。`SeedContext.id` は初期化 ID を使う安定 ID 生成、
+`SeedContext.initializedAt` は固定時刻の ISO 文字列。`DateTime` 列へ渡すときは `new Date(context.initializedAt)` に変換し、文字列を直接代入しない。`SeedContext.id` は初期化 ID を使う安定 ID 生成、
 `SeedContext.users` は `admin`・`member`・`anonymous` と追加 slot の正規試用 User。
 `TestIdentity.roles` は project.yaml に宣言された Role の名前だけ。
 
