@@ -33,6 +33,7 @@ export * from './python-control.ts';
 export * from './realtime.ts';
 export * from './resolve.ts';
 export * from './safety.ts';
+export * from './sandbox-dispatch.ts';
 export * from './session-environment.ts';
 export * from './session-live-events.ts';
 export * from './session-seed.ts';

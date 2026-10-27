@@ -3,6 +3,8 @@ export interface StorageUploadEgressPolicy {
     storage: unknown;
     r2Origin: string;
     bucketPrefix: string;
+    /** Trusted local publication metadata; immutable names contain a UUID, not the app slug. */
+    appSlug?: string;
 }
 /** A bearer-capability PUT, restricted further to this Worker's own namespace: a single PUT to its
  * staging key, or a multipart UploadPart to its final object key (storage.md §4.4; R2 rejects the

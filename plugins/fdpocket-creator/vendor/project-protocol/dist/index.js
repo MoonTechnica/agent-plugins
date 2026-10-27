@@ -33,6 +33,7 @@ export * from "./python-control.js";
 export * from "./realtime.js";
 export * from "./resolve.js";
 export * from "./safety.js";
+export * from "./sandbox-dispatch.js";
 export * from "./session-environment.js";
 export * from "./session-live-events.js";
 export * from "./session-seed.js";

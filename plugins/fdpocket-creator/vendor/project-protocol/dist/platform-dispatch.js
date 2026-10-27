@@ -23,7 +23,7 @@ const UUID = '[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}';
 export const USER_WORKER_SLUG = '[a-z][a-z0-9-]{1,31}';
 const EXACT_UUID = new RegExp(`^${UUID}$`);
 const EXACT_SLUG = new RegExp(`^${USER_WORKER_SLUG}$`);
-const WORKER_NAME_PATTERN = new RegExp(`^(?:p-${UUID}-(?:main|prod)|p-s-[0-9a-f]{12})-(${USER_WORKER_SLUG})$`);
+const WORKER_NAME_PATTERN = new RegExp(`^(?:p-${UUID}-(?:main|prod)-(${USER_WORKER_SLUG})|p-s-[0-9a-f]{12}-(${USER_WORKER_SLUG}|[0-9a-f]{32}))$`);
 export function userWorkerName(target) {
     if (!EXACT_UUID.test(target.projectId) || !EXACT_SLUG.test(target.app))
         throw new Error('invalid user worker target');
@@ -40,7 +40,8 @@ export function isUserWorkerName(name) {
     return WORKER_NAME_PATTERN.test(name);
 }
 export function userWorkerApp(name) {
-    return WORKER_NAME_PATTERN.exec(name)?.[1] ?? null;
+    const match = WORKER_NAME_PATTERN.exec(name);
+    return match?.[1] ?? match?.[2] ?? null;
 }
 /** Defense in depth: trusted DB storage metadata must describe this exact Worker environment. */
 export function workerStorageScope(worker) {

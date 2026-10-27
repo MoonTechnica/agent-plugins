@@ -37,7 +37,10 @@ export function isPresignedStoragePut(request, policy, now = Date.now()) {
     if (!url.pathname.startsWith(prefix) || !(part ? PART_KEY : STAGING_KEY).test(rest))
         return false;
     const app = rest.match(/\/apps\/([^/]+)\//)?.[1];
-    if (app && userWorkerApp(policy.worker) !== app)
+    const scopedApp = policy.appSlug ?? userWorkerApp(policy.worker);
+    if (policy.appSlug !== undefined && !/^[a-z][a-z0-9-]{1,31}$/.test(policy.appSlug))
+        return false;
+    if (app && scopedApp !== app)
         return false;
     // No ambiguous duplicate security parameters, even if an intermediary uses first/last-value parsing.
     const names = [...url.searchParams.keys()];
