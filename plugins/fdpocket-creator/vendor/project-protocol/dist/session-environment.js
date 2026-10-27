@@ -1,5 +1,40 @@
 import { z } from 'zod';
 import { liveJobRunsSchema, liveSessionInspectionSchema } from "./live-bridge.js";
+/**
+ * Why a preview did not start. Closed sets shared with `core.failure_diagnostic` (Python) and
+ * `record_session_state` (SQL); `backend-py/apps/api/tests/test_failure_contract.py` fails when
+ * the three drift apart.
+ */
+export const FAILURE_CODES = [
+    'kit_not_ready',
+    'dependencies_failed',
+    'source_checkout_failed',
+    'sandbox_open_failed',
+    'database_failed',
+    'workers_failed',
+    'provider_timeout',
+    'migration_sql_failed',
+    'migration_history_conflict',
+    'unknown',
+];
+export const FAILURE_PHASES = [
+    'sandbox_open',
+    'checkout',
+    'scaffold',
+    'dependencies',
+    'vite_ready',
+    'database',
+    'workers',
+    'migrate',
+    'unknown',
+];
+export const FAILURE_DETAIL_MAX_CHARS = 4000;
+/** The server's own diagnosis; `detail` is a redacted excerpt, safe for the repairing agent. */
+export const failureDiagnosticSchema = z.object({
+    code: z.enum(FAILURE_CODES),
+    phase: z.enum(FAILURE_PHASES),
+    detail: z.string().max(FAILURE_DETAIL_MAX_CHARS),
+});
 export const sessionEnvironmentViewSchema = z.object({
     environmentId: z.string(),
     status: z.string(),
@@ -65,6 +100,7 @@ export const sessionEnvironmentViewSchema = z.object({
         kind: z.enum(['sandbox', 'connect']).nullable(),
         status: z.enum(['starting', 'running', 'stopped', 'failed']).nullable(),
         url: z.string().url().nullable(),
+        failure: failureDiagnosticSchema.nullish(),
     }),
 });
 const cursor = z.string().min(1).max(2048).nullable();

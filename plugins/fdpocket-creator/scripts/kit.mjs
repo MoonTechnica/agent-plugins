@@ -237846,6 +237846,35 @@ var sandboxDispatchSchema = exports_external.object({
 }, "invalid sandbox dispatch endpoint");
 // frontend/packages/project-protocol/src/session-environment.ts
 init_zod();
+var FAILURE_CODES = [
+  "kit_not_ready",
+  "dependencies_failed",
+  "source_checkout_failed",
+  "sandbox_open_failed",
+  "database_failed",
+  "workers_failed",
+  "provider_timeout",
+  "migration_sql_failed",
+  "migration_history_conflict",
+  "unknown"
+];
+var FAILURE_PHASES = [
+  "sandbox_open",
+  "checkout",
+  "scaffold",
+  "dependencies",
+  "vite_ready",
+  "database",
+  "workers",
+  "migrate",
+  "unknown"
+];
+var FAILURE_DETAIL_MAX_CHARS = 4000;
+var failureDiagnosticSchema = exports_external.object({
+  code: exports_external.enum(FAILURE_CODES),
+  phase: exports_external.enum(FAILURE_PHASES),
+  detail: exports_external.string().max(FAILURE_DETAIL_MAX_CHARS)
+});
 var sessionEnvironmentViewSchema = exports_external.object({
   environmentId: exports_external.string(),
   status: exports_external.string(),
@@ -237895,7 +237924,8 @@ var sessionEnvironmentViewSchema = exports_external.object({
   live: exports_external.object({
     kind: exports_external.enum(["sandbox", "connect"]).nullable(),
     status: exports_external.enum(["starting", "running", "stopped", "failed"]).nullable(),
-    url: exports_external.string().url().nullable()
+    url: exports_external.string().url().nullable(),
+    failure: failureDiagnosticSchema.nullish()
   })
 });
 var cursor = exports_external.string().min(1).max(2048).nullable();

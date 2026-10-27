@@ -1,4 +1,40 @@
 import { z } from 'zod';
+/**
+ * Why a preview did not start. Closed sets shared with `core.failure_diagnostic` (Python) and
+ * `record_session_state` (SQL); `backend-py/apps/api/tests/test_failure_contract.py` fails when
+ * the three drift apart.
+ */
+export declare const FAILURE_CODES: readonly ["kit_not_ready", "dependencies_failed", "source_checkout_failed", "sandbox_open_failed", "database_failed", "workers_failed", "provider_timeout", "migration_sql_failed", "migration_history_conflict", "unknown"];
+export declare const FAILURE_PHASES: readonly ["sandbox_open", "checkout", "scaffold", "dependencies", "vite_ready", "database", "workers", "migrate", "unknown"];
+export declare const FAILURE_DETAIL_MAX_CHARS = 4000;
+/** The server's own diagnosis; `detail` is a redacted excerpt, safe for the repairing agent. */
+export declare const failureDiagnosticSchema: z.ZodObject<{
+    code: z.ZodEnum<{
+        unknown: "unknown";
+        kit_not_ready: "kit_not_ready";
+        dependencies_failed: "dependencies_failed";
+        source_checkout_failed: "source_checkout_failed";
+        sandbox_open_failed: "sandbox_open_failed";
+        database_failed: "database_failed";
+        workers_failed: "workers_failed";
+        provider_timeout: "provider_timeout";
+        migration_sql_failed: "migration_sql_failed";
+        migration_history_conflict: "migration_history_conflict";
+    }>;
+    phase: z.ZodEnum<{
+        unknown: "unknown";
+        sandbox_open: "sandbox_open";
+        checkout: "checkout";
+        scaffold: "scaffold";
+        dependencies: "dependencies";
+        vite_ready: "vite_ready";
+        database: "database";
+        workers: "workers";
+        migrate: "migrate";
+    }>;
+    detail: z.ZodString;
+}, z.core.$strip>;
+export type FailureDiagnostic = z.infer<typeof failureDiagnosticSchema>;
 export declare const sessionEnvironmentViewSchema: z.ZodObject<{
     environmentId: z.ZodString;
     status: z.ZodString;
@@ -87,6 +123,32 @@ export declare const sessionEnvironmentViewSchema: z.ZodObject<{
             stopped: "stopped";
         }>>;
         url: z.ZodNullable<z.ZodString>;
+        failure: z.ZodOptional<z.ZodNullable<z.ZodObject<{
+            code: z.ZodEnum<{
+                unknown: "unknown";
+                kit_not_ready: "kit_not_ready";
+                dependencies_failed: "dependencies_failed";
+                source_checkout_failed: "source_checkout_failed";
+                sandbox_open_failed: "sandbox_open_failed";
+                database_failed: "database_failed";
+                workers_failed: "workers_failed";
+                provider_timeout: "provider_timeout";
+                migration_sql_failed: "migration_sql_failed";
+                migration_history_conflict: "migration_history_conflict";
+            }>;
+            phase: z.ZodEnum<{
+                unknown: "unknown";
+                sandbox_open: "sandbox_open";
+                checkout: "checkout";
+                scaffold: "scaffold";
+                dependencies: "dependencies";
+                vite_ready: "vite_ready";
+                database: "database";
+                workers: "workers";
+                migrate: "migrate";
+            }>;
+            detail: z.ZodString;
+        }, z.core.$strip>>>;
     }, z.core.$strip>;
 }, z.core.$strip>;
 export declare const sessionEventsPageSchema: z.ZodObject<{
