@@ -15,6 +15,7 @@ export const FAILURE_CODES = [
     'provider_timeout',
     'migration_sql_failed',
     'migration_history_conflict',
+    'seed_failed',
     'unknown',
 ];
 export const FAILURE_PHASES = [
@@ -26,6 +27,7 @@ export const FAILURE_PHASES = [
     'database',
     'workers',
     'migrate',
+    'seed',
     'unknown',
 ];
 export const FAILURE_DETAIL_MAX_CHARS = 4000;
@@ -101,6 +103,8 @@ export const sessionEnvironmentViewSchema = z.object({
         status: z.enum(['starting', 'running', 'stopped', 'failed']).nullable(),
         url: z.string().url().nullable(),
         failure: failureDiagnosticSchema.nullish(),
+        /** The app's own seed crashed, so the preview runs without sample data (the preview still works). */
+        seedFailure: failureDiagnosticSchema.nullish(),
     }),
 });
 const cursor = z.string().min(1).max(2048).nullable();

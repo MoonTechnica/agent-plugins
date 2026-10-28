@@ -237856,6 +237856,7 @@ var FAILURE_CODES = [
   "provider_timeout",
   "migration_sql_failed",
   "migration_history_conflict",
+  "seed_failed",
   "unknown"
 ];
 var FAILURE_PHASES = [
@@ -237867,6 +237868,7 @@ var FAILURE_PHASES = [
   "database",
   "workers",
   "migrate",
+  "seed",
   "unknown"
 ];
 var FAILURE_DETAIL_MAX_CHARS = 4000;
@@ -237925,7 +237927,8 @@ var sessionEnvironmentViewSchema = exports_external.object({
     kind: exports_external.enum(["sandbox", "connect"]).nullable(),
     status: exports_external.enum(["starting", "running", "stopped", "failed"]).nullable(),
     url: exports_external.string().url().nullable(),
-    failure: failureDiagnosticSchema.nullish()
+    failure: failureDiagnosticSchema.nullish(),
+    seedFailure: failureDiagnosticSchema.nullish()
   })
 });
 var cursor = exports_external.string().min(1).max(2048).nullable();
