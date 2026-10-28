@@ -4,8 +4,8 @@ import { z } from 'zod';
  * `record_session_state` (SQL); `backend-py/apps/api/tests/test_failure_contract.py` fails when
  * the three drift apart.
  */
-export declare const FAILURE_CODES: readonly ["kit_not_ready", "dependencies_failed", "source_checkout_failed", "sandbox_open_failed", "database_failed", "workers_failed", "provider_timeout", "migration_sql_failed", "migration_history_conflict", "seed_failed", "unknown"];
-export declare const FAILURE_PHASES: readonly ["sandbox_open", "checkout", "scaffold", "dependencies", "vite_ready", "database", "workers", "migrate", "seed", "unknown"];
+export declare const FAILURE_CODES: readonly ["kit_not_ready", "dependencies_failed", "source_checkout_failed", "sandbox_open_failed", "database_failed", "workers_failed", "provider_timeout", "migration_sql_failed", "migration_history_conflict", "seed_failed", "kit_failed", "unknown"];
+export declare const FAILURE_PHASES: readonly ["sandbox_open", "checkout", "scaffold", "dependencies", "vite_ready", "database", "workers", "migrate", "seed", "build", "sync", "unknown"];
 export declare const FAILURE_DETAIL_MAX_CHARS = 4000;
 /** The server's own diagnosis; `detail` is a redacted excerpt, safe for the repairing agent. */
 export declare const failureDiagnosticSchema: z.ZodObject<{
@@ -21,9 +21,11 @@ export declare const failureDiagnosticSchema: z.ZodObject<{
         migration_sql_failed: "migration_sql_failed";
         migration_history_conflict: "migration_history_conflict";
         seed_failed: "seed_failed";
+        kit_failed: "kit_failed";
     }>;
     phase: z.ZodEnum<{
         unknown: "unknown";
+        build: "build";
         sandbox_open: "sandbox_open";
         checkout: "checkout";
         scaffold: "scaffold";
@@ -33,6 +35,7 @@ export declare const failureDiagnosticSchema: z.ZodObject<{
         workers: "workers";
         migrate: "migrate";
         seed: "seed";
+        sync: "sync";
     }>;
     detail: z.ZodString;
 }, z.core.$strip>;
@@ -138,9 +141,11 @@ export declare const sessionEnvironmentViewSchema: z.ZodObject<{
                 migration_sql_failed: "migration_sql_failed";
                 migration_history_conflict: "migration_history_conflict";
                 seed_failed: "seed_failed";
+                kit_failed: "kit_failed";
             }>;
             phase: z.ZodEnum<{
                 unknown: "unknown";
+                build: "build";
                 sandbox_open: "sandbox_open";
                 checkout: "checkout";
                 scaffold: "scaffold";
@@ -150,6 +155,7 @@ export declare const sessionEnvironmentViewSchema: z.ZodObject<{
                 workers: "workers";
                 migrate: "migrate";
                 seed: "seed";
+                sync: "sync";
             }>;
             detail: z.ZodString;
         }, z.core.$strip>>>;
@@ -166,9 +172,11 @@ export declare const sessionEnvironmentViewSchema: z.ZodObject<{
                 migration_sql_failed: "migration_sql_failed";
                 migration_history_conflict: "migration_history_conflict";
                 seed_failed: "seed_failed";
+                kit_failed: "kit_failed";
             }>;
             phase: z.ZodEnum<{
                 unknown: "unknown";
+                build: "build";
                 sandbox_open: "sandbox_open";
                 checkout: "checkout";
                 scaffold: "scaffold";
@@ -178,6 +186,38 @@ export declare const sessionEnvironmentViewSchema: z.ZodObject<{
                 workers: "workers";
                 migrate: "migrate";
                 seed: "seed";
+                sync: "sync";
+            }>;
+            detail: z.ZodString;
+        }, z.core.$strip>>>;
+        kitFailure: z.ZodOptional<z.ZodNullable<z.ZodObject<{
+            code: z.ZodEnum<{
+                unknown: "unknown";
+                kit_not_ready: "kit_not_ready";
+                dependencies_failed: "dependencies_failed";
+                source_checkout_failed: "source_checkout_failed";
+                sandbox_open_failed: "sandbox_open_failed";
+                database_failed: "database_failed";
+                workers_failed: "workers_failed";
+                provider_timeout: "provider_timeout";
+                migration_sql_failed: "migration_sql_failed";
+                migration_history_conflict: "migration_history_conflict";
+                seed_failed: "seed_failed";
+                kit_failed: "kit_failed";
+            }>;
+            phase: z.ZodEnum<{
+                unknown: "unknown";
+                build: "build";
+                sandbox_open: "sandbox_open";
+                checkout: "checkout";
+                scaffold: "scaffold";
+                dependencies: "dependencies";
+                vite_ready: "vite_ready";
+                database: "database";
+                workers: "workers";
+                migrate: "migrate";
+                seed: "seed";
+                sync: "sync";
             }>;
             detail: z.ZodString;
         }, z.core.$strip>>>;

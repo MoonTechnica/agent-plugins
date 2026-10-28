@@ -237857,6 +237857,7 @@ var FAILURE_CODES = [
   "migration_sql_failed",
   "migration_history_conflict",
   "seed_failed",
+  "kit_failed",
   "unknown"
 ];
 var FAILURE_PHASES = [
@@ -237869,6 +237870,8 @@ var FAILURE_PHASES = [
   "workers",
   "migrate",
   "seed",
+  "build",
+  "sync",
   "unknown"
 ];
 var FAILURE_DETAIL_MAX_CHARS = 4000;
@@ -237928,7 +237931,8 @@ var sessionEnvironmentViewSchema = exports_external.object({
     status: exports_external.enum(["starting", "running", "stopped", "failed"]).nullable(),
     url: exports_external.string().url().nullable(),
     failure: failureDiagnosticSchema.nullish(),
-    seedFailure: failureDiagnosticSchema.nullish()
+    seedFailure: failureDiagnosticSchema.nullish(),
+    kitFailure: failureDiagnosticSchema.nullish()
   })
 });
 var cursor = exports_external.string().min(1).max(2048).nullable();
@@ -255170,6 +255174,9 @@ function createSessionSyncTransport(url2, key, request2, signal) {
     return parsed.data;
   };
   return {
+    async report(report2) {
+      await call("/failure", "POST", JSON.stringify(report2));
+    },
     async context() {
       const value2 = await (await call("/context")).json();
       if (!value2 || typeof value2 !== "object" || !("revision" in value2) || value2.revision !== null && typeof value2.revision !== "string" || !("schemaSql" in value2) || typeof value2.schemaSql !== "string")
@@ -255287,6 +255294,21 @@ async function startSessionWatcher(options2) {
     ...event.notification.kind !== "schema" ? { appSlug: event.notification.payload.appSlug } : {}
   });
   const send = transport.send;
+  const reported = new Set;
+  const report2 = async (key2, phase, message2) => {
+    const recovered = message2 === undefined;
+    if (recovered && !reported.has(key2))
+      return;
+    try {
+      await transport.report(recovered ? { key: key2, phase, recovered } : { key: key2, phase, message: message2 });
+      if (recovered)
+        reported.delete(key2);
+      else
+        reported.add(key2);
+    } catch (error51) {
+      console.error("Live failure report failed:", error51 instanceof Error ? error51.message : error51);
+    }
+  };
   const retryLater = (event, delay) => {
     emit({
       ...context(event),
@@ -255322,6 +255344,7 @@ async function startSessionWatcher(options2) {
         }
         for (const event of prepared)
           pending.set(eventKey(event), event);
+        await report2("prepare", "build");
       } catch (error51) {
         if (error51 instanceof SyncFailure) {
           console.error("Live baseline request failed:", error51.message);
@@ -255353,12 +255376,14 @@ async function startSessionWatcher(options2) {
         }
         const detail = preparationDiagnostic(error51, [key, options2.live.token]);
         console.error("Live source preparation failed:", detail);
-        if (!closed)
+        if (!closed) {
           emit({
             status: "error",
             kind: "schema",
             message: `Live changes could not be prepared: ${detail}`
           });
+          await report2("prepare", "build", detail);
+        }
         return;
       }
     }
@@ -255379,6 +255404,7 @@ async function startSessionWatcher(options2) {
           pending.delete(id);
         failures = 0;
         emit({ ...context(event), status: "synced", message: "Live changes synchronized" });
+        await report2(id, "sync");
       } catch (error51) {
         if (closed)
           return;
@@ -255412,6 +255438,7 @@ async function startSessionWatcher(options2) {
         if (error51 instanceof SyncFailure && !error51.retryable) {
           pending.delete(id);
           emit({ ...context(event), status: "error", message: error51.message });
+          await report2(id, "sync", error51.message);
           continue;
         }
         failures += 1;
