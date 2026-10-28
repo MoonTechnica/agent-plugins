@@ -255071,25 +255071,30 @@ async function prepareSessionChanges(options2, changes, signal, baseline = { rev
       ...source ? { bundle: source.bytes } : {}
     });
   }
+  const builds = [];
   for (const [appSlug, app] of Object.entries(manifest2.apps)) {
     if (app.kind === "python" && (changes.allWorkers || changes.apps.has(appSlug))) {
-      const source = await collectPythonSource(root, appSlug);
-      const payload = { sourceHash: source.hash, sizeBytes: source.sizeBytes, appSlug, manifest: manifest2 };
-      events.push({
-        notification: {
-          kind: "python",
-          payload: { hash: digest3(JSON.stringify(payload)), ...payload }
-        },
-        bundle: source.bytes
-      });
+      builds.push(pythonEvent(root, appSlug, manifest2));
       continue;
     }
     if (app.kind !== "api" && app.kind !== "jobs" || !changes.allWorkers && !changes.apps.has(appSlug))
       continue;
     signal.throwIfAborted();
-    events.push(await workerEvent(root, appSlug, app.kind, manifest2));
+    builds.push(workerEvent(root, appSlug, app.kind, manifest2));
   }
+  events.push(...await Promise.all(builds));
   return events;
+}
+async function pythonEvent(root, appSlug, manifest2) {
+  const source = await collectPythonSource(root, appSlug);
+  const payload = { sourceHash: source.hash, sizeBytes: source.sizeBytes, appSlug, manifest: manifest2 };
+  return {
+    notification: {
+      kind: "python",
+      payload: { hash: digest3(JSON.stringify(payload)), ...payload }
+    },
+    bundle: source.bytes
+  };
 }
 async function workerEvent(root, appSlug, kind, manifest2) {
   const appDir = join32(root, "apps", appSlug);
@@ -255122,6 +255127,7 @@ function digest3(bytes3) {
 
 // frontend/packages/miniapp-kit/src/dev/watcher-transport.ts
 init_zod();
+var JOB_POLL_MS = 300;
 var jobSchema = exports_external.object({
   id: exports_external.uuid(),
   status: exports_external.enum(["uploading", "pending", "running", "done", "failed", "replan"]),
@@ -255216,7 +255222,7 @@ function createSessionSyncTransport(url2, key, request2, signal) {
         job = await parseJob(await call(`/${job.id}/uploaded`, "POST", "{}"));
       }
       while (job.status === "pending" || job.status === "running") {
-        await wait(1000, signal);
+        await wait(JOB_POLL_MS, signal);
         job = await parseJob(await call(`/${job.id}`));
       }
       if (job.status === "replan")
@@ -255852,27 +255858,41 @@ async function startLiveDev(options2, manifest2) {
       closers.push(async () => {
         connectedHandler.close();
       });
-    const workers = options2.connected ? null : await createSandboxWorkers({ root: options2.root, kitRoot: options2.kitRoot, live: live2 });
-    if (workers) {
-      closers.push(workers.close);
-      const control = await listen(options2.ports?.workers ?? (options2.ports ? 0 : 4323), "127.0.0.1", workers.control, 20 * 1024 * 1024);
-      closers.push(control.close);
-    }
-    const host = await listen(options2.ports?.host ?? DEV_PORTS.host, options2.connected ? "127.0.0.1" : "0.0.0.0", async (request2) => {
-      if (options2.connected)
-        return handler.fetch(request2);
-      const workerResponse = await workers?.fetch(request2);
-      if (workerResponse)
-        return workerResponse;
-      const gated = gateLiveRequest(request2, live2.token);
-      if (!gated)
-        return notFound();
-      if (new URL(gated.url).pathname === "/kit-dev/events")
-        return Response.json({ sync: sync.slice(), workers: await workers?.info() ?? [] }, { headers: { "cache-control": "no-store" } });
-      return handler.fetch(gated);
-    }, options2.connected ? 4096 : undefined);
-    closers.push(host.close);
-    for (const slug of webApps) {
+    const watcher = await (options2.startWatcher ?? startSessionWatcher)({
+      root: options2.root,
+      kitRoot: options2.kitRoot,
+      live: live2,
+      ...options2.connected ? { notifyUrl: options2.connected.notify.url, notifyKey: options2.connected.notify.key } : {},
+      onEvent: (event) => {
+        sync.unshift(event);
+        sync.splice(50);
+      }
+    });
+    closers.push(watcher.close);
+    const startHost = async () => {
+      const workers = options2.connected ? null : await createSandboxWorkers({ root: options2.root, kitRoot: options2.kitRoot, live: live2 });
+      if (workers) {
+        closers.push(workers.close);
+        const control = await listen(options2.ports?.workers ?? (options2.ports ? 0 : 4323), "127.0.0.1", workers.control, 20 * 1024 * 1024);
+        closers.push(control.close);
+      }
+      const host2 = await listen(options2.ports?.host ?? DEV_PORTS.host, options2.connected ? "127.0.0.1" : "0.0.0.0", async (request2) => {
+        if (options2.connected)
+          return handler.fetch(request2);
+        const workerResponse = await workers?.fetch(request2);
+        if (workerResponse)
+          return workerResponse;
+        const gated = gateLiveRequest(request2, live2.token);
+        if (!gated)
+          return notFound();
+        if (new URL(gated.url).pathname === "/kit-dev/events")
+          return Response.json({ sync: sync.slice(), workers: await workers?.info() ?? [] }, { headers: { "cache-control": "no-store" } });
+        return handler.fetch(gated);
+      }, options2.connected ? 4096 : undefined);
+      closers.push(host2.close);
+      return host2;
+    };
+    const startApp = async (slug) => {
       const origin2 = live2.origins.apps[slug];
       const port = appPorts[slug];
       if (!origin2 || port === undefined)
@@ -255893,18 +255913,12 @@ async function startLiveDev(options2, manifest2) {
         }
       });
       closers.push(vite.close);
-    }
-    const watcher = await (options2.startWatcher ?? startSessionWatcher)({
-      root: options2.root,
-      kitRoot: options2.kitRoot,
-      live: live2,
-      ...options2.connected ? { notifyUrl: options2.connected.notify.url, notifyKey: options2.connected.notify.key } : {},
-      onEvent: (event) => {
-        sync.unshift(event);
-        sync.splice(50);
-      }
-    });
-    closers.push(watcher.close);
+    };
+    const started = await Promise.allSettled([startHost(), ...webApps.map(startApp)]);
+    const failed = started.find((result) => result.status === "rejected");
+    if (failed)
+      throw failed.reason;
+    const host = started[0].value;
     return {
       hostUrl: host.url,
       liveUrl: `${live2.origins.host}${prefix2}`,
