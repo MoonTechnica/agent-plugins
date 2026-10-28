@@ -234630,7 +234630,7 @@ var COMMANDS = {
   generate: { required: [], optional: [] },
   e2e: { required: ["live", "as"], optional: ["app", "test"], switches: ["live"] },
   "schema-plan": { required: ["context-file", "output"], optional: [] },
-  "seed-plan": { required: ["context-file", "output"], optional: [] },
+  "seed-plan": { required: ["context-file", "output"], optional: [], switches: ["skip-seed"] },
   build: { required: [], optional: ["project-id", "gateway-url"] },
   dev: { required: [], optional: ["as", "project-id", "trigger"], switches: ["live", "connect"] },
   db: {
@@ -243185,7 +243185,7 @@ async function generateSeedBundle(input) {
   const { aiPrompts } = await prepareSessionRuntime(input.root);
   const data = sessionSeedContextSchema.parse(input.context);
   const path = join19(input.root, PROJECT_PATHS.seed);
-  if (!existsSync14(path))
+  if (input.skipSeed || !existsSync14(path))
     return sessionSeedBundleSchema.parse({
       version: 1,
       schemaJson,
@@ -243234,7 +243234,12 @@ async function runSeed(input) {
 async function writeSeedPlan(input) {
   const context = sessionSeedContextSchema.parse(JSON.parse(await readFile10(input.contextFile, "utf8")));
   const importModule = input.importModule ?? await projectSeedImporter(input.root);
-  const bundle = await generateSeedBundle({ root: input.root, context, importModule });
+  const bundle = await generateSeedBundle({
+    root: input.root,
+    context,
+    importModule,
+    ...input.skipSeed ? { skipSeed: true } : {}
+  });
   await writeFile6(input.output, JSON.stringify(bundle), { mode: 384, flag: "wx" });
 }
 async function projectSeedImporter(root) {
@@ -259082,7 +259087,8 @@ async function seedPlanCommand(context, flags) {
   await writeSeedPlan({
     root: context.cwd,
     contextFile: resolve4(context.cwd, contextFile),
-    output: resolve4(context.cwd, output)
+    output: resolve4(context.cwd, output),
+    ...flags["skip-seed"] ? { skipSeed: true } : {}
   });
 }
 async function e2eCommand(context, flags) {
