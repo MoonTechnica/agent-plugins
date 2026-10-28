@@ -241384,11 +241384,11 @@ ${untracked.code === 0 ? untracked.stdout : ""}`.split(`
 }
 
 // frontend/packages/miniapp-kit/src/commands.ts
-import { createHash as createHash12, randomUUID as randomUUID4 } from "node:crypto";
+import { createHash as createHash13, randomUUID as randomUUID4 } from "node:crypto";
 import { existsSync as existsSync27 } from "node:fs";
-import { mkdir as mkdir17, readdir as readdir14, readFile as readFile28, writeFile as writeFile20 } from "node:fs/promises";
+import { mkdir as mkdir19, readdir as readdir15, readFile as readFile29, writeFile as writeFile22 } from "node:fs/promises";
 import { homedir } from "node:os";
-import { dirname as dirname14, join as join43, resolve as resolve4 } from "node:path";
+import { dirname as dirname14, join as join44, resolve as resolve4 } from "node:path";
 import { createInterface } from "node:readline";
 // frontend/packages/project-host/src/open.ts
 init_zod();
@@ -253288,7 +253288,7 @@ async function optionalFile(path) {
 // frontend/packages/miniapp-kit/src/dev/server.ts
 import { spawn as spawn6 } from "node:child_process";
 import { readFileSync as readFileSync4 } from "node:fs";
-import { join as join33 } from "node:path";
+import { join as join34 } from "node:path";
 
 // frontend/packages/miniapp-kit/src/verify/dist-server.ts
 function createDistHandler(options2) {
@@ -254962,9 +254962,9 @@ import { watch as watchFiles } from "node:fs";
 import { relative as relative3, sep as sep2 } from "node:path";
 
 // frontend/packages/miniapp-kit/src/dev/watcher-build.ts
-import { createHash as createHash9 } from "node:crypto";
-import { readFile as readFile21 } from "node:fs/promises";
-import { join as join32 } from "node:path";
+import { createHash as createHash10 } from "node:crypto";
+import { mkdir as mkdir13, readFile as readFile22, writeFile as writeFile15 } from "node:fs/promises";
+import { join as join33 } from "node:path";
 
 // frontend/packages/miniapp-kit/src/dev/source-snapshot.ts
 import { createHash as createHash8 } from "node:crypto";
@@ -255037,6 +255037,48 @@ function encodeSource(entries, maxBytes) {
   };
 }
 
+// frontend/packages/miniapp-kit/src/dev/worker-cache.ts
+import { createHash as createHash9 } from "node:crypto";
+import { mkdir as mkdir12, readdir as readdir12, readFile as readFile21, rm as rm14, writeFile as writeFile14 } from "node:fs/promises";
+import { join as join32 } from "node:path";
+var CACHE_DIR = ".kit/cache/workers";
+var SKIPPED2 = new Set(["node_modules", ".git", ".kit", "dist"]);
+var BUILDER_VERSION = 1;
+async function hashTree(hash4, root, relative3) {
+  const entries = await readdir12(join32(root, relative3), { withFileTypes: true }).catch(() => []);
+  for (const entry of entries.sort((a2, b3) => a2.name.localeCompare(b3.name))) {
+    if (SKIPPED2.has(entry.name))
+      continue;
+    const path = relative3 === "" ? entry.name : `${relative3}/${entry.name}`;
+    if (entry.isDirectory())
+      await hashTree(hash4, root, path);
+    else if (entry.isFile())
+      hash4.update(path).update("\x00").update(await readFile21(join32(root, path)));
+  }
+}
+async function workerCacheKey(root, appSlug, kind) {
+  const hash4 = createHash9("sha256").update(`v${BUILDER_VERSION}\x00${kind}\x00${appSlug}\x00`);
+  hash4.update(kind === "jobs" ? scheduledWorkerSource("/app/src/index.ts") : "");
+  for (const file2 of ["package.json", "bun.lock"]) {
+    hash4.update(file2).update(await readFile21(join32(root, file2)).catch(() => ""));
+  }
+  await hashTree(hash4, root, join32("apps", appSlug));
+  await hashTree(hash4, root, "packages");
+  return hash4.digest("hex");
+}
+var entry = (root, appSlug, key) => join32(root, CACHE_DIR, `${appSlug}-${key}.js`);
+async function readCachedWorker(root, appSlug, key) {
+  return readFile21(entry(root, appSlug, key)).then((bytes3) => new Uint8Array(bytes3), () => null);
+}
+async function cacheWorker(root, appSlug, key, bytes3) {
+  await mkdir12(join32(root, CACHE_DIR), { recursive: true });
+  await writeFile14(entry(root, appSlug, key), bytes3);
+  for (const name3 of await readdir12(join32(root, CACHE_DIR))) {
+    if (name3.startsWith(`${appSlug}-`) && name3 !== `${appSlug}-${key}.js`)
+      await rm14(join32(root, CACHE_DIR, name3), { force: true });
+  }
+}
+
 // frontend/packages/miniapp-kit/src/dev/watcher-build.ts
 async function prepareSessionChanges(options2, changes, signal, baseline = { revision: null, schemaSql: "" }) {
   const { root } = options2;
@@ -255097,15 +255139,24 @@ async function pythonEvent(root, appSlug, manifest2) {
   };
 }
 async function workerEvent(root, appSlug, kind, manifest2) {
-  const appDir = join32(root, "apps", appSlug);
-  const files = await collectFiles(join32(appDir, "src"));
+  const appDir = join33(root, "apps", appSlug);
+  const files = await collectFiles(join33(appDir, "src"));
   const sources = new Map(files.map((file2) => [`${appSlug}/src/${file2.path}`, new TextDecoder().decode(file2.bytes)]));
   const findings = checkAppNetwork(manifest2, sources);
   if (findings.length)
     throw new DevError(findings.map((finding) => `${finding.path}: ${finding.code}: ${finding.message}`).join(`
 `));
-  await buildWorkerBundle({ root, appDir, slug: appSlug, kind });
-  const bundle = new Uint8Array(await readFile21(join32(root, "dist", appSlug, "index.js")));
+  const output = join33(root, "dist", appSlug, "index.js");
+  const key = await workerCacheKey(root, appSlug, kind);
+  let bundle = await readCachedWorker(root, appSlug, key);
+  if (bundle) {
+    await mkdir13(join33(root, "dist", appSlug), { recursive: true });
+    await writeFile15(output, bundle);
+  } else {
+    await buildWorkerBundle({ root, appDir, slug: appSlug, kind });
+    bundle = new Uint8Array(await readFile22(output));
+    await cacheWorker(root, appSlug, key, bundle);
+  }
   const payload = {
     bundleHash: digest3(bundle),
     appSlug,
@@ -255122,7 +255173,7 @@ async function workerEvent(root, appSlug, kind, manifest2) {
   };
 }
 function digest3(bytes3) {
-  return createHash9("sha256").update(bytes3).digest("hex");
+  return createHash10("sha256").update(bytes3).digest("hex");
 }
 
 // frontend/packages/miniapp-kit/src/dev/watcher-transport.ts
@@ -255564,7 +255615,7 @@ async function startDev(options2) {
     return startLiveDev(options2, manifest2);
   const createLibsqlClient = options2.createLibsqlClient ?? await loadProjectLibsql(root, (m3) => new DevError(m3));
   await diffDatabase({ root, kitRoot, createLibsqlClient });
-  const projectName = String(JSON.parse(readFileSync4(join33(root, "package.json"), "utf8")).name ?? "");
+  const projectName = String(JSON.parse(readFileSync4(join34(root, "package.json"), "utf8")).name ?? "");
   const offset = process.env[KIT_LIVE_CONFIG_ENV] ? 100 : 0;
   const ports = options2.ports ?? {
     host: DEV_PORTS.host + offset,
@@ -255671,11 +255722,11 @@ async function startDev(options2) {
         if (!dist)
           await buildWorkerBundle({
             root,
-            appDir: join33(root, "apps", app.slug),
+            appDir: join34(root, "apps", app.slug),
             slug: app.slug,
             kind: app.kind
           });
-        const bytes3 = dist ? dist.files.get(`${app.slug}/index.js`) : readFileSync4(join33(root, "dist", app.slug, "index.js"));
+        const bytes3 = dist ? dist.files.get(`${app.slug}/index.js`) : readFileSync4(join34(root, "dist", app.slug, "index.js"));
         if (!bytes3)
           throw new DevError(`missing Worker bundle: ${app.slug}/index.js`);
         return {
@@ -255749,7 +255800,7 @@ async function startDev(options2) {
     for (const slug of dist ? [] : webApps) {
       const vite = await (options2.startVite ?? viteDev)({
         slug,
-        appDir: join33(root, "apps", slug),
+        appDir: join34(root, "apps", slug),
         port: appPorts[slug],
         env
       });
@@ -255899,7 +255950,7 @@ async function startLiveDev(options2, manifest2) {
         throw new DevError("live App configuration is incomplete");
       const vite = await (options2.startVite ?? viteDev)({
         slug,
-        appDir: join33(options2.root, "apps", slug),
+        appDir: join34(options2.root, "apps", slug),
         port,
         env: {
           [KIT_BUILD_ENV.projectId]: options2.projectId,
@@ -256117,13 +256168,13 @@ var execCommand = (command, args) => new Promise((resolve3, reject) => {
 // frontend/packages/miniapp-kit/src/e2e.ts
 import { randomBytes as randomBytes4 } from "node:crypto";
 import { existsSync as existsSync21 } from "node:fs";
-import { readFile as readFile22, realpath } from "node:fs/promises";
+import { readFile as readFile23, realpath } from "node:fs/promises";
 import { relative as relative4, resolve as resolve3, sep as sep3 } from "node:path";
 
 // frontend/packages/miniapp-kit/src/verify/browser.ts
 import { existsSync as existsSync20 } from "node:fs";
 import { createRequire as createRequire12 } from "node:module";
-import { join as join34 } from "node:path";
+import { join as join35 } from "node:path";
 import { pathToFileURL as pathToFileURL9 } from "node:url";
 
 class BrowserUnavailableError extends Error {
@@ -256133,7 +256184,7 @@ function resolvePlaywright() {
   const bases = [process.env.KIT_PLAYWRIGHT_DIR, process.cwd()].filter((base) => Boolean(base));
   for (const base of bases) {
     try {
-      return createRequire12(join34(base, "noop.js")).resolve("playwright-core");
+      return createRequire12(join35(base, "noop.js")).resolve("playwright-core");
     } catch {}
   }
   try {
@@ -256252,7 +256303,7 @@ async function runLiveE2E(options2) {
     grant: env.KIT_TEST_GRANT,
     identity: options2.identity
   });
-  const plan = await readFile22(resolve3(options2.root, "design/test-plan.md"), "utf8");
+  const plan = await readFile23(resolve3(options2.root, "design/test-plan.md"), "utf8");
   if (!plan.trim() || Buffer.byteLength(plan) > 128 * 1024 || plan.includes(input.grant))
     throw new LiveE2EError("Write a bounded, credential-free design/test-plan.md before live E2E");
   const { manifest: manifest2 } = await prepareSessionRuntime(options2.root);
@@ -256403,11 +256454,11 @@ async function checkKitUpdate(input) {
 }
 
 // frontend/packages/miniapp-kit/src/login.ts
-import { createHash as createHash10, randomBytes as randomBytes5 } from "node:crypto";
+import { createHash as createHash11, randomBytes as randomBytes5 } from "node:crypto";
 import { existsSync as existsSync22 } from "node:fs";
-import { chmod, mkdir as mkdir12, readFile as readFile23, rename as rename4, writeFile as writeFile14 } from "node:fs/promises";
+import { chmod, mkdir as mkdir14, readFile as readFile24, rename as rename4, writeFile as writeFile16 } from "node:fs/promises";
 import { createServer as createServer4 } from "node:http";
-import { join as join35 } from "node:path";
+import { join as join36 } from "node:path";
 var DEFAULT_MCP_URL = "https://fdpocket.dev/mcp/creator";
 var REDIRECT_URI = "http://127.0.0.1:43126/callback";
 var REFRESH_MARGIN_MS = 60000;
@@ -256421,10 +256472,10 @@ class LoginError extends Error {
 class LoginInProgress extends LoginError {
 }
 async function readLogins(configDir) {
-  const path = join35(configDir, CREDENTIALS_FILE);
+  const path = join36(configDir, CREDENTIALS_FILE);
   if (!existsSync22(path))
     return {};
-  const parsed = JSON.parse(await readFile23(path, "utf8"));
+  const parsed = JSON.parse(await readFile24(path, "utf8"));
   return parsed.logins ?? {};
 }
 async function writeLogin(configDir, mcpUrl, login) {
@@ -256433,10 +256484,10 @@ async function writeLogin(configDir, mcpUrl, login) {
     delete logins[mcpUrl];
   else
     logins[mcpUrl] = login;
-  await mkdir12(configDir, { recursive: true, mode: 448 });
-  const path = join35(configDir, CREDENTIALS_FILE);
+  await mkdir14(configDir, { recursive: true, mode: 448 });
+  const path = join36(configDir, CREDENTIALS_FILE);
   const temporary = `${path}.${process.pid}.tmp`;
-  await writeFile14(temporary, `${JSON.stringify({ logins }, null, 2)}
+  await writeFile16(temporary, `${JSON.stringify({ logins }, null, 2)}
 `, { mode: 384 });
   await chmod(temporary, 384);
   await rename4(temporary, path);
@@ -256519,7 +256570,7 @@ async function login(mcpUrl, deps) {
     client_id: clientId,
     redirect_uri: REDIRECT_URI,
     state,
-    code_challenge: base64url3(createHash10("sha256").update(verifier).digest()),
+    code_challenge: base64url3(createHash11("sha256").update(verifier).digest()),
     code_challenge_method: "S256"
   }).toString();
   const code = await deps.authorize(url2.toString(), REDIRECT_URI, state);
@@ -256873,8 +256924,8 @@ async function serveMcpStdio(proxy, io) {
 
 // frontend/packages/miniapp-kit/src/new.ts
 import { existsSync as existsSync23 } from "node:fs";
-import { mkdir as mkdir13, readdir as readdir12, readFile as readFile24, writeFile as writeFile15 } from "node:fs/promises";
-import { dirname as dirname12, join as join36, relative as relative5 } from "node:path";
+import { mkdir as mkdir15, readdir as readdir13, readFile as readFile25, writeFile as writeFile17 } from "node:fs/promises";
+import { dirname as dirname12, join as join37, relative as relative5 } from "node:path";
 var TEMPLATE_DIR = "templates/project";
 var DEFAULT_APP_SPECS = ["web", "admin"];
 var NAME_PATTERN = /^[a-z][a-z0-9-]{0,63}$/;
@@ -256905,22 +256956,22 @@ async function newProject(options2) {
   });
   if (!declarations.length || declarations.length > PROJECT_APPS_MAX || new Set(declarations.map((a2) => a2.slug)).size !== declarations.length)
     throw new NewProjectError(`declare 1–${PROJECT_APPS_MAX} unique Apps`);
-  if (existsSync23(root) && (await readdir12(root)).some((entry) => entry !== ".git")) {
+  if (existsSync23(root) && (await readdir13(root)).some((entry2) => entry2 !== ".git")) {
     throw new NewProjectError(`${root} is not empty; kit new only fills an empty Project`);
   }
-  const template = join36(options2.kitRoot, TEMPLATE_DIR);
+  const template = join37(options2.kitRoot, TEMPLATE_DIR);
   const files = [];
   const sources = await listFiles(template);
   const put = async (target2, text) => {
-    await mkdir13(dirname12(join36(root, target2)), { recursive: true });
-    await writeFile15(join36(root, target2), text);
+    await mkdir15(dirname12(join37(root, target2)), { recursive: true });
+    await writeFile17(join37(root, target2), text);
     files.push(target2);
   };
   for (const source of sources) {
     if (source.startsWith("apps/"))
       continue;
     const target2 = targetPath(source);
-    let text = fill(await readFile24(join36(template, source), "utf8"), { name: name3, title });
+    let text = fill(await readFile25(join37(template, source), "utf8"), { name: name3, title });
     if (target2 === PROJECT_PATHS.manifest) {
       const document2 = $parseDocument(text);
       const original = document2.toJS().apps;
@@ -256965,7 +257016,7 @@ async function newProject(options2) {
     const prefix2 = `apps/${templateSlug}/`;
     for (const source of sources.filter((path) => path.startsWith(prefix2))) {
       const target2 = `apps/${slug}/${source.slice(prefix2.length)}`;
-      let text = fill(await readFile24(join36(template, source), "utf8"), { name: name3, title });
+      let text = fill(await readFile25(join37(template, source), "utf8"), { name: name3, title });
       if (target2.endsWith("/vite.config.ts"))
         text = text.replace(`createAppConfig("${templateSlug}"`, `createAppConfig("${slug}"`);
       if (target2.endsWith("/package.json")) {
@@ -257032,11 +257083,11 @@ function fill(text, values) {
 async function listFiles(root) {
   const files = [];
   const walk = async (dir) => {
-    for (const entry of await readdir12(dir, { withFileTypes: true })) {
-      const path = join36(dir, entry.name);
-      if (entry.isDirectory())
+    for (const entry2 of await readdir13(dir, { withFileTypes: true })) {
+      const path = join37(dir, entry2.name);
+      if (entry2.isDirectory())
         await walk(path);
-      else if (entry.isFile())
+      else if (entry2.isFile())
         files.push(relative5(root, path).split("\\").join("/"));
     }
   };
@@ -257284,15 +257335,15 @@ function nextStep(error51) {
 
 // frontend/packages/miniapp-kit/src/repo.ts
 import { existsSync as existsSync24 } from "node:fs";
-import { appendFile, mkdir as mkdir14, readFile as readFile25, rm as rm14, writeFile as writeFile16 } from "node:fs/promises";
-import { join as join37 } from "node:path";
+import { appendFile, mkdir as mkdir16, readFile as readFile26, rm as rm15, writeFile as writeFile18 } from "node:fs/promises";
+import { join as join38 } from "node:path";
 class RepoError extends Error {
   name = "RepoError";
 }
 function kitCommand(kitRoot, ...args) {
   return [
     shellQuote(process.execPath),
-    shellQuote(join37(kitRoot, "scripts", "kit.mjs")),
+    shellQuote(join38(kitRoot, "scripts", "kit.mjs")),
     ...args
   ].join(" ");
 }
@@ -257328,10 +257379,10 @@ async function configureRepo(git, source, config3, author) {
   await set2(git, source, `branch.${branch}.remote`, ".");
   await set2(git, source, `branch.${branch}.merge`, trackingRef(config3.thread_ref));
   await set2(git, source, `branch.${branch}.rebase`, "true");
-  const info = join37(source, ".git", "info");
-  await mkdir14(info, { recursive: true });
-  const excludePath = join37(info, "exclude");
-  const excluded = existsSync24(excludePath) ? (await readFile25(excludePath, "utf8")).split(`
+  const info = join38(source, ".git", "info");
+  await mkdir16(info, { recursive: true });
+  const excludePath = join38(info, "exclude");
+  const excluded = existsSync24(excludePath) ? (await readFile26(excludePath, "utf8")).split(`
 `) : [];
   const missing = EXCLUDES.filter((line) => !excluded.includes(line));
   if (missing.length > 0)
@@ -257345,12 +257396,12 @@ async function requireGitLfs(git, cwd) {
   }
 }
 function requireRepo(source) {
-  if (!existsSync24(join37(source, ".git"))) {
+  if (!existsSync24(join38(source, ".git"))) {
     throw new RepoError(`${source} is not a git repository; run kit.mjs clone in a new directory`);
   }
 }
 async function requireClean(git, source, what) {
-  if (existsSync24(join37(source, ".git", "rebase-merge")) || existsSync24(join37(source, ".git", "rebase-apply"))) {
+  if (existsSync24(join38(source, ".git", "rebase-merge")) || existsSync24(join38(source, ".git", "rebase-apply"))) {
     throw new RepoError("a git rebase is in progress in source/; finish it (git rebase --continue) first");
   }
   if (await gitOk(git, source, ["status", "--porcelain"]) !== "") {
@@ -257360,14 +257411,14 @@ async function requireClean(git, source, what) {
 async function fetchBundles(git, source, pulled, already, download2) {
   const listed = new Set(pulled.bundles.map((bundle2) => bundle2.sha256));
   const fetched = already.filter((sha) => listed.has(sha));
-  const dir = join37(source, ".git", "fdpocket-bundles");
-  await mkdir14(dir, { recursive: true });
+  const dir = join38(source, ".git", "fdpocket-bundles");
+  await mkdir16(dir, { recursive: true });
   for (const bundle2 of fetchOrder(pulled.bundles)) {
     if (fetched.includes(bundle2.sha256))
       continue;
     const bytes3 = await download2(`bundle ${bundle2.seq}`, bundle2.url, bundle2.sha256);
-    const file2 = join37(dir, `${bundle2.sha256}.bundle`);
-    await writeFile16(file2, bytes3);
+    const file2 = join38(dir, `${bundle2.sha256}.bundle`);
+    await writeFile18(file2, bytes3);
     try {
       await gitOk(git, source, [
         "fetch",
@@ -257378,7 +257429,7 @@ async function fetchBundles(git, source, pulled, already, download2) {
         `+refs/*:${REMOTE_REFS}/*`
       ]);
     } finally {
-      await rm14(file2, { force: true });
+      await rm15(file2, { force: true });
     }
     fetched.push(bundle2.sha256);
   }
@@ -257420,17 +257471,17 @@ async function integrate(git, source, threadRef) {
 }
 
 // frontend/packages/miniapp-kit/src/sdk-fingerprint.ts
-import { createHash as createHash11 } from "node:crypto";
-import { readdir as readdir13, readFile as readFile26 } from "node:fs/promises";
-import { join as join38, relative as relative6, sep as sep4 } from "node:path";
+import { createHash as createHash12 } from "node:crypto";
+import { readdir as readdir14, readFile as readFile27 } from "node:fs/promises";
+import { join as join39, relative as relative6, sep as sep4 } from "node:path";
 async function sdkVendorHash(kitRoot) {
-  const root = join38(kitRoot, "vendor");
-  const entries = await readdir13(root, { recursive: true, withFileTypes: true });
-  const files = entries.filter((entry) => entry.isFile()).map((entry) => relative6(root, join38(entry.parentPath, entry.name)).split(sep4).join("/")).sort();
-  const digest4 = createHash11("sha256");
+  const root = join39(kitRoot, "vendor");
+  const entries = await readdir14(root, { recursive: true, withFileTypes: true });
+  const files = entries.filter((entry2) => entry2.isFile()).map((entry2) => relative6(root, join39(entry2.parentPath, entry2.name)).split(sep4).join("/")).sort();
+  const digest4 = createHash12("sha256");
   for (const path of files) {
-    const content = await readFile26(join38(root, path));
-    digest4.update(`${path}\x00${createHash11("sha256").update(content).digest("hex")}
+    const content = await readFile27(join39(root, path));
+    digest4.update(`${path}\x00${createHash12("sha256").update(content).digest("hex")}
 `);
   }
   return digest4.digest("hex");
@@ -257486,18 +257537,18 @@ class ValidationFailed extends Error {
 }
 
 // frontend/packages/miniapp-kit/src/verify/validate.ts
-import { mkdir as mkdir16, writeFile as writeFile18 } from "node:fs/promises";
-import { join as join41 } from "node:path";
+import { mkdir as mkdir18, writeFile as writeFile20 } from "node:fs/promises";
+import { join as join42 } from "node:path";
 
 // frontend/packages/miniapp-kit/src/verify/dynamic.ts
-import { mkdir as mkdir15, writeFile as writeFile17 } from "node:fs/promises";
-import { join as join40 } from "node:path";
+import { mkdir as mkdir17, writeFile as writeFile19 } from "node:fs/promises";
+import { join as join41 } from "node:path";
 
 // frontend/packages/miniapp-kit/src/verify/erase.ts
 import { existsSync as existsSync25 } from "node:fs";
-import { mkdtemp as mkdtemp5, rm as rm15 } from "node:fs/promises";
+import { mkdtemp as mkdtemp5, rm as rm16 } from "node:fs/promises";
 import { tmpdir as tmpdir2 } from "node:os";
-import { join as join39 } from "node:path";
+import { join as join40 } from "node:path";
 var failed = (message2) => ({
   code: "ERASE_TEST_FAILED",
   path: PROJECT_PATHS.eraseTest,
@@ -257506,7 +257557,7 @@ var failed = (message2) => ({
 var describe4 = (error51) => error51 instanceof Error ? error51.message : String(error51);
 async function runEraseTest(options2) {
   const { root } = options2;
-  if (!existsSync25(join39(root, PROJECT_PATHS.eraseTest))) {
+  if (!existsSync25(join40(root, PROJECT_PATHS.eraseTest))) {
     return {
       errors: [],
       warnings: [
@@ -257521,15 +257572,15 @@ async function runEraseTest(options2) {
   const manifest2 = JSON.parse(await readGenerated(root, "project.json"));
   const schema2 = JSON.parse(await readGenerated(root, "schema.json"));
   const importModule = options2.importModule ?? defaultImporter(root, manifest2);
-  const dir = await mkdtemp5(join39(tmpdir2(), "kit-erase-"));
-  const db = options2.createLibsqlClient({ url: `file:${join39(dir, "erase.db")}` });
+  const dir = await mkdtemp5(join40(tmpdir2(), "kit-erase-"));
+  const db = options2.createLibsqlClient({ url: `file:${join40(dir, "erase.db")}` });
   try {
     for (const part of await devDatabaseSql(root))
       await applySql(db, part.sql);
     await runSeed({ root, db, manifest: manifest2, importModule });
     let test;
     try {
-      test = (await importModule(join39(root, PROJECT_PATHS.eraseTest))).default;
+      test = (await importModule(join40(root, PROJECT_PATHS.eraseTest))).default;
     } catch (error51) {
       return { errors: [failed(`could not be loaded: ${describe4(error51)}`)], warnings: [] };
     }
@@ -257572,7 +257623,7 @@ async function runEraseTest(options2) {
     return { errors: [], warnings: [] };
   } finally {
     db.close();
-    await rm15(dir, { recursive: true, force: true });
+    await rm16(dir, { recursive: true, force: true });
   }
 }
 
@@ -257763,7 +257814,7 @@ async function runDynamicChecks(options2) {
   });
   const browser = await (options2.launch ?? launchChromium)();
   try {
-    await mkdir15(join40(options2.outDir, "screenshots"), { recursive: true });
+    await mkdir17(join41(options2.outDir, "screenshots"), { recursive: true });
     const observations = [];
     const at = (app) => ({
       hostUrl: dev.hostUrl,
@@ -257799,7 +257850,7 @@ async function runDynamicChecks(options2) {
       gatewayUrl: dev.gatewayUrl,
       appsOrigin: dev.appsOrigin
     });
-    await writeFile17(join40(options2.outDir, "permission-matrix.json"), `${JSON.stringify(matrix, null, 1)}
+    await writeFile19(join41(options2.outDir, "permission-matrix.json"), `${JSON.stringify(matrix, null, 1)}
 `);
     const erase = await runEraseTest({
       root: options2.root,
@@ -257807,7 +257858,7 @@ async function runDynamicChecks(options2) {
     });
     const judged = judgeDynamic(options2.manifest, observations);
     const workerResults = await dev.checkWorkers();
-    await writeFile17(join40(options2.outDir, "worker-mocks.json"), `${JSON.stringify({ results: workerResults, events: dev.workerEvents() }, null, 1)}
+    await writeFile19(join41(options2.outDir, "worker-mocks.json"), `${JSON.stringify({ results: workerResults, events: dev.workerEvents() }, null, 1)}
 `);
     const workerErrors = workerResults.filter((result) => result.status >= (result.kind === "jobs" ? 400 : 500)).map((result) => ({
       code: "WORKER_RUNTIME_FAILED",
@@ -257885,7 +257936,7 @@ async function observe(context, visit2, at, shot) {
     if (shot)
       await page.waitForTimeout(shot.settleMs);
     const name3 = shot?.name ?? `screenshots/${visit2.app}-${visit2.principal}.png`;
-    await writeFile17(join40(at.outDir, name3), await page.locator("#frame").screenshot());
+    await writeFile19(join41(at.outDir, name3), await page.locator("#frame").screenshot());
     observation.screenshot = name3;
     return observation;
   } finally {
@@ -257959,19 +258010,19 @@ async function validateVersion(options2) {
     })
   });
   const report2 = reportSchema.parse(result.report);
-  await mkdir16(options2.outDir, { recursive: true });
-  await writeFile18(join41(options2.outDir, "report.json"), `${JSON.stringify(report2, null, 2)}
+  await mkdir18(options2.outDir, { recursive: true });
+  await writeFile20(join42(options2.outDir, "report.json"), `${JSON.stringify(report2, null, 2)}
 `);
   if (result.schemaJson !== undefined) {
-    await writeFile18(join41(options2.outDir, "schema.json"), result.schemaJson);
+    await writeFile20(join42(options2.outDir, "schema.json"), result.schemaJson);
   }
   return report2;
 }
 
 // frontend/packages/miniapp-kit/src/workdir.ts
 import { existsSync as existsSync26 } from "node:fs";
-import { readFile as readFile27, unlink, writeFile as writeFile19 } from "node:fs/promises";
-import { dirname as dirname13, join as join42 } from "node:path";
+import { readFile as readFile28, unlink, writeFile as writeFile21 } from "node:fs/promises";
+import { dirname as dirname13, join as join43 } from "node:path";
 var CONFIG_FILE = ".fdpocket.json";
 var LEGACY_CONFIG_FILE = ".tokoyo.json";
 var WORKDIR_DIRS = {
@@ -258046,7 +258097,7 @@ function locateWorkdir(start) {
 }
 function locateFile(start, name3) {
   for (let current = start;; current = dirname13(current)) {
-    if (existsSync26(join42(current, name3)))
+    if (existsSync26(join43(current, name3)))
       return current;
     if (dirname13(current) === current)
       return null;
@@ -258058,9 +258109,9 @@ async function migrateLegacyWorkdir(start) {
   const found = locateFile(start, LEGACY_CONFIG_FILE);
   if (found === null)
     return null;
-  const { app_id, ...rest } = JSON.parse(await readFile27(join42(found, LEGACY_CONFIG_FILE), "utf8"));
-  await writeFile19(join42(found, CONFIG_FILE), serializeConfig(parseConfig(JSON.stringify({ project_id: app_id, ...rest }))));
-  await unlink(join42(found, LEGACY_CONFIG_FILE));
+  const { app_id, ...rest } = JSON.parse(await readFile28(join43(found, LEGACY_CONFIG_FILE), "utf8"));
+  await writeFile21(join43(found, CONFIG_FILE), serializeConfig(parseConfig(JSON.stringify({ project_id: app_id, ...rest }))));
+  await unlink(join43(found, LEGACY_CONFIG_FILE));
   return found;
 }
 async function findWorkdir(start) {
@@ -258120,11 +258171,11 @@ class CommandError extends Error {
 }
 function defaultConfigDir() {
   const xdg = process.env.XDG_CONFIG_HOME;
-  return join43(xdg && xdg !== "" ? xdg : join43(homedir(), ".config"), "fdpocket");
+  return join44(xdg && xdg !== "" ? xdg : join44(homedir(), ".config"), "fdpocket");
 }
 function defaultCodexHome() {
   const home = process.env.CODEX_HOME;
-  return home && home !== "" ? home : join43(homedir(), ".codex");
+  return home && home !== "" ? home : join44(homedir(), ".codex");
 }
 async function readStdin() {
   const chunks = [];
@@ -258224,35 +258275,35 @@ async function runCommand(args, context) {
 var print = (context, value2) => context.stdout(JSON.stringify(value2, null, 2));
 var mcpUrlOf = (flag) => flag ?? process.env.CREATOR_MCP_URL ?? DEFAULT_MCP_URL;
 async function kitVersion(kitRoot) {
-  const manifest2 = join43(kitRoot, ".claude-plugin", "plugin.json");
+  const manifest2 = join44(kitRoot, ".claude-plugin", "plugin.json");
   if (!existsSync27(manifest2))
     throw new CommandError(`${manifest2} is missing; reinstall the Kit`);
-  const version3 = JSON.parse(await readFile28(manifest2, "utf8")).version;
+  const version3 = JSON.parse(await readFile29(manifest2, "utf8")).version;
   if (typeof version3 !== "string")
     throw new CommandError(`${manifest2} has no version`);
   return version3;
 }
 async function readConfig(workdir) {
-  return parseConfig(await readFile28(join43(workdir, CONFIG_FILE), "utf8"));
+  return parseConfig(await readFile29(join44(workdir, CONFIG_FILE), "utf8"));
 }
 async function saveConfig(workdir, config3) {
-  await writeFile20(join43(workdir, CONFIG_FILE), serializeConfig(config3));
+  await writeFile22(join44(workdir, CONFIG_FILE), serializeConfig(config3));
 }
-var sourceOf = (workdir) => join43(workdir, WORKDIR_DIRS.source);
+var sourceOf = (workdir) => join44(workdir, WORKDIR_DIRS.source);
 var AGENTS_TITLE = agentsMd("").split(`
 `)[0];
 async function writeAgentFiles(workdir, kitRoot) {
-  const agents = join43(workdir, "AGENTS.md");
-  if (!existsSync27(agents) || (await readFile28(agents, "utf8")).startsWith(AGENTS_TITLE)) {
-    await writeFile20(agents, agentsMd(kitRoot));
+  const agents = join44(workdir, "AGENTS.md");
+  if (!existsSync27(agents) || (await readFile29(agents, "utf8")).startsWith(AGENTS_TITLE)) {
+    await writeFile22(agents, agentsMd(kitRoot));
   }
-  const claude = join43(workdir, "CLAUDE.md");
+  const claude = join44(workdir, "CLAUDE.md");
   if (!existsSync27(claude))
-    await writeFile20(claude, CLAUDE_MD);
+    await writeFile22(claude, CLAUDE_MD);
 }
 async function fetchVerified(context, name3, url3, sha2562) {
   const bytes3 = await context.download(url3);
-  const actual = createHash12("sha256").update(bytes3).digest("hex");
+  const actual = createHash13("sha256").update(bytes3).digest("hex");
   if (sha2562 !== undefined && actual !== sha2562.toLowerCase()) {
     throw new CommandError(`${name3}: sha256 is ${actual}, expected ${sha2562}; nothing was changed`);
   }
@@ -258273,7 +258324,7 @@ async function clone4(context, flags) {
   }
   const pulled = parsePulled(bundles);
   const workdir = context.cwd;
-  const path = join43(workdir, CONFIG_FILE);
+  const path = join44(workdir, CONFIG_FILE);
   if (existsSync27(path)) {
     const existing = await readConfig(workdir);
     if (existing.project_id !== pulled.project_id) {
@@ -258282,12 +258333,12 @@ async function clone4(context, flags) {
     throw new CommandError(`${workdir} already has App ${pulled.project_id}; run kit.mjs pull instead`);
   }
   const source = sourceOf(workdir);
-  if (existsSync27(source) && (await readdir14(source)).length > 0) {
+  if (existsSync27(source) && (await readdir15(source)).length > 0) {
     throw new CommandError(`${source} is not empty; clone into a new directory`);
   }
   await requireGitLfs(context.git, workdir);
   for (const dir of Object.values(WORKDIR_DIRS))
-    await mkdir17(join43(workdir, dir), { recursive: true });
+    await mkdir19(join44(workdir, dir), { recursive: true });
   const branch = threadBranch(pulled.thread_ref);
   await gitOk(context.git, workdir, ["init", "-q", "-b", branch, source]);
   await gitOk(context.git, source, ["lfs", "install", "--local"]);
@@ -258430,18 +258481,18 @@ async function push(context, flags) {
   print(context, { ...result, ...update.status === "outdated" ? { kit_update: update } : {} });
 }
 async function writeBuildReport(workdir, built, policyRevision) {
-  const path = join43(workdir, WORKDIR_DIRS.outputs, "build-report.json");
-  const pending = join43(sourceOf(workdir), "packages", "db-schema", "pending");
+  const path = join44(workdir, WORKDIR_DIRS.outputs, "build-report.json");
+  const pending = join44(sourceOf(workdir), "packages", "db-schema", "pending");
   const report2 = completeBuildReport({
-    existing: existsSync27(path) ? JSON.parse(await readFile28(path, "utf8")) : null,
-    projectYaml: await readFile28(join43(sourceOf(workdir), "infra", "project.yaml"), "utf8"),
+    existing: existsSync27(path) ? JSON.parse(await readFile29(path, "utf8")) : null,
+    projectYaml: await readFile29(join44(sourceOf(workdir), "infra", "project.yaml"), "utf8"),
     apps: built.apps,
     schemaVersion: built.schema_version,
-    pendingFiles: existsSync27(pending) ? (await readdir14(pending)).filter((name3) => name3.endsWith(".sql")).sort() : [],
+    pendingFiles: existsSync27(pending) ? (await readdir15(pending)).filter((name3) => name3.endsWith(".sql")).sort() : [],
     ...policyRevision === undefined ? {} : { policyRevision }
   });
-  await mkdir17(dirname14(path), { recursive: true });
-  await writeFile20(path, `${JSON.stringify(report2, null, 2)}
+  await mkdir19(dirname14(path), { recursive: true });
+  await writeFile22(path, `${JSON.stringify(report2, null, 2)}
 `);
 }
 async function mcpServe(context, flags) {
@@ -258479,7 +258530,7 @@ async function doctor(context) {
     throw new CommandError('some checks failed; follow each "fix" above');
 }
 async function kitUpdate(context) {
-  const manifest2 = JSON.parse(await readFile28(join43(context.kitRoot, ".claude-plugin", "plugin.json"), "utf8"));
+  const manifest2 = JSON.parse(await readFile29(join44(context.kitRoot, ".claude-plugin", "plugin.json"), "utf8"));
   const current = typeof manifest2.version === "string" ? manifest2.version : "unknown";
   if (process.env.KIT_TOOL_ROOT)
     return { status: "unknown", current };
@@ -258569,7 +258620,7 @@ async function publishedFlags(flags) {
   }
   if (flags["published-schema"] !== undefined) {
     try {
-      out.publishedSchema = JSON.parse(await readFile28(flags["published-schema"], "utf8"));
+      out.publishedSchema = JSON.parse(await readFile29(flags["published-schema"], "utf8"));
     } catch (error51) {
       throw new CommandError(`--published-schema must be a readable JSON file: ${error51 instanceof Error ? error51.message : String(error51)}`);
     }
@@ -258624,13 +258675,13 @@ async function validate(context, flags) {
     root,
     kitRoot: context.kitRoot,
     git: context.git,
-    archive: new Uint8Array(await readFile28(resolve4(context.cwd, flags.archive))),
+    archive: new Uint8Array(await readFile29(resolve4(context.cwd, flags.archive))),
     outDir: resolve4(context.cwd, flags.out),
     projectId: flags["project-id"],
     gatewayUrl: flags["gateway-url"],
     base: flags.base === undefined ? undefined : flags.base === "none" ? null : flags.base,
     sdkUpdate: flags["sdk-update"] === "true",
-    ...flags.captures ? { captures: parseCaptures(await readFile28(resolve4(context.cwd, flags.captures), "utf8")) } : {}
+    ...flags.captures ? { captures: parseCaptures(await readFile29(resolve4(context.cwd, flags.captures), "utf8")) } : {}
   });
   print(context, {
     passed: report2.passed,
@@ -258699,7 +258750,7 @@ async function connectedDev(context, workdir, config3, as) {
     throw new CommandError("--connect needs at least one web App");
   const appPorts = allocateAppPorts(webSlugs);
   await assertConnectedPorts([4320, ...Object.values(appPorts)]);
-  const projectPackage = JSON.parse(await readFile28(join43(root, "package.json"), "utf8"));
+  const projectPackage = JSON.parse(await readFile29(join44(root, "package.json"), "utf8"));
   const name3 = projectPackage && typeof projectPackage === "object" && "name" in projectPackage && typeof projectPackage.name === "string" ? projectPackage.name : "project";
   const scope = {
     projectId: config3.project_id,
@@ -258828,16 +258879,16 @@ async function pack(context) {
   if (tip === base) {
     throw new CommandError("no new commits since the head kit.mjs pull took (base_commit_oid); git commit first");
   }
-  const outputs = join43(workdir, WORKDIR_DIRS.outputs);
-  const reportPath = join43(outputs, "build-report.json");
+  const outputs = join44(workdir, WORKDIR_DIRS.outputs);
+  const reportPath = join44(outputs, "build-report.json");
   if (!existsSync27(reportPath)) {
     throw new CommandError("outputs/build-report.json is missing; write it first (instructions.md §2)");
   }
-  const dist = join43(source, "dist");
+  const dist = join44(source, "dist");
   if (!existsSync27(dist))
     throw new CommandError("source/dist is missing; kit.mjs build first");
-  await mkdir17(outputs, { recursive: true });
-  const bundlePath = join43(outputs, "source.bundle");
+  await mkdir19(outputs, { recursive: true });
+  const bundlePath = join44(outputs, "source.bundle");
   await gitOk(context.git, source, [
     "bundle",
     "create",
@@ -258847,12 +258898,12 @@ async function pack(context) {
     ...base === null ? [] : [`^${base}`]
   ]);
   const distArchive = buildDistArchive(await collectFiles(dist));
-  await writeFile20(join43(outputs, "dist.tar.gz"), distArchive);
+  await writeFile22(join44(outputs, "dist.tar.gz"), distArchive);
   print(context, {
     files: {
-      "source.bundle": describeFile(new Uint8Array(await readFile28(bundlePath))),
+      "source.bundle": describeFile(new Uint8Array(await readFile29(bundlePath))),
       "dist.tar.gz": describeFile(distArchive),
-      "build-report.json": describeFile(new Uint8Array(await readFile28(reportPath)))
+      "build-report.json": describeFile(new Uint8Array(await readFile29(reportPath)))
     },
     project_id: config3.project_id,
     session_id: config3.session_id,
@@ -258883,7 +258934,7 @@ async function uploadOutputs(context, flags) {
     throw new CommandError(`uploading the LFS files failed: ${lfs.stderr.trim()} (not logged in? run kit.mjs login)`);
   }
   for (const [name3, contentType2] of Object.entries(OUTPUT_FILES)) {
-    const bytes3 = new Uint8Array(await readFile28(join43(workdir, WORKDIR_DIRS.outputs, name3)));
+    const bytes3 = new Uint8Array(await readFile29(join44(workdir, WORKDIR_DIRS.outputs, name3)));
     await upload(name3, urls[name3], bytes3, contentType2, context.fetch);
   }
   print(context, { uploaded: Object.keys(OUTPUT_FILES) });
@@ -258967,9 +259018,9 @@ async function addAsset(context, flags) {
   }
   const workdir = await findWorkdir(context.cwd);
   const bytes3 = await fetchVerified(context, path, flags.url, flags.sha256);
-  const target2 = join43(sourceOf(workdir), ...segments);
-  await mkdir17(dirname14(target2), { recursive: true });
-  await writeFile20(target2, bytes3);
+  const target2 = join44(sourceOf(workdir), ...segments);
+  await mkdir19(dirname14(target2), { recursive: true });
+  await writeFile22(target2, bytes3);
   print(context, {
     path,
     ...describeFile(bytes3),
@@ -259002,8 +259053,8 @@ async function codexConfig(context, flags) {
     context.stdout(codexApprovalToml(pluginId, MCP_SERVER_NAME));
     return;
   }
-  const path = join43(context.codexHome, "config.toml");
-  const existing = existsSync27(path) ? await readFile28(path, "utf8") : "";
+  const path = join44(context.codexHome, "config.toml");
+  const existing = existsSync27(path) ? await readFile29(path, "utf8") : "";
   let merged;
   try {
     merged = mergeCodexApproval(existing, pluginId, MCP_SERVER_NAME);
@@ -259014,8 +259065,8 @@ async function codexConfig(context, flags) {
   }
   const changed = merged !== existing;
   if (changed) {
-    await mkdir17(context.codexHome, { recursive: true });
-    await writeFile20(path, merged);
+    await mkdir19(context.codexHome, { recursive: true });
+    await writeFile22(path, merged);
   }
   print(context, {
     written: path,
