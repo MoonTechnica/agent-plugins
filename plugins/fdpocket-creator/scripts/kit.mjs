@@ -243402,11 +243402,11 @@ async function prepareProject(options2) {
   await (options2.install ?? ((directory) => bunInstall(directory, kitRoot)))(root);
   const generate = await generateProject({ root, kitRoot });
   const seedFindings = await checkSeedContract(root, kitRoot);
-  if (seedFindings.length)
+  if (seedFindings.length && options2.seedContract !== "report")
     throw new BuildError(seedFindings.map((finding) => finding.message).join(`
 `));
   const manifest2 = JSON.parse(await readFile11(join21(root, PROJECT_PATHS.generated, "project.json"), "utf8"));
-  return { generate, manifest: manifest2 };
+  return { generate, manifest: manifest2, seedFindings };
 }
 async function checkLockfile2(root) {
   const path = join21(root, "bun.lock");
@@ -252599,19 +252599,24 @@ async function createDevRuntime(options2) {
   const { db, recreated, stamp } = await openDevDatabase(options2);
   try {
     if (recreated) {
-      await runSeed({
-        root,
-        db,
-        manifest: manifest2,
-        importModule: options2.importModule ?? defaultImporter(root, manifest2)
-      });
-      await writeFile11(join27(root, DEV_DB_STAMP), `${stamp}
+      try {
+        await runSeed({
+          root,
+          db,
+          manifest: manifest2,
+          importModule: options2.importModule ?? defaultImporter(root, manifest2)
+        });
+        await writeFile11(join27(root, DEV_DB_STAMP), `${stamp}
 `);
+      } catch (error51) {
+        if (!(error51 instanceof SeedError))
+          throw error51;
+        if (!options2.quiet)
+          console.warn(`kit dev: starting without sample data. ${error51.message}`);
+      }
     }
   } catch (error51) {
     db.close();
-    if (error51 instanceof SeedError)
-      throw new DevError(error51.message);
     throw error51;
   }
   const key = await createTestEs256Key("kit-dev");
@@ -255519,7 +255524,8 @@ async function startDev(options2) {
   const { manifest: manifest2 } = await prepareProject({
     root,
     kitRoot,
-    ...options2.install ? { install: options2.install } : {}
+    ...options2.install ? { install: options2.install } : {},
+    seedContract: "report"
   });
   if (options2.live)
     return startLiveDev(options2, manifest2);
