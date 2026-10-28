@@ -255358,6 +255358,7 @@ function wait(ms, signal) {
 }
 
 // frontend/packages/miniapp-kit/src/dev/watcher.ts
+var MAX_WATCH_RESTARTS = 5;
 async function startSessionWatcher(options2) {
   const url2 = options2.notifyUrl ?? process.env.KIT_LIVE_NOTIFY_URL;
   const key = options2.notifyKey ?? process.env.KIT_LIVE_NOTIFY;
@@ -255385,6 +255386,8 @@ async function startSessionWatcher(options2) {
   let running;
   let requested = false;
   let failures = 0;
+  let watchFailures = 0;
+  let restartWatch;
   let watcher;
   const stop = () => {
     if (closed)
@@ -255392,6 +255395,7 @@ async function startSessionWatcher(options2) {
     closed = true;
     clearTimeout(debounce);
     clearTimeout(retry);
+    clearTimeout(restartWatch);
     lifecycle.abort();
     watcher?.close();
   };
@@ -255509,6 +255513,7 @@ async function startSessionWatcher(options2) {
         if (pending.get(id) === event)
           pending.delete(id);
         failures = 0;
+        watchFailures = 0;
         emit({ ...context(event), status: "synced", message: "Live changes synchronized" });
         await report2(id, "sync");
       } catch (error51) {
@@ -255573,14 +255578,39 @@ async function startSessionWatcher(options2) {
       launch();
     }, 1000);
   };
-  watcher = (options2.watch ?? watchRoot)(options2.root, changed, () => {
+  const watchAgain = (error51) => {
+    if (closed)
+      return;
+    watcher?.close();
+    watchFailures += 1;
+    const detail = error51 instanceof Error ? error51.message : "unknown error";
+    console.error("Live file watching failed:", detail);
+    if (watchFailures > MAX_WATCH_RESTARTS) {
+      emit({
+        status: "stopped",
+        kind: "schema",
+        message: "Live file watching stopped; reconnect this session"
+      });
+      report2("watch", "sync", `File watching failed ${watchFailures} times: ${detail}`).then(stop);
+      return;
+    }
+    const delay = Math.min(30000, 1000 * 2 ** (watchFailures - 1));
     emit({
-      status: "stopped",
+      status: "retrying",
       kind: "schema",
-      message: "Live file watching stopped; reconnect this session"
+      message: "Live file watching failed; watching again",
+      retryAfterMs: delay
     });
-    stop();
-  });
+    clearTimeout(restartWatch);
+    restartWatch = setTimeout(() => {
+      restartWatch = undefined;
+      if (closed)
+        return;
+      watcher = (options2.watch ?? watchRoot)(options2.root, changed, watchAgain);
+      changed(null);
+    }, delay);
+  };
+  watcher = (options2.watch ?? watchRoot)(options2.root, changed, watchAgain);
   changed(null);
   return {
     close: async () => {
