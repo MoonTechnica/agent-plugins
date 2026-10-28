@@ -88,9 +88,9 @@ To keep working, tell the agent what to change, then push again.
 | `/tokoyo-creator:pull <app_id or editor URL>` | Bring the latest version of an existing game to your machine (to continue work, or after you edited it in the browser). |
 | `/tokoyo-creator:check` | Run the pre-push checks locally (the Platform's importer and static validation). |
 | `/tokoyo-creator:push <message>` | Check, then send your game to the Platform as a new draft. The message becomes the version note. |
-| `/tokoyo-creator:remix <game page URL>` | Remix (fork) a game someone published and start working on your copy. |
-| `/tokoyo-creator:propose <title>` | Propose your remix's changes back to the original game, like a GitHub pull request. |
-| `/tokoyo-creator:proposals` | Review proposals other people sent to your game, then comment, merge, or decline. |
+| `/tokoyo-creator:remix <game page URL>` | Start a change to a game someone published. You get your own work branch inside the same game; the author does not change. |
+| `/tokoyo-creator:propose <title>` | Propose your changes to the game's author, like a GitHub pull request. Also resubmits after the author asked for changes. |
+| `/tokoyo-creator:proposals` | Review proposals other people sent to your game, then comment, ask for changes, prepare, adopt, or decline. |
 
 You can also just describe what you want in plain language ("push this", "make the enemies faster") — the agent picks the right Skill.
 
@@ -124,8 +124,8 @@ In Codex, call the Skills with `$`:
 | `$tokoyo-new` | Start a new game. |
 | `$tokoyo-pull` | Bring an existing game's latest version to your machine. |
 | `$tokoyo-push` | Check and send your game to the Platform. |
-| `$tokoyo-remix` | Remix a published game. |
-| `$tokoyo-propose` | Propose your remix's changes to the original. |
+| `$tokoyo-remix` | Start a change to a published game (your own work branch). |
+| `$tokoyo-propose` | Propose your changes to the author, and resubmit after a change request. |
 | `$tokoyo-proposals` | Review proposals sent to your game. |
 
 Or just describe what you want ("create a new TOKOYO.games game: a one-button runner").
@@ -143,13 +143,22 @@ default_tools_approval_mode = "writes"
 [plugins."tokoyo-creator@moon-technica".mcp_servers.tokoyo.tools.open_proposal]
 approval_mode = "approve"
 
+[plugins."tokoyo-creator@moon-technica".mcp_servers.tokoyo.tools.update_proposal]
+approval_mode = "approve"
+
 [plugins."tokoyo-creator@moon-technica".mcp_servers.tokoyo.tools.close_proposal]
+approval_mode = "approve"
+
+[plugins."tokoyo-creator@moon-technica".mcp_servers.tokoyo.tools.request_proposal_changes]
 approval_mode = "approve"
 
 [plugins."tokoyo-creator@moon-technica".mcp_servers.tokoyo.tools.comment_proposal]
 approval_mode = "approve"
 
 [plugins."tokoyo-creator@moon-technica".mcp_servers.tokoyo.tools.merge_proposal]
+approval_mode = "approve"
+
+[plugins."tokoyo-creator@moon-technica".mcp_servers.tokoyo.tools.accept_merge_candidate]
 approval_mode = "approve"
 ```
 
@@ -206,12 +215,16 @@ the agent rebases your commits onto it (like `git pull --rebase`) and resolves a
 only for what is missing. Generated assets use the game's asset budget (per game, per UTC day).
 
 **Contribute to someone else's game** — `remix <game page URL>` → make one focused change → `push`
-→ wait until it is validated (no need to publish) → `propose`. The owner reviews it and can merge it
-into their game's draft. Keep each proposal to a single purpose; unrelated edits make it harder to review.
+→ wait until it is validated (no need to publish) → `propose`. You start from the published version
+(or from the game in progress if the author allowed it); the agent tells you which. The author reviews it
+and can adopt it into their game in progress. If the author asks for changes, fix them, `push`, and
+`propose` again: it resubmits to the same proposal. Keep each proposal to a single purpose.
 
-**Review proposals sent to your game** — `proposals`. The proposed commit arrives with `pull` (as
-`refs/remotes/tokoyo/proposals/<id>`); the agent reads it with `git diff` and summarizes what changes and what could conflict.
-Merging puts the result into your draft; it does not publish it.
+**Review proposals sent to your game** — `proposals`. The proposed commit arrives with `fetch-review` (as
+`refs/remotes/tokoyo/proposals/<id>`; run it inside a clone of the same game); the agent reads it with `git diff`
+and summarizes what changes and what overlaps. You can comment, ask for changes (with a reason), decline, or
+prepare the adoption (free when nothing overlaps; AI reconciles overlaps using coins). Adopting puts the result
+into your game in progress after you confirm; it does not publish it. Publishing is done in the browser.
 
 ## Command-line tool (advanced)
 

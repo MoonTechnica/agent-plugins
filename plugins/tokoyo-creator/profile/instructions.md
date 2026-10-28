@@ -467,22 +467,26 @@ LFS の実体を上げ下ろしするので、最初に一度 `node <kit>/script
 送った版は下書きになり、`editor_url`（制作画面）で試遊する（§8.3 の 6. のとおり開く・示す）。手元の Godot Editor でも動かせるが確認用（§8.7）。
 **公開・非公開・投稿は制作画面で利用者が行う**（MCP には無い。リミックス許可や提案の受付の設定も同じ）。
 
-### 8.6 リミックスと提案（`$tokoyo-remix` / `$tokoyo-propose` / `$tokoyo-proposals`）
+### 8.6 変更の提案（`$tokoyo-remix` / `$tokoyo-propose` / `$tokoyo-proposals`）
 
-同じゲームのfeatからmainへ変更を提案する。別の所有ゲームを作らない。元作者・チームメンバーもfeatで編集し、mainの確定と公開は制作画面で利用者が操作する。
+同じゲームの自分の作業（feat）から、作者へ変更を提案する。別の所有ゲームを作らない。作者・チームメンバーも自分の作業で編集し、採用と公開は作者側が判断する（公開は制作画面だけ）。利用者には「採用」「制作中のゲーム」「公開中のゲーム」の言葉で話す（main・ブランチ・マージ・fork は使わない）。
 
-1. `resolve_app({ reference })` で元ゲーム・作者・参加可否・自分の枝を確認する。自分・所属チームのゲームは `get_app` の通常編集へ進む。外部参加は `contribution.allowed` を確認し、既存の `my_branches` を再開するか `create_branch({ app_id, request_key })` で公開済みリリース（main の明示的な参照許可があれば最新main）からfeatを作る。
-2. 元ゲームの `app_id` と自分の `session_id` で §8.3 の取得・変更・検証・pushを行う。素材ツールにも両IDを渡す。生成・検証成功はfeatだけ進め、main・公開版は変えない。
-3. 自分のfeatの検証済みheadを `open_proposal({ app_id, session_id, title, body })` で提出する。省略した版はそのfeatのheadに限る。続きのpushで提案を自動差し替えず、`update_proposal` で明示的に更新する。
-4. 編集者は `get_proposal_inputs({ proposal_id })` の結果を `kit.mjs fetch-review --inputs '<JSON>'` に渡し、`git diff <base> <theirs>` で提案の差分を読む。取得は提案時点のcommitとmainに限定され、手元のfeatやpushのbaseは変わらない。素材取得が必要なら結果の `lfs_url` をその取得だけに指定する。`merge_proposal` は合流候補を作って検証する操作。成功だけではmainへ反映されない。制作画面で候補を試遊し、利用者が「mainへ取り込む」を確定する。確認後にmain・提案が変われば候補を作り直す。
-5. mainへの取り込み後も公開版は維持する。公開はmainの検証済み版を制作画面で明示的に選ぶ。チャットをそのまま続けた場合も、自分のfeat上で作業を続ける。
+1. `resolve_app({ reference })` で元ゲーム・作者・参加可否・自分の作業を確認する。自分・所属チームのゲームは `get_app` の通常編集へ進む。外部参加は `contribution.allowed` を確認し、既存の `my_branches` を再開するか `create_branch({ app_id, request_key })` で作業を始める。**返された `base`（`kind`: `release` = 公開版 / `main` = 制作中のゲーム、`version_no`）を「公開版 v3 から始めました」のように利用者に伝える**（作者が参照を許可した人だけ制作中のゲームから始まる）。
+2. 元ゲームの `app_id` と自分の `session_id` で §8.3 の取得・変更・検証・pushを行う。素材ツールにも両IDを渡す。生成・検証成功は自分の作業だけ進め、作者のゲームと公開版は変えない。
+3. 自分の作業の検証済みの最新を `open_proposal({ app_id, session_id, title, body })` で提出する（`body` は必須。何を変えたか・なぜか）。省略した版はその作業のheadに限る。続きのpushで提案を自動差し替えない。
+4. **修正の依頼に応える**: `get_proposal` の `state` が `changes_requested` なら `review_request.reason`（理由・依頼者・日時）を利用者にそのまま伝える。直して push → `ready` を待ち → `update_proposal({ proposal_id, proposed_version_id })` で**同じ提案へ再提出**する（依頼は解除され、作者に通知される。確認が出る）。`state` は `awaiting_review` / `changes_requested` / `preparing`（作者が準備中）/ `needs_adjustment`（同じ部分に別の変更があり作者側で調整する。ファイル名は見えない）/ `ready_to_adopt` / `adopted` / `declined` / `withdrawn`。
+5. 作者・チーム側: `get_proposal_inputs({ proposal_id })` の結果を `kit.mjs fetch-review --inputs '<JSON>'` に渡し（**同じゲームの clone が先に要る**。無ければ `$tokoyo-pull`）、`git diff <base> <theirs>` で提案の差分を読む。取得は提案時点のcommitとmainに限定され、手元のfeatやpushのbaseは変わらない。素材取得が必要なら結果の `lfs_url` をその取得だけに指定する。判断は 4 つ: コメント（`comment_proposal`）、**修正を依頼する**（`request_proposal_changes`。理由は必須で提案者にそのまま表示される）、見送り（`close_proposal`。理由必須）、採用。採用は `merge_proposal` で「採用する内容」を準備する（同じ部分に別の変更が無ければ無料、あれば AI が調整してコインを使う。`merge_check_required` は `get_proposal_inputs` で重なりを確認してから）→ `get_build` が `ready` になったら、制作画面か手元で内容を確認し、利用者が確認してから `accept_merge_candidate({ proposal_id })` で採用を確定する。確認後に制作中のゲームが動いたら `STALE_BASE`（もう一度 `merge_proposal` から）。**手元の Agent は競合を解かない**（調整は Platform の AI が行う）。
+6. 採用しても公開版は変わらない。公開はmainの検証済み版を制作画面で明示的に選ぶ（MCP には無い）。チャットをそのまま続けた場合も、自分の作業の上で続ける。
 
 | エラー | すること |
 |---|---|
-| `FORBIDDEN`（`remix_not_allowed` / `proposals_closed` / `not_upstream_editor`） | 作者の設定か立場の問題。利用者に伝えて止まる |
-| `INVALID_ACTION`（`no_validated_version` / `version_not_validated`） | 検証を通っていない版。push して `ready` を待つ |
-| `INVALID_ACTION`（`proposal_already_open`） | 同じfeatから開いている提案がある。`update_proposal` で版を差し替える |
-| `QUOTA_EXCEEDED`（`insufficient_credits`） | マージの支払い元の残高が無い。利用者に伝える |
+| `FORBIDDEN`（`remix_not_allowed` / `proposals_closed` / `not_upstream_editor` / `proposal_required`） | 作者の設定か立場の問題。利用者に伝えて止まる |
+| `INVALID_ACTION`（`no_validated_version` / `version_not_validated` / `version_not_branch_head`） | 検証を通っていない、またはその作業の最新の版ではない。push して `ready` を待つ |
+| `INVALID_ACTION`（`body_required`） | 提案の説明は必須。何を変えたかを書く |
+| `INVALID_ACTION`（`proposal_already_open`） | 同じ作業から開いている提案がある。`update_proposal` で版を差し替える |
+| `INVALID_ACTION`（`candidate_not_ready` / `merge_check_required`） | 採用する内容がまだ無い、または重なりが未確認。`get_proposal_inputs` → `merge_proposal` → `get_build` の順にやり直す |
+| `STALE_BASE`（`candidate_main_changed` / `branch_or_main_changed`） | 準備のあとに制作中のゲームが動いた。もう一度 `merge_proposal` |
+| `QUOTA_EXCEEDED`（`insufficient_credits`） | 準備の支払い元のコインが無い。利用者に伝える |
 | `RATE_LIMITED` | 提案は 1 日 20 件、コメントは 1 日 200 件まで。待つ |
 
 ### 8.7 手元で動かす（Godot Editor）

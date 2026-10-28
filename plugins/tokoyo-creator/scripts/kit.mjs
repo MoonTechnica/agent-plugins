@@ -37267,9 +37267,12 @@ async function readDist(dist) {
 // frontend/packages/creator-kit/src/approval.ts
 var ASK_A_PERSON_TOOLS = [
   "open_proposal",
+  "update_proposal",
   "close_proposal",
+  "request_proposal_changes",
   "comment_proposal",
-  "merge_proposal"
+  "merge_proposal",
+  "accept_merge_candidate"
 ];
 function codexApprovalToml(pluginId, server) {
   const table = `plugins."${pluginId}".mcp_servers.${server}`;
