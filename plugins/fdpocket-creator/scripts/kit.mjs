@@ -255657,7 +255657,9 @@ async function startDev(options2) {
   const { manifest: manifest2 } = await prepareProject({
     root,
     kitRoot,
-    ...options2.install ? { install: options2.install } : {},
+    ...options2.install ? { install: options2.install } : options2.live ? { install: async () => {
+      return;
+    } } : {},
     seedContract: "report"
   });
   if (options2.live)
