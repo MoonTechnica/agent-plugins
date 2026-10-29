@@ -131,7 +131,7 @@ SDKの `useLocale()` / `client.ui.locale()` で利用者のロケールを取得
 1. `node <kit>/scripts/kit.mjs new --name <英小文字とハイフンの名前> --title <表示名>` で `source/` にテンプレートの Project を作る
    （管理画面が要らなければ `--apps web`）。
 2. `source/` で `bun install` → `node <kit>/scripts/kit.mjs generate`。
-3. テンプレートを土台に§3の工程で実装し、ビルドとプレビュー起動を確認してから最初のcommitを作る。テンプレートの構成（spec §1）は崩さない。
+3. テンプレートを土台に§3の工程で実装し、ビルドと `kit check` の成功を確認してから最初のcommitを作る。テンプレートの構成（spec §1）は崩さない。
 
 ## 6. ローカルと本物の環境を分けて確かめる
 
