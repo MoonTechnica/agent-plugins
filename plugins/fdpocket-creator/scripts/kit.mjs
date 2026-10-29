@@ -255363,7 +255363,7 @@ async function startSessionWatcher(options2) {
   const url2 = options2.notifyUrl ?? process.env.KIT_LIVE_NOTIFY_URL;
   const key = options2.notifyKey ?? process.env.KIT_LIVE_NOTIFY;
   if (!url2 || !key)
-    throw new DevError("Live synchronization requires KIT_LIVE_NOTIFY_URL and KIT_LIVE_NOTIFY");
+    throw new DevError("Live synchronization requires KIT_LIVE_NOTIFY_URL and KIT_LIVE_NOTIFY. They are held by the platform that started the live preview: do not start it yourself. Commit and finish; the platform restarts the preview from your commit at the end of the turn.");
   if (!URL.canParse(url2))
     throw new DevError("Live synchronization notification URL is invalid");
   const target2 = new URL(url2);
