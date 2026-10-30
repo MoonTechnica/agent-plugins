@@ -257362,8 +257362,6 @@ function nextStep(error51) {
     }
     case "BUNDLE_REJECTED":
       return error51.reason === "author_mismatch" ? 'Commits by someone else are included: git rebase --exec "git commit --amend --no-edit --reset-author" <base_commit_oid>, then kit.mjs push again' : "Run kit.mjs pull, then kit.mjs push again";
-    case "LFS_OBJECT_MISSING":
-      return "Run kit.mjs login, then kit.mjs push again";
     case "SDK_VERSION_DEPRECATED":
       return "The Kit is outdated: ask the creator to update the plugin (kit.mjs doctor shows how), then kit.mjs link and kit.mjs generate";
     case "QUOTA_EXCEEDED":
