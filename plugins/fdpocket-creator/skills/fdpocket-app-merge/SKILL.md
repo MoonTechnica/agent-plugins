@@ -50,7 +50,7 @@ main と提出済み PR の最新の内容は Platform が用意した実際の 
 | `add/add` | 同じ役割なら 1 つにまとめ、違えば theirs 側を別名に |
 | `other` | theirs の変更が ours の上で成り立つ形に。迷ったら ours を残し、取り込めなかった変更を `notes` に |
 
-- **LFS のファイル**（画像・音・動画・フォント）の衝突はポインタを ours に戻す（`git checkout --ours -- <path>` → `git add`）。
+- **バイナリのファイル**（画像・音・フォント）の衝突は ours に戻す（`git checkout --ours -- <path>` → `git add`）。
 - `package.json` / `bun.lock` の衝突: `package.json` を両方の依存を残す形に解き、`bun.lock` は解かずに `bun install` で作り直す。
 - `infra/project.yaml` の衝突: 両方の App・capability・Role を残す（同じ項目が違う値なら狭い方＝権限の少ない方を採り、`notes` に書く）。
 

@@ -7,7 +7,7 @@ user-invocable: false
 # 手元に取り込む
 
 `<kit>` は作業ディレクトリの `.fdpocket.json` の `kit_root`。まだ作業ディレクトリが無ければ、この Skill の
-ディレクトリの 2 つ上（分からなければ利用者に Kit の場所を聞く）。git と Git LFS が要る。
+ディレクトリの 2 つ上（分からなければ利用者に Kit の場所を聞く）。git が要る。
 
 1. **Project を決める**: ID またはリポジトリの URL を `resolve_project({ reference })` へ渡し、返る `project_id` を使う。制作画面の URL は ID を含むとは限らないので解析せず、分からなければ `list_projects()` の `items` から利用者に選んでもらう。`next_cursor` があれば `list_projects({ cursor })` で続きを取得する。
 2. `.fdpocket.json` の `project_id` が MCP の `project_id`。自分の session_id は既存の `.fdpocket.json`、`get_project({ project_id })` の `session_id`、または `resolve_project` の `my_branches` から選ぶ。貢献のブランチ（`resolve_project` / `get_project` が `requires_proposal: true`）なら

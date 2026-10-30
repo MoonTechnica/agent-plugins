@@ -178,18 +178,30 @@ MCP のツールが返す URL は署名付きで短命なので、受け取っ�
 | パス | 中身 |
 |---|---|
 | `.fdpocket.json` | `project_id`（MCP の `project_id`）・`session_id`・`thread_ref`（push する branch）・`base_commit_oid`（取り込んだスレッドの head）・`kit_root`（`<kit>`）ほか。手で書き換えない |
-| `source/` | 作る Project = **git のリポジトリ**（branch は手元のスレッド `thread/<session>`）。画像・音・動画・フォントは `.gitattributes` の規則で Git LFS に入る |
+| `source/` | 作る Project = **git のリポジトリ**（branch は手元のスレッド `thread/<session>`）。画像・音・フォントも普通のファイルとして commit される（Git LFS は使わない）。**1 ファイル 32 MiB・1 回の push 64 MiB が上限**なので、大きな素材は下の「素材の置き場所」に従う |
 | `assets-cache/` | 素材ツールの `download_url` から取った画像。`kit.mjs assets add --url <download_url> --sha256 <sha256> --path <source/ からの相対パス>` で `source/` に置いて commit する |
 | `outputs/` | 送る 3 つ（`source.bundle`・`dist.tar.gz`・`build-report.json`） |
 
-git と Git LFS（`git lfs version`）・Bun・Node 22.12 以上が要る。`node <kit>/scripts/kit.mjs doctor` で一度に確かめられ、
+git・Bun・Node 22.12 以上が要る。`node <kit>/scripts/kit.mjs doctor` で一度に確かめられ、
 足りないものの直し方（`fix`）と Kit の更新の有無が出る。commit の作者は `clone` が Platform の決めた本人（`get_git_bundles` の `author`）にしてある。
 **作者を変えない**（`user.name` / `user.email` を書き換えない・他人の commit を `--author` で作らない）。
+
+### 素材の置き場所（ソースか Storage か）
+
+`source/` は git に入り、Platform の git は **1 ファイル 32 MiB・1 回の push 64 MiB・1 リポジトリ 1 GB** までしか受け付けない。次の目安で置き場所を決める。
+
+| 置くもの | 置き場所 |
+|---|---|
+| アイコン・ロゴ・UI の挿絵・フォント・短い効果音など、**アプリのコードと一緒に配る小さな素材**（1 ファイル 5 MiB 以下が目安） | `source/` に置いて commit（普通のファイル） |
+| 動画・長い音声・高解像度の写真・大きな 3D やデータなど、**1 ファイルが数 MiB を超えるもの** | **`source/` に置かない**。アプリの Storage（R2。`$fdpocket-app-storage`）に置き、画面からは Storage の URL・ID で参照する |
+| 利用者・作者があとから追加・差し替えるもの（投稿画像、添付、書類） | 必ず Storage（`$fdpocket-app-storage`）。`source/` に入れない |
+
+32 MiB を超えるファイルを commit すると push が通らない。入れてしまったら `git rm` して Storage へ移す。素材を生成したのに大きすぎるときは、縮小・圧縮してから置くか、Storage に回す。
 
 ### 8.2 素材ツール
 
 画像のツール（`generate_image` など）は `fdpocket` の同名のツールで、**どれも `project_id`（`.fdpocket.json` の `project_id`）と `session_id` を渡す**。
-Plugin の MCP（`fdpocket`）と `kit.mjs clone` / `pull` / `push`・LFS の実体の上げ下ろしは、同じ Kit のログインで Platform を呼ぶ
+Plugin の MCP（`fdpocket`）と `kit.mjs clone` / `pull` / `push` は、同じ Kit のログインで Platform を呼ぶ
 （Plugin の MCP は Kit が起動する local MCP）。ログインしていなければ最初の 1 回だけブラウザで許可を求められる。
 ツールが「FDPocket へのログインが要る」と返したら、利用者に開いたブラウザで許可してもらってからやり直す。
 
@@ -208,7 +220,7 @@ MCP の `project_id` は Project の内部 ID（`.fdpocket.json` の `project_id
    `migrations` は `kit push` が build の結果から埋める）。貢献のブランチなら `get_contribution_policy` で規約を読み、差分全体が守っているか確かめる。
 4. **送信**: `kit.mjs push --message "<利用者向けの 1 行の説明>"`（貢献のブランチは `--policy-revision <確かめた revision>`、この会話で最初の送信なら
    `--open`）。`kit push` は `kit.mjs build` → `pack` → `check`（落ちたら終了コード 2 と理由。直して commit し 4. から）→ `begin_build` →
-   アップロード（LFS → 3 点）→ `submit_build` → `get_build` を `ready` / `failed` / `cancelled` まで（10 分で打ち切り）→ `ready` なら取り込み直す、
+   アップロード（3 点）→ `submit_build` → `get_build` を `ready` / `failed` / `cancelled` まで（10 分で打ち切り）→ `ready` なら取り込み直す、
    を 1 回で行い、結果を JSON で出す。Platform が断ったときはコードと次の手順がエラーに出る（§8.4・§8.5）。
    通っても Platform 側で必ず検証される。
 5. **結果**: `status: "ready"` なら、**`editor_url` を返事の最後に目立つ形で毎回示す**（例: 「▶ 制作画面で試す: <editor_url>」。
@@ -238,7 +250,6 @@ main の参照権限がある場合は、同じ `session_id` の `get_git_bundle
 | `INVALID_ACTION`（`kit_sdk_unknown`） | Kit が同梱する SDK が Platform に無い（Kit が古すぎる・未公開の Kit）。`SDK_VERSION_DEPRECATED` と同じく Kit を更新し、`kit.mjs link` → `kit.mjs generate` → commit してから送り直す |
 | `BUNDLE_REJECTED`（`author_mismatch`） | 本人以外の作者の commit がある。`git rebase --exec 'git commit --amend --no-edit --reset-author' <base_commit_oid>` で直して 3. から |
 | `BUNDLE_REJECTED`（ほか） | `pull` で取り込み直してから 3. から |
-| `LFS_OBJECT_MISSING` | `kit.mjs login` してから `kit.mjs push` をやり直す |
 | Kit のコマンドが環境のエラーで止まる（`bun` が見つからない・`mise ERROR` など） | `kit.mjs doctor` を実行し、`fix` のとおり利用者に直してもらう |
 | `get_build` が `failed`（取り込みの検査のコード） | `kit.mjs check` で同じ検査を回して直し、3. から |
 | `QUOTA_EXCEEDED` / `RATE_LIMITED` | 少し待つよう利用者に伝える。何度も送り直さない |

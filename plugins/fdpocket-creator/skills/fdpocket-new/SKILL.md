@@ -10,7 +10,7 @@ user-invocable: false
 分からなければ利用者に Kit の場所を聞く。
 
 0. **準備を確かめる**: `node <kit>/scripts/kit.mjs doctor`。`ok: false` の項目は `fix` のとおり利用者に直してもらう
-   （Node 22.12 以上・git・Git LFS・Bun。`kit` が古いと出たら更新を勧める）。
+   （Node 22.12 以上・git・Bun。`kit` が古いと出たら更新を勧める）。
 
 1. **持ち主を決める**: `whoami()` の `accounts` がチームを含むなら、どのアカウント（個人かチーム）のアプリにするかを利用者に聞く。
    個人なら `owner_account_id` は省く。

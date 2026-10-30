@@ -36,7 +36,7 @@ Things to know up front:
 ## Requirements
 
 - Node.js 22.12 or later and [Bun](https://bun.com) 1.3 or later
-- `git` 2.38 or later and [Git LFS](https://git-lfs.com) (`source/` is a git repository; images and other media are stored with LFS)
+- `git` 2.38 or later (`source/` is a git repository; large media belongs in the app's Storage, not in the source: a file over 32 MiB cannot be pushed)
 - `tar` (built in on macOS and Linux; Windows 10 and later ships `tar.exe`)
 - A registered account (an anonymous guest account is not enough). You sign in through the browser the first time.
 - Network access to the npm registry (the project's dependencies are installed with `bun install`).
@@ -58,7 +58,7 @@ On older versions, run `/plugin marketplace add https://github.com/MoonTechnica/
 ### 2. Sign in
 
 Nothing to do yet: the first time the agent uses FDPocket, your browser opens and you approve the login once.
-The same login is used by the agent's tools and by the Kit (pull, push, Git LFS, the real AI in `kit dev`).
+The same login is used by the agent's tools and by the Kit (pull, push, the real AI in `kit dev`).
 
 ### 3. Make an app
 
@@ -227,7 +227,7 @@ node <kit>/scripts/kit.mjs <command> [--flag value]
 
 | Command | What it does |
 |---|---|
-| `doctor` | Check Node, git, Git LFS, Bun, your login and the Kit version, and show how to fix what is missing. |
+| `doctor` | Check Node, git, Bun, your login and the Kit version, and show how to fix what is missing. |
 | `clone` | Create a working directory for an app (`--project-id` / `--session-id`): `source/` becomes a git repository of its history. |
 | `pull` | Fetch the Platform's new commits and rebase your branch onto them. |
 | `push` | Build, check, send, and wait for the Platform's validation in one step (`--message`; `--open` opens the editor when it is ready). |
@@ -238,9 +238,9 @@ node <kit>/scripts/kit.mjs <command> [--flag value]
 | `check` | Run the pre-push checks locally (exit code 2 when something fails). |
 | `build` | Install with the lockfile and build every app into `source/dist/`. The only way to build. |
 | `pack` | Bundle your new commits as `outputs/source.bundle`, pack `outputs/dist.tar.gz`, and print the push arguments (used by `push`). |
-| `upload` | Upload the LFS files, then the packed files to the signed URLs from `begin_build` (used by `push`). |
+| `upload` | Upload the packed files to the signed URLs from `begin_build` (used by `push`). |
 | `mcp` | The plugin's local MCP server (started by Claude Code / Codex). Uses the Kit's login, so you sign in once. |
-| `login` | Sign the Kit in (for `clone`, `pull`, `push`, Git LFS and the real AI in `kit dev`). `clone` / `pull` / `push` start it for you when needed; the token stays in `~/.config/fdpocket/`. |
+| `login` | Sign the Kit in (for `clone`, `pull`, `push` and the real AI in `kit dev`). `clone` / `pull` / `push` start it for you when needed; the token stays in `~/.config/fdpocket/`. |
 | `assets add` | Put an image from the asset library under `source/`. |
 | `open` | Open the editor URL in your browser. |
 | `link` | Re-point the working directory at a newer Kit (after updating). |
@@ -255,7 +255,6 @@ node <kit>/scripts/kit.mjs <command> [--flag value]
 | A Kit command stops with an environment error (`bun` not found, `mise ERROR …`) | Run `node <kit>/scripts/kit.mjs doctor` and follow each `fix`. |
 | `kit dev` does not start | It needs Node 22.12 or later. If `seed.ts` failed, the error is printed; ask the agent to fix it. |
 | "Someone changed the app first" / `STALE_BASE` | The app moved on. The agent pulls, rebases your commits, and pushes again. |
-| LFS asks for credentials / `LFS_OBJECT_MISSING` | Run `node <kit>/scripts/kit.mjs login` once, then push again. |
 | `author_mismatch` | A commit is not in your name. Do not change `user.name` / `user.email` in `source/`; the agent resets the author and pushes again. |
 | Rate or quota limit | Wait a bit and try again. Do not resend repeatedly. |
 | Permission error on an app | You can only edit apps owned by your account or a team you belong to. |

@@ -234648,7 +234648,6 @@ var COMMANDS = {
   upload: { required: ["urls"], optional: [] },
   link: { required: [], optional: [] },
   login: { required: [], optional: ["mcp-url"] },
-  credential: { actions: ["get", "store", "erase"], required: [], optional: [] },
   assets: { actions: ["add"], required: ["url", "sha256", "path"], optional: [] },
   open: { required: ["url"], optional: [] },
   "codex-config": { required: [], optional: [], switches: ["write"] }
@@ -243514,36 +243513,6 @@ function completeBuildReport(input) {
     report2.policy_revision = revision;
   return report2;
 }
-
-// frontend/packages/miniapp-kit/src/credential.ts
-function parseCredentialRequest(text) {
-  const request = {};
-  for (const line of text.split(`
-`)) {
-    const equals = line.indexOf("=");
-    if (equals > 0)
-      request[line.slice(0, equals)] = line.slice(equals + 1);
-  }
-  return request;
-}
-function isLfsRequest(request, lfsUrl) {
-  const { protocol, host, path } = request;
-  if (!protocol || !host || path === undefined)
-    return false;
-  const base = new URL(lfsUrl);
-  if (`${protocol}:` !== base.protocol || host !== base.host)
-    return false;
-  const asked = `/${path.replace(/^\/+/, "").split("?")[0]}`;
-  const root = base.pathname.replace(/\/+$/, "");
-  const scoped = /^(.*\/git\/[^/]+)\/[0-9a-f-]{36}\/info\/lfs$/.exec(root);
-  if (!scoped)
-    return false;
-  const appPath = scoped[1];
-  if (!appPath || !asked.startsWith(`${appPath}/`))
-    return false;
-  return /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}\/info\/lfs(?:\/|$)/.test(asked.slice(appPath.length + 1));
-}
-var CREDENTIAL_USERNAME = "fdpocket-kit";
 
 // frontend/packages/miniapp-kit/src/db/diff.ts
 import { existsSync as existsSync16 } from "node:fs";
@@ -254927,9 +254896,6 @@ async function gitOk(git, cwd, args, input) {
 async function gitTest(git, cwd, args) {
   return (await git(args, { cwd })).code === 0;
 }
-function shellQuote(value2) {
-  return `'${value2.replaceAll("'", "'\\''")}'`;
-}
 
 // frontend/packages/miniapp-kit/src/dev/vars.ts
 async function readDevVars(root, hosted) {
@@ -256161,14 +256127,13 @@ async function runDoctor(deps) {
   const checks3 = [
     nodeCheck(deps.nodeVersion),
     await toolCheck(deps, "git", ["--version"], "install git (https://git-scm.com/downloads)"),
-    await toolCheck(deps, "git-lfs", ["lfs", "version"], "install Git LFS (https://git-lfs.com), then run: git lfs install", "git"),
     await bunCheck(deps)
   ];
   if (deps.workdir) {
     checks3.push(deps.workdir.loggedIn ? { name: "login", ok: true, detail: "logged in" } : {
       name: "login",
       ok: false,
-      detail: "not logged in (needed for pull, push, LFS and the real AI in kit dev)",
+      detail: "not logged in (needed for pull, push and the real AI in kit dev)",
       fix: "node <kit>/scripts/kit.mjs login (approve in the browser)"
     }, deps.workdir.gatewayUrl ? { name: "gateway", ok: true, detail: deps.workdir.gatewayUrl } : {
       name: "gateway",
@@ -257201,8 +257166,7 @@ function parseReview(text) {
     base: head(raw2.base),
     ours,
     theirs,
-    bundles: raw2.bundles.map(bundle),
-    lfs_url: url2(raw2.lfs_url, "lfs_url")
+    bundles: raw2.bundles.map(bundle)
   };
 }
 var OID = /^[0-9a-f]{40}(?:[0-9a-f]{24})?$/;
@@ -257283,7 +257247,6 @@ function parsePulled(text) {
       ref_name: referenceName
     } : null,
     bundles: raw2.bundles.map(bundle),
-    lfs_url: url2(raw2.lfs_url, "lfs_url"),
     ...raw2.gateway_url === undefined ? {} : { gateway_url: url2(raw2.gateway_url, "gateway_url") }
   };
 }
@@ -257422,13 +257385,6 @@ import { join as join39 } from "node:path";
 class RepoError extends Error {
   name = "RepoError";
 }
-function kitCommand(kitRoot, ...args) {
-  return [
-    shellQuote(process.execPath),
-    shellQuote(join39(kitRoot, "scripts", "kit.mjs")),
-    ...args
-  ].join(" ");
-}
 var EXCLUDES = ["node_modules/", "/dist/", ".DS_Store"];
 async function set2(git2, source, key, value2) {
   await gitOk(git2, source, ["config", key, value2]);
@@ -257438,25 +257394,6 @@ async function configureRepo(git2, source, config3, author) {
     await set2(git2, source, "user.name", author.name);
     await set2(git2, source, "user.email", author.email);
   }
-  const lfs = config3.lfs_url;
-  await set2(git2, source, "lfs.url", lfs);
-  await set2(git2, source, "remote.fdpocket.url", lfs);
-  await set2(git2, source, `lfs.${lfs}.locksverify`, "false");
-  await set2(git2, source, `lfs.${lfs}.access`, "basic");
-  const origin2 = new URL(lfs).origin;
-  const helper = `credential.${origin2}.helper`;
-  const unset = await git2(["config", "--unset-all", helper], { cwd: source });
-  if (unset.code !== 0 && unset.code !== 5) {
-    throw new GitError(`git config --unset-all ${helper} failed: ${unset.stderr.trim()}`);
-  }
-  await gitOk(git2, source, ["config", "--add", helper, ""]);
-  await gitOk(git2, source, [
-    "config",
-    "--add",
-    helper,
-    `!${kitCommand(config3.kit_root, "credential")}`
-  ]);
-  await set2(git2, source, `credential.${origin2}.useHttpPath`, "true");
   const branch = threadBranch(config3.thread_ref);
   await set2(git2, source, `branch.${branch}.remote`, ".");
   await set2(git2, source, `branch.${branch}.merge`, trackingRef(config3.thread_ref));
@@ -257471,11 +257408,6 @@ async function configureRepo(git2, source, config3, author) {
     await appendFile(excludePath, `${missing.join(`
 `)}
 `);
-}
-async function requireGitLfs(git2, cwd) {
-  if (!await gitTest(git2, cwd, ["lfs", "version"])) {
-    throw new RepoError("git-lfs is not installed; install Git LFS (https://git-lfs.com) first");
-  }
 }
 function requireRepo(source) {
   if (!existsSync24(join39(source, ".git"))) {
@@ -258122,8 +258054,7 @@ var REQUIRED2 = [
   "kit_root",
   "kit_version",
   "mcp_url",
-  "thread_ref",
-  "lfs_url"
+  "thread_ref"
 ];
 var OPTIONAL = ["editor_url", "gateway_url"];
 var NULLABLE = ["base_commit_oid"];
@@ -258335,8 +258266,6 @@ async function runCommand(args, context) {
         return await link(context);
       case "login":
         return await loginCommand(context, flags);
-      case "credential":
-        return await credential(context, args.action);
       case "assets":
         return await addAsset(context, flags);
       case "open":
@@ -258418,12 +258347,10 @@ async function clone4(context, flags) {
   if (existsSync27(source) && (await readdir15(source)).length > 0) {
     throw new CommandError(`${source} is not empty; clone into a new directory`);
   }
-  await requireGitLfs(context.git, workdir);
   for (const dir of Object.values(WORKDIR_DIRS))
     await mkdir19(join45(workdir, dir), { recursive: true });
   const branch = threadBranch(pulled.thread_ref);
   await gitOk(context.git, workdir, ["init", "-q", "-b", branch, source]);
-  await gitOk(context.git, source, ["lfs", "install", "--local"]);
   const config3 = {
     project_id: pulled.project_id,
     editor_url: pulled.editor_url,
@@ -258432,7 +258359,6 @@ async function clone4(context, flags) {
     kit_version: await kitVersion(context.kitRoot),
     mcp_url: mcpUrlOf(flags["mcp-url"]),
     thread_ref: pulled.thread_ref,
-    lfs_url: pulled.lfs_url,
     ...pulled.gateway_url ? { gateway_url: pulled.gateway_url } : {},
     base_commit_oid: null,
     fetched_bundles: []
@@ -258478,7 +258404,6 @@ async function pull(context, flags) {
     ...config3,
     kit_root: context.kitRoot,
     kit_version: await kitVersion(context.kitRoot),
-    lfs_url: pulled.lfs_url,
     editor_url: pulled.editor_url,
     ...pulled.gateway_url ? { gateway_url: pulled.gateway_url } : {}
   };
@@ -258644,7 +258569,6 @@ async function fetchReview(context, flags) {
     ours: review.ours,
     theirs: review.theirs,
     fetched_as: `refs/remotes/fdpocket/proposals/${review.proposal_id}`,
-    lfs_url: review.lfs_url,
     next: "read the diff with git diff <base> <theirs>; merge and release remain explicit Platform actions"
   });
 }
@@ -259009,12 +258933,6 @@ async function uploadOutputs(context, flags) {
     if (typeof urls[name3] !== "string")
       throw new CommandError(`--urls has no URL for ${name3}`);
   }
-  const lfs = await context.git(["lfs", "push", "fdpocket", config3.thread_ref], {
-    cwd: sourceOf(workdir)
-  });
-  if (lfs.code !== 0) {
-    throw new CommandError(`uploading the LFS files failed: ${lfs.stderr.trim()} (not logged in? run kit.mjs login)`);
-  }
   for (const [name3, contentType2] of Object.entries(OUTPUT_FILES)) {
     const bytes3 = new Uint8Array(await readFile30(join45(workdir, WORKDIR_DIRS.outputs, name3)));
     await upload(name3, urls[name3], bytes3, contentType2, context.fetch);
@@ -259069,29 +258987,6 @@ async function loginCommand(context, flags) {
     expires_at: new Date(stored.expires_at).toISOString()
   });
 }
-async function credential(context, action2) {
-  const request2 = parseCredentialRequest(await context.stdin());
-  const workdir = locateWorkdir(context.cwd);
-  if (workdir === null)
-    return;
-  const config3 = await readConfig(workdir);
-  if (!isLfsRequest(request2, config3.lfs_url))
-    return;
-  if (action2 === "erase") {
-    await forgetAccessToken(config3.mcp_url, context.configDir);
-    return;
-  }
-  if (action2 !== "get")
-    return;
-  const token2 = await accessToken(config3.mcp_url, context);
-  if (token2 === null) {
-    console.error(`kit.mjs credential: not logged in to ${config3.mcp_url}; run kit.mjs login`);
-    context.stdout("quit=1");
-    return;
-  }
-  context.stdout(`username=${CREDENTIAL_USERNAME}`);
-  context.stdout(`password=${token2}`);
-}
 async function addAsset(context, flags) {
   const path = flags.path;
   const segments = path.split("/");
@@ -259106,7 +259001,7 @@ async function addAsset(context, flags) {
   print(context, {
     path,
     ...describeFile(bytes3),
-    next: "git add it and commit (.gitattributes keeps the bytes in LFS)"
+    next: "git add it and commit"
   });
 }
 async function openEditor(context, flags) {
