@@ -196,6 +196,17 @@ git・Bun・Node 22.12 以上が要る。`node <kit>/scripts/kit.mjs doctor` で
 | 動画・長い音声・高解像度の写真・大きな 3D やデータなど、**1 ファイルが数 MiB を超えるもの** | **`source/` に置かない**。アプリの Storage（R2。`$fdpocket-app-storage`）に置き、画面からは Storage の URL・ID で参照する |
 | 利用者・作者があとから追加・差し替えるもの（投稿画像、添付、書類） | 必ず Storage（`$fdpocket-app-storage`）。`source/` に入れない |
 
+素材は commit する前に、`ffmpeg`（Sandbox に入っている）で縮めて 5 MiB 以下に収める。画像・音声・動画のどれにも使える。
+
+| 素材 | コマンド（出力先は `source/` の下） |
+|---|---|
+| 画像（写真・絵）を WebP に縮小 | `ffmpeg -y -i in.png -vf "scale='min(1600,iw)':-2" -c:v libwebp -quality 80 out.webp` |
+| 画像を JPEG に縮小 | `ffmpeg -y -i in.png -vf "scale='min(1600,iw)':-2" -q:v 4 out.jpg` |
+| 音声（効果音・BGM）を Opus/AAC に | `ffmpeg -y -i in.wav -c:a libopus -b:a 96k out.ogg`（または `-c:a aac -b:a 128k out.m4a`） |
+| 動画を縮小・再エンコード | `ffmpeg -y -i in.mov -vf "scale='min(1280,iw)':-2" -c:v libx264 -crf 28 -preset veryfast -c:a aac -b:a 96k -movflags +faststart out.mp4` |
+
+透過が要る画像は WebP のまま（`-quality 80` で透過は残る）にする。縮めても 5 MiB を超える動画・長い音声は `source/` に置かず Storage へ回す。
+
 32 MiB を超えるファイルを commit すると push が通らない。入れてしまったら `git rm` して Storage へ移す。素材を生成したのに大きすぎるときは、縮小・圧縮してから置くか、Storage に回す。
 
 ### 8.2 素材ツール
