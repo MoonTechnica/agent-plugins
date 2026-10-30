@@ -255228,6 +255228,7 @@ function digest3(bytes3) {
 // frontend/packages/miniapp-kit/src/dev/watcher-transport.ts
 init_zod();
 var JOB_POLL_MS = 300;
+var JOB_POLL_MAX_MS = 2000;
 var jobSchema = exports_external.object({
   id: exports_external.uuid(),
   status: exports_external.enum(["uploading", "pending", "running", "done", "failed", "replan"]),
@@ -255321,8 +255322,8 @@ function createSessionSyncTransport(url2, key, request2, signal) {
           await requireResponse(response, true);
         job = await parseJob(await call(`/${job.id}/uploaded`, "POST", "{}"));
       }
-      while (job.status === "pending" || job.status === "running") {
-        await wait(JOB_POLL_MS, signal);
+      for (let delay = JOB_POLL_MS;job.status === "pending" || job.status === "running"; delay = Math.min(delay * 1.5, JOB_POLL_MAX_MS)) {
+        await wait(delay, signal);
         job = await parseJob(await call(`/${job.id}`));
       }
       if (job.status === "replan")
