@@ -88,7 +88,7 @@ To keep working, tell the agent what to change, then push again.
 | `/tokoyo-creator:pull <app_id or editor URL>` | Bring the latest version of an existing game to your machine (to continue work, or after you edited it in the browser). |
 | `/tokoyo-creator:check` | Run the pre-push checks locally (the Platform's importer and static validation). |
 | `/tokoyo-creator:push <message>` | Check, then send your game to the Platform as a new draft. The message becomes the version note. |
-| `/tokoyo-creator:remix <game page URL>` | Start a change to a game someone published. You get your own work branch inside the same game; the author does not change. |
+| `/tokoyo-creator:propose-change <game page URL>` | Start a change to a game someone published. You get your own work branch inside the same game; the author does not change. |
 | `/tokoyo-creator:propose <title>` | Propose your changes to the game's author, like a GitHub pull request. Also resubmits after the author asked for changes. |
 | `/tokoyo-creator:proposals` | Review proposals other people sent to your game, then comment, ask for changes, prepare, adopt, or decline. |
 
@@ -124,7 +124,7 @@ In Codex, call the Skills with `$`:
 | `$tokoyo-new` | Start a new game. |
 | `$tokoyo-pull` | Bring an existing game's latest version to your machine. |
 | `$tokoyo-push` | Check and send your game to the Platform. |
-| `$tokoyo-remix` | Start a change to a published game (your own work branch). |
+| `$tokoyo-propose-change` | Start a change to a published game (your own work branch). |
 | `$tokoyo-propose` | Propose your changes to the author, and resubmit after a change request. |
 | `$tokoyo-proposals` | Review proposals sent to your game. |
 
@@ -214,7 +214,7 @@ the agent rebases your commits onto it (like `git pull --rebase`) and resolves a
 (Kenney, Quaternius) and imports them, and generates images, sound effects, music, and 3D models
 only for what is missing. Generated assets use the game's asset budget (per game, per UTC day).
 
-**Contribute to someone else's game** — `remix <game page URL>` → make one focused change → `push`
+**Contribute to someone else's game** — `propose-change <game page URL>` → make one focused change → `push`
 → wait until it is validated (no need to publish) → `propose`. You start from the published version
 (or from the game in progress if the author allowed it); the agent tells you which. The author reviews it
 and can adopt it into their game in progress. If the author asks for changes, fix them, `push`, and

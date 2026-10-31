@@ -1,5 +1,5 @@
 ---
-name: tokoyo-remix
+name: tokoyo-propose-change
 description: 他の人のTOKOYO.gamesのゲームに変更を提案するため、同じゲームの中に自分の作業を作って始める。公開版（作者が許可していれば制作中のゲーム）から始め、ゲームの作者は変わらない。Platform MCPのresolve_app / create_branch / get_git_bundlesを使う。「これを改造して」「リミックスして」「このゲームを直して作者に提案したい」のときに使う。
 ---
 

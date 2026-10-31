@@ -3,4 +3,4 @@ description: 他の人のゲームの公開済みリリース（参照許可が�
 argument-hint: "<ゲームのページの URL または app_id>"
 ---
 
-`tokoyo-remix` Skill の手順で、次のゲームをリミックスする: $ARGUMENTS
+`tokoyo-propose-change` Skill の手順で、次のゲームに変更を提案する作業を始める: $ARGUMENTS
