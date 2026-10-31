@@ -237939,7 +237939,13 @@ var sessionEnvironmentViewSchema = exports_external.object({
     failure: failureDiagnosticSchema.nullish(),
     seedFailure: failureDiagnosticSchema.nullish(),
     kitFailure: failureDiagnosticSchema.nullish(),
-    startupPhase: exports_external.enum(SESSION_STARTUP_PHASES).nullish()
+    startupPhase: exports_external.enum(SESSION_STARTUP_PHASES).nullish(),
+    presentation: exports_external.object({
+      status: exports_external.enum(["starting", "running", "stopped", "failed"]),
+      showUrl: exports_external.boolean(),
+      resetFrame: exports_external.boolean(),
+      reconciliation: exports_external.enum(["capacity", "paused", "waiting", "failed", "retrying"]).nullable()
+    }).optional()
   })
 });
 var cursor = exports_external.string().min(1).max(2048).nullable();

@@ -231,6 +231,23 @@ export declare const sessionEnvironmentViewSchema: z.ZodObject<{
             preparing_database: "preparing_database";
             placing_workers: "placing_workers";
         }>>>;
+        presentation: z.ZodOptional<z.ZodObject<{
+            status: z.ZodEnum<{
+                starting: "starting";
+                running: "running";
+                failed: "failed";
+                stopped: "stopped";
+            }>;
+            showUrl: z.ZodBoolean;
+            resetFrame: z.ZodBoolean;
+            reconciliation: z.ZodNullable<z.ZodEnum<{
+                failed: "failed";
+                capacity: "capacity";
+                retrying: "retrying";
+                paused: "paused";
+                waiting: "waiting";
+            }>>;
+        }, z.core.$strip>>;
     }, z.core.$strip>;
 }, z.core.$strip>;
 export declare const sessionEventsPageSchema: z.ZodObject<{

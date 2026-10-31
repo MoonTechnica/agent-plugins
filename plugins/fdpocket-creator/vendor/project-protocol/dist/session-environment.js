@@ -120,6 +120,15 @@ export const sessionEnvironmentViewSchema = z.object({
         kitFailure: failureDiagnosticSchema.nullish(),
         /** The stage a start is in; null (or absent) once it ends. A closed set, as in the database. */
         startupPhase: z.enum(SESSION_STARTUP_PHASES).nullish(),
+        /** What the screen shows. The server decides it (`platform.preview_presentation`); nothing is inferred. */
+        presentation: z
+            .object({
+            status: z.enum(['starting', 'running', 'stopped', 'failed']),
+            showUrl: z.boolean(),
+            resetFrame: z.boolean(),
+            reconciliation: z.enum(['capacity', 'paused', 'waiting', 'failed', 'retrying']).nullable(),
+        })
+            .optional(),
     }),
 });
 const cursor = z.string().min(1).max(2048).nullable();
