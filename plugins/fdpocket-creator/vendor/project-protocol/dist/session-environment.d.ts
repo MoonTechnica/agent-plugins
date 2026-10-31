@@ -227,14 +227,14 @@ export declare const sessionEnvironmentViewSchema: z.ZodObject<{
             }>;
             detail: z.ZodString;
         }, z.core.$strip>>>;
-        startupPhase: z.ZodOptional<z.ZodNullable<z.ZodEnum<{
+        startupPhase: z.ZodCatch<z.ZodOptional<z.ZodNullable<z.ZodEnum<{
             requested: "requested";
             opening_sandbox: "opening_sandbox";
             preparing_source: "preparing_source";
             starting_kit: "starting_kit";
             preparing_database: "preparing_database";
             placing_workers: "placing_workers";
-        }>>>;
+        }>>>>;
         presentation: z.ZodOptional<z.ZodObject<{
             status: z.ZodEnum<{
                 starting: "starting";

@@ -237940,7 +237940,7 @@ var sessionEnvironmentViewSchema = exports_external.object({
     failure: failureDiagnosticSchema.nullish(),
     seedFailure: failureDiagnosticSchema.nullish(),
     kitFailure: failureDiagnosticSchema.nullish(),
-    startupPhase: exports_external.enum(SESSION_STARTUP_PHASES).nullish(),
+    startupPhase: exports_external.enum(SESSION_STARTUP_PHASES).nullish().catch(null),
     presentation: exports_external.object({
       status: exports_external.enum(["starting", "running", "stopped", "failed"]),
       showUrl: exports_external.boolean(),

@@ -122,8 +122,12 @@ export const sessionEnvironmentViewSchema = z.object({
         seedFailure: failureDiagnosticSchema.nullish(),
         /** The Kit reported code it could not build or hand over; cleared when the same step recovers. */
         kitFailure: failureDiagnosticSchema.nullish(),
-        /** The stage a start is in; null (or absent) once it ends. A closed set, as in the database. */
-        startupPhase: z.enum(SESSION_STARTUP_PHASES).nullish(),
+        /**
+         * The stage a start is in; null (or absent) once it ends. A closed set, as in the database.
+         * A stage this screen does not know reads as none: the server is deployed before an open tab
+         * is reloaded, and a new stage must not make the whole view unreadable (it did: 'requested').
+         */
+        startupPhase: z.enum(SESSION_STARTUP_PHASES).nullish().catch(null),
         /**
          * What the screen shows. The server decides it (`platform.preview_presentation`); nothing is
          * inferred. Optional only because the Developer Kit ships its own copy of this schema and an
