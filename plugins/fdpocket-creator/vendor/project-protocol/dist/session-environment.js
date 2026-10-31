@@ -120,7 +120,11 @@ export const sessionEnvironmentViewSchema = z.object({
         kitFailure: failureDiagnosticSchema.nullish(),
         /** The stage a start is in; null (or absent) once it ends. A closed set, as in the database. */
         startupPhase: z.enum(SESSION_STARTUP_PHASES).nullish(),
-        /** What the screen shows. The server decides it (`platform.preview_presentation`); nothing is inferred. */
+        /**
+         * What the screen shows. The server decides it (`platform.preview_presentation`); nothing is
+         * inferred. Optional only because the Developer Kit ships its own copy of this schema and an
+         * installed Kit must keep reading a view; the screen refuses a view without it.
+         */
         presentation: z
             .object({
             status: z.enum(['starting', 'running', 'stopped', 'failed']),
