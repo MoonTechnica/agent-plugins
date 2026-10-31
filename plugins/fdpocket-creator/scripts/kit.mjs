@@ -237879,6 +237879,13 @@ var failureDiagnosticSchema = exports_external.object({
   phase: exports_external.enum(FAILURE_PHASES),
   detail: exports_external.string().max(FAILURE_DETAIL_MAX_CHARS)
 });
+var SESSION_STARTUP_PHASES = [
+  "opening_sandbox",
+  "preparing_source",
+  "starting_kit",
+  "preparing_database",
+  "placing_workers"
+];
 var sessionEnvironmentViewSchema = exports_external.object({
   environmentId: exports_external.string(),
   status: exports_external.string(),
@@ -237931,7 +237938,8 @@ var sessionEnvironmentViewSchema = exports_external.object({
     url: exports_external.string().url().nullable(),
     failure: failureDiagnosticSchema.nullish(),
     seedFailure: failureDiagnosticSchema.nullish(),
-    kitFailure: failureDiagnosticSchema.nullish()
+    kitFailure: failureDiagnosticSchema.nullish(),
+    startupPhase: exports_external.enum(SESSION_STARTUP_PHASES).nullish()
   })
 });
 var cursor = exports_external.string().min(1).max(2048).nullable();

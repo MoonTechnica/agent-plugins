@@ -40,6 +40,9 @@ export declare const failureDiagnosticSchema: z.ZodObject<{
     detail: z.ZodString;
 }, z.core.$strip>;
 export type FailureDiagnostic = z.infer<typeof failureDiagnosticSchema>;
+/** The stages the platform records while a preview starts (`session_sandboxes.startup_phase`). */
+export declare const SESSION_STARTUP_PHASES: readonly ["opening_sandbox", "preparing_source", "starting_kit", "preparing_database", "placing_workers"];
+export type SessionStartupPhase = (typeof SESSION_STARTUP_PHASES)[number];
 export declare const sessionEnvironmentViewSchema: z.ZodObject<{
     environmentId: z.ZodString;
     status: z.ZodString;
@@ -221,6 +224,13 @@ export declare const sessionEnvironmentViewSchema: z.ZodObject<{
             }>;
             detail: z.ZodString;
         }, z.core.$strip>>>;
+        startupPhase: z.ZodOptional<z.ZodNullable<z.ZodEnum<{
+            opening_sandbox: "opening_sandbox";
+            preparing_source: "preparing_source";
+            starting_kit: "starting_kit";
+            preparing_database: "preparing_database";
+            placing_workers: "placing_workers";
+        }>>>;
     }, z.core.$strip>;
 }, z.core.$strip>;
 export declare const sessionEventsPageSchema: z.ZodObject<{

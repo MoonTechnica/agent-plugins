@@ -40,6 +40,14 @@ export const failureDiagnosticSchema = z.object({
     phase: z.enum(FAILURE_PHASES),
     detail: z.string().max(FAILURE_DETAIL_MAX_CHARS),
 });
+/** The stages the platform records while a preview starts (`session_sandboxes.startup_phase`). */
+export const SESSION_STARTUP_PHASES = [
+    'opening_sandbox',
+    'preparing_source',
+    'starting_kit',
+    'preparing_database',
+    'placing_workers',
+];
 export const sessionEnvironmentViewSchema = z.object({
     environmentId: z.string(),
     status: z.string(),
@@ -110,6 +118,8 @@ export const sessionEnvironmentViewSchema = z.object({
         seedFailure: failureDiagnosticSchema.nullish(),
         /** The Kit reported code it could not build or hand over; cleared when the same step recovers. */
         kitFailure: failureDiagnosticSchema.nullish(),
+        /** The stage a start is in; null (or absent) once it ends. A closed set, as in the database. */
+        startupPhase: z.enum(SESSION_STARTUP_PHASES).nullish(),
     }),
 });
 const cursor = z.string().min(1).max(2048).nullable();
