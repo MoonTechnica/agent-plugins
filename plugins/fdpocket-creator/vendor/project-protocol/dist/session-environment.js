@@ -40,8 +40,12 @@ export const failureDiagnosticSchema = z.object({
     phase: z.enum(FAILURE_PHASES),
     detail: z.string().max(FAILURE_DETAIL_MAX_CHARS),
 });
-/** The stages the platform records while a preview starts (`session_sandboxes.startup_phase`). */
+/**
+ * The stages the platform records while a preview starts (`session_sandboxes.startup_phases`).
+ * Steps run in parallel, so several can run at once; the view names the earliest of them.
+ */
 export const SESSION_STARTUP_PHASES = [
+    'requested',
     'opening_sandbox',
     'preparing_source',
     'starting_kit',

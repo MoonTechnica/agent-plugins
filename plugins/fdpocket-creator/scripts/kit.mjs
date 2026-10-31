@@ -237880,6 +237880,7 @@ var failureDiagnosticSchema = exports_external.object({
   detail: exports_external.string().max(FAILURE_DETAIL_MAX_CHARS)
 });
 var SESSION_STARTUP_PHASES = [
+  "requested",
   "opening_sandbox",
   "preparing_source",
   "starting_kit",
