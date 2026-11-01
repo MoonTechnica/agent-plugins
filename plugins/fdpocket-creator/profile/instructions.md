@@ -48,6 +48,7 @@ Project は利用者向けの `web` と、必要なら管理用の `admin` の A
 | `$fdpocket-app-ai` | AI の機能（要約・下書き・分類・チャット・画像や PDF の読み取り）を入れるとき |
 | `$fdpocket-app-python` | GPU の AI の処理（推論・学習・埋め込み・画像や音声の変換）を python の App で作るとき |
 | `$fdpocket-app-dependencies` | npm の依存を足す前に必ず |
+| `$fdpocket-app-structure` | **App や共有 package を足すとき・複数の App でコードや部品を共有するとき・`kit check` が構造エラー（`UNDECLARED_DEPENDENCY` など）を返したとき**。置き場の判断、依存の宣言、App 間 import の禁止、App の足し方 |
 | `$fdpocket-app-merge` | **`./input/merge-report.json` があるとき・リポジトリが `git merge` の途中（`MERGE_HEAD` がある）のとき** |
 
 **記憶で書かない。** spec と Kit の SDK の型に無い API は存在しない。

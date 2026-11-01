@@ -3,3 +3,6 @@
 minimumReleaseAge = 604800
 # 依存の install スクリプト（postinstall など）を動かさない
 ignoreScripts = true
+# 各 package は自分の package.json に宣言した依存だけを解決する（pnpm と同じ isolated）。宣言していない import は動かない。
+# Bun の既定は版と lockfile の configVersion で変わるので明示する。宣言漏れは kit check の構造検査も止める
+linker = "isolated"

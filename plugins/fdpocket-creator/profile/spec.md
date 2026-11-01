@@ -29,6 +29,7 @@ App は Project 専用のオリジン（`https://{project}.{apps-domain}`）で�
 │   ├── db-schema/           # schema.zmodel（編集する）, platform.zmodel（Kit が置く）, migrations/, pending/, seed.ts, erase.test.ts
 │   ├── sdk/                 # src/index.ts（client と schema）+ src/zenstack/（kit generate の生成物）。編集しない。commit する
 │   ├── ui/                  # shadcn の部品と globals.css
+│   ├── <name>/              # 共有 package（任意。複数の App で使うコード。@workspace/<name>。足し方は $fdpocket-app-structure）
 │   ├── miniapp-sdk/         # Kit が置くビルド済みの SDK。編集しない。commit する
 │   └── project-protocol/    # 同上（SDK の依存）
 ├── infra/project.yaml       # App・capability・バケット・Role の宣言（§2）
@@ -38,6 +39,10 @@ App は Project 専用のオリジン（`https://{project}.{apps-domain}`）で�
 ├── bun.lock                 # commit する（§8）
 └── package.json             # workspaces: apps/*, packages/*
 ```
+
+**構造の決まり**（`kit check` と取り込みの検証が止める）: 使う package は使う側の `package.json` に宣言する。
+App は別の App を import しない（共有するコードは `packages/` へ出す）。package は App を import しない。
+`../` で他の package のファイルを触らず、`@workspace/<name>` で import する。置き場の判断・共有 package の作り方・App の足し方は `$fdpocket-app-structure`。
 
 `kit new` がこの形を作る。App の `vite.config.ts` は `createAppConfig('<slug>', import.meta.dirname)`
 （`@workspace/miniapp-sdk/vite`）を呼ぶだけにする。配信の場所・出力（Project の根の `dist/<slug>/`）・
@@ -663,7 +668,7 @@ export default async function seed(context: SeedContext): Promise<SeedPlan<Schem
 - npm の公開パッケージは足してよい（足す前に `$fdpocket-app-dependencies` の基準で調べる）。`package.json` に書いて `bun install` し、
   **`bun.lock` を commit する**。
 - **git・URL・`file:` の依存は不可**（`kit build` が install の前に落とす）。`bun.lock` は npm レジストリの版 + integrity と `workspace:` だけ。
-- **`bunfig.toml` を変えない**（`minimumReleaseAge`: 公開 7 日未満の版を解決しない / `ignoreScripts`: 依存の install スクリプトを動かさない）。
+- **`bunfig.toml` を変えない**（`minimumReleaseAge`: 公開 7 日未満の版を解決しない / `ignoreScripts`: 依存の install スクリプトを動かさない / `linker = "isolated"`: 各 package は自分の `package.json` に宣言した依存だけを解決する）。
   `kit build` は `--frozen-lockfile --ignore-scripts` で入れるので、書き換えても効かない。
 - SDKの依存宣言が変わる更新時は、元のアプリ依存とlockの整合を確認してからSDK差分をlockへ反映し、
   その後に固定インストールする。ローカルで更新されたSDK宣言と`bun.lock`は通常の編集と一緒にcommitする。
@@ -682,6 +687,7 @@ export default async function seed(context: SeedContext): Promise<SeedPlan<Schem
 | `eval` / `new Function` | 素直に書く |
 | 生の SQL（`$queryRaw` / `$executeRaw`）・`$transaction` | `client.db` の操作 |
 | `platform.zmodel` / `packages/sdk/` / `packages/miniapp-sdk/` / `packages/project-protocol/` / `migrations/` の手での編集 | 正しい手順（§5・§6） |
+| App が別の App を import する・package が App を import する・`../` で他の package のファイルを触る・`package.json` に宣言していない package を import する | 共有するコードを `packages/<name>` に出し、`@workspace/<name>` で import して使う側の `package.json` に宣言する（`$fdpocket-app-structure`） |
 | **admin の権限を画面の条件分岐で代用する** | `requiredPermission` と ZModel のポリシーで守り、`client.auth.can` は表示だけ |
 | 利用者が互いに送る自由入力を、通報・ブロックの手段なしに公開する | §3.5 の 3 つを入れる。入れられないなら公開範囲を Workspace に閉じる |
 
