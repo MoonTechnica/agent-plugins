@@ -243646,13 +243646,14 @@ async function finalizeMigration(options2) {
   await placePlatform(root, options2.kitRoot);
   const pending = await renderPendingSql(root);
   const data = (await readIfPresent(join23(root, PENDING_DATA_PATH)))?.trim() ?? "";
-  if (pending.body === "" && data === "") {
+  const parsed = parseIntent(await readIfPresent(join23(root, PENDING_INTENT_PATH)));
+  const hasContract = parsed.intent?.some((item) => ("contract" in item)) ?? false;
+  if (pending.body === "" && data === "" && !hasContract) {
     await clearPending(root);
     return { status: "empty", migration: null, changes: [] };
   }
   const createClient = options2.createLibsqlClient ?? await loadProjectLibsql(root, fail5);
   const changes = await classifyPending(pending, createClient);
-  const parsed = parseIntent(await readIfPresent(join23(root, PENDING_INTENT_PATH)));
   if (parsed.error !== null) {
     return {
       status: "blocked",
