@@ -249829,7 +249829,8 @@ function registerTokenRoutes(app, adapters, config3) {
       throw new Error("bootstrapped project user disappeared");
     c2.header("Cache-Control", "private, no-store");
     return c2.json({
-      apps: sessionApps(resolved, actor.permissions, identity2.isAnonymous).filter((candidate) => candidate.kind === "web" && candidate.canOpen)
+      apps: sessionApps(resolved, actor.permissions, identity2.isAnonymous).filter((candidate) => candidate.kind === "web" && candidate.canOpen),
+      loginRequired: identity2.isAnonymous && needsLogin(resolved)
     });
   });
   app.post("/v1/token/exchange", async (c2) => {
@@ -249972,6 +249973,9 @@ function registerTokenRoutes(app, adapters, config3) {
     };
     return c2.json(session2);
   });
+}
+function needsLogin(resolved) {
+  return resolved.apps.some((app) => app.kind === "web" && app.access === "public" && app.anonymousAllowed === false);
 }
 function sessionApps(resolved, permissions, isAnonymous = false) {
   return resolved.apps.map((app) => ({
