@@ -255576,17 +255576,17 @@ async function startSessionWatcher(options2) {
     ...event.notification.kind !== "schema" ? { appSlug: event.notification.payload.appSlug } : {}
   });
   const send = transport.send;
-  const reported = new Set;
+  const confirmed = new Set;
   const report2 = async (key2, phase, message2) => {
     const recovered = message2 === undefined;
-    if (recovered && !reported.has(key2))
+    if (recovered && confirmed.has(key2))
       return;
     try {
       await transport.report(recovered ? { key: key2, phase, recovered } : { key: key2, phase, message: message2 });
       if (recovered)
-        reported.delete(key2);
+        confirmed.add(key2);
       else
-        reported.add(key2);
+        confirmed.delete(key2);
     } catch (error51) {
       console.error("Live failure report failed:", error51 instanceof Error ? error51.message : error51);
     }
