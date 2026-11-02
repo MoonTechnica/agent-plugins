@@ -64,7 +64,7 @@ node <kit>/scripts/kit.mjs e2e --live --as admin --app admin --test design/e2e.t
 ```
 
 `--live` と `--as` は必須。`--app` を省くと `web`、無ければ最初の web App を使う。
-`--test` は source 内の相対パス。省略時は `design/e2e.ts` があれば実行し、無ければ接続・表示の smoke だけを行う。
+`--test` は source 内の相対パス。省略時は `design/e2e.ts` があれば実行し、シナリオが無ければ実行しない（プレビューが開くかの確認は Platform がターンの終了時にする。あなたはしない）。
 シナリオは TS / JS の default export として書く。`page` は実際の Playwright Page、`frame` は接続した App の Frame。
 期待と違えば例外にして失敗させる。シナリオの引数に許可証やセッショントークンは渡らない。
 

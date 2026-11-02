@@ -256555,7 +256555,14 @@ async function exchange2(request2, options2, send, secrets) {
     return Response.json({ error: { code: "E2E_EXCHANGE_FAILED" } }, { status: 502 });
   }
 }
+function scenarioOf(options2) {
+  const path = options2.test ?? (existsSync21(resolve3(options2.root, "design/e2e.ts")) ? "design/e2e.ts" : null);
+  if (!path)
+    throw new LiveE2EError("The Platform checks that the preview opens when your turn ends; do not check it yourself. " + "Use e2e --live for something only a real environment shows: write a scenario and pass it " + "with --test (see $app-testing).");
+  return path;
+}
 async function runLiveE2E(options2) {
+  scenarioOf(options2);
   const env = options2.env ?? process.env;
   const input = validateLiveE2EInput({
     live: env.KIT_LIVE,
@@ -256610,19 +256617,17 @@ async function checkBrowser(options2, input, app, hostUrl, redact2, importer) {
     if (!frame2)
       throw new LiveE2EError("The live App frame did not open");
     await frame2.waitForFunction(() => Boolean(document.body?.innerText.trim() || document.querySelector("img,svg,canvas,video")), null, { timeout: 30000 });
-    const path = options2.test ?? (existsSync21(resolve3(options2.root, "design/e2e.ts")) ? "design/e2e.ts" : null);
-    if (path) {
-      const scenario = (await importer(await scenarioPath(options2.root, path))).default;
-      if (typeof scenario !== "function")
-        throw new LiveE2EError("E2E scenario must export a default async function");
-      await scenario({
-        page,
-        frame: frame2,
-        app,
-        identity: input.identity,
-        environmentId: input.live.environmentId
-      });
-    }
+    const path = scenarioOf(options2);
+    const scenario = (await importer(await scenarioPath(options2.root, path))).default;
+    if (typeof scenario !== "function")
+      throw new LiveE2EError("E2E scenario must export a default async function");
+    await scenario({
+      page,
+      frame: frame2,
+      app,
+      identity: input.identity,
+      environmentId: input.live.environmentId
+    });
     if (errors7.length)
       throw new LiveE2EError("Live E2E browser errors: " + errors7.join("; "));
     return {
@@ -256630,7 +256635,7 @@ async function checkBrowser(options2, input, app, hostUrl, redact2, importer) {
       app,
       identity: input.identity,
       environmentId: input.live.environmentId,
-      scenario: path ?? "connection-smoke"
+      scenario: path
     };
   } catch (error51) {
     throw new LiveE2EError(redact2(error51 instanceof Error ? error51.message : "Live E2E failed"));
@@ -258933,7 +258938,7 @@ async function dev(context, flags) {
   }
   const liveRaw = flags.live ? process.env[KIT_LIVE_CONFIG_ENV] : undefined;
   if (flags.live && !liveRaw)
-    throw new CommandError("--live needs KIT_LIVE from the session environment");
+    throw new CommandError("--live is for the preview the Platform starts for the chat; it is not for your turn. " + "The Platform starts and checks that preview itself. To see the screen yourself, run plain `kit dev`.");
   const live2 = liveRaw ? parseLiveConfig(liveRaw) : undefined;
   const server2 = await startDev({
     root: sourceOf(workdir),
