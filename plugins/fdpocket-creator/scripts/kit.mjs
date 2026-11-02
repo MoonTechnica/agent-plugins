@@ -253413,8 +253413,10 @@ async function prepareSchemaPlan({ root, kitRoot }, baseline, signal = new Abort
     migrations: baseline.schemaSql ? [{ name: "0000_session_baseline", sql: baseline.schemaSql }] : []
   }, await loadProjectLibsql(root, (message2) => new DevError(message2)));
   const matched = matchIntent(changes, intent2.intent);
-  if (matched.stale.length)
-    throw new DevError("Pending intent is stale for the accepted session schema");
+  if (matched.stale.length) {
+    const path = `${PROJECT_PATHS.pending}/intent.yaml`;
+    throw new DevError(`${path} has entries that match no change to the accepted session schema: ${matched.stale.map((item) => JSON.stringify(item)).join(", ")}. Remove them if the change they describe is already in the schema.`);
+  }
   const destructiveWithoutIntent = matched.unexplained.length > 0;
   const deltaSql = applyRenames(rawDelta, intent2.intent);
   const payload = {
