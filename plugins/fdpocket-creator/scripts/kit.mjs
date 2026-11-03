@@ -257606,9 +257606,10 @@ class RepoError extends Error {
 }
 var EXCLUDES = ["node_modules/", "/dist/", ".DS_Store"];
 async function set2(git2, source, key, value2) {
-  await gitOk(git2, source, ["config", key, value2]);
+  await gitOk(git2, source, ["config", "--local", key, value2]);
 }
 async function configureRepo(git2, source, config3, author) {
+  requireRepo(source);
   if (author) {
     await set2(git2, source, "user.name", author.name);
     await set2(git2, source, "user.email", author.email);
