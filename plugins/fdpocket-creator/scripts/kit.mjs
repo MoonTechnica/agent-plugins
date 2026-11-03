@@ -245530,7 +245530,7 @@ var HOST_ONLY_PATHS = new Set([
   "/v1/auth/direct/issue",
   "/v1/connections/requests"
 ]);
-var PROJECT_ALLOW_HEADERS = `authorization, content-type, idempotency-key, range, if-range, ${REQUEST_ID_HEADER}`;
+var PROJECT_ALLOW_HEADERS = `authorization, content-type, idempotency-key, range, if-range, ${REQUEST_ID_HEADER}, ${CONTRACT_HEADER}`;
 var PROJECT_ALLOW_METHODS = "GET, HEAD, POST, PUT, PATCH, DELETE, OPTIONS";
 function createBaseApp(config3, logger, liveOriginAllowed = async () => false) {
   const app = new Hono3;
@@ -245581,7 +245581,7 @@ function createBaseApp(config3, logger, liveOriginAllowed = async () => false) {
     c2.header("Vary", "Origin", { append: true });
     if (c2.req.method === "OPTIONS") {
       c2.header("Access-Control-Allow-Methods", "POST, OPTIONS");
-      c2.header("Access-Control-Allow-Headers", `authorization, content-type, ${REQUEST_ID_HEADER}`);
+      c2.header("Access-Control-Allow-Headers", `authorization, content-type, ${REQUEST_ID_HEADER}, ${CONTRACT_HEADER}`);
       c2.header("Access-Control-Max-Age", "600");
       return c2.body(null, 204);
     }

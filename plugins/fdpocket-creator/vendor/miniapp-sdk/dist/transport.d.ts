@@ -20,13 +20,19 @@ export interface Transport {
     forward(url: string, init?: RequestInit): Promise<Response>;
 }
 /**
+ * Gateway の URL。固定の文字列か、使う時点で引く関数。ブラウザの SDK は成果物に URL を焼き込まず、
+ * Host が渡す `context.gatewayUrl` を接続後に使う（contract-compatibility.md §3.4）。
+ */
+export type GatewayUrl = string | (() => string);
+export declare function gatewayBase(gateway: GatewayUrl): string;
+/**
  * Gateway への送信（sdk.md §3.5）。Project トークンを付け、失敗はすべて `SdkError` にする。
  * - 5xx・届かない（ネットワーク）は本文に関係なく `GATEWAY_UNAVAILABLE`（retryable。フェイルクローズ）
  * - 4xx は Gateway のエラー本文のコードをそのまま（読めなければ status から）
  * - 401 はセッションを捨てる合図（`onUnauthenticated`）。キャッシュで成功を装わない
  */
 export declare function createTransport(options: {
-    gateway: string;
+    gateway: GatewayUrl;
     fetch: typeof globalThis.fetch;
     /** 送る直前のトークン（期限が近ければ更新してから返す。無ければ null） */
     token: () => Promise<string | null>;

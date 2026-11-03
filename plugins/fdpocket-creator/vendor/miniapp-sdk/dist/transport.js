@@ -1,5 +1,8 @@
 import { CONTRACT_HEADER, CONTRACT_VERSION, errorResponse, sdkErrorCodeForStatus, } from '@workspace/project-protocol';
 import { SdkError } from "./errors.js";
+export function gatewayBase(gateway) {
+    return (typeof gateway === 'function' ? gateway() : gateway).replace(/\/+$/, '');
+}
 /**
  * Gateway への送信（sdk.md §3.5）。Project トークンを付け、失敗はすべて `SdkError` にする。
  * - 5xx・届かない（ネットワーク）は本文に関係なく `GATEWAY_UNAVAILABLE`（retryable。フェイルクローズ）
@@ -7,7 +10,7 @@ import { SdkError } from "./errors.js";
  * - 401 はセッションを捨てる合図（`onUnauthenticated`）。キャッシュで成功を装わない
  */
 export function createTransport(options) {
-    const base = options.gateway.replace(/\/+$/, '');
+    const base = () => gatewayBase(options.gateway);
     async function forward(url, init = {}) {
         const token = await options.token();
         if (!token)
@@ -38,7 +41,7 @@ export function createTransport(options) {
     }
     return {
         async send(path, { method = 'GET', body, headers = {} } = {}) {
-            const response = await authorizedFetch(`${base}${path}`, {
+            const response = await authorizedFetch(`${base()}${path}`, {
                 method,
                 headers: {
                     ...headers,

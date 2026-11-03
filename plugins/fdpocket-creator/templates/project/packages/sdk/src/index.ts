@@ -12,6 +12,5 @@ export type * from "./zenstack/models"
 export const client = createClient<SchemaType>({
   projectId: __PROJECT_ID__,
   app: __APP_SLUG__,
-  gateway: __GATEWAY_URL__,
 })
 export type { SeedContext, SeedOperation, SeedPlan, TestIdentity } from "@workspace/miniapp-sdk"

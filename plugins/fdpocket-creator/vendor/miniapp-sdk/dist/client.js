@@ -10,7 +10,7 @@ import { createPython } from "./python/client.js";
 import { createRealtime } from "./realtime/client.js";
 import { createSafety } from "./safety/client.js";
 import { createStorage } from "./storage/client.js";
-import { createTransport, readResponse } from "./transport.js";
+import { createTransport, gatewayBase, readResponse } from "./transport.js";
 import { createUiBridge } from "./ui/client.js";
 import { createWorkspaces } from "./workspaces/client.js";
 /** 期限のこれだけ前に更新する */
@@ -23,7 +23,14 @@ const HOST_TIMEOUT_MS = 10_000;
  */
 export function createClient(options) {
     const fetchImpl = options.fetch ?? globalThis.fetch.bind(globalThis);
-    const base = options.gateway.replace(/\/+$/, '');
+    /** Host が接続時に渡した Gateway の URL（`options.gateway` があればそれが優先） */
+    let hostGateway = null;
+    const gateway = () => {
+        const url = options.gateway ?? hostGateway;
+        if (!url)
+            throw new SdkError('HOST_UNAVAILABLE', 'gateway url is not known before the host connects');
+        return url;
+    };
     const listeners = new Set();
     let held = null;
     let timer;
@@ -63,7 +70,7 @@ export function createClient(options) {
                 throw new SdkError('UNAUTHENTICATED', 'no project session');
             let response;
             try {
-                response = await fetchImpl(`${base}/v1/token/refresh`, {
+                response = await fetchImpl(`${gatewayBase(gateway)}/v1/token/refresh`, {
                     method: 'POST',
                     headers: { authorization: `Bearer ${current.token}` },
                 });
@@ -167,6 +174,7 @@ export function createClient(options) {
                                     bridge.detach();
                                     connected.close();
                                 };
+                                hostGateway = context.data.gatewayUrl;
                                 set(next);
                                 resolve(next.session);
                             }
@@ -213,7 +221,7 @@ export function createClient(options) {
                 return;
             let response;
             try {
-                response = await fetchImpl(`${base}/v1/token/revoke`, {
+                response = await fetchImpl(`${gatewayBase(gateway)}/v1/token/revoke`, {
                     method: 'POST',
                     headers: { authorization: `Bearer ${current.token}` },
                 });
@@ -229,7 +237,7 @@ export function createClient(options) {
     };
     // 期限を過ぎたトークンは送らずに更新を試みる。401 はセッションを捨てる
     const transport = createTransport({
-        gateway: base,
+        gateway,
         fetch: fetchImpl,
         token: async () => {
             if (!held)
@@ -240,7 +248,7 @@ export function createClient(options) {
         },
         onUnauthenticated: () => set(null),
     });
-    const realtime = createRealtime(transport, base, options.webSocket);
+    const realtime = createRealtime(transport, gateway, options.webSocket);
     listeners.add((session) => {
         if (!session)
             void realtime.removeAllChannels();
@@ -258,14 +266,16 @@ export function createClient(options) {
         idempotent: (key) => ({
             db: createDbClient(transport, { idempotencyKey: key }),
         }),
-        storage: createStorage(transport, fetchImpl, base),
+        storage: createStorage(transport, fetchImpl, gateway),
         ui: bridge.ui,
         safety: createSafety(transport, bridge),
         notifications: createNotifications(transport, bridge),
         workspaces: createWorkspaces(transport),
-        ai: createAi(transport, base),
+        ai: createAi(transport, gateway),
         python: createPython(transport),
-        gateway: base,
+        get gateway() {
+            return gatewayBase(gateway);
+        },
         fetch: transport.fetch,
     };
 }

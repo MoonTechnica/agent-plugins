@@ -1,5 +1,5 @@
 import { type FileVisibility, type Open, type StorageDeleteResponse as ProtocolStorageDeleteResponse, type StorageDownloadResponse as ProtocolStorageDownloadResponse, type StorageFile as ProtocolStorageFile } from '@workspace/project-protocol';
-import type { Transport } from '../transport.ts';
+import { type GatewayUrl, type Transport } from '../transport.ts';
 /** 読む側の StorageFile: 後から足された status・visibility の値も入りうる */
 type StorageFile = Open<ProtocolStorageFile>;
 type StorageDeleteResponse = Open<ProtocolStorageDeleteResponse>;
@@ -41,5 +41,5 @@ export interface Storage {
  * `client.storage`（sdk.md §3.3・storage.md §4）。本体は App と R2 の間を直接通り、
  * proxyバケットの取得はGatewayが毎回認可して中継する。PUTにはトークンを付けない（署名URLが権限）。
  */
-export declare function createStorage(transport: Transport, fetchImpl: typeof globalThis.fetch, gateway: string): Storage;
+export declare function createStorage(transport: Transport, fetchImpl: typeof globalThis.fetch, gateway: GatewayUrl): Storage;
 export {};

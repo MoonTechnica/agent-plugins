@@ -15,10 +15,18 @@ import { createContext, createElement, useContext, useMemo, useSyncExternalStore
  * `$transaction` のフックは型に出るが Gateway が受けない（sdk.md §3.2）。
  */
 export { getQueryKey, useClientQueries, useModelQueries, } from '@zenstackhq/tanstack-query/react';
+/** 接続前の endpoint の仮の頭。fetch が実際の Gateway の URL に置き換える */
+const DEFERRED_GATEWAY = 'https://gateway.deferred.invalid';
 const ProjectContext = createContext(null);
 export function ProjectProvider(props) {
     const { client, queryClient, children } = props;
-    const settings = useMemo(() => ({ endpoint: `${client.gateway}/v1/db`, fetch: client.fetch }), [client]);
+    // Gateway の URL は接続後に Host から届く。描画の時点では引かず、送る時に差し替える
+    const settings = useMemo(() => ({
+        endpoint: `${DEFERRED_GATEWAY}/v1/db`,
+        fetch: ((input, init) => client.fetch(input.startsWith(DEFERRED_GATEWAY)
+            ? `${client.gateway}${input.slice(DEFERRED_GATEWAY.length)}`
+            : input, init)),
+    }), [client]);
     return createElement(ProjectContext.Provider, { value: client }, createElement(QueryClientProvider, { client: queryClient }, createElement(QuerySettingsProvider, { value: settings }, children)));
 }
 /** Provider の client（`auth` / `storage` / `ui`） */

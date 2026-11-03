@@ -27,8 +27,11 @@ export interface ClientOptions {
     projectId: string;
     /** この App の slug。トークンの `app` と一致しなければ `TOKEN_SCOPE_MISMATCH` */
     app: string;
-    /** Gateway の URL（区画ごと。環境はトークンが持つ） */
-    gateway: string;
+    /**
+     * Gateway の URL（テスト・手元用）。省略すると、Host が渡す `context.gatewayUrl` を使う
+     * （成果物に URL を焼き込まず、Gateway を移しても公開済みのアプリが動く）。
+     */
+    gateway?: string;
     fetch?: typeof globalThis.fetch;
     webSocket?: RealtimeSocketFactory;
     window?: HostWindow;

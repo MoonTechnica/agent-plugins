@@ -1,8 +1,7 @@
 import { aiResetResponse, aiTurnEvent, aiTurnRequestSchema, aiTurnResult, } from '@workspace/project-protocol';
 import { SdkError } from "../errors.js";
-import { readResponse } from "../transport.js";
+import { gatewayBase, readResponse } from "../transport.js";
 export function createAi(transport, gateway) {
-    const base = gateway.replace(/\/+$/, '');
     return {
         async chat({ onToken, signal, ...input }) {
             const parsed = aiTurnRequestSchema.safeParse({ ...input, stream: onToken !== undefined });
@@ -10,7 +9,7 @@ export function createAi(transport, gateway) {
                 throw new SdkError('VALIDATION_FAILED', 'invalid ai.chat input');
             let response;
             try {
-                response = await transport.fetch(`${base}/v1/ai/turns`, {
+                response = await transport.fetch(`${gatewayBase(gateway)}/v1/ai/turns`, {
                     method: 'POST',
                     headers: { 'content-type': 'application/json' },
                     body: JSON.stringify(parsed.data),
@@ -39,7 +38,7 @@ export function createAi(transport, gateway) {
         },
         openai() {
             return {
-                baseURL: `${base}/v1/ai/openai`,
+                baseURL: `${gatewayBase(gateway)}/v1/ai/openai`,
                 apiKey: 'fdpocket',
                 // OpenAI SDK・AI SDK・LangChain は (URL 文字列, init) で呼ぶ
                 fetch: (input, init) => transport.forward(input instanceof Request ? input.url : String(input), init),

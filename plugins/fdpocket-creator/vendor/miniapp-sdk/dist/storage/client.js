@@ -1,6 +1,7 @@
 import { multipartPartLength, STORAGE_FILE_MAX_BYTES, STORAGE_MULTIPART_PART_BYTES, STORAGE_MULTIPART_SIGN_MAX_PARTS, sdkErrorCodeForStatus, storageBeginResponse, storageCompleteResponse, storageDeleteResponse, storageDownloadResponse, storageSignPartsResponse, } from '@workspace/project-protocol';
 import { createDbClient } from "../db/client.js";
 import { SdkError } from "../errors.js";
+import { gatewayBase } from "../transport.js";
 /** complete を送る回数の上限（応答が届かなかったときの送り直し。Gateway の complete は冪等） */
 const COMPLETE_ATTEMPTS = 3;
 /** Multipart の同時に送る part 数と、1 part を送る回数の上限（storage.md §4.4） */
@@ -77,7 +78,7 @@ export function createStorage(transport, fetchImpl, gateway) {
                     return {
                         ...response,
                         url: response.url.startsWith('/')
-                            ? `${gateway.replace(/\/+$/, '')}${response.url}`
+                            ? `${gatewayBase(gateway)}${response.url}`
                             : response.url,
                     };
                 },

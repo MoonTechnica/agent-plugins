@@ -1,6 +1,7 @@
 import { CONTRACT_VERSION, REALTIME_LIMITS, realtimeJoinSchema, sdkErrorCode, } from '@workspace/project-protocol';
 import { deserialize } from '@zenstackhq/client-helpers/fetch';
 import { SdkError } from "../errors.js";
+import { gatewayBase } from "../transport.js";
 const error = (message) => new SdkError('GATEWAY_UNAVAILABLE', message, { retryable: true });
 function decodeRealtime(input) {
     if (!input || typeof input !== 'object' || !('meta' in input))
@@ -139,11 +140,11 @@ export function createRealtime(transport, gateway, socketFactory = (url) => new 
                         typeof result.socketUrl !== 'string')
                         throw error('invalid realtime ticket response');
                     const url = new URL(result.socketUrl);
-                    const expected = new URL(gateway);
+                    const expected = new URL(gatewayBase(gateway));
                     expected.protocol = expected.protocol === 'https:' ? 'wss:' : 'ws:';
                     if (url.origin !== expected.origin ||
                         url.pathname !==
-                            `${new URL(gateway).pathname.replace(/\/+$/, '')}/v1/realtime/socket` ||
+                            `${new URL(gatewayBase(gateway)).pathname.replace(/\/+$/, '')}/v1/realtime/socket` ||
                         url.username ||
                         url.password ||
                         url.hash ||

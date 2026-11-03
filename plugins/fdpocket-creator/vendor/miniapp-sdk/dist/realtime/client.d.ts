@@ -1,5 +1,5 @@
 import { type RealtimeChange, type RealtimeSubscription } from '@workspace/project-protocol';
-import type { Transport } from '../transport.ts';
+import { type GatewayUrl, type Transport } from '../transport.ts';
 export type RealtimeStatus = 'SUBSCRIBED' | 'TIMED_OUT' | 'CLOSED' | 'CHANNEL_ERROR';
 export type ChangeFilter = RealtimeSubscription;
 export interface ChannelOptions {
@@ -54,6 +54,6 @@ export interface Realtime {
     removeAllChannels(): Promise<'ok'[]>;
 }
 /** One socket per authorized room; ephemeral commands are never replayed after disconnect. */
-export declare function createRealtime(transport: Transport, gateway: string, socketFactory?: RealtimeSocketFactory): Realtime & {
+export declare function createRealtime(transport: Transport, gateway: GatewayUrl, socketFactory?: RealtimeSocketFactory): Realtime & {
     reauthenticate(): void;
 };

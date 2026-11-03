@@ -47,7 +47,7 @@ App は別の App を import しない（共有するコードは `packages/` �
 `kit new` がこの形を作る。App の `vite.config.ts` は `createAppConfig('<slug>', import.meta.dirname)`
 （`@workspace/miniapp-sdk/vite`）を呼ぶだけにする。配信の場所・出力（Project の根の `dist/<slug>/`）・
 TanStack Router / React / Tailwind のプラグイン・`kit dev` のポート（`APP_DEV_PORTS`: web 5173 / admin 5174）・
-ビルド時の定数（`__PROJECT_ID__` / `__APP_SLUG__` / `__GATEWAY_URL__`）を決める。定数の値は `kit build` / `kit dev` が渡す。
+ビルド時の定数（`__PROJECT_ID__` / `__APP_SLUG__`）を決める。定数の値は `kit build` / `kit dev` が渡す。Gateway の URL は成果物に焼き込まず、`createClient` が Host の `context.gatewayUrl` から受け取る（契約の互換性。`contract-compatibility.md` §3.4）。
 
 ## 2. `infra/project.yaml`
 
