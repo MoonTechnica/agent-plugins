@@ -1,5 +1,5 @@
 import { z } from 'zod';
-import { testIdentitySlotSchema, tokenExchangeResponseSchema } from "./token.js";
+import { testIdentitySlotSchema, tokenExchangeResponse } from "./token.js";
 export const LIVE_HOST_BRIDGE_VERSION = 1;
 export const liveHostNonceSchema = z.string().regex(/^[a-f0-9]{32}$/);
 export const liveHostInitSchema = z
@@ -39,7 +39,7 @@ export const liveHostExchangeReplySchema = z.discriminatedUnion('ok', [
         app: z.string(),
         testIdentity: testIdentitySlotSchema.nullable(),
         ok: z.literal(true),
-        session: tokenExchangeResponseSchema,
+        session: tokenExchangeResponse.exact,
     })
         .strict(),
     z

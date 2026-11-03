@@ -1,5 +1,6 @@
 import { z } from 'zod';
-import { SDK_ERROR_CODES } from "./errors.js";
+import { contract } from "./contract.js";
+import { sdkErrorCode } from "./errors.js";
 import { AI_INSTRUCTIONS_KEY_PATTERN, AI_SCHEMA_KEY_PATTERN } from "./manifest.js";
 /**
  * ミニアプリ内 AI（`ai.chat`。docs/designs/app-platform/project-ai.md §3・§7）の Gateway との契約。
@@ -52,9 +53,9 @@ export const aiTurnRequestSchema = z.strictObject({
  * （推論するモデルでは推論のトークンも上限に含まれる）。tool_calls 等は `other`
  */
 export const AI_FINISH_REASONS = ['stop', 'length', 'content_filter', 'other'];
-export const aiTurnResultSchema = z.strictObject({
+export const aiTurnResult = contract((o) => o.object({
     text: z.string(),
-    finishReason: z.enum(AI_FINISH_REASONS),
+    finishReason: o.enum(AI_FINISH_REASONS),
     /** Schema を指定したときの JSON（読めない・`finishReason` が `stop` 以外なら付かない） */
     json: z.unknown().optional(),
     /** このターンで引いたクレジット */
@@ -63,12 +64,12 @@ export const aiTurnResultSchema = z.strictObject({
     responseId: z.string(),
     /** 実際に使われたモデル（Jev Router なら選ばれたモデル） */
     model: z.string(),
-});
+}));
 /** SSE の data（`stream: true`） */
-export const aiTurnEventSchema = z.discriminatedUnion('type', [
-    z.strictObject({ type: z.literal('delta'), text: z.string() }),
-    z.strictObject({ type: z.literal('done'), result: aiTurnResultSchema }),
-    z.strictObject({ type: z.literal('error'), code: z.enum(SDK_ERROR_CODES), message: z.string() }),
-]);
+export const aiTurnEvent = contract((o) => z.discriminatedUnion('type', [
+    o.object({ type: z.literal('delta'), text: z.string() }),
+    o.object({ type: z.literal('done'), result: aiTurnResult.in(o) }),
+    o.object({ type: z.literal('error'), code: sdkErrorCode.in(o), message: z.string() }),
+]));
 /** `POST /v1/ai/conversations/{conversation}/reset` */
-export const aiResetResponseSchema = z.strictObject({ conversation: z.string() });
+export const aiResetResponse = contract((o) => o.object({ conversation: z.string() }));

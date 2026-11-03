@@ -1,7 +1,7 @@
 import { z } from 'zod';
 import { isAppPath } from "./app-path.js";
 import { deliveryResponseSchema } from "./delivery.js";
-import { appSlugSchema, environmentSchema, tokenExchangeResponseSchema } from "./token.js";
+import { appSlugSchema, environmentSchema, tokenExchangeResponse } from "./token.js";
 /** OAuth-shaped handoff credentials are short-lived, target-bound and never platform JWTs. */
 export const DIRECT_AUTH_TTL_SECONDS = 120;
 export const DIRECT_AUTH_START_PATH = '/_platform/auth/start';
@@ -65,9 +65,9 @@ export const directAuthIssueResponseSchema = z.strictObject({
     code: directAuthOpaqueSchema,
     expiresAt: z.iso.datetime(),
 });
-export const directAuthResultSchema = tokenExchangeResponseSchema.extend({
+export const directAuthResultSchema = tokenExchangeResponse.exact.extend({
     delivery: deliveryResponseSchema,
-    deliveryLaunch: tokenExchangeResponseSchema,
+    deliveryLaunch: tokenExchangeResponse.exact,
     path: directAuthPathSchema,
     projectId: z.uuid(),
     app: appSlugSchema,

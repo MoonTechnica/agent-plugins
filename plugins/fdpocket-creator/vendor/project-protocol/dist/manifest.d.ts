@@ -2,6 +2,7 @@ import { z } from 'zod';
 import { type ConnectionCapabilities } from './connections.ts';
 import { type NetworkMock } from './network-mocks.ts';
 import { type NormalizedPythonApp } from './python.ts';
+import { type ContractVersion } from './version.ts';
 /**
  * `infra/project.yaml`（project-runtime.md §2）の正本。
  *
@@ -11,8 +12,6 @@ import { type NormalizedPythonApp } from './python.ts';
  * ZModel にモデルが存在するかの突合は validator（tasks/0428）が行う。
  */
 export declare const PROJECT_MANIFEST_VERSION = 1;
-/** API 契約の版（sdk.md §9） */
-export declare const PROJECT_SDK_VERSION = 3;
 /** App の slug（URL のパス・トークンの `app` claim） */
 export declare const APP_SLUG_PATTERN: RegExp;
 /** 論理バケット名（R2 の prefix に入る） */
@@ -620,7 +619,7 @@ export type NormalizedNotificationTrigger = z.infer<typeof normalizedNotificatio
 export interface NormalizedProjectManifest {
     realtime?: import('./realtime.ts').RealtimeManifest;
     version: typeof PROJECT_MANIFEST_VERSION;
-    sdkVersion: typeof PROJECT_SDK_VERSION;
+    sdkVersion: ContractVersion;
     apps: Record<string, NormalizedProjectApp>;
     buckets: Record<string, NormalizedBucket>;
     roles: Record<string, string[]>;

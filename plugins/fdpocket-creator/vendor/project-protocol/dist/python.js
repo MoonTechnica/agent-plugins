@@ -1,4 +1,5 @@
 import { z } from 'zod';
+import { contract } from "./contract.js";
 /**
  * `kind: python` の App（python-backend.md §3）。GPU の AI 処理を Platform の Modal の Sandbox で動かす。
  * 値の範囲は Modal の上限（Sandbox の timeout は最大 24 時間・GPU は 1 container に 8 枚まで。A10 は 4 枚）と、
@@ -166,34 +167,36 @@ export const pythonRunRequestSchema = z.strictObject({
 export const pythonRunAcceptedSchema = z.object({ runId: z.uuid(), status: z.string() });
 /** 実行の id（`python.get(runId)` の引数） */
 export const pythonRunIdSchema = z.uuid();
-export const pythonRunSchema = z.strictObject({
+export const pythonRun = contract((o) => o.object({
     runId: z.uuid(),
     app: z.string(),
     task: z.string(),
-    status: z.enum(PYTHON_RUN_STATUSES),
+    status: o.enum(PYTHON_RUN_STATUSES),
     progress: z.number().min(0).max(1).nullable(),
     progressMessage: z.string().nullable(),
     /** succeeded のときだけ */
     output: z.unknown().optional(),
     /** 失敗・停止・キャンセル・時間切れのとき（`code` は例外の型か理由） */
-    error: z.strictObject({ code: z.string(), message: z.string().nullable() }).nullable().optional(),
+    error: o.object({ code: z.string(), message: z.string().nullable() }).nullable().optional(),
     createdAt: z.string(),
     startedAt: z.string().nullable(),
     finishedAt: z.string().nullable(),
-});
+}));
 /**
  * タスクの `onFinish` で jobs に届くジョブの `payload`（Platform が登録する。python-backend.md §4.2）。
  * 出力は載せない（1 MiB まであり、ジョブの payload は 64 KiB まで）。`python.get(runId)` で読む
  */
-export const pythonRunFinishedSchema = z.strictObject({
+export const pythonRunFinished = contract((o) => o.invariant(o.object({
     runId: z.uuid(),
     app: z.string(),
     task: z.string(),
-    status: z
-        .enum(PYTHON_RUN_STATUSES)
-        .refine((status) => PYTHON_RUN_FINAL_STATUSES.includes(status)),
-    error: z.strictObject({ code: z.string(), message: z.string().nullable() }).nullable(),
-});
+    status: o.enum(PYTHON_RUN_STATUSES),
+    error: o.object({ code: z.string(), message: z.string().nullable() }).nullable(),
+}), (value, ctx) => {
+    // 終わった状態だけが onFinish に届く。送る側（Platform）が守る
+    if (!PYTHON_RUN_FINAL_STATUSES.includes(value.status))
+        ctx.addIssue({ code: 'custom', path: ['status'], message: 'run is not finished' });
+}));
 /** ランナー（Sandbox の中）の資格情報。実行ごとの乱数で、Platform は SHA-256 の hex だけを持つ */
 export const PYTHON_RUN_TOKEN_PATTERN = /^prt_[A-Za-z0-9_-]{43}$/;
 export async function pythonRunTokenHash(token) {

@@ -1,4 +1,5 @@
 import { z } from 'zod';
+import { contract } from "./contract.js";
 import { PROJECT_TOKEN_TTL_SECONDS } from "./limits.js";
 import { APP_ACCESSES, APP_KINDS, APP_SLUG_PATTERN, localizedNameSchema } from "./manifest.js";
 /**
@@ -17,11 +18,12 @@ export const appSlugSchema = z.string().regex(APP_SLUG_PATTERN);
 export const PROJECT_TOKEN_ISSUER = 'project-gateway';
 /**
  * Gateway が発行する Project アクセストークンの claims（gateway.md §3.2）。
- * strict なので Supabase JWT の claim（`role` 等）が混ざったトークンは受け付けない。
+ * Gateway は自分が署名したものを `exact` で読み返す（Supabase JWT の claim が混ざったトークンは通らない）。
+ * SDK は `wire` で読み、`aud` / `app` だけを見る（寿命の上限は発行側の不変条件）。
  * Permission はトークンに入れない（判定は毎回 DB）。
  */
-export const projectTokenClaimsSchema = z
-    .strictObject({
+export const projectTokenClaims = contract((o) => o.invariant(o
+    .object({
     iss: z.literal(PROJECT_TOKEN_ISSUER),
     /** Project 内の User.id。サービストークンは `service:{projectId}:{app}`（P1） */
     sub: z.string().min(1).max(255),
@@ -29,7 +31,9 @@ export const projectTokenClaimsSchema = z
     gid: z.string().min(1).max(512),
     aud: z.uuid(),
     app: appSlugSchema,
-    env: environmentSchema,
+    env: o.enum(ENVIRONMENTS),
+    /** 成果物が焼き込んだ契約番号（contract-compatibility.md §3.2） */
+    cv: z.int().min(1),
     /** Concrete physical environment, including main and prod. */
     envId: z.uuid(),
     /** Real Platform principal; gid may be a session-local synthetic identity. */
@@ -68,11 +72,12 @@ export const projectTokenClaimsSchema = z
             path: ['testGrantId'],
             message: 'grant requires a session test identity',
         });
+}), (c, ctx) => {
     const ttl = c.exp - c.iat;
     if (ttl <= 0 || ttl > PROJECT_TOKEN_TTL_SECONDS) {
         ctx.addIssue({ code: 'custom', path: ['exp'], message: 'token lifetime out of range' });
     }
-});
+}));
 // ---------- サービストークン（api / jobs。gateway.md §3.4・tasks/0478） ----------
 /** サービストークンの寿命（Project トークンと同じ 10 分。SDK が期限の前に取り直す） */
 export const SERVICE_TOKEN_TTL_SECONDS = PROJECT_TOKEN_TTL_SECONDS;
@@ -84,18 +89,20 @@ export const SERVICE_CREDENTIAL_PATTERN = /^psc_[A-Za-z0-9_-]{43}$/;
 export const SERVICE_CREDENTIAL_BINDING = 'PLATFORM_SERVICE_CREDENTIAL';
 /**
  * サービストークンの claims。`typ: service` と `cid`（資格情報の ID）を持ち、`gid` / `anon` を持たない。
- * Project トークンの schema（strict）とは互いに通らないので、利用者のルートにサービストークンを出しても
+ * Project トークンの `exact` とは互いに通らないので、利用者のルートにサービストークンを出しても
  * `UNAUTHENTICATED` になる（サービストークンだけで利用者のデータは読めない。`X-Act-As` が要る）。
  */
-export const serviceTokenClaimsSchema = z
-    .strictObject({
+export const serviceTokenClaims = contract((o) => o.invariant(o
+    .object({
     iss: z.literal(PROJECT_TOKEN_ISSUER),
     typ: z.literal('service'),
     /** `service:{projectId}:{app}` */
     sub: z.string().min(1).max(255),
     aud: z.uuid(),
     app: appSlugSchema,
-    env: environmentSchema,
+    env: o.enum(ENVIRONMENTS),
+    /** 成果物が焼き込んだ契約番号（contract-compatibility.md §3.2） */
+    cv: z.int().min(1),
     envId: z.uuid(),
     cid: z.uuid(),
     /** 発行時の写し。認可には現在の manifest を照会する。 */
@@ -106,33 +113,40 @@ export const serviceTokenClaimsSchema = z
 })
     .superRefine((c, ctx) => {
     if (c.sub !== `service:${c.aud}:${c.app}`) {
-        ctx.addIssue({ code: 'custom', path: ['sub'], message: 'sub must be service:{aud}:{app}' });
+        ctx.addIssue({
+            code: 'custom',
+            path: ['sub'],
+            message: 'sub must be service:{aud}:{app}',
+        });
     }
+}), (c, ctx) => {
     const ttl = c.exp - c.iat;
     if (ttl <= 0 || ttl > SERVICE_TOKEN_TTL_SECONDS) {
         ctx.addIssue({ code: 'custom', path: ['exp'], message: 'token lifetime out of range' });
     }
-});
+}));
 /** `POST /v1/token/service` の応答（Authorization は資格情報） */
-export const serviceTokenResponseSchema = z.strictObject({
+export const serviceTokenResponse = contract((o) => o.object({
     token: z.string().min(1),
     expiresAt: z.iso.datetime(),
-});
-/** `gateway_service_credential` の結果（使えない資格情報は null） */
+}));
+/** `gateway_service_credential` の結果（使えない資格情報は null）。Platform の内側（Supabase → Gateway） */
 export const serviceCredentialSchema = z.strictObject({
     credentialId: z.uuid(),
     projectId: z.uuid(),
     environment: environmentSchema,
     environmentId: z.uuid(),
+    /** 配備した版の契約番号（サービストークンの cv）。配備前の資格情報は null */
+    contract: z.int().min(1).nullable(),
     appSlug: appSlugSchema,
     servicePermissions: z.array(z.string()),
 });
 /** `POST /v1/token/exchange` の本文（Authorization は Supabase の access token） */
-export const tokenExchangeRequestSchema = z
-    .strictObject({
+export const tokenExchangeRequest = contract((o) => o
+    .object({
     projectId: z.uuid(),
     app: appSlugSchema,
-    environment: environmentSchema,
+    environment: o.enum(ENVIRONMENTS),
     environmentId: z.uuid().optional(),
     testIdentity: testIdentitySlotSchema.optional(),
 })
@@ -149,33 +163,33 @@ export const tokenExchangeRequestSchema = z
             path: ['testIdentity'],
             message: 'test identity requires session',
         });
-});
+}));
 /** 本人が開ける（または一覧に出る）同じ Project の App */
-export const sessionAppSchema = z.strictObject({
+export const sessionApp = contract((o) => o.object({
     slug: appSlugSchema,
-    kind: z.enum(APP_KINDS),
-    access: z.enum(APP_ACCESSES),
+    kind: o.enum(APP_KINDS),
+    access: o.enum(APP_ACCESSES),
     displayName: localizedNameSchema.nullable(),
     /** restricted の App を開ける Permission があるか（Host の「管理画面を開く」の表示判定） */
     canOpen: z.boolean(),
-});
+}));
 /**
  * 現在の主体（sdk.md §3.1）。`permissions` は発行時の写しで、表示の補助にだけ使う。
- * Supabase の JWT は載せない（strict）。
+ * Supabase の JWT は載せない（書く側は `exact` で確かめる）。
  */
-export const sessionSchema = z.strictObject({
+export const session = contract((o) => o.object({
     userId: z.string().min(1),
     globalUserId: z.string().min(1),
     displayName: z.string().nullable(),
     isAnonymous: z.boolean(),
     permissions: z.array(z.string()),
     expiresAt: z.iso.datetime(),
-    apps: z.array(sessionAppSchema),
-});
-export const tokenExchangeResponseSchema = z.strictObject({
+    apps: z.array(sessionApp.in(o)),
+}));
+export const tokenExchangeResponse = contract((o) => o.object({
     token: z.string().min(1),
     expiresAt: z.iso.datetime(),
-    session: sessionSchema,
-});
+    session: session.in(o),
+}));
 /** `GET /v1/me` */
-export const meResponseSchema = sessionSchema;
+export const meResponse = session;

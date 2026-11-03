@@ -1,4 +1,4 @@
-import { aiResetResponseSchema, aiTurnEventSchema, aiTurnRequestSchema, aiTurnResultSchema, } from '@workspace/project-protocol';
+import { aiResetResponse, aiTurnEvent, aiTurnRequestSchema, aiTurnResult, } from '@workspace/project-protocol';
 import { SdkError } from "../errors.js";
 import { readResponse } from "../transport.js";
 export function createAi(transport, gateway) {
@@ -28,7 +28,7 @@ export function createAi(transport, gateway) {
             return readStream(response, onToken, signal);
         },
         async reset(conversation) {
-            const parsed = aiResetResponseSchema.safeParse(await transport.send(`/v1/ai/conversations/${encodeURIComponent(conversation)}/reset`, {
+            const parsed = aiResetResponse.wire.safeParse(await transport.send(`/v1/ai/conversations/${encodeURIComponent(conversation)}/reset`, {
                 method: 'POST',
             }));
             if (!parsed.success) {
@@ -48,7 +48,7 @@ export function createAi(transport, gateway) {
     };
 }
 function resultOf(body) {
-    const parsed = aiTurnResultSchema.safeParse(body);
+    const parsed = aiTurnResult.wire.safeParse(body);
     if (!parsed.success) {
         throw new SdkError('GATEWAY_UNAVAILABLE', 'unexpected ai response', { retryable: true });
     }
@@ -79,8 +79,12 @@ async function readStream(response, onToken, signal) {
                     .join('\n');
                 if (!data)
                     continue;
-                const event = aiTurnEventSchema.safeParse(JSON.parse(data));
+                const raw = JSON.parse(data);
+                const event = aiTurnEvent.wire.safeParse(raw);
                 if (!event.success) {
+                    // 後から足された種類の event は読み飛ばす（読む側は寛容。contract-compatibility.md §2）
+                    if (isLaterEventType(raw))
+                        continue;
                     throw new SdkError('GATEWAY_UNAVAILABLE', 'unexpected ai event', { retryable: true });
                 }
                 if (event.data.type === 'delta')
@@ -108,4 +112,11 @@ async function readStream(response, onToken, signal) {
     throw new SdkError('GATEWAY_UNAVAILABLE', 'ai stream ended without a result', {
         retryable: true,
     });
+}
+const KNOWN_EVENT_TYPES = new Set(['delta', 'done', 'error']);
+/** `type` を持つが、この SDK が知らない種類（壊れた既知の event とは区別する） */
+function isLaterEventType(raw) {
+    if (typeof raw !== 'object' || raw === null || !('type' in raw))
+        return false;
+    return typeof raw.type === 'string' && !KNOWN_EVENT_TYPES.has(raw.type);
 }

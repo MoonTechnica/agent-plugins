@@ -67,7 +67,7 @@ export declare function createServerClient<S extends SchemaDef = SchemaDef>(opti
 }): ServerClient<S>;
 export type { JobCancelResponse, JobDelivery, JobScheduleRequest, JobScheduleResponse, PythonRun, PythonRunFinished, } from '@workspace/project-protocol';
 /** onFinish で届いたジョブの payload を確かめる（python-backend.md §4.2） */
-export { pythonRunFinishedSchema } from '@workspace/project-protocol';
+export { pythonRunFinished } from '@workspace/project-protocol';
 export type { Ai, AiChatInput, OpenAiCompatible } from '../ai/client.ts';
 export { SdkError } from '../errors.ts';
 export type { Python, PythonRunHandle } from '../python/client.ts';

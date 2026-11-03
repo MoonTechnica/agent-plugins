@@ -7,6 +7,7 @@ import { networkMocksSchema } from "./network-mocks.js";
 import { PYTHON_RESERVED_SECRET_PREFIX, PYTHON_SERVER_IDLE_DEFAULT, PYTHON_SERVER_INSTANCES_DEFAULT, PYTHON_SERVER_TARGET_CONCURRENCY_DEFAULT, PYTHON_TASK_NAME_PATTERN, PYTHON_TASK_TIMEOUT_DEFAULT, PYTHON_TASKS_MAX, PYTHON_VERSIONS, pythonComputeSchema, pythonServerSchema, pythonTaskSchema, resolvePythonCompute, } from "./python.js";
 import { realtimeManifestSchema } from "./realtime.js";
 import { validateSchedule } from "./schedules.js";
+import { SUPPORTED_CONTRACTS } from "./version.js";
 /**
  * `infra/project.yaml`（project-runtime.md §2）の正本。
  *
@@ -16,8 +17,6 @@ import { validateSchedule } from "./schedules.js";
  * ZModel にモデルが存在するかの突合は validator（tasks/0428）が行う。
  */
 export const PROJECT_MANIFEST_VERSION = 1;
-/** API 契約の版（sdk.md §9） */
-export const PROJECT_SDK_VERSION = 3;
 /** App の slug（URL のパス・トークンの `app` claim） */
 export const APP_SLUG_PATTERN = /^[a-z][a-z0-9-]{1,31}$/;
 /** 論理バケット名（R2 の prefix に入る） */
@@ -261,7 +260,7 @@ const aiSchema = z.strictObject({
 });
 const baseSchema = z.strictObject({
     version: z.literal(PROJECT_MANIFEST_VERSION),
-    sdkVersion: z.literal(PROJECT_SDK_VERSION),
+    sdkVersion: z.literal([...SUPPORTED_CONTRACTS]),
     apps: z.record(z.string(), appSchema),
     buckets: z.record(z.string(), bucketSchema).optional(),
     roles: z.record(z.string(), uniqueList(permissionSchema)).optional(),

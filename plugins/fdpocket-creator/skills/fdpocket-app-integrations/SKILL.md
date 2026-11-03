@@ -49,7 +49,7 @@ export default {
 登録は api なら `server.asUser(request).jobs.schedule({ app, handler, payload, idempotencyKey, runAt? })`
 （その利用者が払う。`asUser` 無しの `server.jobs.schedule` は払う人がいないので、ジョブから AI・python を使えない）、
 python のタスクの終わりは `project.yaml` の `onFinish`（Platform が登録する。中身は `{ runId, app, task, status, error }` で
-`pythonRunFinishedSchema` で確かめ、出力は `server.forJob(job).python.get(runId)` で読む）、途中からは `ctx.jobs.schedule(...)`
+`pythonRunFinished.wire` で確かめ、出力は `server.forJob(job).python.get(runId)` で読む）、途中からは `ctx.jobs.schedule(...)`
 （`$fdpocket-app-python`）。payload は JSON で 64 KiB まで、`runAt` は 30 日先まで。
 ジョブは main / prod と本人のセッション環境で動く。セッションの schedule は自動の時刻実行ではなく、
 開発者パネルの手動実行で確かめる。利用者・テスト主体の範囲を保ち、セッションの AI・GPU の費用はチャットの持ち主が払う。

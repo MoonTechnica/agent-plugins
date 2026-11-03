@@ -18,6 +18,7 @@ from urllib.parse import quote
 import httpx
 
 from fdpocket._transport import UNREACHABLE, Transport, read
+from fdpocket.contract import CONTRACT_HEADER, CONTRACT_VERSION
 from fdpocket.errors import (
     GATEWAY_UNAVAILABLE,
     NOT_AVAILABLE_IN_DEVELOPMENT,
@@ -83,7 +84,10 @@ class ServiceToken:
         try:
             response = self._http.post(
                 f"{self._base}/v1/token/service",
-                headers={"authorization": f"Bearer {self._credential}"},
+                headers={
+                    "authorization": f"Bearer {self._credential}",
+                    CONTRACT_HEADER: str(CONTRACT_VERSION),
+                },
             )
         except httpx.HTTPError as error:
             raise FdpocketError(GATEWAY_UNAVAILABLE, UNREACHABLE) from error

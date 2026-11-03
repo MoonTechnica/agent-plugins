@@ -1,5 +1,7 @@
-import { type PythonRun } from '@workspace/project-protocol';
+import { type Open, type PythonRun as ProtocolPythonRun } from '@workspace/project-protocol';
 import type { Transport } from '../transport.ts';
+/** 読む側の実行状態。後から足された status も入りうる */
+export type PythonRun = Open<ProtocolPythonRun>;
 /**
  * `client.python`（python-backend.md §4.2）: 同じ Project の python の App のタスク（GPU の AI 処理など）を依頼し、
  * 終わるまで待つ。費用は依頼した本人（画面）・その利用者（api の asUser）・ジョブの払う人（forJob）のクレジット。

@@ -1,12 +1,12 @@
 import { z } from 'zod';
 import { STORAGE_DOWNLOAD_URL_TTL_MAX_SECONDS } from "./limits.js";
-import { PROJECT_TOKEN_ISSUER, projectTokenClaimsSchema } from "./token.js";
+import { PROJECT_TOKEN_ISSUER, projectTokenClaims } from "./token.js";
 /** A file-only signature; never accepted as a Project or service bearer token. */
 export const storageDownloadClaimsSchema = z
     .strictObject({
     iss: z.literal(PROJECT_TOKEN_ISSUER),
     typ: z.literal('storage-download'),
-    project: projectTokenClaimsSchema,
+    project: projectTokenClaims.exact,
     fileId: z.uuid(),
     versionId: z.uuid().nullable(),
     policyVersion: z.string().min(1).optional(),

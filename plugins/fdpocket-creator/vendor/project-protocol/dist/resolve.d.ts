@@ -46,6 +46,7 @@ declare const activeSchema: z.ZodObject<{
         isAnonymous: z.ZodBoolean;
     }, z.core.$strict>>;
     versionId: z.ZodNullable<z.ZodUUID>;
+    contract: z.ZodInt;
     schemaRevision: z.ZodOptional<z.ZodString>;
     schemaKey: z.ZodString;
     schemaVersion: z.ZodString;
@@ -230,6 +231,7 @@ export declare const gatewayResolveResultSchema: z.ZodDiscriminatedUnion<[z.ZodO
         isAnonymous: z.ZodBoolean;
     }, z.core.$strict>>;
     versionId: z.ZodNullable<z.ZodUUID>;
+    contract: z.ZodInt;
     schemaRevision: z.ZodOptional<z.ZodString>;
     schemaKey: z.ZodString;
     schemaVersion: z.ZodString;

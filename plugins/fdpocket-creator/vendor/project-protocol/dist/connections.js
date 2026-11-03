@@ -1,4 +1,5 @@
 import { z } from 'zod';
+import { contract } from "./contract.js";
 /** Platform-managed read integrations. Provider credentials and URLs are never SDK inputs. */
 export const CONNECTION_SERVICES = [
     {
@@ -78,13 +79,13 @@ export const connectionPermissionRequestResultSchema = z.union([
     connectionRequestResultSchema,
     z.object({ grantId: z.uuid(), status: z.literal('approved') }),
 ]);
-export const connectionGrantResultSchema = z.strictObject({ grantId: z.uuid() });
+export const connectionGrantResult = contract((o) => o.object({ grantId: z.uuid() }));
 export const connectionCallSchema = z.strictObject({
     grantId: z.uuid(),
     tool: z.literal(CONNECTION_READ_TOOL),
     input: z.record(z.string(), z.unknown()),
 });
-export const connectionCallResultSchema = z.strictObject({ result: z.unknown() });
+export const connectionCallResult = contract((o) => o.object({ result: z.unknown() }));
 export const connectionScopeSchema = z.strictObject({
     userId: z.uuid(),
     projectId: z.uuid(),

@@ -8,6 +8,7 @@ from typing import Any
 
 import httpx
 
+from fdpocket.contract import CONTRACT_HEADER, CONTRACT_VERSION
 from fdpocket.errors import GATEWAY_UNAVAILABLE, FdpocketError
 
 HTTP_SERVER_ERROR = 500
@@ -54,7 +55,11 @@ class Transport:
         body: object = None,
         params: Mapping[str, str] | None = None,
     ) -> Any:  # noqa: ANN401 - Gateway の JSON をそのまま返す
-        headers = {**self.headers, "authorization": f"Bearer {self.token()}"}
+        headers = {
+            **self.headers,
+            "authorization": f"Bearer {self.token()}",
+            CONTRACT_HEADER: str(CONTRACT_VERSION),
+        }
         try:
             response = self.http.request(
                 method, f"{self.base}{path}", headers=headers, params=params, json=body

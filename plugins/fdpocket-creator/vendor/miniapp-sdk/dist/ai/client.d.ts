@@ -1,4 +1,4 @@
-import { type AiTurnRequest, type AiTurnResult } from '@workspace/project-protocol';
+import { type AiTurnRequest, type Open, type AiTurnResult as ProtocolAiTurnResult } from '@workspace/project-protocol';
 import { type Transport } from '../transport.ts';
 export interface AiChatInput extends Omit<AiTurnRequest, 'stream'> {
     /** 渡すと SSE で受け、届いた分から順に呼ぶ（無ければ完了後にまとめて返す） */
@@ -32,3 +32,5 @@ export interface OpenAiCompatible {
     fetch: (input: RequestInfo | URL, init?: RequestInit) => Promise<Response>;
 }
 export declare function createAi(transport: Transport, gateway: string): Ai;
+/** 読む側の結果。後から足された終わり方も入りうる */
+export type AiTurnResult = Open<ProtocolAiTurnResult>;

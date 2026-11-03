@@ -1,4 +1,4 @@
-import { multipartPartLength, STORAGE_FILE_MAX_BYTES, STORAGE_MULTIPART_PART_BYTES, STORAGE_MULTIPART_SIGN_MAX_PARTS, sdkErrorCodeForStatus, storageBeginResponseSchema, storageCompleteResponseSchema, storageDeleteResponseSchema, storageDownloadResponseSchema, storageSignPartsResponseSchema, } from '@workspace/project-protocol';
+import { multipartPartLength, STORAGE_FILE_MAX_BYTES, STORAGE_MULTIPART_PART_BYTES, STORAGE_MULTIPART_SIGN_MAX_PARTS, sdkErrorCodeForStatus, storageBeginResponse, storageCompleteResponse, storageDeleteResponse, storageDownloadResponse, storageSignPartsResponse, } from '@workspace/project-protocol';
 import { createDbClient } from "../db/client.js";
 import { SdkError } from "../errors.js";
 /** complete を送る回数の上限（応答が届かなかったときの送り直し。Gateway の complete は冪等） */
@@ -40,7 +40,7 @@ export function createStorage(transport, fetchImpl, gateway) {
                         throw new SdkError('PAYLOAD_TOO_LARGE', 'file is larger than the upload limit');
                     }
                     const contentType = mediaType(options.contentType ?? blob.type);
-                    const begun = parse(storageBeginResponseSchema, await transport.send(`/v1/storage/${encodeURIComponent(bucket)}/uploads`, {
+                    const begun = parse(storageBeginResponse.wire, await transport.send(`/v1/storage/${encodeURIComponent(bucket)}/uploads`, {
                         method: 'POST',
                         body: {
                             name,
@@ -60,7 +60,7 @@ export function createStorage(transport, fetchImpl, gateway) {
                     const completeBody = 'multipart' in begun ? { r2UploadId: begun.multipart.r2UploadId } : {};
                     for (let attempt = 1;; attempt++) {
                         try {
-                            const completed = parse(storageCompleteResponseSchema, await transport.send(`/v1/storage/uploads/${encodeURIComponent(begun.uploadId)}/complete`, { method: 'POST', body: completeBody }));
+                            const completed = parse(storageCompleteResponse.wire, await transport.send(`/v1/storage/uploads/${encodeURIComponent(begun.uploadId)}/complete`, { method: 'POST', body: completeBody }));
                             return completed.file;
                         }
                         catch (error) {
@@ -73,7 +73,7 @@ export function createStorage(transport, fetchImpl, gateway) {
                     }
                 },
                 async getDownloadUrl(fileId) {
-                    const response = parse(storageDownloadResponseSchema, await transport.send(`${files}/${encodeURIComponent(fileId)}/download`));
+                    const response = parse(storageDownloadResponse.wire, await transport.send(`${files}/${encodeURIComponent(fileId)}/download`));
                     return {
                         ...response,
                         url: response.url.startsWith('/')
@@ -95,7 +95,7 @@ export function createStorage(transport, fetchImpl, gateway) {
                     };
                 },
                 async remove(fileId) {
-                    return parse(storageDeleteResponseSchema, await transport.send(`${files}/${encodeURIComponent(fileId)}`, { method: 'DELETE' }));
+                    return parse(storageDeleteResponse.wire, await transport.send(`${files}/${encodeURIComponent(fileId)}`, { method: 'DELETE' }));
                 },
             };
         },
@@ -133,7 +133,7 @@ export function createStorage(transport, fetchImpl, gateway) {
                     ? [partNumber]
                     : Array.from({ length: Math.min(STORAGE_MULTIPART_SIGN_MAX_PARTS, partCount - first + 1) }, (_, i) => first + i);
                 pending = (async () => {
-                    const response = parse(storageSignPartsResponseSchema, await transport.send(`${uploads}/parts`, {
+                    const response = parse(storageSignPartsResponse.wire, await transport.send(`${uploads}/parts`, {
                         method: 'POST',
                         body: { r2UploadId, partNumbers: numbers },
                     }));

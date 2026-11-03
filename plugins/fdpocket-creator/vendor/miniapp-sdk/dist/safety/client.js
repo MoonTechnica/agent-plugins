@@ -1,8 +1,8 @@
-import { safetyBlocksResponseSchema } from '@workspace/project-protocol';
+import { safetyBlocksResponse } from '@workspace/project-protocol';
 import { SdkError } from "../errors.js";
 export function createSafety(transport, bridge) {
     const blocks = async (send) => {
-        const parsed = safetyBlocksResponseSchema.safeParse(await send);
+        const parsed = safetyBlocksResponse.wire.safeParse(await send);
         if (!parsed.success) {
             throw new SdkError('GATEWAY_UNAVAILABLE', 'unexpected safety response', { retryable: true });
         }

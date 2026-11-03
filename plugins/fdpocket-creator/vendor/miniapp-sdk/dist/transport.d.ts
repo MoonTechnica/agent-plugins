@@ -1,4 +1,4 @@
-import { type SdkErrorCode } from '@workspace/project-protocol';
+import { type WireSdkErrorCode as SdkErrorCode } from '@workspace/project-protocol';
 export interface SendOptions {
     method?: 'GET' | 'POST' | 'PATCH' | 'PUT' | 'DELETE';
     /** JSON にして送る */

@@ -31938,11 +31938,11 @@ ${lanes.join(`
             cb();
             return false;
           }
-          const session = new inspector.Session;
-          session.connect();
-          session.post("Profiler.enable", () => {
-            session.post("Profiler.start", () => {
-              activeSession = session;
+          const session2 = new inspector.Session;
+          session2.connect();
+          session2.post("Profiler.enable", () => {
+            session2.post("Profiler.start", () => {
+              activeSession = session2;
               profilePath = path;
               cb();
             });
@@ -229253,7 +229253,7 @@ var exports_openapi_Cz9TYzzn = {};
 __export(exports_openapi_Cz9TYzzn, {
   RPCApiSpecGenerator: () => RPCApiSpecGenerator
 });
-function errorResponse(description) {
+function errorResponse2(description) {
   return {
     description,
     content: { [JSON_CT]: { schema: { $ref: "#/components/schemas/_rpcErrorResponse" } } }
@@ -229831,11 +229831,11 @@ var init_openapi_Cz9TYzzn = __esm(() => {
       dataSchema: () => ({ type: "boolean" })
     }
   };
-  ERROR_400 = errorResponse("Error occurred while processing the request");
-  ERROR_403 = errorResponse("Forbidden: insufficient permissions to perform this operation");
-  ERROR_404 = errorResponse("Resource not found");
-  ERROR_422 = errorResponse("Operation is unprocessable due to validation errors");
-  ERROR_500 = errorResponse("Internal server error");
+  ERROR_400 = errorResponse2("Error occurred while processing the request");
+  ERROR_403 = errorResponse2("Forbidden: insufficient permissions to perform this operation");
+  ERROR_404 = errorResponse2("Resource not found");
+  ERROR_422 = errorResponse2("Operation is unprocessable due to validation errors");
+  ERROR_500 = errorResponse2("Internal server error");
   NOT_FOUND_OPERATIONS = new Set(["update", "delete"]);
 });
 
@@ -229894,7 +229894,7 @@ function unmarshalQ(value, meta3) {
   }
   return parsedValue;
 }
-function errorResponse2(description) {
+function errorResponse3(description) {
   return {
     description,
     content: { "application/vnd.api+json": { schema: { $ref: "#/components/schemas/_errorResponse" } } }
@@ -232834,10 +232834,10 @@ var init_api2 = __esm(() => {
     omit: zod_default.record(zod_default.string(), zod_default.record(zod_default.string(), zod_default.boolean())).optional(),
     slicing: slicingSchema.optional()
   });
-  ERROR_4002 = errorResponse2("Error occurred while processing the request");
-  ERROR_4032 = errorResponse2("Forbidden: insufficient permissions to perform this operation");
-  ERROR_4042 = errorResponse2("Resource not found");
-  ERROR_4222 = errorResponse2("Operation is unprocessable due to validation errors");
+  ERROR_4002 = errorResponse3("Error occurred while processing the request");
+  ERROR_4032 = errorResponse3("Forbidden: insufficient permissions to perform this operation");
+  ERROR_4042 = errorResponse3("Resource not found");
+  ERROR_4222 = errorResponse3("Operation is unprocessable due to validation errors");
   SCALAR_STRING_OPS = [
     "$contains",
     "$icontains",
@@ -234716,6 +234716,30 @@ import { pathToFileURL as pathToFileURL6 } from "node:url";
 // frontend/packages/project-protocol/src/ai.ts
 init_zod();
 
+// frontend/packages/project-protocol/src/contract.ts
+init_zod();
+var WIRE = {
+  mode: "wire",
+  object: (shape) => exports_external.object(shape),
+  enum: (_values) => exports_external.string(),
+  invariant: (schema) => schema
+};
+var EXACT = {
+  mode: "exact",
+  object: (shape) => exports_external.strictObject(shape),
+  enum: (values) => exports_external.enum(values),
+  invariant: (schema, check2) => schema.superRefine(check2)
+};
+function contract(build) {
+  const wire = build(WIRE);
+  const exact = build(EXACT);
+  return {
+    wire,
+    exact,
+    in: (shape) => shape.mode === "wire" ? wire : exact
+  };
+}
+
 // frontend/packages/project-protocol/src/errors.ts
 init_zod();
 var SDK_ERROR_CODES = [
@@ -234735,9 +234759,10 @@ var SDK_ERROR_CODES = [
   "HOST_UNAVAILABLE",
   "REALTIME_DISABLED",
   "REALTIME_CAPACITY",
-  "RESYNC_REQUIRED"
+  "RESYNC_REQUIRED",
+  "CONTRACT_UNSUPPORTED"
 ];
-var sdkErrorCodeSchema = exports_external.enum(SDK_ERROR_CODES);
+var sdkErrorCode = contract((o) => o.enum(SDK_ERROR_CODES));
 var HTTP_STATUS_BY_ERROR = {
   UNAUTHENTICATED: 401,
   SESSION_EXPIRED: 401,
@@ -234755,7 +234780,8 @@ var HTTP_STATUS_BY_ERROR = {
   HOST_UNAVAILABLE: 503,
   REALTIME_DISABLED: 403,
   REALTIME_CAPACITY: 429,
-  RESYNC_REQUIRED: 409
+  RESYNC_REQUIRED: 409,
+  CONTRACT_UNSUPPORTED: 426
 };
 var RETRYABLE = new Set([
   "REALTIME_CAPACITY",
@@ -234766,16 +234792,16 @@ var RETRYABLE = new Set([
 function isRetryable(code) {
   return RETRYABLE.has(code);
 }
-var errorResponseSchema = exports_external.strictObject({
-  error: exports_external.strictObject({
-    code: sdkErrorCodeSchema,
+var errorResponse = contract((o) => o.object({
+  error: o.object({
+    code: sdkErrorCode.in(o),
     message: exports_external.string(),
     requestId: exports_external.string().optional(),
     retryable: exports_external.boolean(),
     committed: exports_external.boolean().optional(),
     details: exports_external.unknown().optional()
   })
-});
+}));
 
 // frontend/packages/project-protocol/src/manifest.ts
 init_zod();
@@ -234877,13 +234903,13 @@ var connectionPermissionRequestResultSchema = exports_external.union([
   connectionRequestResultSchema,
   exports_external.object({ grantId: exports_external.uuid(), status: exports_external.literal("approved") })
 ]);
-var connectionGrantResultSchema = exports_external.strictObject({ grantId: exports_external.uuid() });
+var connectionGrantResult = contract((o) => o.object({ grantId: exports_external.uuid() }));
 var connectionCallSchema = exports_external.strictObject({
   grantId: exports_external.uuid(),
   tool: exports_external.literal(CONNECTION_READ_TOOL),
   input: exports_external.record(exports_external.string(), exports_external.unknown())
 });
-var connectionCallResultSchema = exports_external.strictObject({ result: exports_external.unknown() });
+var connectionCallResult = contract((o) => o.object({ result: exports_external.unknown() }));
 var connectionScopeSchema = exports_external.strictObject({
   userId: exports_external.uuid(),
   projectId: exports_external.uuid(),
@@ -235192,26 +235218,29 @@ var pythonRunRequestSchema = exports_external.strictObject({
 });
 var pythonRunAcceptedSchema = exports_external.object({ runId: exports_external.uuid(), status: exports_external.string() });
 var pythonRunIdSchema = exports_external.uuid();
-var pythonRunSchema = exports_external.strictObject({
+var pythonRun = contract((o) => o.object({
   runId: exports_external.uuid(),
   app: exports_external.string(),
   task: exports_external.string(),
-  status: exports_external.enum(PYTHON_RUN_STATUSES),
+  status: o.enum(PYTHON_RUN_STATUSES),
   progress: exports_external.number().min(0).max(1).nullable(),
   progressMessage: exports_external.string().nullable(),
   output: exports_external.unknown().optional(),
-  error: exports_external.strictObject({ code: exports_external.string(), message: exports_external.string().nullable() }).nullable().optional(),
+  error: o.object({ code: exports_external.string(), message: exports_external.string().nullable() }).nullable().optional(),
   createdAt: exports_external.string(),
   startedAt: exports_external.string().nullable(),
   finishedAt: exports_external.string().nullable()
-});
-var pythonRunFinishedSchema = exports_external.strictObject({
+}));
+var pythonRunFinished = contract((o) => o.invariant(o.object({
   runId: exports_external.uuid(),
   app: exports_external.string(),
   task: exports_external.string(),
-  status: exports_external.enum(PYTHON_RUN_STATUSES).refine((status) => PYTHON_RUN_FINAL_STATUSES.includes(status)),
-  error: exports_external.strictObject({ code: exports_external.string(), message: exports_external.string().nullable() }).nullable()
-});
+  status: o.enum(PYTHON_RUN_STATUSES),
+  error: o.object({ code: exports_external.string(), message: exports_external.string().nullable() }).nullable()
+}), (value, ctx) => {
+  if (!PYTHON_RUN_FINAL_STATUSES.includes(value.status))
+    ctx.addIssue({ code: "custom", path: ["status"], message: "run is not finished" });
+}));
 var PYTHON_RUN_TOKEN_PATTERN = /^prt_[A-Za-z0-9_-]{43}$/;
 async function pythonRunTokenHash(token) {
   const digest = await crypto.subtle.digest("SHA-256", new TextEncoder().encode(token));
@@ -235315,7 +235344,7 @@ var realtimeManifestSchema = exports_external.strictObject({
   channels: exports_external.record(name, realtimeChannelSchema).default({})
 });
 var realtimeFrameSchema = exports_external.strictObject({
-  version: exports_external.literal(1),
+  contract: exports_external.int().min(1),
   ref: exports_external.string().min(1).max(64),
   type: exports_external.enum(["authenticate", "broadcast", "track", "untrack", "heartbeat", "leave", "refresh"]),
   payload: exports_external.unknown()
@@ -236130,9 +236159,16 @@ function validateSchedule(expression) {
   }
 }
 
+// frontend/packages/project-protocol/src/version.ts
+var CONTRACT_VERSION = 3;
+var SUPPORTED_CONTRACTS = [3];
+var CONTRACT_HEADER = "x-fdpocket-contract";
+function isSupportedContract(value) {
+  return SUPPORTED_CONTRACTS.includes(value);
+}
+
 // frontend/packages/project-protocol/src/manifest.ts
 var PROJECT_MANIFEST_VERSION = 1;
-var PROJECT_SDK_VERSION = 3;
 var APP_SLUG_PATTERN = /^[a-z][a-z0-9-]{1,31}$/;
 var BUCKET_NAME_PATTERN = /^[a-z][a-z0-9-]{1,31}$/;
 var PERMISSION_PATTERN = /^[a-z]+(\.[a-z_]+)+$/;
@@ -236287,7 +236323,7 @@ var aiSchema = exports_external.strictObject({
 });
 var baseSchema = exports_external.strictObject({
   version: exports_external.literal(PROJECT_MANIFEST_VERSION),
-  sdkVersion: exports_external.literal(PROJECT_SDK_VERSION),
+  sdkVersion: exports_external.literal([...SUPPORTED_CONTRACTS]),
   apps: exports_external.record(exports_external.string(), appSchema),
   buckets: exports_external.record(exports_external.string(), bucketSchema).optional(),
   roles: exports_external.record(exports_external.string(), uniqueList(permissionSchema)).optional(),
@@ -236766,20 +236802,20 @@ var aiTurnRequestSchema = exports_external.strictObject({
   stream: exports_external.boolean().optional()
 });
 var AI_FINISH_REASONS = ["stop", "length", "content_filter", "other"];
-var aiTurnResultSchema = exports_external.strictObject({
+var aiTurnResult = contract((o) => o.object({
   text: exports_external.string(),
-  finishReason: exports_external.enum(AI_FINISH_REASONS),
+  finishReason: o.enum(AI_FINISH_REASONS),
   json: exports_external.unknown().optional(),
   credits: exports_external.number().nonnegative(),
   responseId: exports_external.string(),
   model: exports_external.string()
-});
-var aiTurnEventSchema = exports_external.discriminatedUnion("type", [
-  exports_external.strictObject({ type: exports_external.literal("delta"), text: exports_external.string() }),
-  exports_external.strictObject({ type: exports_external.literal("done"), result: aiTurnResultSchema }),
-  exports_external.strictObject({ type: exports_external.literal("error"), code: exports_external.enum(SDK_ERROR_CODES), message: exports_external.string() })
-]);
-var aiResetResponseSchema = exports_external.strictObject({ conversation: exports_external.string() });
+}));
+var aiTurnEvent = contract((o) => exports_external.discriminatedUnion("type", [
+  o.object({ type: exports_external.literal("delta"), text: exports_external.string() }),
+  o.object({ type: exports_external.literal("done"), result: aiTurnResult.in(o) }),
+  o.object({ type: exports_external.literal("error"), code: sdkErrorCode.in(o), message: exports_external.string() })
+]));
+var aiResetResponse = contract((o) => o.object({ conversation: exports_external.string() }));
 // frontend/packages/project-protocol/src/api-path.ts
 function parseApiPath(pathname) {
   const [, prefix, app, ...parts] = pathname.split("/");
@@ -236964,9 +237000,9 @@ var safetyReportTargetSchema = exports_external.strictObject({
 var safetyBlockRequestSchema = exports_external.strictObject({
   userId: exports_external.string().min(1).max(255)
 });
-var safetyBlocksResponseSchema = exports_external.strictObject({
+var safetyBlocksResponse = contract((o) => o.object({
   userIds: exports_external.array(exports_external.string())
-});
+}));
 
 // frontend/packages/project-protocol/src/token.ts
 init_zod();
@@ -236978,13 +237014,14 @@ function tierOf(environment) {
 var testIdentitySlotSchema = exports_external.string().regex(/^[a-z][a-z0-9_-]{0,31}$/);
 var appSlugSchema = exports_external.string().regex(APP_SLUG_PATTERN);
 var PROJECT_TOKEN_ISSUER = "project-gateway";
-var projectTokenClaimsSchema = exports_external.strictObject({
+var projectTokenClaims = contract((o) => o.invariant(o.object({
   iss: exports_external.literal(PROJECT_TOKEN_ISSUER),
   sub: exports_external.string().min(1).max(255),
   gid: exports_external.string().min(1).max(512),
   aud: exports_external.uuid(),
   app: appSlugSchema,
-  env: environmentSchema,
+  env: o.enum(ENVIRONMENTS),
+  cv: exports_external.int().min(1),
   envId: exports_external.uuid(),
   actorId: exports_external.uuid(),
   testIdentity: testIdentitySlotSchema.optional(),
@@ -237020,22 +237057,24 @@ var projectTokenClaimsSchema = exports_external.strictObject({
       path: ["testGrantId"],
       message: "grant requires a session test identity"
     });
+}), (c, ctx) => {
   const ttl = c.exp - c.iat;
   if (ttl <= 0 || ttl > PROJECT_TOKEN_TTL_SECONDS) {
     ctx.addIssue({ code: "custom", path: ["exp"], message: "token lifetime out of range" });
   }
-});
+}));
 var SERVICE_TOKEN_TTL_SECONDS = PROJECT_TOKEN_TTL_SECONDS;
 var ACT_AS_HEADER = "x-act-as";
 var SERVICE_CREDENTIAL_PATTERN = /^psc_[A-Za-z0-9_-]{43}$/;
 var SERVICE_CREDENTIAL_BINDING = "PLATFORM_SERVICE_CREDENTIAL";
-var serviceTokenClaimsSchema = exports_external.strictObject({
+var serviceTokenClaims = contract((o) => o.invariant(o.object({
   iss: exports_external.literal(PROJECT_TOKEN_ISSUER),
   typ: exports_external.literal("service"),
   sub: exports_external.string().min(1).max(255),
   aud: exports_external.uuid(),
   app: appSlugSchema,
-  env: environmentSchema,
+  env: o.enum(ENVIRONMENTS),
+  cv: exports_external.int().min(1),
   envId: exports_external.uuid(),
   cid: exports_external.uuid(),
   permissions: exports_external.array(exports_external.string()),
@@ -237044,29 +237083,35 @@ var serviceTokenClaimsSchema = exports_external.strictObject({
   exp: exports_external.int().positive()
 }).superRefine((c, ctx) => {
   if (c.sub !== `service:${c.aud}:${c.app}`) {
-    ctx.addIssue({ code: "custom", path: ["sub"], message: "sub must be service:{aud}:{app}" });
+    ctx.addIssue({
+      code: "custom",
+      path: ["sub"],
+      message: "sub must be service:{aud}:{app}"
+    });
   }
+}), (c, ctx) => {
   const ttl = c.exp - c.iat;
   if (ttl <= 0 || ttl > SERVICE_TOKEN_TTL_SECONDS) {
     ctx.addIssue({ code: "custom", path: ["exp"], message: "token lifetime out of range" });
   }
-});
-var serviceTokenResponseSchema = exports_external.strictObject({
+}));
+var serviceTokenResponse = contract((o) => o.object({
   token: exports_external.string().min(1),
   expiresAt: exports_external.iso.datetime()
-});
+}));
 var serviceCredentialSchema = exports_external.strictObject({
   credentialId: exports_external.uuid(),
   projectId: exports_external.uuid(),
   environment: environmentSchema,
   environmentId: exports_external.uuid(),
+  contract: exports_external.int().min(1).nullable(),
   appSlug: appSlugSchema,
   servicePermissions: exports_external.array(exports_external.string())
 });
-var tokenExchangeRequestSchema = exports_external.strictObject({
+var tokenExchangeRequest = contract((o) => o.object({
   projectId: exports_external.uuid(),
   app: appSlugSchema,
-  environment: environmentSchema,
+  environment: o.enum(ENVIRONMENTS),
   environmentId: exports_external.uuid().optional(),
   testIdentity: testIdentitySlotSchema.optional()
 }).superRefine((r, ctx) => {
@@ -237082,65 +237127,68 @@ var tokenExchangeRequestSchema = exports_external.strictObject({
       path: ["testIdentity"],
       message: "test identity requires session"
     });
-});
-var sessionAppSchema = exports_external.strictObject({
+}));
+var sessionApp = contract((o) => o.object({
   slug: appSlugSchema,
-  kind: exports_external.enum(APP_KINDS),
-  access: exports_external.enum(APP_ACCESSES),
+  kind: o.enum(APP_KINDS),
+  access: o.enum(APP_ACCESSES),
   displayName: localizedNameSchema.nullable(),
   canOpen: exports_external.boolean()
-});
-var sessionSchema = exports_external.strictObject({
+}));
+var session = contract((o) => o.object({
   userId: exports_external.string().min(1),
   globalUserId: exports_external.string().min(1),
   displayName: exports_external.string().nullable(),
   isAnonymous: exports_external.boolean(),
   permissions: exports_external.array(exports_external.string()),
   expiresAt: exports_external.iso.datetime(),
-  apps: exports_external.array(sessionAppSchema)
-});
-var tokenExchangeResponseSchema = exports_external.strictObject({
+  apps: exports_external.array(sessionApp.in(o))
+}));
+var tokenExchangeResponse = contract((o) => o.object({
   token: exports_external.string().min(1),
   expiresAt: exports_external.iso.datetime(),
-  session: sessionSchema
-});
+  session: session.in(o)
+}));
 
 // frontend/packages/project-protocol/src/bridge.ts
 var nonceSchema = exports_external.string().length(32);
-var initMessageSchema = exports_external.strictObject({
+var initMessage = contract((o) => o.object({
   type: exports_external.literal("init"),
   nonce: nonceSchema,
   launchId: exports_external.uuid()
-});
-var helloMessageSchema = exports_external.strictObject({
+}));
+var helloMessage = contract((o) => o.object({
   type: exports_external.literal("hello"),
   nonce: nonceSchema,
-  protocolVersion: exports_external.int().min(1),
-  runtimeVersion: exports_external.int().min(1)
-});
-var safeAreaInsetsSchema = exports_external.strictObject({
+  contract: exports_external.int().min(1)
+}));
+var safeAreaInsets = contract((o) => o.object({
   top: exports_external.number().min(0),
   right: exports_external.number().min(0),
   bottom: exports_external.number().min(0),
   left: exports_external.number().min(0)
-});
-var contextMessageSchema = exports_external.strictObject({
-  type: exports_external.literal("context"),
+}));
+var LOCALES = ["ja", "en"];
+var hostContext = contract((o) => o.object({
   token: exports_external.string().min(1),
   expiresAt: exports_external.iso.datetime(),
-  session: sessionSchema,
+  session: session.in(o),
   gatewayUrl: exports_external.url(),
-  host: exports_external.literal("superapp"),
-  locale: exports_external.enum(["ja", "en"]),
-  safeArea: safeAreaInsetsSchema
-});
-var contextUpdateMessageSchema = exports_external.strictObject({
+  locale: o.enum(LOCALES),
+  safeArea: safeAreaInsets.in(o)
+}));
+var contextMessage = contract((o) => o.object({
+  type: exports_external.literal("context"),
+  host: o.enum(["superapp"]),
+  ...hostContext.in(o).shape
+}));
+var contextUpdateMessage = contract((o) => o.object({
   type: exports_external.literal("context_update"),
   token: exports_external.string().min(1).optional(),
   expiresAt: exports_external.iso.datetime().optional(),
-  session: sessionSchema.optional(),
-  safeArea: safeAreaInsetsSchema.optional()
-});
+  session: session.in(o).optional(),
+  safeArea: safeAreaInsets.in(o).optional()
+}));
 var appPathSchema = exports_external.string().max(2048).refine(isAppPath);
 var BRIDGE_OPS = [
   "ui.openShare",
@@ -237153,47 +237201,48 @@ var BRIDGE_OPS = [
   "notifications.openSettings",
   "safety.report"
 ];
-var bridgeOpNameSchema = exports_external.enum(BRIDGE_OPS);
-var BRIDGE_OP_PAYLOAD_SCHEMAS = {
-  "ui.openShare": exports_external.strictObject({ path: appPathSchema, text: exports_external.string().max(280).optional() }),
-  "ui.close": exports_external.undefined(),
-  "ui.navigate": exports_external.strictObject({ app: appSlugSchema, path: appPathSchema }),
-  "ui.openCredits": exports_external.undefined(),
-  "connections.requestPermission": exports_external.strictObject({ provider: connectionServiceSchema }),
-  "notifications.requestPermission": exports_external.strictObject({ reason: exports_external.string().min(1).max(200) }),
-  "notifications.status": exports_external.undefined(),
-  "notifications.openSettings": exports_external.undefined(),
-  "safety.report": exports_external.strictObject({ target: safetyReportTargetSchema })
+var bridgeOpName = contract((o) => o.enum(BRIDGE_OPS));
+var none = contract(() => exports_external.undefined());
+var BRIDGE_OP_PAYLOADS = {
+  "ui.openShare": contract((o) => o.object({ path: appPathSchema, text: exports_external.string().max(280).optional() })),
+  "ui.close": none,
+  "ui.navigate": contract((o) => o.object({ app: appSlugSchema, path: appPathSchema })),
+  "ui.openCredits": none,
+  "connections.requestPermission": contract((o) => o.object({ provider: connectionServiceSchema })),
+  "notifications.requestPermission": contract((o) => o.object({ reason: exports_external.string().min(1).max(200) })),
+  "notifications.status": none,
+  "notifications.openSettings": none,
+  "safety.report": contract((o) => o.object({ target: safetyReportTargetSchema }))
 };
-var bridgeOpMessageSchema = exports_external.strictObject({
+var bridgeOpMessage = contract((o) => o.object({
   type: exports_external.literal("op"),
   requestId: exports_external.uuid(),
-  op: bridgeOpNameSchema,
+  op: exports_external.enum(BRIDGE_OPS),
   payload: exports_external.unknown().optional()
 }).superRefine((message, ctx) => {
-  if (!BRIDGE_OP_PAYLOAD_SCHEMAS[message.op].safeParse(message.payload).success) {
+  if (!BRIDGE_OP_PAYLOADS[message.op].in(o).safeParse(message.payload).success) {
     ctx.addIssue({
       code: "custom",
       path: ["payload"],
       message: `invalid payload for ${message.op}`
     });
   }
-});
-var replyMessageSchema = exports_external.discriminatedUnion("ok", [
-  exports_external.strictObject({
+}));
+var replyMessage = contract((o) => exports_external.discriminatedUnion("ok", [
+  o.object({
     type: exports_external.literal("reply"),
     requestId: exports_external.uuid(),
     ok: exports_external.literal(true),
     result: exports_external.unknown().optional()
   }),
-  exports_external.strictObject({
+  o.object({
     type: exports_external.literal("reply"),
     requestId: exports_external.uuid(),
     ok: exports_external.literal(false),
-    code: sdkErrorCodeSchema,
+    code: sdkErrorCode.in(o),
     retryable: exports_external.boolean()
   })
-]);
+]));
 // frontend/packages/project-protocol/src/csp.ts
 function originOf(value) {
   const url2 = new URL(value);
@@ -237318,9 +237367,9 @@ var directAuthIssueResponseSchema = exports_external.strictObject({
   code: directAuthOpaqueSchema,
   expiresAt: exports_external.iso.datetime()
 });
-var directAuthResultSchema = tokenExchangeResponseSchema.extend({
+var directAuthResultSchema = tokenExchangeResponse.exact.extend({
   delivery: deliveryResponseSchema,
-  deliveryLaunch: tokenExchangeResponseSchema,
+  deliveryLaunch: tokenExchangeResponse.exact,
   path: directAuthPathSchema,
   projectId: exports_external.uuid(),
   app: appSlugSchema
@@ -237352,12 +237401,12 @@ var jobScheduleRequestSchema = exports_external.strictObject({
 }).refine((input) => new TextEncoder().encode(JSON.stringify(input.payload)).length <= 65536, {
   message: "job payload exceeds 64 KiB"
 });
-var jobScheduleResponseSchema = exports_external.strictObject({
+var jobScheduleResponse = contract((o) => o.object({
   id: exports_external.uuid(),
-  status: exports_external.enum(["pending", "running", "done", "failed", "cancelled"])
-});
+  status: o.enum(["pending", "running", "done", "failed", "cancelled"])
+}));
 var jobCancelRequestSchema = exports_external.strictObject({ id: exports_external.uuid() });
-var jobCancelResponseSchema = exports_external.strictObject({ cancelled: exports_external.boolean() });
+var jobCancelResponse = contract((o) => o.object({ cancelled: exports_external.boolean() }));
 var RUN_CONTEXT_HEADER = "x-fdpocket-run";
 // frontend/packages/project-protocol/src/live-bridge.ts
 init_zod();
@@ -237390,7 +237439,7 @@ var liveHostExchangeReplySchema = exports_external.discriminatedUnion("ok", [
     app: exports_external.string(),
     testIdentity: testIdentitySlotSchema.nullable(),
     ok: exports_external.literal(true),
-    session: tokenExchangeResponseSchema
+    session: tokenExchangeResponse.exact
   }).strict(),
   exports_external.object({
     type: exports_external.literal("kit-session-reply"),
@@ -237512,18 +237561,18 @@ function stripLivePrefix(pathname, token) {
 init_zod();
 var NOTIFICATION_STATUSES = ["granted", "denied", "default"];
 var notificationStatusSchema = exports_external.enum(NOTIFICATION_STATUSES);
-var notificationStatusResponseSchema = exports_external.strictObject({
-  status: notificationStatusSchema
-});
+var notificationStatusResponse = contract((o) => o.object({
+  status: o.enum(NOTIFICATION_STATUSES)
+}));
 var notificationSendRequestSchema = exports_external.strictObject({
   template: exports_external.string().regex(/^[a-z][a-z0-9_]{0,63}$/),
   to: exports_external.array(exports_external.string().min(1).max(255)).min(1).max(500),
   params: exports_external.record(exports_external.string().max(64), exports_external.union([exports_external.string().max(4096), exports_external.number().finite(), exports_external.boolean()])),
   dedupeKey: exports_external.string().regex(/^[A-Za-z0-9._:-]{1,128}$/).optional()
 });
-var notificationSendResponseSchema = exports_external.strictObject({
+var notificationSendResponse = contract((o) => o.object({
   recipients: exports_external.int().nonnegative()
-});
+}));
 // frontend/packages/project-protocol/src/origin.ts
 init_zod();
 var ORIGIN_HOST_PATTERN = /^[a-z0-9]+(?:-[a-z0-9]+)*-[0-9a-f]{10}(?:--(?:main|s-[0-9a-f]{12}))?$/;
@@ -237600,12 +237649,12 @@ function isWorkerStorageScope(worker, value) {
   if (typeof value !== "object" || value === null)
     return false;
   const actual = value;
-  const session = /^p-s-([0-9a-f]{12})-/.exec(worker);
-  if (session && isUserWorkerName(worker)) {
+  const session2 = /^p-s-([0-9a-f]{12})-/.exec(worker);
+  if (session2 && isUserWorkerName(worker)) {
     if (actual.tier !== "dev" || typeof actual.namespace !== "string")
       return false;
     const scope = new RegExp(`^projects/(${UUID})/environments/(${UUID})$`).exec(actual.namespace);
-    return scope !== null && scope[2].replaceAll("-", "").slice(0, 12) === session[1];
+    return scope !== null && scope[2].replaceAll("-", "").slice(0, 12) === session2[1];
   }
   const expected = workerStorageScope(worker);
   return expected !== null && expected.namespace === actual.namespace && expected.tier === actual.tier;
@@ -237686,11 +237735,11 @@ function isWorkerOutboundPolicy(worker, value) {
 }
 // frontend/packages/project-protocol/src/profile.ts
 init_zod();
-var platformProfileSchema = exports_external.strictObject({
+var platformProfile = contract((o) => o.object({
   displayName: exports_external.string().nullable(),
   avatarUrl: exports_external.url().nullable()
-});
-var platformProfileResponseSchema = platformProfileSchema.nullable();
+}));
+var platformProfileResponse = contract((o) => platformProfile.in(o).nullable());
 // frontend/packages/project-protocol/src/resolve.ts
 init_zod();
 var RESOLVE_STATUSES = [
@@ -237736,6 +237785,7 @@ var activeSchema = exports_external.strictObject({
     isAnonymous: exports_external.boolean()
   }).nullable(),
   versionId: exports_external.uuid().nullable(),
+  contract: exports_external.int().min(1),
   schemaRevision: exports_external.string().regex(/^[a-f0-9]{64}$/).optional(),
   schemaKey: exports_external.string().min(1),
   schemaVersion: exports_external.string().min(1),
@@ -238084,7 +238134,7 @@ init_zod();
 var storageDownloadClaimsSchema = exports_external.strictObject({
   iss: exports_external.literal(PROJECT_TOKEN_ISSUER),
   typ: exports_external.literal("storage-download"),
-  project: projectTokenClaimsSchema,
+  project: projectTokenClaims.exact,
   fileId: exports_external.uuid(),
   versionId: exports_external.uuid().nullable(),
   policyVersion: exports_external.string().min(1).optional(),
@@ -238129,69 +238179,60 @@ function multipartPartLength(size, partNumber) {
 }
 var r2UploadIdSchema = exports_external.string().regex(/^[A-Za-z0-9_\-.~+/=]{1,1024}$/);
 var beginBase = { uploadId: exports_external.uuid(), fileId: exports_external.uuid(), expiresAt: isoSchema };
-var storageSinglePutBeginResponseSchema = exports_external.strictObject({
+var storageSinglePutBeginResponse = contract((o) => o.object({
   ...beginBase,
   url: exports_external.url(),
-  headers: exports_external.strictObject({ "Content-Type": exports_external.string(), "Content-Length": exports_external.string() })
-});
-var storageMultipartBeginResponseSchema = exports_external.strictObject({
+  headers: o.object({ "Content-Type": exports_external.string(), "Content-Length": exports_external.string() })
+}));
+var storageMultipartBeginResponse = contract((o) => o.object({
   ...beginBase,
-  multipart: exports_external.strictObject({
+  multipart: o.invariant(o.object({
     r2UploadId: r2UploadIdSchema,
-    partSize: exports_external.literal(STORAGE_MULTIPART_PART_BYTES),
+    partSize: exports_external.int().positive(),
     partCount: exports_external.int().min(2).max(1e4)
+  }), (value, ctx) => {
+    if (value.partSize !== STORAGE_MULTIPART_PART_BYTES)
+      ctx.addIssue({ code: "custom", path: ["partSize"], message: "unexpected part size" });
   })
-});
-var storageBeginResponseSchema = exports_external.union([
-  storageSinglePutBeginResponseSchema,
-  storageMultipartBeginResponseSchema
-]);
+}));
+var storageBeginResponse = contract((o) => exports_external.union([storageSinglePutBeginResponse.in(o), storageMultipartBeginResponse.in(o)]));
 var storageSignPartsRequestSchema = exports_external.strictObject({
   r2UploadId: r2UploadIdSchema,
   partNumbers: exports_external.array(exports_external.int().min(1).max(1e4)).min(1).max(STORAGE_MULTIPART_SIGN_MAX_PARTS).refine((numbers) => new Set(numbers).size === numbers.length, "duplicate part number")
 });
-var storageSignPartsResponseSchema = exports_external.strictObject({
-  parts: exports_external.array(exports_external.strictObject({
+var storageSignPartsResponse = contract((o) => o.object({
+  parts: exports_external.array(o.object({
     partNumber: exports_external.int().min(1).max(1e4),
     url: exports_external.url(),
-    headers: exports_external.strictObject({ "Content-Length": exports_external.string() })
+    headers: o.object({ "Content-Length": exports_external.string() })
   })),
   expiresAt: isoSchema
-});
+}));
 var storageCompleteRequestSchema = exports_external.strictObject({
   checksum: exports_external.strictObject({ sha256: exports_external.string().regex(/^[0-9a-f]{64}$/) }).optional(),
   r2UploadId: r2UploadIdSchema.optional()
 });
 var storageAbortRequestSchema = exports_external.strictObject({ r2UploadId: r2UploadIdSchema });
-var storageAbortResponseSchema = exports_external.strictObject({
-  uploadId: exports_external.uuid(),
-  status: exports_external.literal("failed")
-});
-var storageFileSchema = exports_external.strictObject({
+var storageAbortResponse = contract((o) => o.object({ uploadId: exports_external.uuid(), status: o.enum(["failed"]) }));
+var storageFile = contract((o) => o.object({
   id: exports_external.uuid(),
   bucket: exports_external.string().min(1),
   ownerId: exports_external.string().min(1),
   workspaceId: exports_external.string().nullable(),
-  visibility: fileVisibilitySchema,
-  status: exports_external.enum(STORAGE_FILE_STATUSES),
+  visibility: o.enum(FILE_VISIBILITIES),
+  status: o.enum(STORAGE_FILE_STATUSES),
   originalName: exports_external.string().nullable(),
   contentType: exports_external.string().nullable(),
   sizeBytes: exports_external.int().nonnegative().nullable(),
   publicUrl: exports_external.url().nullable(),
   createdAt: isoSchema
-});
-var storageCompleteResponseSchema = exports_external.strictObject({
-  fileId: exports_external.uuid(),
-  file: storageFileSchema
-});
-var storageDownloadResponseSchema = exports_external.strictObject({
+}));
+var storageCompleteResponse = contract((o) => o.object({ fileId: exports_external.uuid(), file: storageFile.in(o) }));
+var storageDownloadResponse = contract((o) => o.object({
   url: exports_external.union([exports_external.url(), storageProxyUrlSchema]),
   expiresAt: isoSchema.nullable()
-});
-var storageDeleteResponseSchema = exports_external.strictObject({
-  fileId: exports_external.uuid(),
-  status: exports_external.enum(["deleting", "deleted"])
-});
+}));
+var storageDeleteResponse = contract((o) => o.object({ fileId: exports_external.uuid(), status: o.enum(["deleting", "deleted"]) }));
 // frontend/packages/project-protocol/src/storage-egress.ts
 var UUID2 = "[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}";
 var STAGING_KEY = new RegExp(`^[a-z][a-z0-9-]{1,31}/(?:apps/[a-z][a-z0-9-]*/)?${UUID2}$`);
@@ -238307,8 +238348,6 @@ var reportSchema = exports_external.strictObject({
   stages: exports_external.array(stageReportSchema),
   passed: exports_external.boolean()
 });
-// frontend/packages/project-protocol/src/version.ts
-var RUNTIME_VERSION = 1;
 // frontend/packages/project-protocol/src/workspaces.ts
 init_zod();
 var WORKSPACE_INVITE_ROLES = ["admin", "editor", "viewer"];
@@ -238317,7 +238356,7 @@ var workspaceRoleSchema = exports_external.enum(["owner", ...WORKSPACE_INVITE_RO
 var workspaceCreateRequestSchema = exports_external.strictObject({
   name: exports_external.string().trim().min(1).max(100)
 });
-var workspaceSchema = exports_external.strictObject({ id: exports_external.uuid(), name: exports_external.string() });
+var workspace = contract((o) => o.object({ id: exports_external.uuid(), name: exports_external.string() }));
 var workspaceInviteRequestSchema = exports_external.strictObject({
   userId: exports_external.string().min(1).max(255).optional(),
   accountName: exports_external.string().trim().min(1).max(64).optional(),
@@ -238325,26 +238364,26 @@ var workspaceInviteRequestSchema = exports_external.strictObject({
 }).refine((value) => value.userId === undefined !== (value.accountName === undefined), {
   message: "exactly one of userId or accountName is required"
 });
-var workspaceInvitationCreatedSchema = exports_external.strictObject({
+var workspaceInvitationCreated = contract((o) => o.object({
   invitationId: exports_external.uuid(),
   expiresAt: exports_external.string()
-});
-var workspaceInvitationSchema = exports_external.strictObject({
+}));
+var workspaceInvitation = contract((o) => o.object({
   invitationId: exports_external.uuid(),
   workspaceId: exports_external.uuid(),
   workspaceName: exports_external.string().nullable(),
-  role: workspaceInviteRoleSchema,
+  role: o.enum(WORKSPACE_INVITE_ROLES),
   invitedByUserId: exports_external.string().nullable(),
   expiresAt: exports_external.string()
-});
-var workspaceInvitationsResponseSchema = exports_external.strictObject({
-  invitations: exports_external.array(workspaceInvitationSchema)
-});
+}));
+var workspaceInvitationsResponse = contract((o) => o.object({
+  invitations: exports_external.array(workspaceInvitation.in(o))
+}));
 var workspaceAnswerRequestSchema = exports_external.strictObject({ invitationId: exports_external.uuid() });
-var workspaceMembershipSchema = exports_external.strictObject({
+var workspaceMembership = contract((o) => o.object({
   workspaceId: exports_external.uuid(),
-  role: workspaceRoleSchema
-});
+  role: o.enum(["owner", ...WORKSPACE_INVITE_ROLES])
+}));
 // frontend/node_modules/yaml/dist/index.js
 var composer = require_composer();
 var Document = require_Document();
@@ -239219,15 +239258,15 @@ async function checkShadow(input) {
         message: "the published version's Apps were not started on the new schema; only its schema's reads were checked"
       });
     }
-    for (const contract of contractsOf(input.intent)) {
-      const table = after[contract.table];
-      const exists = table !== undefined && (contract.column === null || table.columns.some((c) => c.name === contract.column));
+    for (const contract3 of contractsOf(input.intent)) {
+      const table = after[contract3.table];
+      const exists = table !== undefined && (contract3.column === null || table.columns.some((c) => c.name === contract3.column));
       if (exists)
         continue;
       errors5.push({
         code: "INTENT_STALE",
         path: "packages/db-schema/pending/intent.yaml",
-        message: `contract: ${contract.table}${contract.column ? `.${contract.column}` : ""} is not in the new schema`
+        message: `contract: ${contract3.table}${contract3.column ? `.${contract3.column}` : ""} is not in the new schema`
       });
     }
     return { errors: errors5, warnings };
@@ -240162,11 +240201,11 @@ function declaredNames(record2) {
   const workspaces2 = record2.workspaces;
   if (typeof workspaces2 !== "object" || workspaces2 === null)
     return names;
-  for (const workspace of Object.values(workspaces2)) {
-    if (typeof workspace !== "object" || workspace === null)
+  for (const workspace2 of Object.values(workspaces2)) {
+    if (typeof workspace2 !== "object" || workspace2 === null)
       continue;
     for (const field2 of DEPENDENCY_FIELDS) {
-      const deps = workspace[field2];
+      const deps = workspace2[field2];
       if (typeof deps === "object" && deps !== null) {
         for (const name3 of Object.keys(deps))
           names.add(name3);
@@ -241658,7 +241697,7 @@ async function exchange(deps, request, environment, environmentId, signal, onPha
   onPhase?.("exchange_body");
   const body = await response.json().catch(() => null);
   if (!response.ok) {
-    const parsed2 = errorResponseSchema.safeParse(body);
+    const parsed2 = errorResponse.exact.safeParse(body);
     if (parsed2.success && parsed2.data.error.code === "CONSENT_REQUIRED")
       throw consentError(parsed2.data);
     const reason = parsed2.success && EXCHANGE_FAILURES[parsed2.data.error.code] || "unavailable";
@@ -241666,10 +241705,10 @@ async function exchange(deps, request, environment, environmentId, signal, onPha
       console.error("[project-host] token exchange failed", response.status);
     throw new HostOpenError(reason);
   }
-  const parsed = tokenExchangeResponseSchema.safeParse(body);
+  const parsed = tokenExchangeResponse.exact.safeParse(body);
   if (!parsed.success)
     throw new HostOpenError("unavailable", { cause: parsed.error });
-  const claims = projectTokenClaimsSchema.safeParse(decodeClaims(parsed.data.token));
+  const claims = projectTokenClaims.exact.safeParse(decodeClaims(parsed.data.token));
   if (!claims.success || claims.data.aud !== request.projectId || claims.data.app !== request.app || claims.data.env !== environment || claims.data.envId !== environmentId || claims.data.testIdentity !== request.testIdentity || claims.data.testGrantId !== undefined) {
     throw new HostOpenError("unavailable");
   }
@@ -241707,7 +241746,7 @@ async function exchangeSessionLive(deps, request) {
 // frontend/packages/project-host/src/native.ts
 init_zod();
 var CHANNEL = "project-host";
-var hostContextSchema = contextMessageSchema.omit({ type: true, host: true });
+var hostContextSchema = contextMessage.exact.omit({ type: true, host: true });
 var nativeStartMessageSchema = exports_external.strictObject({
   type: exports_external.literal("start"),
   url: exports_external.url(),
@@ -241715,17 +241754,17 @@ var nativeStartMessageSchema = exports_external.strictObject({
   launchId: exports_external.uuid(),
   context: hostContextSchema
 });
-var nativeUpdateMessageSchema = contextUpdateMessageSchema.omit({ type: true }).extend({ type: exports_external.literal("update") });
+var nativeUpdateMessageSchema = contextUpdateMessage.exact.omit({ type: true }).extend({ type: exports_external.literal("update") });
 var nativeMessageSchema = exports_external.union([
   nativeStartMessageSchema,
   nativeUpdateMessageSchema,
-  replyMessageSchema
+  replyMessage.exact
 ]);
 var BRIDGE_STATES = ["idle", "waiting", "connected", "failed", "closed"];
-var BRIDGE_FAILURES = ["hello_timeout", "protocol_mismatch", "invalid_context"];
+var BRIDGE_FAILURES = ["hello_timeout", "contract_unsupported", "invalid_context"];
 var hostPageOpMessageSchema = exports_external.strictObject({
   type: exports_external.literal("op"),
-  op: bridgeOpMessageSchema,
+  op: bridgeOpMessage.exact,
   userActivation: exports_external.boolean()
 });
 var hostPageMessageSchema = exports_external.union([
@@ -245500,6 +245539,13 @@ function createBaseApp(config3, logger, liveOriginAllowed = async () => false) {
     const given = c2.req.header(REQUEST_ID_HEADER);
     const requestId = given && REQUEST_ID_PATTERN.test(given) ? given : newRequestId();
     c2.set("requestId", requestId);
+    const declared = c2.req.header(CONTRACT_HEADER);
+    if (declared !== undefined) {
+      const contract3 = Number(declared);
+      if (!isSupportedContract(contract3))
+        throw new GatewayError("CONTRACT_UNSUPPORTED", `contract ${declared} is not supported`);
+      c2.set("contract", contract3);
+    }
     const startedAt = Date.now();
     await next();
     if (c2.req.method !== "GET" || c2.req.path !== "/v1/.well-known/jwks.json" || c2.res.status !== 200) {
@@ -245511,6 +245557,7 @@ function createBaseApp(config3, logger, liveOriginAllowed = async () => false) {
       method: c2.req.method,
       path: c2.req.path,
       status: c2.res.status,
+      contract: c2.get("contract") ?? null,
       duration_ms: Date.now() - startedAt
     });
   });
@@ -246060,9 +246107,11 @@ async function verifyProjectToken(c2, adapters, config3, cost, options2 = {}) {
     if (!(options2.actAs ?? true))
       throw new GatewayError("FORBIDDEN", "act-as is not allowed here");
     const claims2 = await runClaimsOf(c2, adapters, run2);
+    c2.set("contract", claims2.cv);
     return resolveProjectClaims(c2, adapters, config3, cost, claims2, { ...options2, launch: false });
   }
   const claims = await userClaimsOf(c2, adapters, options2.actAs ?? true);
+  c2.set("contract", claims.cv);
   return resolveProjectClaims(c2, adapters, config3, cost, claims, options2);
 }
 var PYTHON_RUN = /^python:([0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12})$/;
@@ -246088,6 +246137,7 @@ async function runClaimsOf(c2, adapters, run2) {
     app: service.app,
     env: service.env,
     envId: service.envId,
+    cv: service.cv,
     actorId: principal.userId,
     ...principal.testIdentity ? { testIdentity: principal.testIdentity } : {},
     anon: false,
@@ -248024,7 +248074,7 @@ async function exchangeResponse(response, tokens) {
   const body = await response.json();
   if (typeof body === "object" && body !== null && "token" in body && typeof body.token === "string")
     tokens.add(body.token);
-  return tokenExchangeResponseSchema.parse(body);
+  return tokenExchangeResponse.exact.parse(body);
 }
 function registerDirectAuthRoutes(app, adapters, config3) {
   app.post("/v1/auth/direct/issue", async (c2) => {
@@ -248100,11 +248150,11 @@ function registerDirectAuthRoutes(app, adapters, config3) {
       });
       if (!resolved.versionId)
         throw new GatewayError("FORBIDDEN", "Built delivery is unavailable");
-      for (const session2 of sessions) {
-        const claims = await adapters.signer.verify(session2.token);
+      for (const session3 of sessions) {
+        const claims = await adapters.signer.verify(session3.token);
         if (claims.aud !== input.projectId || claims.app !== input.app || claims.env !== input.environment || claims.envId !== resolved.environmentId || claims.anon || claims.actorId !== identity2.userId)
           throw new GatewayError("UNAUTHENTICATED", "direct auth scope mismatch");
-        await assertCurrent(session2.token, resolved.versionId, input.origin);
+        await assertCurrent(session3.token, resolved.versionId, input.origin);
       }
       const code = directAuthRandom();
       const expiresAt = new Date(adapters.clock().getTime() + DIRECT_AUTH_TTL_SECONDS * 1000).toISOString();
@@ -248146,19 +248196,19 @@ function registerDirectAuthRoutes(app, adapters, config3) {
     try {
       if (Date.parse(grant.expiresAt) <= adapters.clock().getTime())
         throw new GatewayError("UNAUTHENTICATED", "direct auth grant expired or used");
-      for (const session2 of [grant.result, grant.result.deliveryLaunch]) {
-        await assertCurrent(session2.token, grant.versionId, input.origin);
+      for (const session3 of [grant.result, grant.result.deliveryLaunch]) {
+        await assertCurrent(session3.token, grant.versionId, input.origin);
       }
-      for (const session2 of [grant.result, grant.result.deliveryLaunch]) {
+      for (const session3 of [grant.result, grant.result.deliveryLaunch]) {
         const response = await app.request("https://internal/v1/token/refresh", {
           method: "POST",
-          headers: { origin: input.origin, authorization: `Bearer ${session2.token}` }
+          headers: { origin: input.origin, authorization: `Bearer ${session3.token}` }
         });
         const refreshed = await exchangeResponse(response, tokens);
-        Object.assign(session2, refreshed);
+        Object.assign(session3, refreshed);
       }
-      for (const session2 of [grant.result, grant.result.deliveryLaunch])
-        await assertCurrent(session2.token, grant.versionId, input.origin);
+      for (const session3 of [grant.result, grant.result.deliveryLaunch])
+        await assertCurrent(session3.token, grant.versionId, input.origin);
       const delivery2 = await app.request("https://internal/v1/delivery/open", {
         method: "POST",
         headers: {
@@ -248303,7 +248353,7 @@ function registerJobRoutes(app, adapters) {
       const refusal = exports_external.object({ error: exports_external.enum(["FORBIDDEN", "VALIDATION_FAILED", "RATE_LIMITED"]) }).safeParse(raw2);
       if (refusal.success)
         throw new GatewayError(refusal.data.error, "job refused");
-      return c2.json((action2 === "schedule" ? jobScheduleResponseSchema : jobCancelResponseSchema).parse(raw2));
+      return c2.json((action2 === "schedule" ? jobScheduleResponse.exact : jobCancelResponse.exact).parse(raw2));
     });
   }
 }
@@ -248913,11 +248963,11 @@ function createRealtimeService(adapters, config3, runtime) {
         throw forbidden();
     }
   }
-  async function current(session2) {
-    const scope = await context(session2.token, session2.origin);
-    if (scope.generation !== session2.generation || scope.scope !== session2.scope)
+  async function current(session3) {
+    const scope = await context(session3.token, session3.origin);
+    if (scope.generation !== session3.generation || scope.scope !== session3.scope)
       throw new GatewayError("RESYNC_REQUIRED", "Realtime deployment changed");
-    if (scope.authorization !== session2.authorization)
+    if (scope.authorization !== session3.authorization)
       throw new GatewayError("RESYNC_REQUIRED", "Realtime authorization changed");
     return scope;
   }
@@ -248948,11 +248998,11 @@ function createRealtimeService(adapters, config3, runtime) {
         request: parsed.data
       };
     },
-    async authorize(session2, action2, peer, payload) {
-      const scope = await current(session2);
-      await validate(scope, session2.request, action2, payload);
+    async authorize(session3, action2, peer, payload) {
+      const scope = await current(session3);
+      await validate(scope, session3.request, action2, payload);
       if (peer) {
-        if (session2.room !== peer.room)
+        if (session3.room !== peer.room)
           throw forbidden();
         const other = await adapters.signer.verify(peer.token);
         if (scope.actor.blockedUserIds.includes(other.sub) || scope.resolved.user.blockedUserIds.some((id) => other.gid.endsWith(`:${id}`)))
@@ -248960,14 +249010,14 @@ function createRealtimeService(adapters, config3, runtime) {
       }
       return { presenceKey: scope.actor.id };
     },
-    async initialize(session2) {
-      const scope = await current(session2);
-      await validate(scope, session2.request, "join");
+    async initialize(session3) {
+      const scope = await current(session3);
+      await validate(scope, session3.request, "join");
       const state = [];
       const snapshot = [];
-      if (session2.request.changes.length) {
+      if (session3.request.changes.length) {
         await capture(scope);
-        for (const sub2 of session2.request.changes) {
+        for (const sub2 of session3.request.changes) {
           const spec = subscription(scope, sub2);
           const initial = await snapshotRealtime({
             db: scope.db,
@@ -248998,16 +249048,16 @@ function createRealtimeService(adapters, config3, runtime) {
       assertSize(snapshot, REALTIME_LIMITS.serverFrameBytes - 1024);
       return { cursor: state.map((s3) => s3.cursor), state, snapshot };
     },
-    async drain(session2, _cursor, input) {
-      const scope = await current(session2);
-      await validate(scope, session2.request, "join");
-      if (!Array.isArray(input) || input.length !== session2.request.changes.length)
+    async drain(session3, _cursor, input) {
+      const scope = await current(session3);
+      await validate(scope, session3.request, "join");
+      if (!Array.isArray(input) || input.length !== session3.request.changes.length)
         throw new GatewayError("RESYNC_REQUIRED", "invalid Realtime state");
       const states = input;
       const state = [];
       const events = [];
       let hasMore = false;
-      for (const [index2, sub2] of session2.request.changes.entries()) {
+      for (const [index2, sub2] of session3.request.changes.entries()) {
         const spec = subscription(scope, sub2);
         const previous = states[index2];
         if (!previous)
@@ -249237,7 +249287,7 @@ function registerSessionInitializationRoute(app, adapters, logger) {
           manifest: manifest2,
           artifactHash
         });
-        return c2.json({ ...receipt, manifest: manifest2, runtimeVersion: RUNTIME_VERSION });
+        return c2.json({ ...receipt, manifest: manifest2, contract: CONTRACT_VERSION });
       } finally {
         stage = "cleanup";
         db.close();
@@ -249282,7 +249332,7 @@ var STAGING_CLEANUP_AFTER_MS = 24 * 60 * 60 * 1000;
 var WORKSPACE_WRITERS = new Set(["owner", "admin", "editor"]);
 function registerStorageRoutes(app, adapters, config3, runtime) {
   app.post("/v1/storage/:bucket/uploads", async (c2) => {
-    const { session: session2, db, resolved, claims } = await open2(c2);
+    const { session: session3, db, resolved, claims } = await open2(c2);
     const bucketName = c2.req.param("bucket");
     const bucket = resolved.storage.buckets[bucketName];
     assertCapability(resolved, claims, bucketName, "write", "FORBIDDEN");
@@ -249317,7 +249367,7 @@ function registerStorageRoutes(app, adapters, config3, runtime) {
       fileId: id,
       objectKey: `${prefix2}/objects/${id}`,
       kind: "cleanup_staging",
-      runAt: new Date(session2.at.getTime() + STAGING_CLEANUP_AFTER_MS)
+      runAt: new Date(session3.at.getTime() + STAGING_CLEANUP_AFTER_MS)
     });
     const inserted = await insertUpload(db, {
       id,
@@ -249330,7 +249380,7 @@ function registerStorageRoutes(app, adapters, config3, runtime) {
       originalName: request.name,
       contentType: request.contentType,
       sizeBytes: request.expectedSize
-    }, session2, resolved.storage.quotaBytes);
+    }, session3, resolved.storage.quotaBytes);
     if (!inserted)
       throw new GatewayError("QUOTA_EXCEEDED", "project storage quota exceeded");
     await reserveSessionStorage(claims, resolved.storage.namespace);
@@ -249344,7 +249394,7 @@ function registerStorageRoutes(app, adapters, config3, runtime) {
           partSize: STORAGE_MULTIPART_PART_BYTES,
           partCount: multipartPartCount(request.expectedSize)
         },
-        expiresAt: new Date(session2.at.getTime() + STAGING_CLEANUP_AFTER_MS).toISOString()
+        expiresAt: new Date(session3.at.getTime() + STAGING_CLEANUP_AFTER_MS).toISOString()
       };
       return c2.json(response2);
     }
@@ -249361,12 +249411,12 @@ function registerStorageRoutes(app, adapters, config3, runtime) {
         "Content-Type": request.contentType,
         "Content-Length": String(request.expectedSize)
       },
-      expiresAt: new Date(session2.at.getTime() + STORAGE_UPLOAD_URL_TTL_SECONDS * 1000).toISOString()
+      expiresAt: new Date(session3.at.getTime() + STORAGE_UPLOAD_URL_TTL_SECONDS * 1000).toISOString()
     };
     return c2.json(response);
   });
   app.post("/v1/storage/uploads/:uploadId/complete", async (c2) => {
-    const { session: session2, db, resolved, claims } = await open2(c2);
+    const { session: session3, db, resolved, claims } = await open2(c2);
     const request = storageCompleteRequestSchema.safeParse(await jsonBody(c2));
     if (!request.success) {
       throw new GatewayError("VALIDATION_FAILED", "invalid complete request");
@@ -249383,7 +249433,7 @@ function registerStorageRoutes(app, adapters, config3, runtime) {
     if (file2.sizeBytes !== null && usesMultipart(file2.sizeBytes)) {
       if (!request.data.r2UploadId)
         throw new GatewayError("VALIDATION_FAILED", "r2UploadId is required");
-      return c2.json(await completeMultipart(file2, request.data.r2UploadId, claims, session2, db, resolved.storage.namespace));
+      return c2.json(await completeMultipart(file2, request.data.r2UploadId, claims, session3, db, resolved.storage.namespace));
     }
     const tier = tierOf(claims.env);
     const staging = {
@@ -249402,7 +249452,7 @@ function registerStorageRoutes(app, adapters, config3, runtime) {
         to: "failed",
         action: "storage.upload.failed",
         reason: "mismatch"
-      }, session2);
+      }, session3);
       throw new GatewayError("VALIDATION_FAILED", "uploaded file does not match the request");
     }
     await confirmSessionStorage(claims, resolved.storage.namespace);
@@ -249417,7 +249467,7 @@ function registerStorageRoutes(app, adapters, config3, runtime) {
       from: ["initiated", "uploading", "validating"],
       to: "active",
       action: "storage.upload.activated"
-    }, session2);
+    }, session3);
     if (!activated || activated.status !== "active") {
       throw new GatewayError("CONFLICT", "upload state changed");
     }
@@ -249451,7 +249501,7 @@ function registerStorageRoutes(app, adapters, config3, runtime) {
     return c2.json(response);
   });
   app.delete("/v1/storage/uploads/:uploadId", async (c2) => {
-    const { session: session2, db, resolved, claims } = await open2(c2);
+    const { session: session3, db, resolved, claims } = await open2(c2);
     const request = storageAbortRequestSchema.safeParse(await jsonBody(c2));
     if (!request.success)
       throw new GatewayError("VALIDATION_FAILED", "invalid abort request");
@@ -249473,11 +249523,11 @@ function registerStorageRoutes(app, adapters, config3, runtime) {
       to: "failed",
       action: "storage.upload.failed",
       reason: "aborted"
-    }, session2);
+    }, session3);
     return c2.json(response);
   });
   app.get("/v1/storage/files/:fileId/download", async (c2) => {
-    const { session: session2, db, resolved, claims, schema: schema2 } = await open2(c2, true);
+    const { session: session3, db, resolved, claims, schema: schema2 } = await open2(c2, true);
     const file2 = await findReadableFile(runtime, {
       db,
       claims,
@@ -249489,7 +249539,7 @@ function registerStorageRoutes(app, adapters, config3, runtime) {
       throw new GatewayError("NOT_FOUND", "file not found");
     const tier = tierOf(claims.env);
     if (resolved.storage.buckets[file2.bucket]?.delivery === "proxy") {
-      const iat = Math.floor(session2.at.getTime() / 1000);
+      const iat = Math.floor(session3.at.getTime() / 1000);
       const exp2 = Math.min(claims.exp, iat + STORAGE_DOWNLOAD_URL_TTL_MAX_SECONDS);
       const ticket = await adapters.signer.signStorageDownload({
         iss: PROJECT_TOKEN_ISSUER,
@@ -249502,7 +249552,7 @@ function registerStorageRoutes(app, adapters, config3, runtime) {
         iat,
         exp: exp2
       });
-      await auditStorage(db, session2, "storage.download.granted", file2.id);
+      await auditStorage(db, session3, "storage.download.granted", file2.id);
       const response2 = {
         url: `/v1/storage/files/${file2.id}/content?ticket=${ticket}`,
         expiresAt: new Date(exp2 * 1000).toISOString()
@@ -249510,7 +249560,7 @@ function registerStorageRoutes(app, adapters, config3, runtime) {
       return c2.json(response2);
     }
     const publicUrl = file2.visibility === "public" ? adapters.storage.publicUrl({ tier, area: "public", key: file2.objectKey }) : null;
-    await auditStorage(db, session2, "storage.download.granted", file2.id);
+    await auditStorage(db, session3, "storage.download.granted", file2.id);
     if (publicUrl) {
       const response2 = { url: publicUrl, expiresAt: null };
       return c2.json(response2);
@@ -249521,7 +249571,7 @@ function registerStorageRoutes(app, adapters, config3, runtime) {
     });
     const response = {
       url: url2,
-      expiresAt: new Date(session2.at.getTime() + STORAGE_DOWNLOAD_URL_TTL_MAX_SECONDS * 1000).toISOString()
+      expiresAt: new Date(session3.at.getTime() + STORAGE_DOWNLOAD_URL_TTL_MAX_SECONDS * 1000).toISOString()
     };
     return c2.json(response);
   });
@@ -249535,7 +249585,7 @@ function registerStorageRoutes(app, adapters, config3, runtime) {
     const { claims, resolved } = await resolveProjectClaims(c2, adapters, config3, STORAGE_COST, ticket.project);
     if (resolved.versionId !== ticket.versionId || resolved.schemaRevision !== ticket.schemaRevision || ticket.policyVersion !== undefined && resolved.policyVersion !== ticket.policyVersion)
       throw new GatewayError("NOT_FOUND", "file not found");
-    const { session: session2, db, schema: schema2 } = await open2(c2, true, { claims, resolved });
+    const { session: session3, db, schema: schema2 } = await open2(c2, true, { claims, resolved });
     const client = await policyClientFor(runtime, db, claims, resolved, schema2);
     const visible = await client.storageFile.findUnique({
       where: { id: ticket.fileId },
@@ -249569,7 +249619,7 @@ function registerStorageRoutes(app, adapters, config3, runtime) {
       "Content-Security-Policy": nativeMedia ? "script-src 'none'; base-uri 'none'; form-action 'none'" : "default-src 'none'; sandbox"
     });
     if (c2.req.method === "HEAD") {
-      await auditStorage(db, session2, "storage.download.granted", file2.id);
+      await auditStorage(db, session3, "storage.download.granted", file2.id);
       return c2.newResponse(null, { headers });
     }
     const rawRange = c2.req.header("Range");
@@ -249599,7 +249649,7 @@ function registerStorageRoutes(app, adapters, config3, runtime) {
     if (etag && /^(W\/)?"[^"\r\n]+"$/.test(etag))
       headers.set("ETag", etag);
     try {
-      await auditStorage(db, session2, "storage.download.granted", file2.id);
+      await auditStorage(db, session3, "storage.download.granted", file2.id);
     } catch (error51) {
       await upstream.body.cancel();
       throw error51;
@@ -249607,7 +249657,7 @@ function registerStorageRoutes(app, adapters, config3, runtime) {
     return c2.newResponse(upstream.body, { status, headers });
   });
   app.delete("/v1/storage/files/:fileId", async (c2) => {
-    const { session: session2, db, resolved, claims, schema: schema2 } = await open2(c2, true);
+    const { session: session3, db, resolved, claims, schema: schema2 } = await open2(c2, true);
     const fileId = c2.req.param("fileId");
     const client = await policyClientFor(runtime, db, claims, resolved, schema2);
     if (!await canDelete(client, fileId))
@@ -249631,7 +249681,7 @@ function registerStorageRoutes(app, adapters, config3, runtime) {
       from: ["active", "initiated", "uploading", "validating"],
       to: "deleting",
       action: "storage.deleted"
-    }, session2);
+    }, session3);
     const response = {
       fileId,
       status: updated?.status === "deleted" ? "deleted" : "deleting"
@@ -249662,13 +249712,13 @@ function registerStorageRoutes(app, adapters, config3, runtime) {
     }
     return { row, size: row.sizeBytes };
   }
-  async function completeMultipart(file2, r2UploadId, claims, session2, db, namespace) {
+  async function completeMultipart(file2, r2UploadId, claims, session3, db, namespace) {
     const tier = tierOf(claims.env);
     const size = file2.sizeBytes ?? 0;
     const target2 = { tier, area: "private", key: file2.objectKey };
     const fail6 = async (reason) => {
       await adapters.storage.abortMultipart(target2, r2UploadId);
-      await transitionStorageFile(db, { id: file2.id, from: IN_PROGRESS, to: "failed", action: "storage.upload.failed", reason }, session2);
+      await transitionStorageFile(db, { id: file2.id, from: IN_PROGRESS, to: "failed", action: "storage.upload.failed", reason }, session3);
       throw new GatewayError("VALIDATION_FAILED", "uploaded file does not match the request");
     };
     const parts = await adapters.storage.listParts(target2, r2UploadId);
@@ -249692,7 +249742,7 @@ function registerStorageRoutes(app, adapters, config3, runtime) {
     await confirmSessionStorage(claims, namespace);
     if (file2.visibility === "public")
       await copyToPublic(target2, size, file2.contentType ?? "");
-    const { file: activated } = await transitionStorageFile(db, { id: file2.id, from: IN_PROGRESS, to: "active", action: "storage.upload.activated" }, session2);
+    const { file: activated } = await transitionStorageFile(db, { id: file2.id, from: IN_PROGRESS, to: "active", action: "storage.upload.activated" }, session3);
     if (!activated || activated.status !== "active") {
       throw new GatewayError("CONFLICT", "upload state changed");
     }
@@ -249722,7 +249772,7 @@ function registerStorageRoutes(app, adapters, config3, runtime) {
       assertAppAccess(resolved, actor?.permissions ?? []);
     }
     const loaded = await runtime.schemaOf(resolved);
-    const session2 = {
+    const session3 = {
       requestId: c2.get("requestId"),
       appSlug: claims.app,
       actorId: claims.sub,
@@ -249730,7 +249780,7 @@ function registerStorageRoutes(app, adapters, config3, runtime) {
       at: adapters.clock()
     };
     const schema2 = withSchema ? loaded : null;
-    return { claims, resolved, db, session: session2, schema: schema2 };
+    return { claims, resolved, db, session: session3, schema: schema2 };
   }
   function completed(file2, tier) {
     return { fileId: file2.id, file: toStorageFile(file2, adapters, tier) };
@@ -249801,7 +249851,7 @@ function registerTokenRoutes(app, adapters, config3) {
     if (!body || typeof body !== "object" || Array.isArray(body) || "app" in body) {
       throw new GatewayError("VALIDATION_FAILED", "invalid catalog request");
     }
-    const parsed = tokenExchangeRequestSchema.safeParse({ ...body, app: "catalog" });
+    const parsed = tokenExchangeRequest.exact.safeParse({ ...body, app: "catalog" });
     if (!parsed.success)
       throw new GatewayError("VALIDATION_FAILED", "invalid catalog request");
     const request = parsed.data;
@@ -249834,7 +249884,7 @@ function registerTokenRoutes(app, adapters, config3) {
     });
   });
   app.post("/v1/token/exchange", async (c2) => {
-    const parsed = tokenExchangeRequestSchema.safeParse(await jsonBody(c2));
+    const parsed = tokenExchangeRequest.exact.safeParse(await jsonBody(c2));
     if (!parsed.success)
       throw new GatewayError("VALIDATION_FAILED", "invalid exchange request");
     const request = parsed.data;
@@ -249906,6 +249956,8 @@ function registerTokenRoutes(app, adapters, config3) {
     const credential = await adapters.services.resolve(await sha256Hex2(new TextEncoder().encode(secret)));
     if (!credential)
       throw new GatewayError("UNAUTHENTICATED", "unknown service credential");
+    if (credential.contract === null)
+      throw new GatewayError("UNAUTHENTICATED", "service credential has no deployed version");
     const iat = Math.floor(adapters.clock().getTime() / 1000);
     const exp2 = iat + SERVICE_TOKEN_TTL_SECONDS;
     const scope = {
@@ -249923,6 +249975,7 @@ function registerTokenRoutes(app, adapters, config3) {
       app: credential.appSlug,
       env: credential.environment,
       envId: credential.environmentId,
+      cv: credential.contract,
       cid: credential.credentialId,
       permissions: credential.servicePermissions,
       jti: crypto.randomUUID(),
@@ -249962,7 +250015,7 @@ function registerTokenRoutes(app, adapters, config3) {
     const actor = await loadProjectActor(db, claims.sub, [], resolved.user.bootstrap);
     if (!actor)
       throw new GatewayError("UNAUTHENTICATED", "project user not found");
-    const session2 = {
+    const session3 = {
       userId: actor.id,
       globalUserId: claims.gid,
       displayName: actor.displayName,
@@ -249971,7 +250024,7 @@ function registerTokenRoutes(app, adapters, config3) {
       expiresAt: new Date(claims.exp * 1000).toISOString(),
       apps: sessionApps(resolved, actor.permissions, claims.anon)
     };
-    return c2.json(session2);
+    return c2.json(session3);
   });
 }
 function needsLogin(resolved) {
@@ -249998,6 +250051,7 @@ async function issue2(adapters, target2, subject) {
     app: target2.appSlug,
     env: target2.environment,
     envId: subject.resolved.environmentId,
+    cv: subject.resolved.contract,
     actorId: subject.resolved.actorId,
     ...subject.resolved.testIdentity ? { testIdentity: subject.resolved.testIdentity.slot } : {},
     ...subject.resolved.testGrantId ? { testGrantId: subject.resolved.testGrantId } : {},
@@ -250129,14 +250183,14 @@ function registerWorkspaceRoutes(app, adapters, config3) {
     if (!actor.permissions.includes("workspace.create")) {
       throw new GatewayError("FORBIDDEN", "permission required");
     }
-    const workspace = await createWorkspace(db, {
+    const workspace2 = await createWorkspace(db, {
       userId: actor.id,
       name: parsed.data.name,
       requestId: c2.get("requestId"),
       appSlug: claims.app,
       now: adapters.clock()
     });
-    return c2.json(workspace);
+    return c2.json(workspace2);
   });
   app.get("/v1/workspaces/invitations", async (c2) => {
     const { db, claims } = await open2(c2);
@@ -250319,10 +250373,10 @@ function createGateway(adapters, config3, logger = consoleLogger, realtimeTransp
     } catch (cause) {
       throw new GatewayError("VALIDATION_FAILED", "invalid Realtime subscription", { cause });
     }
-    const session2 = await realtime2.prepare(bearerOf(c2), origin2, input);
+    const session3 = await realtime2.prepare(bearerOf(c2), origin2, input);
     c2.header("Access-Control-Allow-Origin", origin2);
     c2.header("Vary", "Origin", { append: true });
-    return c2.json(await realtimeTransport.issue(session2));
+    return c2.json(await realtimeTransport.issue(session3));
   });
   registerDbRoutes(app, adapters, config3, logger, runtime);
   registerStorageRoutes(app, adapters, config3, runtime);
@@ -250907,13 +250961,13 @@ function createEs256Signer(options2) {
   }
   return {
     async sign(claims) {
-      return sign2(projectTokenClaimsSchema.parse(claims), signingKey);
+      return sign2(projectTokenClaims.exact.parse(claims), signingKey);
     },
-    verify: (token2) => verifyAs(token2, projectTokenClaimsSchema),
+    verify: (token2) => verifyAs(token2, projectTokenClaims.exact),
     async signService(claims) {
-      return sign2(serviceTokenClaimsSchema.parse(claims), signingKey);
+      return sign2(serviceTokenClaims.exact.parse(claims), signingKey);
     },
-    verifyService: (token2) => verifyAs(token2, serviceTokenClaimsSchema),
+    verifyService: (token2) => verifyAs(token2, serviceTokenClaims.exact),
     signStorageDownload: async (claims) => sign2(storageDownloadClaimsSchema.parse(claims), signingKey),
     verifyStorageDownload: (token2) => verifyAs(token2, storageDownloadClaimsSchema),
     async publicJwks() {
@@ -252823,6 +252877,7 @@ async function createDevRuntime(options2) {
         projectId,
         environment: "session",
         environmentId: DEV_ENVIRONMENT_ID,
+        contract: CONTRACT_VERSION,
         appSlug: app.slug,
         servicePermissions: app.servicePermissions,
         db: { name: "dev", group: "dev" }
@@ -253102,6 +253157,7 @@ function createDevRegistry(input) {
         status: "active",
         environmentId: DEV_ENVIRONMENT_ID,
         actorId: principal.userId,
+        contract: CONTRACT_VERSION,
         testIdentity: {
           slot: principalName,
           globalUserId: `test:${DEV_ENVIRONMENT_ID}:${principalName}`,
@@ -253431,7 +253487,7 @@ async function prepareSchemaPlan({ root, kitRoot }, baseline, signal = new Abort
 `),
     migrations,
     manifest: manifest2,
-    runtimeVersion: RUNTIME_VERSION,
+    contract: CONTRACT_VERSION,
     zmodelHash: digest2(await readFile18(join28(root, PROJECT_PATHS.schema))),
     generatedSql,
     dataSql: await optionalFile(join28(root, PROJECT_PATHS.pending, "data.sql")),
@@ -254317,7 +254373,7 @@ function createConnectedHostHandler(options2) {
       }
       const attempt = epoch;
       try {
-        const result = tokenExchangeResponseSchema.parse(bounded(await options2.exchange({
+        const result = tokenExchangeResponse.wire.parse(bounded(await options2.exchange({
           app: selected.app,
           testIdentity: selected.testIdentity,
           signal
@@ -254510,18 +254566,18 @@ async function checked(response) {
       code: response.status === 429 ? "REALTIME_CAPACITY" : "GATEWAY_UNAVAILABLE"
     });
 }
-async function issueRealtimeTicket(session2, env, baseUrl) {
+async function issueRealtimeTicket(session3, env, baseUrl) {
   const ticket = crypto.randomUUID();
-  await checked(await stub(env.REALTIME_DISPATCHERS, session2.scope).fetch(request("/reserve", { id: ticket })));
-  await checked(await stub(env.REALTIME_ROOMS, session2.room).fetch(request("/ticket", {
+  await checked(await stub(env.REALTIME_DISPATCHERS, session3.scope).fetch(request("/reserve", { id: ticket })));
+  await checked(await stub(env.REALTIME_ROOMS, session3.room).fetch(request("/ticket", {
     ticket,
-    session: session2,
-    origin: session2.origin,
+    session: session3,
+    origin: session3.origin,
     expiresAt: Date.now() + 30000
   })));
   const url2 = new URL("/v1/realtime/socket", baseUrl);
   url2.protocol = url2.protocol === "http:" ? "ws:" : "wss:";
-  url2.searchParams.set("room", session2.room);
+  url2.searchParams.set("room", session3.room);
   return { ticket, socketUrl: url2.href };
 }
 async function wakeRealtime(scope, env) {
@@ -254604,8 +254660,8 @@ async function startRealtimeGateway(options2) {
     return {
       url: url2,
       port: Number(ready.port),
-      async issue(session2) {
-        const issued = await issueRealtimeTicket(session2, env, options2.publicBaseUrl ?? url2);
+      async issue(session3) {
+        const issued = await issueRealtimeTicket(session3, env, options2.publicBaseUrl ?? url2);
         const socket = new URL(issued.socketUrl);
         socket.pathname = `${options2.prefix ?? ""}/v1/realtime/socket`;
         return { ...issued, socketUrl: socket.href };
@@ -255942,10 +255998,10 @@ async function startDev(options2) {
     runtime = await createDevRuntime({
       python: { vars: devVars },
       realtimeTransport: {
-        issue: (session2) => {
+        issue: (session3) => {
           if (!gatewayWorker)
             throw new DevError("Gateway is starting");
-          return gatewayWorker.issue(session2);
+          return gatewayWorker.issue(session3);
         },
         wake: (scope) => {
           if (!gatewayWorker)
@@ -256546,7 +256602,7 @@ async function exchange2(request2, options2, send, secrets) {
     const raw2 = await response.text();
     if (Buffer.byteLength(raw2) > 1024 * 1024)
       throw new LiveE2EError("Oversized exchange response");
-    const value2 = tokenExchangeResponseSchema.parse(JSON.parse(raw2));
+    const value2 = tokenExchangeResponse.wire.parse(JSON.parse(raw2));
     if (value2.session.globalUserId !== `test:${options2.live.environmentId}:${options2.identity}` || value2.session.isAnonymous !== (options2.identity === "anonymous"))
       throw new LiveE2EError("The Gateway did not return the requested test identity");
     secrets.add(value2.token);
@@ -256975,7 +257031,7 @@ class McpToolError extends Error {
 class McpAuthError extends Error {
   name = "McpAuthError";
 }
-var PROTOCOL_VERSION2 = "2025-06-18";
+var PROTOCOL_VERSION = "2025-06-18";
 function createMcpClient(options2) {
   const send = options2.fetch ?? globalThis.fetch;
   let id = 0;
@@ -256991,7 +257047,7 @@ function createMcpClient(options2) {
           authorization: `Bearer ${token2}`,
           "content-type": "application/json",
           accept: "application/json, text/event-stream",
-          "mcp-protocol-version": PROTOCOL_VERSION2
+          "mcp-protocol-version": PROTOCOL_VERSION
         },
         body: JSON.stringify({
           jsonrpc: "2.0",
@@ -257060,7 +257116,7 @@ function toolError(tool, text) {
 }
 
 // frontend/packages/miniapp-kit/src/mcp-proxy.ts
-var PROTOCOL_VERSION3 = "2025-06-18";
+var PROTOCOL_VERSION2 = "2025-06-18";
 function createMcpProxy(deps) {
   let catalog = null;
   let loggingIn = null;
@@ -257087,7 +257143,7 @@ function createMcpProxy(deps) {
       authorization: `Bearer ${token2}`,
       "content-type": "application/json",
       accept: "application/json, text/event-stream",
-      "mcp-protocol-version": PROTOCOL_VERSION3
+      "mcp-protocol-version": PROTOCOL_VERSION2
     },
     body: JSON.stringify(message2)
   });
@@ -257125,7 +257181,7 @@ function createMcpProxy(deps) {
             jsonrpc: "2.0",
             id: message2.id,
             result: {
-              protocolVersion: typeof requested === "string" ? requested : PROTOCOL_VERSION3,
+              protocolVersion: typeof requested === "string" ? requested : PROTOCOL_VERSION2,
               capabilities: { tools: {} },
               serverInfo: loaded.serverInfo,
               instructions: loaded.instructions
@@ -257999,25 +258055,25 @@ async function runPermissionMatrix(options2) {
   }
   const results = [];
   for (const item of options2.plan) {
-    const session2 = await exchange3(item.app, item.principal);
-    if (!session2.token) {
+    const session3 = await exchange3(item.app, item.principal);
+    if (!session3.token) {
       results.push({
         ...item,
-        permissions: session2.permissions,
-        exchange: session2.code,
+        permissions: session3.permissions,
+        exchange: session3.code,
         rows: null
       });
       continue;
     }
-    const read = await fetchImpl(`${options2.gatewayUrl}/v1/db/${item.model}/findMany?q=${encodeURIComponent("{}")}`, { headers: { authorization: `Bearer ${session2.token}`, origin: options2.appsOrigin } });
+    const read = await fetchImpl(`${options2.gatewayUrl}/v1/db/${item.model}/findMany?q=${encodeURIComponent("{}")}`, { headers: { authorization: `Bearer ${session3.token}`, origin: options2.appsOrigin } });
     results.push(read.ok ? {
       ...item,
-      permissions: session2.permissions,
+      permissions: session3.permissions,
       exchange: "ok",
       rows: (await read.json()).data.length
     } : {
       ...item,
-      permissions: session2.permissions,
+      permissions: session3.permissions,
       exchange: "ok",
       rows: null,
       readError: await errorCode(read)

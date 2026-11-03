@@ -1,4 +1,5 @@
 import { z } from 'zod';
+import { contract } from "./contract.js";
 /**
  * ミニアプリの中の通報とブロック（compliance.md §4。App Store 4.7.1 / 1.2）。
  * - 通報は Host の通報画面（運営の Google フォームへの案内と、対象のコピー）を開くだけ。
@@ -21,6 +22,6 @@ export const safetyBlockRequestSchema = z.strictObject({
     userId: z.string().min(1).max(255),
 });
 /** `GET` / `POST /v1/safety/blocks` の応答（本人がブロックしている人の User.id。名前順） */
-export const safetyBlocksResponseSchema = z.strictObject({
+export const safetyBlocksResponse = contract((o) => o.object({
     userIds: z.array(z.string()),
-});
+}));

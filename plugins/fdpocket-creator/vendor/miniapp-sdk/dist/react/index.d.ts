@@ -1,5 +1,5 @@
 import { type QueryClient } from '@tanstack/react-query';
-import type { SafeAreaInsets, Session } from '@workspace/project-protocol';
+import type { SafeAreaInsets, WireSession as Session } from '@workspace/project-protocol';
 import { type ReactElement, type ReactNode } from 'react';
 import type { ProjectClient } from '../client.ts';
 /**

@@ -118,7 +118,7 @@ export declare const realtimeManifestSchema: z.ZodObject<{
     }, z.core.$strict>>>;
 }, z.core.$strict>;
 export declare const realtimeFrameSchema: z.ZodObject<{
-    version: z.ZodLiteral<1>;
+    contract: z.ZodInt;
     ref: z.ZodString;
     type: z.ZodEnum<{
         broadcast: "broadcast";

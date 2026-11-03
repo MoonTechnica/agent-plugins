@@ -13,22 +13,22 @@ export declare const notificationStatusSchema: z.ZodEnum<{
 }>;
 export type NotificationStatus = z.infer<typeof notificationStatusSchema>;
 /** `GET /v1/notifications/status` */
-export declare const notificationStatusResponseSchema: z.ZodObject<{
+export declare const notificationStatusResponse: import("./contract.ts").Contract<z.ZodObject<{
     status: z.ZodEnum<{
         default: "default";
         granted: "granted";
         denied: "denied";
     }>;
-}, z.core.$strict>;
-export type NotificationStatusResponse = z.infer<typeof notificationStatusResponseSchema>;
+}, z.core.$strip>>;
+export type NotificationStatusResponse = z.output<typeof notificationStatusResponse.exact>;
 /** bridge の `notifications.requestPermission` の reply の `result` */
-export declare const notificationPermissionResultSchema: z.ZodObject<{
+export declare const notificationPermissionResult: import("./contract.ts").Contract<z.ZodObject<{
     status: z.ZodEnum<{
         default: "default";
         granted: "granted";
         denied: "denied";
     }>;
-}, z.core.$strict>;
+}, z.core.$strip>>;
 export type NotificationPermissionResult = NotificationStatusResponse;
 /** Worker 専用の送信。宛先は同じ Project の User.id。文面は承認済みテンプレートから描画する。 */
 export declare const notificationSendRequestSchema: z.ZodObject<{
@@ -38,7 +38,7 @@ export declare const notificationSendRequestSchema: z.ZodObject<{
     dedupeKey: z.ZodOptional<z.ZodString>;
 }, z.core.$strict>;
 export type NotificationSendRequest = z.infer<typeof notificationSendRequestSchema>;
-export declare const notificationSendResponseSchema: z.ZodObject<{
+export declare const notificationSendResponse: import("./contract.ts").Contract<z.ZodObject<{
     recipients: z.ZodInt;
-}, z.core.$strict>;
-export type NotificationSendResponse = z.infer<typeof notificationSendResponseSchema>;
+}, z.core.$strip>>;
+export type NotificationSendResponse = z.output<typeof notificationSendResponse.exact>;

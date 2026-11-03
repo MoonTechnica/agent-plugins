@@ -1,4 +1,5 @@
 import { z } from 'zod';
+import { contract } from "./contract.js";
 import { STORAGE_FILE_MAX_BYTES, STORAGE_MULTIPART_PART_BYTES, STORAGE_MULTIPART_SIGN_MAX_PARTS, STORAGE_SINGLE_PUT_MAX_BYTES, } from "./limits.js";
 import { storageProxyUrlSchema } from "./storage-download.js";
 /**
@@ -47,26 +48,27 @@ export function multipartPartLength(size, partNumber) {
  */
 const r2UploadIdSchema = z.string().regex(/^[A-Za-z0-9_\-.~+/=]{1,1024}$/);
 const beginBase = { uploadId: z.uuid(), fileId: z.uuid(), expiresAt: isoSchema };
-export const storageSinglePutBeginResponseSchema = z.strictObject({
+export const storageSinglePutBeginResponse = contract((o) => o.object({
     ...beginBase,
     /** 署名 PUT（staging キー。10 分） */
     url: z.url(),
     /** PUT に付けるヘッダー（署名に含まれる。変えると R2 が拒否する） */
-    headers: z.strictObject({ 'Content-Type': z.string(), 'Content-Length': z.string() }),
-});
-export const storageMultipartBeginResponseSchema = z.strictObject({
+    headers: o.object({ 'Content-Type': z.string(), 'Content-Length': z.string() }),
+}));
+export const storageMultipartBeginResponse = contract((o) => o.object({
     ...beginBase,
     /** 100 MiB 超。part の URL は `/parts` で取る。expiresAt は未完了の upload を掃除する時刻 */
-    multipart: z.strictObject({
+    multipart: o.invariant(o.object({
         r2UploadId: r2UploadIdSchema,
-        partSize: z.literal(STORAGE_MULTIPART_PART_BYTES),
+        partSize: z.int().positive(),
         partCount: z.int().min(2).max(10_000),
+    }), (value, ctx) => {
+        // part の大きさは SDK の分割と Gateway の署名が同じ値を使う。書く側（Gateway）だけが固定する
+        if (value.partSize !== STORAGE_MULTIPART_PART_BYTES)
+            ctx.addIssue({ code: 'custom', path: ['partSize'], message: 'unexpected part size' });
     }),
-});
-export const storageBeginResponseSchema = z.union([
-    storageSinglePutBeginResponseSchema,
-    storageMultipartBeginResponseSchema,
-]);
+}));
+export const storageBeginResponse = contract((o) => z.union([storageSinglePutBeginResponse.in(o), storageMultipartBeginResponse.in(o)]));
 /** `POST /v1/storage/uploads/{uploadId}/parts` */
 export const storageSignPartsRequestSchema = z.strictObject({
     r2UploadId: r2UploadIdSchema,
@@ -76,15 +78,15 @@ export const storageSignPartsRequestSchema = z.strictObject({
         .max(STORAGE_MULTIPART_SIGN_MAX_PARTS)
         .refine((numbers) => new Set(numbers).size === numbers.length, 'duplicate part number'),
 });
-export const storageSignPartsResponseSchema = z.strictObject({
-    parts: z.array(z.strictObject({
+export const storageSignPartsResponse = contract((o) => o.object({
+    parts: z.array(o.object({
         partNumber: z.int().min(1).max(10_000),
         /** 署名 UploadPart（10 分。Content-Length は署名に含まれる） */
         url: z.url(),
-        headers: z.strictObject({ 'Content-Length': z.string() }),
+        headers: o.object({ 'Content-Length': z.string() }),
     })),
     expiresAt: isoSchema,
-});
+}));
 /** `POST /v1/storage/uploads/{uploadId}/complete` */
 export const storageCompleteRequestSchema = z.strictObject({
     checksum: z.strictObject({ sha256: z.string().regex(/^[0-9a-f]{64}$/) }).optional(),
@@ -93,37 +95,28 @@ export const storageCompleteRequestSchema = z.strictObject({
 });
 /** `DELETE /v1/storage/uploads/{uploadId}`（Multipart の中断） */
 export const storageAbortRequestSchema = z.strictObject({ r2UploadId: r2UploadIdSchema });
-export const storageAbortResponseSchema = z.strictObject({
-    uploadId: z.uuid(),
-    status: z.literal('failed'),
-});
+export const storageAbortResponse = contract((o) => o.object({ uploadId: z.uuid(), status: o.enum(['failed']) }));
 /** SDK に返す StorageFile（ZModel の行から objectKey・uploaderApp を除いたもの） */
-export const storageFileSchema = z.strictObject({
+export const storageFile = contract((o) => o.object({
     id: z.uuid(),
     bucket: z.string().min(1),
     ownerId: z.string().min(1),
     workspaceId: z.string().nullable(),
-    visibility: fileVisibilitySchema,
-    status: z.enum(STORAGE_FILE_STATUSES),
+    visibility: o.enum(FILE_VISIBILITIES),
+    status: o.enum(STORAGE_FILE_STATUSES),
     originalName: z.string().nullable(),
     contentType: z.string().nullable(),
     sizeBytes: z.int().nonnegative().nullable(),
     /** visibility = public のときの CDN の URL */
     publicUrl: z.url().nullable(),
     createdAt: isoSchema,
-});
-export const storageCompleteResponseSchema = z.strictObject({
-    fileId: z.uuid(),
-    file: storageFileSchema,
-});
+}));
+export const storageCompleteResponse = contract((o) => o.object({ fileId: z.uuid(), file: storageFile.in(o) }));
 /** `GET /v1/storage/files/{fileId}/download` */
-export const storageDownloadResponseSchema = z.strictObject({
+export const storageDownloadResponse = contract((o) => o.object({
     url: z.union([z.url(), storageProxyUrlSchema]),
     /** 署名 GET の期限。public の CDN の URL は期限が無いので null */
     expiresAt: isoSchema.nullable(),
-});
+}));
 /** `DELETE /v1/storage/files/{fileId}`（論理削除。実体は worker が消す） */
-export const storageDeleteResponseSchema = z.strictObject({
-    fileId: z.uuid(),
-    status: z.enum(['deleting', 'deleted']),
-});
+export const storageDeleteResponse = contract((o) => o.object({ fileId: z.uuid(), status: o.enum(['deleting', 'deleted']) }));

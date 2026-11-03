@@ -18,7 +18,7 @@ export declare const safetyBlockRequestSchema: z.ZodObject<{
 }, z.core.$strict>;
 export type SafetyBlockRequest = z.infer<typeof safetyBlockRequestSchema>;
 /** `GET` / `POST /v1/safety/blocks` の応答（本人がブロックしている人の User.id。名前順） */
-export declare const safetyBlocksResponseSchema: z.ZodObject<{
+export declare const safetyBlocksResponse: import("./contract.ts").Contract<z.ZodObject<{
     userIds: z.ZodArray<z.ZodString>;
-}, z.core.$strict>;
-export type SafetyBlocksResponse = z.infer<typeof safetyBlocksResponseSchema>;
+}, z.core.$strip>>;
+export type SafetyBlocksResponse = z.output<typeof safetyBlocksResponse.exact>;

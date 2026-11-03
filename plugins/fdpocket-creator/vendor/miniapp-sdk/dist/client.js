@@ -1,5 +1,5 @@
 import "./zod-jitless.js";
-import { contextMessageSchema, contextUpdateMessageSchema, DIRECT_AUTH_START_PATH, initMessageSchema, PROTOCOL_VERSION, projectTokenClaimsSchema, RUNTIME_VERSION, tokenExchangeResponseSchema, } from '@workspace/project-protocol';
+import { CONTRACT_VERSION, contextMessage, contextUpdateMessage, DIRECT_AUTH_START_PATH, initMessage, projectTokenClaims, tokenExchangeResponse, } from '@workspace/project-protocol';
 import { createAi } from "./ai/client.js";
 import { createConnections } from "./connections/client.js";
 import { createDbClient } from "./db/client.js";
@@ -48,7 +48,7 @@ export function createClient(options) {
     }
     /** トークンの claims を読み、この Project・App のものかを確かめる（署名は Gateway が毎回検証する） */
     function accept(token, expiresAt, session) {
-        const claims = projectTokenClaimsSchema.safeParse(decodePayload(token));
+        const claims = projectTokenClaims.wire.safeParse(decodePayload(token));
         if (!claims.success)
             throw new SdkError('UNAUTHENTICATED', 'malformed project token');
         if (claims.data.aud !== options.projectId || claims.data.app !== options.app) {
@@ -75,7 +75,7 @@ export function createClient(options) {
                 });
             }
             try {
-                const parsed = tokenExchangeResponseSchema.safeParse(await readResponse(response));
+                const parsed = tokenExchangeResponse.wire.safeParse(await readResponse(response));
                 if (!parsed.success) {
                     throw new SdkError('GATEWAY_UNAVAILABLE', 'unexpected refresh response', {
                         retryable: true,
@@ -147,7 +147,7 @@ export function createClient(options) {
                     // Host（親の窓）からの init だけを受ける。MessagePort の上で以後を話す
                     if (event.source !== win?.parent)
                         return;
-                    const init = initMessageSchema.safeParse(event.data);
+                    const init = initMessage.wire.safeParse(event.data);
                     const received = event.ports?.[0];
                     if (!init.success || !received)
                         return;
@@ -156,7 +156,7 @@ export function createClient(options) {
                     port.addEventListener('message', (message) => {
                         if (bridge.receive(message.data))
                             return;
-                        const context = contextMessageSchema.safeParse(message.data);
+                        const context = contextMessage.wire.safeParse(message.data);
                         if (context.success && !held) {
                             try {
                                 const next = accept(context.data.token, context.data.expiresAt, context.data.session);
@@ -175,7 +175,7 @@ export function createClient(options) {
                             }
                             return;
                         }
-                        const update = contextUpdateMessageSchema.safeParse(message.data);
+                        const update = contextUpdateMessage.wire.safeParse(message.data);
                         if (update.success && held && update.data.safeArea) {
                             bridge.setSafeArea(update.data.safeArea);
                         }
@@ -193,8 +193,7 @@ export function createClient(options) {
                     port.postMessage({
                         type: 'hello',
                         nonce: init.data.nonce,
-                        protocolVersion: PROTOCOL_VERSION,
-                        runtimeVersion: RUNTIME_VERSION,
+                        contract: CONTRACT_VERSION,
                     });
                 }
                 win.addEventListener('message', onInit);

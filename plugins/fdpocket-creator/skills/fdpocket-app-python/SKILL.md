@@ -155,12 +155,12 @@ await server.asUser(request).db.captionRequest.create({ data: { fileId, runId: r
 
 ```ts
 // apps/batch/src/index.ts — 中身は { runId, app, task, status, error }。出力は python.get で読む
-import { createServerClient, pythonRunFinishedSchema } from '@workspace/miniapp-sdk/server'
+import { createServerClient, pythonRunFinished } from '@workspace/miniapp-sdk/server'
 
 export default {
   async queue(job, env, ctx) {
     if (job.handler !== 'captionDone') return
-    const done = pythonRunFinishedSchema.parse(job.payload)
+    const done = pythonRunFinished.wire.parse(job.payload)
     const server = createServerClient<SchemaType>({ env })
     const asJob = server.forJob(job)                    // AI・python はタスクの払う人のまま
     if (done.status !== 'succeeded') {

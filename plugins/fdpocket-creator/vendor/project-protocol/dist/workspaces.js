@@ -1,4 +1,5 @@
 import { z } from 'zod';
+import { contract } from "./contract.js";
 /**
  * Project 内 Workspace の作成・招待・受諾（gateway.md §5。tasks/0487）。
  * - 作成: Workspace と作った人の `Membership`（owner）を Gateway が 1 つの書き込みで作る（`workspace.create` の Permission）
@@ -15,7 +16,7 @@ export const workspaceRoleSchema = z.enum(['owner', ...WORKSPACE_INVITE_ROLES]);
 export const workspaceCreateRequestSchema = z.strictObject({
     name: z.string().trim().min(1).max(100),
 });
-export const workspaceSchema = z.strictObject({ id: z.uuid(), name: z.string() });
+export const workspace = contract((o) => o.object({ id: z.uuid(), name: z.string() }));
 /** `POST /v1/workspaces/{id}/invitations`（宛先はどちらか 1 つ） */
 export const workspaceInviteRequestSchema = z
     .strictObject({
@@ -28,28 +29,28 @@ export const workspaceInviteRequestSchema = z
     .refine((value) => (value.userId === undefined) !== (value.accountName === undefined), {
     message: 'exactly one of userId or accountName is required',
 });
-export const workspaceInvitationCreatedSchema = z.strictObject({
+export const workspaceInvitationCreated = contract((o) => o.object({
     invitationId: z.uuid(),
     expiresAt: z.string(),
-});
+}));
 /** 本人宛ての招待（`GET /v1/workspaces/invitations`。この Project・環境だけ） */
-export const workspaceInvitationSchema = z.strictObject({
+export const workspaceInvitation = contract((o) => o.object({
     invitationId: z.uuid(),
     workspaceId: z.uuid(),
     /** Workspace が消えていれば null */
     workspaceName: z.string().nullable(),
-    role: workspaceInviteRoleSchema,
+    role: o.enum(WORKSPACE_INVITE_ROLES),
     /** 招待した人の Project 内 User.id（この Project の User が居なければ null） */
     invitedByUserId: z.string().nullable(),
     expiresAt: z.string(),
-});
-export const workspaceInvitationsResponseSchema = z.strictObject({
-    invitations: z.array(workspaceInvitationSchema),
-});
+}));
+export const workspaceInvitationsResponse = contract((o) => o.object({
+    invitations: z.array(workspaceInvitation.in(o)),
+}));
 /** `POST /v1/workspaces/{id}/accept` / `.../decline` */
 export const workspaceAnswerRequestSchema = z.strictObject({ invitationId: z.uuid() });
 /** 受諾の応答（作られた / 既にあった `Membership`） */
-export const workspaceMembershipSchema = z.strictObject({
+export const workspaceMembership = contract((o) => o.object({
     workspaceId: z.uuid(),
-    role: workspaceRoleSchema,
-});
+    role: o.enum(['owner', ...WORKSPACE_INVITE_ROLES]),
+}));

@@ -18,7 +18,7 @@ export const RESOLVE_STATUSES = [
     'not_found',
     /** 年齢区分・requiredPermission・チャットの閲覧権限が無い */
     'forbidden',
-    /** projects / project_environments / runtime_compat のどれかが止まっている */
+    /** projects / project_environments / contract_compat のどれかが止まっている */
     'disabled',
     /** このミニアプリへの初回の同意が無い（compliance.md §5） */
     'consent_required',
@@ -64,6 +64,8 @@ const activeSchema = z.strictObject({
     })
         .nullable(),
     versionId: z.uuid().nullable(),
+    /** その版の契約番号（project_versions.sdk_version。トークンの cv になる） */
+    contract: z.int().min(1),
     schemaRevision: z
         .string()
         .regex(/^[a-f0-9]{64}$/)

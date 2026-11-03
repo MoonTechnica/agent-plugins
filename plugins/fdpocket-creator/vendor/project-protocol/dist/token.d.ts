@@ -1,4 +1,5 @@
 import { z } from 'zod';
+import { type Open } from './contract.ts';
 /**
  * Project の環境（lifecycle.md §1.1）。環境 = Turso DB の単位。
  * 区画（tier）は資格情報の境界で、main と session は同じ dev 区画。
@@ -20,10 +21,11 @@ export declare const appSlugSchema: z.ZodString;
 export declare const PROJECT_TOKEN_ISSUER = "project-gateway";
 /**
  * Gateway が発行する Project アクセストークンの claims（gateway.md §3.2）。
- * strict なので Supabase JWT の claim（`role` 等）が混ざったトークンは受け付けない。
+ * Gateway は自分が署名したものを `exact` で読み返す（Supabase JWT の claim が混ざったトークンは通らない）。
+ * SDK は `wire` で読み、`aud` / `app` だけを見る（寿命の上限は発行側の不変条件）。
  * Permission はトークンに入れない（判定は毎回 DB）。
  */
-export declare const projectTokenClaimsSchema: z.ZodObject<{
+export declare const projectTokenClaims: import("./contract.ts").Contract<z.ZodObject<{
     iss: z.ZodLiteral<"project-gateway">;
     sub: z.ZodString;
     gid: z.ZodString;
@@ -34,6 +36,7 @@ export declare const projectTokenClaimsSchema: z.ZodObject<{
         session: "session";
         prod: "prod";
     }>;
+    cv: z.ZodInt;
     envId: z.ZodUUID;
     actorId: z.ZodUUID;
     testIdentity: z.ZodOptional<z.ZodString>;
@@ -42,8 +45,8 @@ export declare const projectTokenClaimsSchema: z.ZodObject<{
     jti: z.ZodUUID;
     iat: z.ZodInt;
     exp: z.ZodInt;
-}, z.core.$strict>;
-export type ProjectTokenClaims = z.infer<typeof projectTokenClaimsSchema>;
+}, z.core.$strip>>;
+export type ProjectTokenClaims = z.output<typeof projectTokenClaims.exact>;
 /** サービストークンの寿命（Project トークンと同じ 10 分。SDK が期限の前に取り直す） */
 export declare const SERVICE_TOKEN_TTL_SECONDS: number;
 /** api / jobs が利用者として Gateway を呼ぶときに、その利用者の Project トークンを載せるヘッダ */
@@ -54,10 +57,10 @@ export declare const SERVICE_CREDENTIAL_PATTERN: RegExp;
 export declare const SERVICE_CREDENTIAL_BINDING = "PLATFORM_SERVICE_CREDENTIAL";
 /**
  * サービストークンの claims。`typ: service` と `cid`（資格情報の ID）を持ち、`gid` / `anon` を持たない。
- * Project トークンの schema（strict）とは互いに通らないので、利用者のルートにサービストークンを出しても
+ * Project トークンの `exact` とは互いに通らないので、利用者のルートにサービストークンを出しても
  * `UNAUTHENTICATED` になる（サービストークンだけで利用者のデータは読めない。`X-Act-As` が要る）。
  */
-export declare const serviceTokenClaimsSchema: z.ZodObject<{
+export declare const serviceTokenClaims: import("./contract.ts").Contract<z.ZodObject<{
     iss: z.ZodLiteral<"project-gateway">;
     typ: z.ZodLiteral<"service">;
     sub: z.ZodString;
@@ -68,21 +71,22 @@ export declare const serviceTokenClaimsSchema: z.ZodObject<{
         session: "session";
         prod: "prod";
     }>;
+    cv: z.ZodInt;
     envId: z.ZodUUID;
     cid: z.ZodUUID;
     permissions: z.ZodArray<z.ZodString>;
     jti: z.ZodUUID;
     iat: z.ZodInt;
     exp: z.ZodInt;
-}, z.core.$strict>;
-export type ServiceTokenClaims = z.infer<typeof serviceTokenClaimsSchema>;
+}, z.core.$strip>>;
+export type ServiceTokenClaims = z.output<typeof serviceTokenClaims.exact>;
 /** `POST /v1/token/service` の応答（Authorization は資格情報） */
-export declare const serviceTokenResponseSchema: z.ZodObject<{
+export declare const serviceTokenResponse: import("./contract.ts").Contract<z.ZodObject<{
     token: z.ZodString;
     expiresAt: z.ZodISODateTime;
-}, z.core.$strict>;
-export type ServiceTokenResponse = z.infer<typeof serviceTokenResponseSchema>;
-/** `gateway_service_credential` の結果（使えない資格情報は null） */
+}, z.core.$strip>>;
+export type ServiceTokenResponse = z.output<typeof serviceTokenResponse.exact>;
+/** `gateway_service_credential` の結果（使えない資格情報は null）。Platform の内側（Supabase → Gateway） */
 export declare const serviceCredentialSchema: z.ZodObject<{
     credentialId: z.ZodUUID;
     projectId: z.ZodUUID;
@@ -92,12 +96,13 @@ export declare const serviceCredentialSchema: z.ZodObject<{
         prod: "prod";
     }>;
     environmentId: z.ZodUUID;
+    contract: z.ZodNullable<z.ZodInt>;
     appSlug: z.ZodString;
     servicePermissions: z.ZodArray<z.ZodString>;
 }, z.core.$strict>;
 export type ServiceCredential = z.infer<typeof serviceCredentialSchema>;
 /** `POST /v1/token/exchange` の本文（Authorization は Supabase の access token） */
-export declare const tokenExchangeRequestSchema: z.ZodObject<{
+export declare const tokenExchangeRequest: import("./contract.ts").Contract<z.ZodObject<{
     projectId: z.ZodUUID;
     app: z.ZodString;
     environment: z.ZodEnum<{
@@ -107,10 +112,10 @@ export declare const tokenExchangeRequestSchema: z.ZodObject<{
     }>;
     environmentId: z.ZodOptional<z.ZodUUID>;
     testIdentity: z.ZodOptional<z.ZodString>;
-}, z.core.$strict>;
-export type TokenExchangeRequest = z.infer<typeof tokenExchangeRequestSchema>;
+}, z.core.$strip>>;
+export type TokenExchangeRequest = z.output<typeof tokenExchangeRequest.exact>;
 /** 本人が開ける（または一覧に出る）同じ Project の App */
-export declare const sessionAppSchema: z.ZodObject<{
+export declare const sessionApp: import("./contract.ts").Contract<z.ZodObject<{
     slug: z.ZodString;
     kind: z.ZodEnum<{
         web: "web";
@@ -127,13 +132,13 @@ export declare const sessionAppSchema: z.ZodObject<{
         en: z.ZodString;
     }, z.core.$strict>>;
     canOpen: z.ZodBoolean;
-}, z.core.$strict>;
-export type SessionApp = z.infer<typeof sessionAppSchema>;
+}, z.core.$strip>>;
+export type SessionApp = z.output<typeof sessionApp.exact>;
 /**
  * 現在の主体（sdk.md §3.1）。`permissions` は発行時の写しで、表示の補助にだけ使う。
- * Supabase の JWT は載せない（strict）。
+ * Supabase の JWT は載せない（書く側は `exact` で確かめる）。
  */
-export declare const sessionSchema: z.ZodObject<{
+export declare const session: import("./contract.ts").Contract<z.ZodObject<{
     userId: z.ZodString;
     globalUserId: z.ZodString;
     displayName: z.ZodNullable<z.ZodString>;
@@ -157,10 +162,12 @@ export declare const sessionSchema: z.ZodObject<{
             en: z.ZodString;
         }, z.core.$strict>>;
         canOpen: z.ZodBoolean;
-    }, z.core.$strict>>;
-}, z.core.$strict>;
-export type Session = z.infer<typeof sessionSchema>;
-export declare const tokenExchangeResponseSchema: z.ZodObject<{
+    }, z.core.$strip>>;
+}, z.core.$strip>>;
+export type Session = z.output<typeof session.exact>;
+/** 読む側（SDK）が受け取る Session。App の種類などに知らない値が入りうる */
+export type WireSession = Open<Session>;
+export declare const tokenExchangeResponse: import("./contract.ts").Contract<z.ZodObject<{
     token: z.ZodString;
     expiresAt: z.ZodISODateTime;
     session: z.ZodObject<{
@@ -187,12 +194,12 @@ export declare const tokenExchangeResponseSchema: z.ZodObject<{
                 en: z.ZodString;
             }, z.core.$strict>>;
             canOpen: z.ZodBoolean;
-        }, z.core.$strict>>;
-    }, z.core.$strict>;
-}, z.core.$strict>;
-export type TokenExchangeResponse = z.infer<typeof tokenExchangeResponseSchema>;
+        }, z.core.$strip>>;
+    }, z.core.$strip>;
+}, z.core.$strip>>;
+export type TokenExchangeResponse = z.output<typeof tokenExchangeResponse.exact>;
 /** `GET /v1/me` */
-export declare const meResponseSchema: z.ZodObject<{
+export declare const meResponse: import("./contract.ts").Contract<z.ZodObject<{
     userId: z.ZodString;
     globalUserId: z.ZodString;
     displayName: z.ZodNullable<z.ZodString>;
@@ -216,6 +223,6 @@ export declare const meResponseSchema: z.ZodObject<{
             en: z.ZodString;
         }, z.core.$strict>>;
         canOpen: z.ZodBoolean;
-    }, z.core.$strict>>;
-}, z.core.$strict>;
+    }, z.core.$strip>>;
+}, z.core.$strip>>;
 export type MeResponse = Session;

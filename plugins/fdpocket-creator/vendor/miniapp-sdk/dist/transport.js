@@ -1,4 +1,4 @@
-import { errorResponseSchema, sdkErrorCodeForStatus, } from '@workspace/project-protocol';
+import { CONTRACT_HEADER, CONTRACT_VERSION, errorResponse, sdkErrorCodeForStatus, } from '@workspace/project-protocol';
 import { SdkError } from "./errors.js";
 /**
  * Gateway への送信（sdk.md §3.5）。Project トークンを付け、失敗はすべて `SdkError` にする。
@@ -14,6 +14,7 @@ export function createTransport(options) {
             throw new SdkError('UNAUTHENTICATED', 'no project session');
         const headers = new Headers(init.headers);
         headers.set('authorization', `Bearer ${token}`);
+        headers.set(CONTRACT_HEADER, String(CONTRACT_VERSION));
         let response;
         try {
             response = await options.fetch(url, { ...init, headers });
@@ -89,7 +90,7 @@ export async function readResponse(response, onUnauthenticated = () => { }) {
 }
 function parseErrorBody(text) {
     try {
-        const parsed = errorResponseSchema.safeParse(JSON.parse(text));
+        const parsed = errorResponse.wire.safeParse(JSON.parse(text));
         return parsed.success ? parsed.data.error : null;
     }
     catch {

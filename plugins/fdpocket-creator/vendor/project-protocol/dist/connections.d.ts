@@ -141,17 +141,17 @@ export declare const connectionPermissionRequestResultSchema: z.ZodUnion<readonl
     grantId: z.ZodUUID;
     status: z.ZodLiteral<"approved">;
 }, z.core.$strip>]>;
-export declare const connectionGrantResultSchema: z.ZodObject<{
+export declare const connectionGrantResult: import("./contract.ts").Contract<z.ZodObject<{
     grantId: z.ZodUUID;
-}, z.core.$strict>;
+}, z.core.$strip>>;
 export declare const connectionCallSchema: z.ZodObject<{
     grantId: z.ZodUUID;
     tool: z.ZodLiteral<"fdpocket-read">;
     input: z.ZodRecord<z.ZodString, z.ZodUnknown>;
 }, z.core.$strict>;
-export declare const connectionCallResultSchema: z.ZodObject<{
+export declare const connectionCallResult: import("./contract.ts").Contract<z.ZodObject<{
     result: z.ZodUnknown;
-}, z.core.$strict>;
+}, z.core.$strip>>;
 export declare const connectionScopeSchema: z.ZodObject<{
     userId: z.ZodUUID;
     projectId: z.ZodUUID;

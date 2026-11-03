@@ -14,6 +14,7 @@ export declare const storageDownloadClaimsSchema: z.ZodObject<{
             session: "session";
             prod: "prod";
         }>;
+        cv: z.ZodInt;
         envId: z.ZodUUID;
         actorId: z.ZodUUID;
         testIdentity: z.ZodOptional<z.ZodString>;
@@ -22,7 +23,7 @@ export declare const storageDownloadClaimsSchema: z.ZodObject<{
         jti: z.ZodUUID;
         iat: z.ZodInt;
         exp: z.ZodInt;
-    }, z.core.$strict>;
+    }, z.core.$strip>;
     fileId: z.ZodUUID;
     versionId: z.ZodNullable<z.ZodUUID>;
     policyVersion: z.ZodOptional<z.ZodString>;

@@ -582,6 +582,7 @@ SDK は失敗を `null` / `[]` で隠さず `SdkError` を投げる。メンバ�
 | `CONSENT_REQUIRED` | 利用者がこのミニアプリにまだ同意していない | Host が同意画面を出す。App は待つ |
 | `GATEWAY_UNAVAILABLE` | Gateway に届かない（フェイルクローズ） | 再試行の導線。読めたふりをしない |
 | `HOST_UNAVAILABLE` | 埋め込まれていない | 直接アクセスの表示に切り替える |
+| `CONTRACT_UNSUPPORTED` | この成果物の契約番号を Platform がもう受け付けない | 作者に再ビルドを案内する。再試行しない |
 
 ## 5. データモデル（ZModel）
 

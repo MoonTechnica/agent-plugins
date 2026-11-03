@@ -59,8 +59,8 @@ export declare const directAuthResultSchema: z.ZodObject<{
                 en: z.ZodString;
             }, z.core.$strict>>;
             canOpen: z.ZodBoolean;
-        }, z.core.$strict>>;
-    }, z.core.$strict>;
+        }, z.core.$strip>>;
+    }, z.core.$strip>;
     delivery: z.ZodObject<{
         token: z.ZodString;
         expiresAt: z.ZodISODateTime;
@@ -92,13 +92,13 @@ export declare const directAuthResultSchema: z.ZodObject<{
                     en: z.ZodString;
                 }, z.core.$strict>>;
                 canOpen: z.ZodBoolean;
-            }, z.core.$strict>>;
-        }, z.core.$strict>;
-    }, z.core.$strict>;
+            }, z.core.$strip>>;
+        }, z.core.$strip>;
+    }, z.core.$strip>;
     path: z.ZodString;
     projectId: z.ZodUUID;
     app: z.ZodString;
-}, z.core.$strict>;
+}, z.core.$strip>;
 export type DirectAuthResult = z.infer<typeof directAuthResultSchema>;
 export declare function pkceChallenge(verifier: string): Promise<string>;
 export declare function directAuthRandom(): string;

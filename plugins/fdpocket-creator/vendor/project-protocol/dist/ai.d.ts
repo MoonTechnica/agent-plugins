@@ -31,7 +31,7 @@ export type AiTurnRequest = z.infer<typeof aiTurnRequestSchema>;
  */
 export declare const AI_FINISH_REASONS: readonly ["stop", "length", "content_filter", "other"];
 export type AiFinishReason = (typeof AI_FINISH_REASONS)[number];
-export declare const aiTurnResultSchema: z.ZodObject<{
+export declare const aiTurnResult: import("./contract.ts").Contract<z.ZodObject<{
     text: z.ZodString;
     finishReason: z.ZodEnum<{
         length: "length";
@@ -43,13 +43,13 @@ export declare const aiTurnResultSchema: z.ZodObject<{
     credits: z.ZodNumber;
     responseId: z.ZodString;
     model: z.ZodString;
-}, z.core.$strict>;
-export type AiTurnResult = z.infer<typeof aiTurnResultSchema>;
+}, z.core.$strip>>;
+export type AiTurnResult = z.output<typeof aiTurnResult.exact>;
 /** SSE の data（`stream: true`） */
-export declare const aiTurnEventSchema: z.ZodDiscriminatedUnion<[z.ZodObject<{
+export declare const aiTurnEvent: import("./contract.ts").Contract<z.ZodDiscriminatedUnion<[z.ZodObject<{
     type: z.ZodLiteral<"delta">;
     text: z.ZodString;
-}, z.core.$strict>, z.ZodObject<{
+}, z.core.$strip>, z.ZodObject<{
     type: z.ZodLiteral<"done">;
     result: z.ZodObject<{
         text: z.ZodString;
@@ -63,8 +63,8 @@ export declare const aiTurnEventSchema: z.ZodDiscriminatedUnion<[z.ZodObject<{
         credits: z.ZodNumber;
         responseId: z.ZodString;
         model: z.ZodString;
-    }, z.core.$strict>;
-}, z.core.$strict>, z.ZodObject<{
+    }, z.core.$strip>;
+}, z.core.$strip>, z.ZodObject<{
     type: z.ZodLiteral<"error">;
     code: z.ZodEnum<{
         UNAUTHENTICATED: "UNAUTHENTICATED";
@@ -84,11 +84,12 @@ export declare const aiTurnEventSchema: z.ZodDiscriminatedUnion<[z.ZodObject<{
         REALTIME_DISABLED: "REALTIME_DISABLED";
         REALTIME_CAPACITY: "REALTIME_CAPACITY";
         RESYNC_REQUIRED: "RESYNC_REQUIRED";
+        CONTRACT_UNSUPPORTED: "CONTRACT_UNSUPPORTED";
     }>;
     message: z.ZodString;
-}, z.core.$strict>], "type">;
-export type AiTurnEvent = z.infer<typeof aiTurnEventSchema>;
+}, z.core.$strip>], "type">>;
+export type AiTurnEvent = z.output<typeof aiTurnEvent.exact>;
 /** `POST /v1/ai/conversations/{conversation}/reset` */
-export declare const aiResetResponseSchema: z.ZodObject<{
+export declare const aiResetResponse: import("./contract.ts").Contract<z.ZodObject<{
     conversation: z.ZodString;
-}, z.core.$strict>;
+}, z.core.$strip>>;

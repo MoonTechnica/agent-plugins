@@ -1,6 +1,6 @@
 import './zod-jitless.ts';
-export type { AiFinishReason, AiTurnResult, PlatformProfile, SdkErrorCode, Session, } from '@workspace/project-protocol';
-export type { Ai, AiChatInput, OpenAiCompatible } from './ai/client.ts';
+export type { AiFinishReason, PlatformProfile, WireSdkErrorCode as SdkErrorCode, WireSession as Session, } from '@workspace/project-protocol';
+export type { Ai, AiChatInput, AiTurnResult, OpenAiCompatible } from './ai/client.ts';
 export { apiPath } from './api-path.ts';
 export { type Auth, type ClientOptions, createClient, type HostWindow, type ProjectClient, } from './client.ts';
 export type { Connections } from './connections/client.ts';

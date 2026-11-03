@@ -14518,6 +14518,30 @@ function date4(params) {
 // frontend/node_modules/zod/v4/classic/external.js
 config(en_default());
 
+// frontend/packages/project-protocol/src/contract.ts
+var WIRE = {
+  mode: "wire",
+  object: (shape) => external_exports.object(shape),
+  // 型は閉じた enum のまま。読む側の型は Contract.wire が Open<> で開く
+  enum: (_values) => external_exports.string(),
+  invariant: (schema) => schema
+};
+var EXACT = {
+  mode: "exact",
+  object: (shape) => external_exports.strictObject(shape),
+  enum: (values) => external_exports.enum(values),
+  invariant: (schema, check2) => schema.superRefine(check2)
+};
+function contract(build) {
+  const wire = build(WIRE);
+  const exact = build(EXACT);
+  return {
+    wire,
+    exact,
+    in: (shape) => shape.mode === "wire" ? wire : exact
+  };
+}
+
 // frontend/packages/project-protocol/src/errors.ts
 var SDK_ERROR_CODES = [
   "UNAUTHENTICATED",
@@ -14536,9 +14560,10 @@ var SDK_ERROR_CODES = [
   "HOST_UNAVAILABLE",
   "REALTIME_DISABLED",
   "REALTIME_CAPACITY",
-  "RESYNC_REQUIRED"
+  "RESYNC_REQUIRED",
+  "CONTRACT_UNSUPPORTED"
 ];
-var sdkErrorCodeSchema = external_exports.enum(SDK_ERROR_CODES);
+var sdkErrorCode = contract((o) => o.enum(SDK_ERROR_CODES));
 var RETRYABLE = /* @__PURE__ */ new Set([
   "REALTIME_CAPACITY",
   "CONFLICT",
@@ -14548,17 +14573,19 @@ var RETRYABLE = /* @__PURE__ */ new Set([
 function isRetryable(code) {
   return RETRYABLE.has(code);
 }
-var errorResponseSchema = external_exports.strictObject({
-  error: external_exports.strictObject({
-    code: sdkErrorCodeSchema,
-    message: external_exports.string(),
-    requestId: external_exports.string().optional(),
-    retryable: external_exports.boolean(),
-    /** `POST_WRITE_READ_DENIED` のとき true（書き込みは保存済み。sdk.md §3.2） */
-    committed: external_exports.boolean().optional(),
-    details: external_exports.unknown().optional()
+var errorResponse = contract(
+  (o) => o.object({
+    error: o.object({
+      code: sdkErrorCode.in(o),
+      message: external_exports.string(),
+      requestId: external_exports.string().optional(),
+      retryable: external_exports.boolean(),
+      /** `POST_WRITE_READ_DENIED` のとき true（書き込みは保存済み。sdk.md §3.2） */
+      committed: external_exports.boolean().optional(),
+      details: external_exports.unknown().optional()
+    })
   })
-});
+);
 
 // frontend/packages/project-protocol/src/realtime.ts
 var REALTIME_LIMITS = {
@@ -14626,11 +14653,18 @@ var realtimeManifestSchema = external_exports.strictObject({
   channels: external_exports.record(name, realtimeChannelSchema).default({})
 });
 var realtimeFrameSchema = external_exports.strictObject({
-  version: external_exports.literal(1),
+  contract: external_exports.int().min(1),
   ref: external_exports.string().min(1).max(64),
   type: external_exports.enum(["authenticate", "broadcast", "track", "untrack", "heartbeat", "leave", "refresh"]),
   payload: external_exports.unknown()
 });
+
+// frontend/packages/project-protocol/src/version.ts
+var CONTRACT_VERSION = 3;
+var SUPPORTED_CONTRACTS = [3];
+function isSupportedContract(value) {
+  return SUPPORTED_CONTRACTS.includes(value);
+}
 
 // infra/workers/gateway/src/realtime.ts
 var MAX_CONNECTIONS = REALTIME_LIMITS.connections;
@@ -14699,11 +14733,13 @@ function createRealtimeRoom(resolve) {
         socket.close(1013, "Realtime backpressure");
         return;
       }
-      socket.send(JSON.stringify({ version: 1, ref, type, payload }));
+      socket.send(
+        JSON.stringify({ contract: CONTRACT_VERSION, ref, type, payload })
+      );
     }
     async fail(socket, ref, error51) {
       const candidate = error51 && typeof error51 === "object" && "code" in error51 ? String(error51.code) : "GATEWAY_UNAVAILABLE";
-      const parsed = sdkErrorCodeSchema.safeParse(candidate);
+      const parsed = sdkErrorCode.exact.safeParse(candidate);
       const code = parsed.success ? parsed.data : "GATEWAY_UNAVAILABLE";
       console.warn("realtime_operation_rejected", { code });
       const retryable = isRetryable(code);
@@ -14800,7 +14836,7 @@ function createRealtimeRoom(resolve) {
         if (!validated.success)
           throw Object.assign(new Error("frame"), { code: "FORBIDDEN" });
         const frame = validated.data;
-        if (!frame || frame.version !== 1 || typeof frame.ref !== "string" || frame.ref.length > 128 || !frame.payload || typeof frame.payload !== "object")
+        if (!frame || !isSupportedContract(frame.contract) || typeof frame.ref !== "string" || frame.ref.length > 128 || !frame.payload || typeof frame.payload !== "object")
           throw Object.assign(new Error("frame"), { code: "FORBIDDEN" });
         ref = frame.ref;
         let connection = await this.connection(socket);

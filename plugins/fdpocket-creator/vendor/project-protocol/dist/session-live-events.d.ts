@@ -24,7 +24,7 @@ export interface SessionSchemaPayload {
     source?: SessionSourceDescriptor;
     hash: string;
     manifest: NormalizedProjectManifest;
-    runtimeVersion: number;
+    contract: number;
     zmodelHash: string;
     generatedSql: string;
     dataSql: string;

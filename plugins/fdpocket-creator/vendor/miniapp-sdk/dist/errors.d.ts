@@ -1,4 +1,4 @@
-import { type SdkErrorCode } from '@workspace/project-protocol';
+import { type WireSdkErrorCode as SdkErrorCode } from '@workspace/project-protocol';
 /**
  * SDK のエラー（sdk.md §3.5）。失敗を `null` / `[]` で誤魔化さず、必ずこれを throw する。
  * ユーザー向けの文言は持たない（`code` で App が出し分ける。i18n は App 側）。

@@ -1,9 +1,9 @@
-import { PYTHON_RUN_FINAL_STATUSES, pythonRunAcceptedSchema, pythonRunIdSchema, pythonRunRequestSchema, pythonRunSchema, } from '@workspace/project-protocol';
+import { PYTHON_RUN_FINAL_STATUSES, pythonRun, pythonRunAcceptedSchema, pythonRunIdSchema, pythonRunRequestSchema, } from '@workspace/project-protocol';
 import { SdkError } from "../errors.js";
 const WAIT_DEFAULT_MS = 60 * 60 * 1000;
 const INTERVAL_DEFAULT_MS = 2000;
 export function createPython(transport, sleep = (ms) => new Promise((r) => setTimeout(r, ms))) {
-    const read = async (path, method = 'GET') => parse(pythonRunSchema, await transport.send(path, { method }));
+    const read = async (path, method = 'GET') => parse(pythonRun.wire, await transport.send(path, { method }));
     function handle(runId) {
         const get = () => read(`/v1/python/runs/${runId}`);
         return {

@@ -1,5 +1,9 @@
-import { type FileVisibility, type StorageDeleteResponse, type StorageDownloadResponse, type StorageFile } from '@workspace/project-protocol';
+import { type FileVisibility, type Open, type StorageDeleteResponse as ProtocolStorageDeleteResponse, type StorageDownloadResponse as ProtocolStorageDownloadResponse, type StorageFile as ProtocolStorageFile } from '@workspace/project-protocol';
 import type { Transport } from '../transport.ts';
+/** 読む側の StorageFile: 後から足された status・visibility の値も入りうる */
+type StorageFile = Open<ProtocolStorageFile>;
+type StorageDeleteResponse = Open<ProtocolStorageDeleteResponse>;
+type StorageDownloadResponse = Open<ProtocolStorageDownloadResponse>;
 export interface UploadProgress {
     loaded: number;
     total: number;
@@ -38,3 +42,4 @@ export interface Storage {
  * proxyバケットの取得はGatewayが毎回認可して中継する。PUTにはトークンを付けない（署名URLが権限）。
  */
 export declare function createStorage(transport: Transport, fetchImpl: typeof globalThis.fetch, gateway: string): Storage;
+export {};

@@ -16,10 +16,10 @@ export declare const workspaceInviteRoleSchema: z.ZodEnum<{
 export type WorkspaceInviteRole = z.infer<typeof workspaceInviteRoleSchema>;
 /** Workspace の役割（`Membership.role`） */
 export declare const workspaceRoleSchema: z.ZodEnum<{
-    owner: "owner";
     admin: "admin";
     editor: "editor";
     viewer: "viewer";
+    owner: "owner";
 }>;
 export type WorkspaceRole = z.infer<typeof workspaceRoleSchema>;
 /** `POST /v1/workspaces` */
@@ -27,11 +27,11 @@ export declare const workspaceCreateRequestSchema: z.ZodObject<{
     name: z.ZodString;
 }, z.core.$strict>;
 export type WorkspaceCreateRequest = z.infer<typeof workspaceCreateRequestSchema>;
-export declare const workspaceSchema: z.ZodObject<{
+export declare const workspace: import("./contract.ts").Contract<z.ZodObject<{
     id: z.ZodUUID;
     name: z.ZodString;
-}, z.core.$strict>;
-export type Workspace = z.infer<typeof workspaceSchema>;
+}, z.core.$strip>>;
+export type Workspace = z.output<typeof workspace.exact>;
 /** `POST /v1/workspaces/{id}/invitations`（宛先はどちらか 1 つ） */
 export declare const workspaceInviteRequestSchema: z.ZodObject<{
     userId: z.ZodOptional<z.ZodString>;
@@ -43,13 +43,13 @@ export declare const workspaceInviteRequestSchema: z.ZodObject<{
     }>>;
 }, z.core.$strict>;
 export type WorkspaceInviteRequest = z.input<typeof workspaceInviteRequestSchema>;
-export declare const workspaceInvitationCreatedSchema: z.ZodObject<{
+export declare const workspaceInvitationCreated: import("./contract.ts").Contract<z.ZodObject<{
     invitationId: z.ZodUUID;
     expiresAt: z.ZodString;
-}, z.core.$strict>;
-export type WorkspaceInvitationCreated = z.infer<typeof workspaceInvitationCreatedSchema>;
+}, z.core.$strip>>;
+export type WorkspaceInvitationCreated = z.output<typeof workspaceInvitationCreated.exact>;
 /** 本人宛ての招待（`GET /v1/workspaces/invitations`。この Project・環境だけ） */
-export declare const workspaceInvitationSchema: z.ZodObject<{
+export declare const workspaceInvitation: import("./contract.ts").Contract<z.ZodObject<{
     invitationId: z.ZodUUID;
     workspaceId: z.ZodUUID;
     workspaceName: z.ZodNullable<z.ZodString>;
@@ -60,9 +60,9 @@ export declare const workspaceInvitationSchema: z.ZodObject<{
     }>;
     invitedByUserId: z.ZodNullable<z.ZodString>;
     expiresAt: z.ZodString;
-}, z.core.$strict>;
-export type WorkspaceInvitation = z.infer<typeof workspaceInvitationSchema>;
-export declare const workspaceInvitationsResponseSchema: z.ZodObject<{
+}, z.core.$strip>>;
+export type WorkspaceInvitation = z.output<typeof workspaceInvitation.exact>;
+export declare const workspaceInvitationsResponse: import("./contract.ts").Contract<z.ZodObject<{
     invitations: z.ZodArray<z.ZodObject<{
         invitationId: z.ZodUUID;
         workspaceId: z.ZodUUID;
@@ -74,22 +74,22 @@ export declare const workspaceInvitationsResponseSchema: z.ZodObject<{
         }>;
         invitedByUserId: z.ZodNullable<z.ZodString>;
         expiresAt: z.ZodString;
-    }, z.core.$strict>>;
-}, z.core.$strict>;
-export type WorkspaceInvitationsResponse = z.infer<typeof workspaceInvitationsResponseSchema>;
+    }, z.core.$strip>>;
+}, z.core.$strip>>;
+export type WorkspaceInvitationsResponse = z.output<typeof workspaceInvitationsResponse.exact>;
 /** `POST /v1/workspaces/{id}/accept` / `.../decline` */
 export declare const workspaceAnswerRequestSchema: z.ZodObject<{
     invitationId: z.ZodUUID;
 }, z.core.$strict>;
 export type WorkspaceAnswerRequest = z.infer<typeof workspaceAnswerRequestSchema>;
 /** 受諾の応答（作られた / 既にあった `Membership`） */
-export declare const workspaceMembershipSchema: z.ZodObject<{
+export declare const workspaceMembership: import("./contract.ts").Contract<z.ZodObject<{
     workspaceId: z.ZodUUID;
     role: z.ZodEnum<{
-        owner: "owner";
         admin: "admin";
         editor: "editor";
         viewer: "viewer";
+        owner: "owner";
     }>;
-}, z.core.$strict>;
-export type WorkspaceMembership = z.infer<typeof workspaceMembershipSchema>;
+}, z.core.$strip>>;
+export type WorkspaceMembership = z.output<typeof workspaceMembership.exact>;

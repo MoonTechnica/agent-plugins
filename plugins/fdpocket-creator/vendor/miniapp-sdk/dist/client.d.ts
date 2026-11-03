@@ -1,5 +1,5 @@
 import './zod-jitless.ts';
-import { type Session } from '@workspace/project-protocol';
+import { type WireSession as Session } from '@workspace/project-protocol';
 import type { SchemaDef } from '@zenstackhq/schema';
 import { type Ai } from './ai/client.ts';
 import { type Connections } from './connections/client.ts';

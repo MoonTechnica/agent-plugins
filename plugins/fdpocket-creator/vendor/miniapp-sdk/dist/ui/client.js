@@ -1,4 +1,4 @@
-import { BRIDGE_OP_PAYLOAD_SCHEMAS, replyMessageSchema, } from '@workspace/project-protocol';
+import { BRIDGE_OP_PAYLOADS, replyMessage, } from '@workspace/project-protocol';
 import { SdkError } from "../errors.js";
 const NO_INSETS = { top: 0, right: 0, bottom: 0, left: 0 };
 /**
@@ -15,7 +15,7 @@ export function createUiBridge() {
     function send(op, payload) {
         if (!port)
             return Promise.reject(new SdkError('HOST_UNAVAILABLE', 'not embedded in the super app'));
-        if (!BRIDGE_OP_PAYLOAD_SCHEMAS[op].safeParse(payload).success) {
+        if (!BRIDGE_OP_PAYLOADS[op].exact.safeParse(payload).success) {
             return Promise.reject(new SdkError('VALIDATION_FAILED', `invalid input for ${op}`));
         }
         const requestId = crypto.randomUUID();
@@ -61,7 +61,7 @@ export function createUiBridge() {
                 listener(next);
         },
         receive(data) {
-            const reply = replyMessageSchema.safeParse(data);
+            const reply = replyMessage.wire.safeParse(data);
             if (!reply.success)
                 return false;
             const waiting = pending.get(reply.data.requestId);

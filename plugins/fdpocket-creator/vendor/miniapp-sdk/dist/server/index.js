@@ -1,5 +1,5 @@
 import "../zod-jitless.js";
-import { ACT_AS_HEADER, notificationSendRequestSchema, notificationSendResponseSchema, RUN_CONTEXT_HEADER, SERVICE_CREDENTIAL_PATTERN, serviceTokenResponseSchema, } from '@workspace/project-protocol';
+import { ACT_AS_HEADER, notificationSendRequestSchema, notificationSendResponse, RUN_CONTEXT_HEADER, SERVICE_CREDENTIAL_PATTERN, serviceTokenResponse, } from '@workspace/project-protocol';
 import { createAi } from "../ai/client.js";
 import { createConnectionReader } from "../connections/client.js";
 import { createDbClient } from "../db/client.js";
@@ -31,7 +31,7 @@ export function createServerClient(options) {
         if (held && held.expiresAt - 60_000 > now())
             return held.token;
         pending ??= (async () => {
-            const result = serviceTokenResponseSchema.safeParse(await credentials.send('/v1/token/service', { method: 'POST' }));
+            const result = serviceTokenResponse.wire.safeParse(await credentials.send('/v1/token/service', { method: 'POST' }));
             if (!result.success || Date.parse(result.data.expiresAt) <= now()) {
                 throw new SdkError('GATEWAY_UNAVAILABLE', 'invalid service token response', {
                     retryable: true,
@@ -80,7 +80,7 @@ export function createServerClient(options) {
                 if (!parsed.success)
                     throw new SdkError('VALIDATION_FAILED', 'invalid notification request');
                 const body = parsed.data;
-                const result = notificationSendResponseSchema.safeParse(await serviceTransport().send('/v1/notifications/send', { method: 'POST', body }));
+                const result = notificationSendResponse.wire.safeParse(await serviceTransport().send('/v1/notifications/send', { method: 'POST', body }));
                 if (!result.success)
                     throw new SdkError('GATEWAY_UNAVAILABLE', 'invalid notification response', {
                         retryable: true,
@@ -114,5 +114,5 @@ export function createServerClient(options) {
     };
 }
 /** onFinish で届いたジョブの payload を確かめる（python-backend.md §4.2） */
-export { pythonRunFinishedSchema } from '@workspace/project-protocol';
+export { pythonRunFinished } from '@workspace/project-protocol';
 export { SdkError } from "../errors.js";

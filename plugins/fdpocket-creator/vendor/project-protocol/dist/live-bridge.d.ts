@@ -58,9 +58,9 @@ export declare const liveHostExchangeReplySchema: z.ZodDiscriminatedUnion<[z.Zod
                     en: z.ZodString;
                 }, z.core.$strict>>;
                 canOpen: z.ZodBoolean;
-            }, z.core.$strict>>;
-        }, z.core.$strict>;
-    }, z.core.$strict>;
+            }, z.core.$strip>>;
+        }, z.core.$strip>;
+    }, z.core.$strip>;
 }, z.core.$strict>, z.ZodObject<{
     type: z.ZodLiteral<"kit-session-reply">;
     version: z.ZodLiteral<1>;

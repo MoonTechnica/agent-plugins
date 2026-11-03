@@ -88,7 +88,7 @@ export const realtimeManifestSchema = z.strictObject({
     channels: z.record(name, realtimeChannelSchema).default({}),
 });
 export const realtimeFrameSchema = z.strictObject({
-    version: z.literal(1),
+    contract: z.int().min(1),
     ref: z.string().min(1).max(64),
     type: z.enum(['authenticate', 'broadcast', 'track', 'untrack', 'heartbeat', 'leave', 'refresh']),
     payload: z.unknown(),

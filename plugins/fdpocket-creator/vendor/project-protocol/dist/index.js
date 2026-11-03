@@ -6,6 +6,7 @@ export * from "./apple-app-site-association.js";
 export * from "./artifact.js";
 export * from "./bridge.js";
 export * from "./connections.js";
+export * from "./contract.js";
 export * from "./csp.js";
 export * from "./db-batch.js";
 export * from "./delivery.js";

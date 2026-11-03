@@ -1,4 +1,4 @@
-import { REALTIME_LIMITS, realtimeJoinSchema, sdkErrorCodeSchema, } from '@workspace/project-protocol';
+import { CONTRACT_VERSION, REALTIME_LIMITS, realtimeJoinSchema, sdkErrorCode, } from '@workspace/project-protocol';
 import { deserialize } from '@zenstackhq/client-helpers/fetch';
 import { SdkError } from "../errors.js";
 const error = (message) => new SdkError('GATEWAY_UNAVAILABLE', message, { retryable: true });
@@ -84,7 +84,7 @@ export function createRealtime(transport, gateway, socketFactory = (url) => new 
                 const id = String(++ref);
                 let encoded;
                 try {
-                    encoded = JSON.stringify({ version: 1, ref: id, type, payload });
+                    encoded = JSON.stringify({ contract: CONTRACT_VERSION, ref: id, type, payload });
                 }
                 catch (cause) {
                     console.error('Realtime payload encoding failed');
@@ -154,7 +154,7 @@ export function createRealtime(transport, gateway, socketFactory = (url) => new 
                     ws.addEventListener('open', () => {
                         if (socket === ws)
                             ws.send(JSON.stringify({
-                                version: 1,
+                                contract: CONTRACT_VERSION,
                                 ref: String(++ref),
                                 type: 'authenticate',
                                 payload: { ticket: result.ticket },
@@ -165,10 +165,10 @@ export function createRealtime(transport, gateway, socketFactory = (url) => new 
                             return;
                         try {
                             const frame = JSON.parse(String(event.data));
-                            if (frame.version !== 1 || typeof frame.type !== 'string')
+                            if (typeof frame.type !== 'string')
                                 throw error('invalid realtime frame');
                             if (frame.type === 'error') {
-                                const code = sdkErrorCodeSchema.safeParse(frame.payload?.code);
+                                const code = sdkErrorCode.wire.safeParse(frame.payload?.code);
                                 const failure = new SdkError(code.success ? code.data : 'GATEWAY_UNAVAILABLE', typeof frame.payload?.message === 'string'
                                     ? frame.payload.message
                                     : 'realtime server error', { retryable: frame.payload?.retryable === true });

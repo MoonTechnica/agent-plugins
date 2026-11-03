@@ -138,7 +138,7 @@ export declare const pythonRunAcceptedSchema: z.ZodObject<{
 }, z.core.$strip>;
 /** 実行の id（`python.get(runId)` の引数） */
 export declare const pythonRunIdSchema: z.ZodUUID;
-export declare const pythonRunSchema: z.ZodObject<{
+export declare const pythonRun: import("./contract.ts").Contract<z.ZodObject<{
     runId: z.ZodUUID;
     app: z.ZodString;
     task: z.ZodString;
@@ -158,17 +158,17 @@ export declare const pythonRunSchema: z.ZodObject<{
     error: z.ZodOptional<z.ZodNullable<z.ZodObject<{
         code: z.ZodString;
         message: z.ZodNullable<z.ZodString>;
-    }, z.core.$strict>>>;
+    }, z.core.$strip>>>;
     createdAt: z.ZodString;
     startedAt: z.ZodNullable<z.ZodString>;
     finishedAt: z.ZodNullable<z.ZodString>;
-}, z.core.$strict>;
-export type PythonRun = z.infer<typeof pythonRunSchema>;
+}, z.core.$strip>>;
+export type PythonRun = z.output<typeof pythonRun.exact>;
 /**
  * タスクの `onFinish` で jobs に届くジョブの `payload`（Platform が登録する。python-backend.md §4.2）。
  * 出力は載せない（1 MiB まであり、ジョブの payload は 64 KiB まで）。`python.get(runId)` で読む
  */
-export declare const pythonRunFinishedSchema: z.ZodObject<{
+export declare const pythonRunFinished: import("./contract.ts").Contract<z.ZodObject<{
     runId: z.ZodUUID;
     app: z.ZodString;
     task: z.ZodString;
@@ -185,9 +185,9 @@ export declare const pythonRunFinishedSchema: z.ZodObject<{
     error: z.ZodNullable<z.ZodObject<{
         code: z.ZodString;
         message: z.ZodNullable<z.ZodString>;
-    }, z.core.$strict>>;
-}, z.core.$strict>;
-export type PythonRunFinished = z.infer<typeof pythonRunFinishedSchema>;
+    }, z.core.$strip>>;
+}, z.core.$strip>>;
+export type PythonRunFinished = z.output<typeof pythonRunFinished.exact>;
 /** ランナー（Sandbox の中）の資格情報。実行ごとの乱数で、Platform は SHA-256 の hex だけを持つ */
 export declare const PYTHON_RUN_TOKEN_PATTERN: RegExp;
 export declare function pythonRunTokenHash(token: string): Promise<string>;

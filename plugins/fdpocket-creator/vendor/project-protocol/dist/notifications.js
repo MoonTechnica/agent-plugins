@@ -1,4 +1,5 @@
 import { z } from 'zod';
+import { contract } from "./contract.js";
 /**
  * ミニアプリの通知の許可（integrations.md §2.2・sdk.md §3.3b）。
  * - 既定は OFF（`default`）。利用者がスーパーアプリのシートで押したときだけ `granted`。止めたら `denied`
@@ -8,11 +9,11 @@ import { z } from 'zod';
 export const NOTIFICATION_STATUSES = ['granted', 'denied', 'default'];
 export const notificationStatusSchema = z.enum(NOTIFICATION_STATUSES);
 /** `GET /v1/notifications/status` */
-export const notificationStatusResponseSchema = z.strictObject({
-    status: notificationStatusSchema,
-});
+export const notificationStatusResponse = contract((o) => o.object({
+    status: o.enum(NOTIFICATION_STATUSES),
+}));
 /** bridge の `notifications.requestPermission` の reply の `result` */
-export const notificationPermissionResultSchema = notificationStatusResponseSchema;
+export const notificationPermissionResult = notificationStatusResponse;
 /** Worker 専用の送信。宛先は同じ Project の User.id。文面は承認済みテンプレートから描画する。 */
 export const notificationSendRequestSchema = z.strictObject({
     template: z.string().regex(/^[a-z][a-z0-9_]{0,63}$/),
@@ -23,6 +24,6 @@ export const notificationSendRequestSchema = z.strictObject({
         .regex(/^[A-Za-z0-9._:-]{1,128}$/)
         .optional(),
 });
-export const notificationSendResponseSchema = z.strictObject({
+export const notificationSendResponse = contract((o) => o.object({
     recipients: z.int().nonnegative(),
-});
+}));

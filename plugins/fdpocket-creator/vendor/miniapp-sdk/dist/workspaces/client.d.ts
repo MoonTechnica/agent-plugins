@@ -1,5 +1,8 @@
-import { type Workspace, type WorkspaceInvitation, type WorkspaceInvitationCreated, type WorkspaceInviteRequest, type WorkspaceMembership } from '@workspace/project-protocol';
+import { type Open, type WorkspaceInvitation as ProtocolWorkspaceInvitation, type WorkspaceMembership as ProtocolWorkspaceMembership, type Workspace, type WorkspaceInvitationCreated, type WorkspaceInviteRequest } from '@workspace/project-protocol';
 import type { Transport } from '../transport.ts';
+/** 読む側の招待・所属。後から足された役割も入りうる */
+export type WorkspaceInvitation = Open<ProtocolWorkspaceInvitation>;
+export type WorkspaceMembership = Open<ProtocolWorkspaceMembership>;
 /**
  * Project 内 Workspace の共有（gateway.md §5。sdk.md §3.4）。家族・チーム・顧客ごとのデータの単位。
  * - `create`: Workspace を作り、作った人を owner にする（`workspace.create` の Permission が要る）

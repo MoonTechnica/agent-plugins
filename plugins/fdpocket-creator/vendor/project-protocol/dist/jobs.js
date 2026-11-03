@@ -1,4 +1,5 @@
 import { z } from 'zod';
+import { contract } from "./contract.js";
 import { appSlugSchema } from "./token.js";
 export const jobScheduleRequestSchema = z
     .strictObject({
@@ -14,12 +15,12 @@ export const jobScheduleRequestSchema = z
     .refine((input) => new TextEncoder().encode(JSON.stringify(input.payload)).length <= 65_536, {
     message: 'job payload exceeds 64 KiB',
 });
-export const jobScheduleResponseSchema = z.strictObject({
+export const jobScheduleResponse = contract((o) => o.object({
     id: z.uuid(),
-    status: z.enum(['pending', 'running', 'done', 'failed', 'cancelled']),
-});
+    status: o.enum(['pending', 'running', 'done', 'failed', 'cancelled']),
+}));
 export const jobCancelRequestSchema = z.strictObject({ id: z.uuid() });
-export const jobCancelResponseSchema = z.strictObject({ cancelled: z.boolean() });
+export const jobCancelResponse = contract((o) => o.object({ cancelled: z.boolean() }));
 /**
  * サーバーの App が今配送中の実行として Gateway を呼ぶときに添えるヘッダ（`queue:<job id>` / `schedule:<schedule id>` /
  * `python:<run id>`）。払う人は Platform が決める（登録した利用者・cron は Project の持ち主・python の実行はその実行の

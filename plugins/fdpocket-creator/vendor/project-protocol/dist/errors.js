@@ -1,7 +1,11 @@
 import { z } from 'zod';
+import { contract } from "./contract.js";
 /**
  * SDK のエラーコード（sdk.md §3.5）。Gateway が返し、SDK が `SdkError.code` に写す。
  * ユーザー向けの文言は持たない（i18n は App 側）。
+ *
+ * 読む側（凍結された SDK）は知らないコードも受ける（`Open<SdkErrorCode>`）。Platform は後からコードを
+ * 足してよいが、消してはいけない（contract-compatibility.md §4.2）。
  */
 export const SDK_ERROR_CODES = [
     'UNAUTHENTICATED',
@@ -21,8 +25,9 @@ export const SDK_ERROR_CODES = [
     'REALTIME_DISABLED',
     'REALTIME_CAPACITY',
     'RESYNC_REQUIRED',
+    'CONTRACT_UNSUPPORTED',
 ];
-export const sdkErrorCodeSchema = z.enum(SDK_ERROR_CODES);
+export const sdkErrorCode = contract((o) => o.enum(SDK_ERROR_CODES));
 /**
  * Gateway が返す HTTP status。`FORBIDDEN` は App capability とポリシーのどちらで拒否したかを区別しない
  * （存在と権限の差を漏らさない）。`HOST_UNAVAILABLE` は bridge の中でしか起きない（参考値）。
@@ -45,6 +50,7 @@ export const HTTP_STATUS_BY_ERROR = {
     REALTIME_DISABLED: 403,
     REALTIME_CAPACITY: 429,
     RESYNC_REQUIRED: 409,
+    CONTRACT_UNSUPPORTED: 426,
 };
 const RETRYABLE = new Set([
     'REALTIME_CAPACITY',
@@ -52,6 +58,7 @@ const RETRYABLE = new Set([
     'RATE_LIMITED',
     'GATEWAY_UNAVAILABLE',
 ]);
+/** 知らないコードは再試行しない（送る側が `retryable` を付けるので、読む側はそれを優先する） */
 export function isRetryable(code) {
     return RETRYABLE.has(code);
 }
@@ -83,9 +90,9 @@ export function sdkErrorCodeForStatus(status) {
     }
 }
 /** Gateway のエラー応答の本文 */
-export const errorResponseSchema = z.strictObject({
-    error: z.strictObject({
-        code: sdkErrorCodeSchema,
+export const errorResponse = contract((o) => o.object({
+    error: o.object({
+        code: sdkErrorCode.in(o),
         message: z.string(),
         requestId: z.string().optional(),
         retryable: z.boolean(),
@@ -93,4 +100,4 @@ export const errorResponseSchema = z.strictObject({
         committed: z.boolean().optional(),
         details: z.unknown().optional(),
     }),
-});
+}));
