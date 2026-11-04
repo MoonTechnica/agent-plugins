@@ -142,6 +142,7 @@ export declare const reportSchema: z.ZodObject<{
                 api: "api";
                 jobs: "jobs";
                 python: "python";
+                mcp: "mcp";
             }>;
             access: z.ZodOptional<z.ZodEnum<{
                 public: "public";

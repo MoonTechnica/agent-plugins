@@ -23,14 +23,20 @@ export declare const RESERVED_PERMISSION_PREFIX = "platform.";
 /**
  * App の種類。`web` は静的サイト（admin も `access: restricted` の web）、
  * `api` / `jobs` は Workers for Platforms（P1。README Q5。integrations.md §3.1）、
- * `python` は Modal の Sandbox で動く GPU の Python（python-backend.md）。
+ * `python` は Modal の Sandbox で動く GPU の Python（python-backend.md）、
+ * `mcp` は外部の AI クライアントが OAuth で接続する MCP サーバ（miniapp-mcp.md §4.1。1 Project に 1 つ）。
  */
-export declare const APP_KINDS: readonly ["web", "api", "jobs", "python"];
+export declare const APP_KINDS: readonly ["web", "api", "jobs", "python", "mcp"];
 export type AppKind = (typeof APP_KINDS)[number];
-/** 利用者の代わりに Gateway を呼ぶ App（capability を持たず、secrets・egress・servicePermissions を持つ） */
+/**
+ * 利用者の代わりに Gateway を呼ぶ App（secrets・egress・servicePermissions を持つ）。api / jobs / python は
+ * capability を持たず、mcp は呼ぶ主体が利用者本人なので web と同じ形の capability を自分で持つ（miniapp-mcp.md §4.1）
+ */
 export declare const SERVER_APP_KINDS: readonly AppKind[];
 /** Workers for Platforms に配備する App（TypeScript の Worker） */
-export declare const WORKER_APP_KINDS: readonly AppKind[];
+export declare const WORKER_APP_KINDS: readonly ["api", "jobs", "mcp"];
+export type WorkerAppKind = (typeof WORKER_APP_KINDS)[number];
+export declare function isWorkerAppKind(kind: AppKind): kind is WorkerAppKind;
 /** サーバーの App のサービストークンに付けられる権限（gateway.md §3.4。`notifications.send` は tasks/0476） */
 export declare const SERVICE_PERMISSIONS: readonly ["notifications.send", "jobs.schedule", "jobs.consume", "ai.chat", "python.run"];
 export type ServicePermission = (typeof SERVICE_PERMISSIONS)[number];
@@ -106,6 +112,7 @@ declare const baseSchema: z.ZodObject<{
             api: "api";
             jobs: "jobs";
             python: "python";
+            mcp: "mcp";
         }>;
         access: z.ZodOptional<z.ZodEnum<{
             public: "public";
@@ -311,6 +318,7 @@ export declare const projectManifestSchema: z.ZodObject<{
             api: "api";
             jobs: "jobs";
             python: "python";
+            mcp: "mcp";
         }>;
         access: z.ZodOptional<z.ZodEnum<{
             public: "public";

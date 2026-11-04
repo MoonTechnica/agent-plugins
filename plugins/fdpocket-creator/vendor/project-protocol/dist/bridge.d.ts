@@ -51,6 +51,7 @@ export declare const hostContext: Contract<z.ZodObject<{
                 api: "api";
                 jobs: "jobs";
                 python: "python";
+                mcp: "mcp";
             }>;
             access: z.ZodEnum<{
                 public: "public";
@@ -93,6 +94,7 @@ export declare const contextMessage: Contract<z.ZodObject<{
                 api: "api";
                 jobs: "jobs";
                 python: "python";
+                mcp: "mcp";
             }>;
             access: z.ZodEnum<{
                 public: "public";
@@ -140,6 +142,7 @@ export declare const contextUpdateMessage: Contract<z.ZodObject<{
                 api: "api";
                 jobs: "jobs";
                 python: "python";
+                mcp: "mcp";
             }>;
             access: z.ZodEnum<{
                 public: "public";

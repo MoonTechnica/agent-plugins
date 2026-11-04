@@ -48,6 +48,7 @@ export declare const liveHostExchangeReplySchema: z.ZodDiscriminatedUnion<[z.Zod
                     api: "api";
                     jobs: "jobs";
                     python: "python";
+                    mcp: "mcp";
                 }>;
                 access: z.ZodEnum<{
                     public: "public";

@@ -221,6 +221,41 @@ apps:
 | 台数 | サーバーは `maxInstances`（1〜10。既定 1）台まで。1 台あたりの同時の要求の平均が `targetConcurrency`（1〜1000。既定 4）を超えると Platform が足し、空いた台は止まる。どの台も持ち主が払う。`kit dev` は 1 台 |
 | `secrets` | python でも書ける。`MODAL_` で始まる名前は予約 |
 
+外部の AI クライアント（Claude / ChatGPT / Codex / Cursor / VS Code / Claude Code）からアプリのデータを使えるようにする
+Project は、`kind: mcp` の App を **1 つ**足す（MCP サーバ。接続先は `https://{app-host}.fdpocket.dev/mcp`、認証は OAuth で
+Platform が行う。書き方は §3.11 と `$fdpocket-app-mcp`）。ツールを呼ぶ主体は接続した利用者本人なので、capability は web と同じ形で
+**mcp の App 自身が持つ**（AI から触れる範囲を web より狭くできる）。
+
+```yaml
+version: 1
+sdkVersion: 3
+apps:
+  web:
+    kind: web
+    access: public
+    capabilities:
+      models:
+        task: [read, create, update]
+  assistant:
+    kind: mcp                                # 1 Project に 1 つ。公開版と main でだけ接続できる
+    access: public                           # restricted なら requiredPermission が要る（web と同じ）
+    capabilities:                            # ツールが触るモデル × 操作・バケット・AI・python・connections
+      models:
+        task: [read, update]
+      ai: { chat: true }                     # ツールからミニアプリ内 AI を呼ぶなら（費用はツールを使った本人）
+    servicePermissions: [notifications.send] # api と同じ
+    network:
+      egress: [api.example.com]
+    secrets:
+      - name: EXAMPLE_API_KEY
+```
+
+| 規則 | 内容 |
+|---|---|
+| mcp | 1 Project に 1 つ。slug は任意（`assistant` / `mcp` など）。`capabilities`（`models` / `buckets` / `ai` / `python` / `connections`。`realtime` と `users` は書けない）・`access`・`requiredPermission`・`secrets` / `network.egress` / `servicePermissions`（api と同じ規則）を書ける。`anonymous`・`displayName`・`routes`・`schedules`・`network.browser` は書けない |
+| 接続できる人 | `can_use_project` を満たす本登録の利用者（匿名は不可）。`restricted` ならその Permission を持つ人だけ。公開前は main で制作担当だけが試せる |
+| 目録 | ツールの目録は workerd 上で評価して作る: `kit check` が `.kit/generated/mcp-tools.json` に書いて検査し、`kit build` が同じものを `dist/<slug>/mcp-tools.json` にも出す（§3.11）。ツールは 64 個まで |
+
 ## 3. SDK（`@workspace/miniapp-sdk`）
 
 各 App は Project の `@workspace/sdk` の `client` を使う（`packages/sdk/src/index.ts`。テンプレートが置き、編集しない）。
@@ -580,6 +615,69 @@ APIの `ServerUserClient.connections.read` は `asUser(request)` で本人の有
 Dropboxの一覧件数はProvider側で近似上限。本文ファイルのダウンロード・添付取得・再帰の全件走査・任意SOQL・任意CRMオブジェクト・送信や更新は追加しない。ページングのcursorは同一サービス・container・検索条件・limitでのみ再利用する。Nango提供アプリのOAuth権限に書き込みが含まれる場合も、SDKから使えるのは固定した読み取り操作だけ。
 
 接続と許可は本人・App・物理環境に固定される。grantIdを他人へ渡したり、公開・採用で別環境へコピーしない。実データを制作Agentのプロンプトやログへ自動投入しない。接続未設定・再接続必要・取消を成功と扱わず、利用者が復帰できる表示を用意する。
+
+### 3.11 `@workspace/miniapp-sdk/mcp` — 外部の AI から使うツール（`kind: mcp` の App）
+
+`apps/<slug>/src/index.ts` で `defineMcpApp` の戻り値（`McpApp`。Worker の `fetch` を持つ）を `export default` する。
+プロトコル（MCP の 2026-07-28 と 2025-11-25 以前の両方）・認証・scope の検査は SDK が持ち、Agent が書くのはツールだけ。
+
+```ts
+import { defineMcpApp, toolFor } from '@workspace/miniapp-sdk/mcp'
+import type { SchemaType } from '@workspace/sdk'
+import { z } from 'zod'
+
+const tool = toolFor<SchemaType>() // ctx.server.db.<model> が Project のスキーマで型付けされる
+
+export default defineMcpApp({
+  name: 'team-taskboard', // 省略可（instructions も）
+  tools: [
+    tool({
+      name: 'list_open_tasks',
+      title: 'List open tasks',
+      description: 'Returns the tasks that are not completed, newest first.',
+      scope: 'read', // read | write。annotations.readOnlyHint と一致させる
+      annotations: { readOnlyHint: true, destructiveHint: false, idempotentHint: true, openWorldHint: false },
+      input: z.object({ limit: z.number().int().min(1).max(50).default(20) }),
+      output: z.object({ tasks: z.array(z.object({ id: z.string(), title: z.string() })) }),
+      async run({ limit }, ctx) {
+        const tasks = await ctx.server.db.task.findMany({ where: { completedAt: null }, orderBy: { createdAt: 'desc' }, take: limit })
+        return { tasks }
+      },
+    }),
+    tool({
+      name: 'complete_task',
+      title: 'Complete a task',
+      description: 'Marks one task as completed. Ask the user which task before calling.',
+      scope: 'write',
+      annotations: { readOnlyHint: false, destructiveHint: false, idempotentHint: true, openWorldHint: false },
+      input: z.object({ taskId: z.string() }),
+      async run({ taskId }, ctx) {
+        return ctx.server.db.task.update({ where: { id: taskId }, data: { completedAt: new Date().toISOString() } })
+      },
+    }),
+  ],
+})
+```
+
+| 名前 | 中身 |
+|---|---|
+| `defineMcpApp(config)` | `McpAppConfig`: `name` / `version` / `instructions`（任意）と `tools`（`McpTool` の配列。64 個まで、名前は一意）。戻り値は `McpApp`（`fetch(request, env, ctx?)`。`env` は `McpBindings` = `GATEWAY_URL` / `PLATFORM_SERVICE_CREDENTIAL` と、`kit build` だけが付ける `PLATFORM_MCP_CATALOG`。`ctx` は `McpExecutionContext` = `waitUntil`） |
+| `tool(definition)` / `toolFor<SchemaType>()` | `McpToolDefinition`: `name`（`[A-Za-z0-9_.-]{1,64}`）・`title`・`description`（必須）・`scope`（`McpScope` = `read` / `write`）・`annotations`（`McpToolAnnotations`。`readOnlyHint` / `destructiveHint` / `idempotentHint` / `openWorldHint` の 4 つとも明示）・`input`（zod の object）・`output`（任意。書くと `structuredContent` と JSON の本文の両方を返す）・`run(args, ctx)`。`tool` は `ctx.server.db` の型が緩く、`toolFor` で作った `tool` は Project のスキーマで型付けされる。戻り値は `McpTool`（`name` / `title` / `description` / `scope` / `annotations` と内部用の `definition`） |
+| `McpToolContext` | `run` の第 2 引数: `server`（本人として Gateway を呼ぶ `ServerUserClient`。`db` / `storage` / `ai` / `python` / `jobs` / `connections`）・`env`・`request`（Host・ヘッダ）・`scopes`（許可された scope）・`userId`（Project 内の `User.id`）・`signal`（クライアントが取り消したら abort） |
+| `McpToolCatalogEntry` | `kit build` が書く目録の 1 行（`name` / `title` / `description` / `scope` / `annotations` / `inputSchema` / `outputSchema`） |
+
+- **認可は画面と同じ**: `ctx.server` は接続した本人の Project トークンで Gateway を呼ぶ（capability ∩ Role ∩ ZenStack と上限）。
+  AI・python を呼ぶツールは**その本人のクレジット**から引く。トークンや OAuth の処理をツールに書かない。
+- **scope**: 読むだけのツールは `read`、書くツールは `write`。クライアントは `read` から始めて必要なときに `write` へ昇格する
+  （不足は SDK が 403 で知らせる）。`destructiveHint: true` は取り消せない操作（削除・送信・支払い）だけ。
+- **1 ツール 1 操作**で、何でもできる catch-all を作らない。`description` はツールが何をするかを狭く正確に書き、
+  「必ず最初に呼べ」「ほかのツールの前に」のようなモデルへの指示・システム指示を書かない（審査で落ちる。`kit check` も止める）。
+- 失敗は `SdkError` を投げる（`isError` の結果としてモデルに返り、直せる）。本文は 150,000 文字で切り詰められる。
+- `kit dev` で `POST http://127.0.0.1:4320/mcp` に立ち、開発者パネルの「MCP」に接続先と `claude mcp add` のコマンドが出る
+  （OAuth の代わりに、選んだ主体の Project トークンを `--header` に渡す。10 分で切れる）。
+- `kit build` が目録（`mcp-tools.json`）を書き、`kit check` が名前・annotations と scope の整合・description・
+  ツールが触るモデル / バケット / AI / python が `capabilities` にあることを検査する（check は目録が無い・古いときは
+  自分で bundle して評価し直すので、build より先に回してよい）。
 
 ## 4. エラー（`SdkError`）
 

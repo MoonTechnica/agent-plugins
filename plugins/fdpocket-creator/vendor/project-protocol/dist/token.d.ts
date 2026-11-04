@@ -122,6 +122,7 @@ export declare const sessionApp: import("./contract.ts").Contract<z.ZodObject<{
         api: "api";
         jobs: "jobs";
         python: "python";
+        mcp: "mcp";
     }>;
     access: z.ZodEnum<{
         public: "public";
@@ -152,6 +153,7 @@ export declare const session: import("./contract.ts").Contract<z.ZodObject<{
             api: "api";
             jobs: "jobs";
             python: "python";
+            mcp: "mcp";
         }>;
         access: z.ZodEnum<{
             public: "public";
@@ -184,6 +186,7 @@ export declare const tokenExchangeResponse: import("./contract.ts").Contract<z.Z
                 api: "api";
                 jobs: "jobs";
                 python: "python";
+                mcp: "mcp";
             }>;
             access: z.ZodEnum<{
                 public: "public";
@@ -213,6 +216,7 @@ export declare const meResponse: import("./contract.ts").Contract<z.ZodObject<{
             api: "api";
             jobs: "jobs";
             python: "python";
+            mcp: "mcp";
         }>;
         access: z.ZodEnum<{
             public: "public";

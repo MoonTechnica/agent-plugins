@@ -77,6 +77,7 @@ declare const activeSchema: z.ZodObject<{
             api: "api";
             jobs: "jobs";
             python: "python";
+            mcp: "mcp";
         }>;
         access: z.ZodEnum<{
             public: "public";
@@ -166,6 +167,7 @@ declare const activeSchema: z.ZodObject<{
             api: "api";
             jobs: "jobs";
             python: "python";
+            mcp: "mcp";
         }>;
         access: z.ZodEnum<{
             public: "public";
@@ -265,6 +267,7 @@ export declare const gatewayResolveResultSchema: z.ZodDiscriminatedUnion<[z.ZodO
             api: "api";
             jobs: "jobs";
             python: "python";
+            mcp: "mcp";
         }>;
         access: z.ZodEnum<{
             public: "public";
@@ -354,6 +357,7 @@ export declare const gatewayResolveResultSchema: z.ZodDiscriminatedUnion<[z.ZodO
             api: "api";
             jobs: "jobs";
             python: "python";
+            mcp: "mcp";
         }>;
         access: z.ZodEnum<{
             public: "public";

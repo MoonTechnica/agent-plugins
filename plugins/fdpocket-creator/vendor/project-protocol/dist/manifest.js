@@ -32,13 +32,22 @@ const CONTENT_TYPE_PATTERN = /^[a-z]+\/([a-z0-9.+-]+|\*)$/;
 /**
  * App の種類。`web` は静的サイト（admin も `access: restricted` の web）、
  * `api` / `jobs` は Workers for Platforms（P1。README Q5。integrations.md §3.1）、
- * `python` は Modal の Sandbox で動く GPU の Python（python-backend.md）。
+ * `python` は Modal の Sandbox で動く GPU の Python（python-backend.md）、
+ * `mcp` は外部の AI クライアントが OAuth で接続する MCP サーバ（miniapp-mcp.md §4.1。1 Project に 1 つ）。
  */
-export const APP_KINDS = ['web', 'api', 'jobs', 'python'];
-/** 利用者の代わりに Gateway を呼ぶ App（capability を持たず、secrets・egress・servicePermissions を持つ） */
-export const SERVER_APP_KINDS = ['api', 'jobs', 'python'];
+export const APP_KINDS = ['web', 'api', 'jobs', 'python', 'mcp'];
+/**
+ * 利用者の代わりに Gateway を呼ぶ App（secrets・egress・servicePermissions を持つ）。api / jobs / python は
+ * capability を持たず、mcp は呼ぶ主体が利用者本人なので web と同じ形の capability を自分で持つ（miniapp-mcp.md §4.1）
+ */
+export const SERVER_APP_KINDS = ['api', 'jobs', 'python', 'mcp'];
 /** Workers for Platforms に配備する App（TypeScript の Worker） */
-export const WORKER_APP_KINDS = ['api', 'jobs'];
+export const WORKER_APP_KINDS = ['api', 'jobs', 'mcp'];
+export function isWorkerAppKind(kind) {
+    return WORKER_APP_KINDS.includes(kind);
+}
+/** mcp の App が宣言できる capability（web と同じ規則。realtime と users.invite は画面だけ） */
+const MCP_CAPABILITY_KEYS = new Set(['models', 'buckets', 'ai', 'python', 'connections']);
 /** サーバーの App のサービストークンに付けられる権限（gateway.md §3.4。`notifications.send` は tasks/0476） */
 export const SERVICE_PERMISSIONS = [
     'notifications.send',
@@ -301,7 +310,19 @@ function refineServerFields(ctx, slug, app) {
         report(ctx, [...path, 'routes'], 'not_allowed', 'only api apps declare routes');
     }
     refinePythonFields(ctx, slug, app);
-    if (!server) {
+    if (app.kind === 'mcp') {
+        // 外部の AI が利用者本人として呼ぶので、capability・access・requiredPermission は web と同じ形で自分が持つ。
+        // 匿名は常に不可、表示名は listing の名前を Kit が使う（miniapp-mcp.md §4.1）
+        for (const key of ['anonymous', 'displayName']) {
+            if (app[key] !== undefined)
+                report(ctx, [...path, key], 'not_allowed', `mcp apps cannot declare ${key}`);
+        }
+        for (const key of Object.keys(app.capabilities ?? {})) {
+            if (!MCP_CAPABILITY_KEYS.has(key))
+                report(ctx, [...path, 'capabilities', key], 'not_allowed', `mcp apps cannot declare capabilities.${key} (web only)`);
+        }
+    }
+    else if (!server) {
         if (app.access === undefined)
             report(ctx, [...path, 'access'], 'required', 'web apps need access');
         if (app.capabilities === undefined) {
@@ -504,10 +525,16 @@ function refineManifest(m, ctx) {
             }
         }
     }
-    // Slugs identify Apps; several Apps may use the same execution kind.
+    // Slugs identify Apps; several Apps may use the same execution kind (mcp is the exception: one /mcp URL).
+    let mcpSeen = false;
     for (const [slug, app] of Object.entries(m.apps).sort(([a], [b]) => byKey(a, b))) {
         if (!APP_SLUG_PATTERN.test(slug)) {
             report(ctx, ['apps', slug], 'invalid_slug', 'app slugs are [a-z][a-z0-9-]{1,31}');
+        }
+        if (app.kind === 'mcp') {
+            if (mcpSeen)
+                report(ctx, ['apps', slug], 'not_allowed', 'at most one mcp App per project');
+            mcpSeen = true;
         }
         if (slug === 'api' && app.kind === 'web') {
             report(ctx, ['apps', slug], 'reserved_slug', 'api is reserved for the API namespace; use another web App slug');

@@ -9,6 +9,10 @@
       "types": "./dist/index.d.ts",
       "default": "./dist/index.js"
     },
+    "./mcp": {
+      "types": "./dist/mcp/index.d.ts",
+      "default": "./dist/mcp/index.js"
+    },
     "./react": {
       "types": "./dist/react/index.d.ts",
       "default": "./dist/react/index.js"
@@ -23,6 +27,7 @@
     }
   },
   "dependencies": {
+    "@modelcontextprotocol/server": "2.4.0",
     "@workspace/project-protocol": "workspace:*",
     "@zenstackhq/client-helpers": "3.9.7",
     "@zenstackhq/orm": "3.9.7",

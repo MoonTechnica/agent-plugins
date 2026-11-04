@@ -47,6 +47,7 @@ Project は利用者向けの `web` と、必要なら管理用の `admin` の A
 | `$fdpocket-app-notifications` | 通知テンプレート・利用者の同意・サーバーからの送信を扱うとき |
 | `$fdpocket-app-ai` | AI の機能（要約・下書き・分類・チャット・画像や PDF の読み取り）を入れるとき |
 | `$fdpocket-app-python` | GPU の AI の処理（推論・学習・埋め込み・画像や音声の変換）を python の App で作るとき |
+| `$fdpocket-app-mcp` | 「AI から使えるようにして」「Claude / ChatGPT と連携」「MCP」と頼まれたとき。`kind: mcp` の App とツールの書き方 |
 | `$fdpocket-app-dependencies` | npm の依存を足す前に必ず |
 | `$fdpocket-app-structure` | **App や共有 package を足すとき・複数の App でコードや部品を共有するとき・`kit check` が構造エラー（`UNDECLARED_DEPENDENCY` など）を返したとき**。置き場の判断、依存の宣言、App 間 import の禁止、App の足し方 |
 | `$fdpocket-app-merge` | **`./input/merge-report.json` があるとき・リポジトリが `git merge` の途中（`MERGE_HEAD` がある）のとき** |
@@ -163,6 +164,7 @@ AI・GPU を実際に使った費用はチャットの持ち主が払う。詳�
 | 外部サービスとの連携・通知を頼まれた | api / jobs と `network` / `secrets` / 通知テンプレートで作る（spec §2・`$fdpocket-app-integrations`・`$fdpocket-app-notifications`）。秘密の値は作者が管理画面で入れるので、必要な秘密の名前と入れ方を `notes` に書く |
 | AI の機能を頼まれた | `client.ai`（spec §3.8・`$fdpocket-app-ai`）。費用は使った利用者のクレジット。作者の API キーで特定の AI を使うと頼まれたときだけ `$fdpocket-app-integrations` |
 | GPU が要る AI の処理・Python のライブラリ（PyTorch・transformers など）が要る処理を頼まれた | `kind: python` の App（spec §2・§3.9・`$fdpocket-app-python`）。費用は依頼した利用者のクレジット |
+| 外部の AI（Claude / ChatGPT / Codex など）からアプリを使えるようにと頼まれた | `kind: mcp` の App を 1 つ足し、アプリの意味を持ったツールを書く（spec §2・§3.11・`$fdpocket-app-mcp`）。接続は公開版と main、費用はツールを使った本人のクレジット |
 | 実装できない要求がある（spec に無い API・宣言できない宛先など） | 実装できる範囲に落とし、`build-report.json` の `notes` に書く |
 | 依存を足すか迷う | `$fdpocket-app-dependencies` の基準に満たなければ足さない |
 | 掲載情報を直すべきか | 目的・主な画面・見た目が変わったときだけ直す |

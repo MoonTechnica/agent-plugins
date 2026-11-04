@@ -97,6 +97,7 @@ export declare const CONTRACTS: {
                         api: "api";
                         jobs: "jobs";
                         python: "python";
+                        mcp: "mcp";
                     }>;
                     access: z.ZodEnum<{
                         public: "public";
@@ -146,6 +147,7 @@ export declare const CONTRACTS: {
                         api: "api";
                         jobs: "jobs";
                         python: "python";
+                        mcp: "mcp";
                     }>;
                     access: z.ZodEnum<{
                         public: "public";
@@ -554,6 +556,7 @@ export declare const CONTRACTS: {
                         api: "api";
                         jobs: "jobs";
                         python: "python";
+                        mcp: "mcp";
                     }>;
                     access: z.ZodEnum<{
                         public: "public";
@@ -613,6 +616,7 @@ export declare const CONTRACTS: {
                     api: "api";
                     jobs: "jobs";
                     python: "python";
+                    mcp: "mcp";
                 }>;
                 access: z.ZodEnum<{
                     public: "public";
@@ -635,6 +639,7 @@ export declare const CONTRACTS: {
                 api: "api";
                 jobs: "jobs";
                 python: "python";
+                mcp: "mcp";
             }>;
             access: z.ZodEnum<{
                 public: "public";
