@@ -239520,6 +239520,10 @@ function readTar(data) {
 }
 
 // frontend/packages/project-validator/src/import.ts
+function isWorkerSidecar(app, path) {
+  return app.kind === "mcp" && path === `${app.slug}/${MCP_TOOLS_FILE}`;
+}
+
 class ImportError extends Error {
   code;
   name = "ImportError";
@@ -239529,7 +239533,11 @@ class ImportError extends Error {
   }
 }
 function distAppsOf(manifest2) {
-  return Object.entries(manifest2.apps).filter(([, app]) => APP_KINDS.includes(app.kind)).map(([slug, app]) => ({ slug, entry: appEntryOf(slug, app.kind) })).sort((a, b2) => a.slug < b2.slug ? -1 : a.slug > b2.slug ? 1 : 0);
+  return Object.entries(manifest2.apps).filter(([, app]) => APP_KINDS.includes(app.kind)).map(([slug, app]) => ({
+    slug,
+    entry: appEntryOf(slug, app.kind),
+    kind: app.kind
+  })).sort((a, b2) => a.slug < b2.slug ? -1 : a.slug > b2.slug ? 1 : 0);
 }
 function normalizeEntryName(name3) {
   return name3.replace(/^\.\//, "").replace(/\/+$/, "");
@@ -239593,7 +239601,7 @@ async function importArtifact(archive, apps) {
     if (!app) {
       throw new ImportError("UNKNOWN_APP", `${path} is not inside any app of project.yaml (${apps.map((a) => `${a.slug}/`).join(", ")})`);
     }
-    if (app.entry === `${app.slug}/index.js` && path !== app.entry) {
+    if (app.entry === `${app.slug}/index.js` && path !== app.entry && !isWorkerSidecar(app, path)) {
       throw new ImportError("UNEXPECTED_WORKER_FILE", `dist/${app.slug}/ must contain only index.js`);
     }
     const bytes3 = entry.bytes;
@@ -244051,7 +244059,11 @@ async function buildProject(options2) {
   }
   let index;
   try {
-    index = await buildArtifactIndex(existsSync17(dist) ? await collectFiles(dist) : [], apps.map((app) => ({ slug: app.slug, entry: app.entry.replace(/^dist\//, "") })));
+    index = await buildArtifactIndex(existsSync17(dist) ? await collectFiles(dist) : [], apps.map((app) => ({
+      slug: app.slug,
+      entry: app.entry.replace(/^dist\//, ""),
+      kind: app.kind
+    })));
   } catch (error51) {
     throw new BuildError(error51 instanceof Error ? error51.message : String(error51));
   }
@@ -256677,7 +256689,11 @@ async function startDev(options2) {
       closers.push(distServer.close);
     const distHandler = dist ? createDistHandler({
       files: dist.files,
-      apps: webApps.map((slug) => ({ slug, entry: `${slug}/index.html` })),
+      apps: webApps.map((slug) => ({
+        slug,
+        entry: `${slug}/index.html`,
+        kind: "web"
+      })),
       csp: (slug) => appContentSecurityPolicy({
         browserOrigins: manifest2.apps[slug]?.network.browser ?? [],
         gatewayUrl: dist.gatewayUrl,
