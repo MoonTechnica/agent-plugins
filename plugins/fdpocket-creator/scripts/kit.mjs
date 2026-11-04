@@ -259075,6 +259075,7 @@ async function validateVersion(options2) {
     kitRoot: options2.kitRoot,
     changedMigrations: changed.skipped === undefined ? changed.changed : { skipped: changed.skipped },
     loadZModel: projectZModelLoader(options2.root),
+    mcpCatalog: (slug) => extractMcpCatalog(options2.root, slug),
     ...advisories ? { advisories: { client: advisories, now: options2.now ?? new Date } } : {}
   }, {
     schema: {
