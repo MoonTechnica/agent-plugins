@@ -383,6 +383,7 @@ export declare const reportSchema: z.ZodObject<{
             path: z.ZodOptional<z.ZodString>;
         }, z.core.$strict>>;
     }, z.core.$strict>>;
+    externalHistoryChecked: z.ZodOptional<z.ZodBoolean>;
     passed: z.ZodBoolean;
 }, z.core.$strict>;
 export type ValidationReport = z.infer<typeof reportSchema>;

@@ -84,6 +84,8 @@ export const reportSchema = z.strictObject({
     /** 動的検証のスクリーンショット（`listing` は掲載用・`review` は審査 Agent 用）。path は成果物の中の相対パス */
     screenshots: z.array(validationScreenshotSchema),
     stages: z.array(stageReportSchema),
+    /** Present only when the fixed external-history checks ran. */
+    externalHistoryChecked: z.boolean().optional(),
     /** 全段階が `passed` のときだけ true。公開の可否はこれ 1 つで判断できる。 */
     passed: z.boolean(),
 });
