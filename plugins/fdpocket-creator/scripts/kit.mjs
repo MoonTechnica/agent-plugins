@@ -254857,7 +254857,7 @@ frame.addEventListener('load', () => {
         token: session.token,
         expiresAt: session.expiresAt,
         session: session.session,
-        gatewayUrl: config.gatewayUrl,
+        gatewayUrl: config.appGatewayUrl ?? config.gatewayUrl,
         host: 'superapp',
         locale,
         safeArea: { top: 0, right: 0, bottom: 0, left: 0 },
@@ -256825,6 +256825,7 @@ async function startDev(options2) {
     pageConfig = {
       projectId,
       gatewayUrl,
+      ...dist ? { appGatewayUrl: dist.gatewayUrl } : {},
       appsOrigin: runtime.appsOrigin,
       apps,
       principals: DEV_PRINCIPAL_NAMES,
