@@ -151,7 +151,7 @@ listing/
 ## 5. `listingRequested`
 
 `userEdited` の項目を、**利用者が依頼文で頼んだので**変えたときだけ `build-report.json` の `listingRequested` に挙げる
-（`title` / `tagline` / `description` / `category` / `tags` / `screenshots`）。挙げない限り、Platform は前の値のまま残す。
+（`title` / `tagline` / `description` / `category` / `tags` / `screenshots` / `icon` / `cover`）。挙げない限り、Platform は前の値のまま残す。
 
 ## 6. チェック
 
