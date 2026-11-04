@@ -10,6 +10,7 @@ import { pythonRun, pythonRunFinished } from "./python.js";
 import { safetyBlocksResponse } from "./safety.js";
 import { storageAbortResponse, storageBeginResponse, storageCompleteResponse, storageDeleteResponse, storageDownloadResponse, storageFile, storageSignPartsResponse, } from "./storage.js";
 import { projectTokenClaims, serviceTokenClaims, serviceTokenResponse, session, sessionApp, tokenExchangeRequest, tokenExchangeResponse, } from "./token.js";
+import { userInvitation, userInvitationResult, userInvitationsResponse, } from "./user-invitations.js";
 import { workspace, workspaceInvitation, workspaceInvitationCreated, workspaceInvitationsResponse, workspaceMembership, } from "./workspaces.js";
 /**
  * 凍結する契約の一覧（contract-compatibility.md §4.1）。公開済みのミニアプリ・ネイティブアプリと
@@ -56,6 +57,9 @@ export const CONTRACTS = {
     'token.serviceResponse': { contract: serviceTokenResponse, direction: 'read' },
     'token.session': { contract: session, direction: 'read' },
     'token.sessionApp': { contract: sessionApp, direction: 'read' },
+    'users.invitation': { contract: userInvitation, direction: 'read' },
+    'users.invitationResult': { contract: userInvitationResult, direction: 'read' },
+    'users.invitations': { contract: userInvitationsResponse, direction: 'read' },
     'workspaces.invitation': { contract: workspaceInvitation, direction: 'read' },
     'workspaces.invitationCreated': { contract: workspaceInvitationCreated, direction: 'read' },
     'workspaces.invitations': { contract: workspaceInvitationsResponse, direction: 'read' },

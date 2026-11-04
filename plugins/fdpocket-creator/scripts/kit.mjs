@@ -236222,6 +236222,7 @@ var appSchema = exports_external.strictObject({
     models: exports_external.record(exports_external.string(), uniqueList(exports_external.enum(MODEL_OPERATIONS))).optional(),
     buckets: exports_external.record(exports_external.string(), uniqueList(exports_external.enum(BUCKET_OPERATIONS))).optional(),
     realtime: exports_external.record(exports_external.string(), uniqueList(exports_external.enum(["broadcastReceive", "broadcastSend", "presenceRead", "presenceTrack"]))).optional(),
+    users: exports_external.strictObject({ invite: exports_external.boolean() }).optional(),
     ai: exports_external.strictObject({ chat: exports_external.boolean() }).optional(),
     connections: connectionCapabilitiesSchema.optional(),
     python: exports_external.record(exports_external.string(), uniqueList(exports_external.string())).optional()
@@ -236686,6 +236687,7 @@ function normalizeProjectManifest(manifest) {
         } : {},
         ...app.capabilities?.realtime ? { realtime: sortedRecord(app.capabilities.realtime, sorted) } : {},
         ...app.capabilities?.ai ? { ai: { chat: app.capabilities.ai.chat } } : {},
+        ...app.capabilities?.users ? { users: { invite: app.capabilities.users.invite } } : {},
         ...app.capabilities?.python ? { python: sortedRecord(app.capabilities.python, sorted) } : {}
       },
       anonymous: app.anonymous ?? { allowed: false, write: false },
@@ -237754,6 +237756,7 @@ var capabilitiesSchema = exports_external.strictObject({
   buckets: exports_external.record(exports_external.string(), exports_external.array(exports_external.enum(BUCKET_OPERATIONS))),
   realtime: exports_external.record(exports_external.string(), exports_external.array(exports_external.enum(["broadcastReceive", "broadcastSend", "presenceRead", "presenceTrack"]))).optional(),
   ai: exports_external.strictObject({ chat: exports_external.boolean() }).optional(),
+  users: exports_external.strictObject({ invite: exports_external.boolean() }).optional(),
   connections: connectionCapabilitiesSchema.optional()
 });
 var resolvedBucketSchema = exports_external.strictObject({
@@ -238286,6 +238289,74 @@ function isPresignedStoragePut(request, policy, now = Date.now()) {
     return false;
   return true;
 }
+// frontend/packages/project-protocol/src/user-invitations.ts
+init_zod();
+
+// frontend/packages/project-protocol/src/workspaces.ts
+init_zod();
+var WORKSPACE_INVITE_ROLES = ["admin", "editor", "viewer"];
+var workspaceInviteRoleSchema = exports_external.enum(WORKSPACE_INVITE_ROLES);
+var workspaceRoleSchema = exports_external.enum(["owner", ...WORKSPACE_INVITE_ROLES]);
+var workspaceCreateRequestSchema = exports_external.strictObject({
+  name: exports_external.string().trim().min(1).max(100)
+});
+var workspace = contract((o) => o.object({ id: exports_external.uuid(), name: exports_external.string() }));
+var workspaceInviteRequestSchema = exports_external.strictObject({
+  userId: exports_external.string().min(1).max(255).optional(),
+  accountName: exports_external.string().trim().min(1).max(64).optional(),
+  role: workspaceInviteRoleSchema.default("editor")
+}).refine((value) => value.userId === undefined !== (value.accountName === undefined), {
+  message: "exactly one of userId or accountName is required"
+});
+var workspaceInvitationCreated = contract((o) => o.object({
+  invitationId: exports_external.uuid(),
+  expiresAt: exports_external.string()
+}));
+var workspaceInvitation = contract((o) => o.object({
+  invitationId: exports_external.uuid(),
+  workspaceId: exports_external.uuid(),
+  workspaceName: exports_external.string().nullable(),
+  role: o.enum(WORKSPACE_INVITE_ROLES),
+  invitedByUserId: exports_external.string().nullable(),
+  expiresAt: exports_external.string()
+}));
+var workspaceInvitationsResponse = contract((o) => o.object({
+  invitations: exports_external.array(workspaceInvitation.in(o))
+}));
+var workspaceAnswerRequestSchema = exports_external.strictObject({ invitationId: exports_external.uuid() });
+var workspaceMembership = contract((o) => o.object({
+  workspaceId: exports_external.uuid(),
+  role: o.enum(["owner", ...WORKSPACE_INVITE_ROLES])
+}));
+
+// frontend/packages/project-protocol/src/user-invitations.ts
+var userInviteWorkspaceSchema = exports_external.strictObject({
+  id: exports_external.uuid(),
+  role: workspaceInviteRoleSchema.default("editor")
+});
+var userInviteRequestSchema = exports_external.strictObject({
+  userId: exports_external.string().min(1).max(255).optional(),
+  email: exports_external.string().trim().max(254).email().optional(),
+  workspace: userInviteWorkspaceSchema.optional()
+}).refine((value) => value.userId === undefined !== (value.email === undefined), {
+  message: "exactly one of userId or email is required"
+});
+var USER_INVITATION_KINDS = ["invited", "workspace_invited", "already_has_access"];
+var userInvitationResult = contract((o) => o.object({
+  kind: o.enum(USER_INVITATION_KINDS),
+  invitationId: exports_external.uuid().optional(),
+  expiresAt: exports_external.string().optional()
+}));
+var USER_INVITATION_STATUSES = ["pending", "expired"];
+var userInvitation = contract((o) => o.object({
+  invitationId: exports_external.uuid(),
+  status: o.enum(USER_INVITATION_STATUSES),
+  invitee: exports_external.string().nullable(),
+  appSlug: exports_external.string().nullable(),
+  expiresAt: exports_external.string(),
+  createdAt: exports_external.string()
+}));
+var userInvitationsResponse = contract((o) => o.object({ invitations: exports_external.array(userInvitation.in(o)) }));
 // frontend/packages/project-protocol/src/validation-report.ts
 init_zod();
 var VALIDATION_STAGES = ["import", "static", "dynamic"];
@@ -238348,42 +238419,6 @@ var reportSchema = exports_external.strictObject({
   stages: exports_external.array(stageReportSchema),
   passed: exports_external.boolean()
 });
-// frontend/packages/project-protocol/src/workspaces.ts
-init_zod();
-var WORKSPACE_INVITE_ROLES = ["admin", "editor", "viewer"];
-var workspaceInviteRoleSchema = exports_external.enum(WORKSPACE_INVITE_ROLES);
-var workspaceRoleSchema = exports_external.enum(["owner", ...WORKSPACE_INVITE_ROLES]);
-var workspaceCreateRequestSchema = exports_external.strictObject({
-  name: exports_external.string().trim().min(1).max(100)
-});
-var workspace = contract((o) => o.object({ id: exports_external.uuid(), name: exports_external.string() }));
-var workspaceInviteRequestSchema = exports_external.strictObject({
-  userId: exports_external.string().min(1).max(255).optional(),
-  accountName: exports_external.string().trim().min(1).max(64).optional(),
-  role: workspaceInviteRoleSchema.default("editor")
-}).refine((value) => value.userId === undefined !== (value.accountName === undefined), {
-  message: "exactly one of userId or accountName is required"
-});
-var workspaceInvitationCreated = contract((o) => o.object({
-  invitationId: exports_external.uuid(),
-  expiresAt: exports_external.string()
-}));
-var workspaceInvitation = contract((o) => o.object({
-  invitationId: exports_external.uuid(),
-  workspaceId: exports_external.uuid(),
-  workspaceName: exports_external.string().nullable(),
-  role: o.enum(WORKSPACE_INVITE_ROLES),
-  invitedByUserId: exports_external.string().nullable(),
-  expiresAt: exports_external.string()
-}));
-var workspaceInvitationsResponse = contract((o) => o.object({
-  invitations: exports_external.array(workspaceInvitation.in(o))
-}));
-var workspaceAnswerRequestSchema = exports_external.strictObject({ invitationId: exports_external.uuid() });
-var workspaceMembership = contract((o) => o.object({
-  workspaceId: exports_external.uuid(),
-  role: o.enum(["owner", ...WORKSPACE_INVITE_ROLES])
-}));
 // frontend/node_modules/yaml/dist/index.js
 var composer = require_composer();
 var Document = require_Document();
@@ -250088,9 +250123,6 @@ async function issue2(adapters, target2, subject) {
   };
 }
 
-// frontend/packages/project-gateway/src/workspaces/routes.ts
-init_zod();
-
 // frontend/packages/project-gateway/src/internal/workspaces.ts
 async function createWorkspace(db, input) {
   const id = crypto.randomUUID();
@@ -250170,7 +250202,121 @@ function audit(context, actorId, action2, resource, onlyIfWorkspaceExists = fals
   };
 }
 
+// frontend/packages/project-gateway/src/users/routes.ts
+var USER_INVITATION_COST = 1;
+var WORKSPACE_INVITER_ROLES = new Set(["owner", "admin"]);
+var USERS_INVITE_PERMISSION = "users.invite";
+function registerUserInvitationRoutes(app, adapters, config3) {
+  app.post("/v1/project/user-invitations", async (c2) => {
+    const parsed = userInviteRequestSchema.safeParse(await jsonBody(c2));
+    if (!parsed.success)
+      throw new GatewayError("VALIDATION_FAILED", "invalid invitation");
+    const { db, actor, claims } = await open2(c2);
+    const { workspace: workspace2, userId, email: email3 } = parsed.data;
+    if (workspace2) {
+      const role = await workspaceRoleOf2(db, workspace2.id, actor.id);
+      if (!role || !WORKSPACE_INVITER_ROLES.has(role)) {
+        throw new GatewayError("FORBIDDEN", "workspace owner or admin required");
+      }
+    }
+    let inviteeId;
+    if (userId !== undefined) {
+      const invitee = await findProjectUser(db, userId);
+      if (!invitee)
+        throw new GatewayError("NOT_FOUND", "user not found");
+      inviteeId = platformUserIdOf(invitee.globalUserId);
+    }
+    const scope = { projectId: claims.aud, environment: claims.env };
+    const outcome = await adapters.registry.createUserInvitation({
+      ...scope,
+      inviterId: claims.actorId,
+      ...inviteeId === undefined ? { inviteeEmail: email3 } : { inviteeId },
+      appSlug: claims.app,
+      ...workspace2 ? { workspace: workspace2 } : {}
+    });
+    switch (outcome.status) {
+      case "created": {
+        const body = {
+          kind: "invited",
+          invitationId: outcome.invitationId,
+          expiresAt: outcome.expiresAt
+        };
+        return c2.json(body);
+      }
+      case "already_has_access": {
+        if (!workspace2) {
+          const body = { kind: "already_has_access" };
+          return c2.json(body);
+        }
+        const issuer = claims.gid.slice(0, claims.gid.lastIndexOf(":") + 1);
+        const projectUserId = (await projectUserIdsByGlobal(db, [`${issuer}${outcome.inviteeId}`])).get(`${issuer}${outcome.inviteeId}`);
+        if (projectUserId && await workspaceRoleOf2(db, workspace2.id, projectUserId)) {
+          throw new GatewayError("CONFLICT", "already a member");
+        }
+        const invited = await adapters.registry.createWorkspaceInvitation({
+          ...scope,
+          workspaceId: workspace2.id,
+          inviterId: claims.actorId,
+          inviteeId: outcome.inviteeId,
+          role: workspace2.role
+        });
+        if (invited.status === "created") {
+          const body = {
+            kind: "workspace_invited",
+            invitationId: invited.invitationId,
+            expiresAt: invited.expiresAt
+          };
+          return c2.json(body);
+        }
+        return failed(invited.status);
+      }
+      default:
+        return failed(outcome.status);
+    }
+  });
+  app.get("/v1/project/user-invitations", async (c2) => {
+    const { claims } = await open2(c2);
+    const sent = await adapters.registry.listUserInvitations({
+      projectId: claims.aud,
+      environment: claims.env,
+      inviterId: claims.actorId
+    });
+    const body = { invitations: sent };
+    return c2.json(body);
+  });
+  async function open2(c2) {
+    const { claims, resolved } = await verifyProjectToken(c2, adapters, config3, USER_INVITATION_COST);
+    if (claims.anon)
+      throw new GatewayError("FORBIDDEN", "sign-in required");
+    if (resolved.app.capabilities.users?.invite !== true) {
+      throw new GatewayError("FORBIDDEN", "users.invite is not declared by this App");
+    }
+    const db = await adapters.turso.connect(resolved.db);
+    const actor = await loadProjectActor(db, claims.sub, blockedGlobalUserIds(claims.gid, resolved.user.blockedUserIds), resolved.user.bootstrap);
+    if (!actor)
+      throw new GatewayError("UNAUTHENTICATED", "project user not found");
+    assertAppAccess(resolved, actor.permissions);
+    if (!actor.permissions.includes(USERS_INVITE_PERMISSION)) {
+      throw new GatewayError("FORBIDDEN", "permission required");
+    }
+    return { claims, db, actor };
+  }
+}
+function failed(status) {
+  switch (status) {
+    case "already_invited":
+      throw new GatewayError("CONFLICT", "already invited");
+    case "quota_exceeded":
+      throw new GatewayError("QUOTA_EXCEEDED", "too many invitations");
+    case "invalid_action":
+      throw new GatewayError("VALIDATION_FAILED", "cannot invite this user");
+    case "not_found":
+      throw new GatewayError("NOT_FOUND", "user not found");
+  }
+}
+
 // frontend/packages/project-gateway/src/workspaces/routes.ts
+init_zod();
 var WORKSPACE_COST = 1;
 var workspaceIdSchema = exports_external.uuid();
 var INVITER_ROLES = new Set(["owner", "admin"]);
@@ -250387,6 +250533,7 @@ function createGateway(adapters, config3, logger = consoleLogger, realtimeTransp
   if (config3.erase)
     registerEraseRoutes(app, adapters, config3.erase);
   registerWorkspaceRoutes(app, adapters, config3);
+  registerUserInvitationRoutes(app, adapters, config3);
   return Object.assign(app, { realtime: realtime2 });
 }
 // frontend/packages/project-gateway/src/notifications/supabase-notifier.ts
@@ -250458,6 +250605,32 @@ var acceptOutcomeSchema = exports_external.union([
   })),
   exports_external.object({ status: exports_external.enum(["expired", "not_found"]) })
 ]);
+var userInvitationOutcomeSchema = exports_external.union([
+  exports_external.object({ status: exports_external.literal("created"), invitation_id: exports_external.uuid(), expires_at: exports_external.string() }).transform((row) => ({
+    status: "created",
+    invitationId: row.invitation_id,
+    expiresAt: row.expires_at
+  })),
+  exports_external.object({ status: exports_external.literal("already_has_access"), invitee_id: exports_external.uuid() }).transform((row) => ({ status: "already_has_access", inviteeId: row.invitee_id })),
+  exports_external.object({
+    status: exports_external.enum(["already_invited", "not_found", "invalid_action", "quota_exceeded"])
+  })
+]);
+var sentUserInvitationsSchema = exports_external.array(exports_external.object({
+  invitation_id: exports_external.uuid(),
+  status: exports_external.enum(["pending", "expired"]),
+  invitee: exports_external.string().nullable(),
+  app_slug: exports_external.string().nullable(),
+  expires_at: exports_external.string(),
+  created_at: exports_external.string()
+}).transform((row) => ({
+  invitationId: row.invitation_id,
+  status: row.status,
+  invitee: row.invitee,
+  appSlug: row.app_slug,
+  expiresAt: row.expires_at,
+  createdAt: row.created_at
+})));
 var declineOutcomeSchema = exports_external.object({ status: exports_external.enum(["declined", "not_found"]) });
 // frontend/node_modules/aws4fetch/dist/aws4fetch.esm.mjs
 var encoder5 = new TextEncoder;
@@ -252719,8 +252892,62 @@ class LocalSessionStorageLedger {
   }
 }
 
-// frontend/packages/miniapp-kit/src/dev/workspace-invitations.ts
+// frontend/packages/miniapp-kit/src/dev/user-invitations.ts
 var TTL_MS = 7 * 24 * 60 * 60 * 1000;
+var EMAIL = /^[^@\s]+@[^@\s]+\.[^@\s]+$/;
+var maskEmail = (email3) => `${email3.slice(0, 1)}***${email3.slice(email3.indexOf("@"))}`;
+function createDevUserInvitations(input) {
+  const invitations = [];
+  const expired = (row) => Date.parse(row.expiresAt) <= input.clock().getTime();
+  return {
+    async create(request) {
+      if (request.inviteeId !== undefined) {
+        const invitee = input.principals.find((p3) => p3.userId === request.inviteeId);
+        if (!invitee)
+          return { status: "not_found" };
+        if (invitee.isAnonymous || invitee.userId === request.inviterId) {
+          return { status: "invalid_action" };
+        }
+        return { status: "already_has_access", inviteeId: invitee.userId };
+      }
+      const email3 = request.inviteeEmail?.trim().toLowerCase();
+      if (!email3 || !EMAIL.test(email3))
+        return { status: "invalid_action" };
+      const duplicate = invitations.some((row) => !expired(row) && row.projectId === request.projectId && row.environment === request.environment && row.email === email3);
+      if (duplicate)
+        return { status: "already_invited" };
+      const now2 = input.clock();
+      const invitationId = crypto.randomUUID();
+      const expiresAt = new Date(now2.getTime() + TTL_MS).toISOString();
+      invitations.push({
+        invitationId,
+        projectId: request.projectId,
+        environment: request.environment,
+        inviterId: request.inviterId,
+        email: email3,
+        status: "pending",
+        invitee: maskEmail(email3),
+        appSlug: request.appSlug,
+        expiresAt,
+        createdAt: now2.toISOString()
+      });
+      return { status: "created", invitationId, expiresAt };
+    },
+    async list(request) {
+      return invitations.filter((row) => row.projectId === request.projectId && row.environment === request.environment && row.inviterId === request.inviterId).reverse().slice(0, 50).map((row) => ({
+        invitationId: row.invitationId,
+        status: expired(row) ? "expired" : "pending",
+        invitee: row.invitee,
+        appSlug: row.appSlug,
+        expiresAt: row.expiresAt,
+        createdAt: row.createdAt
+      }));
+    }
+  };
+}
+
+// frontend/packages/miniapp-kit/src/dev/workspace-invitations.ts
+var TTL_MS2 = 7 * 24 * 60 * 60 * 1000;
 function createDevWorkspaceInvitations(input) {
   const invitations = new Map;
   const sameScope2 = (a2, b3) => a2.projectId === b3.projectId && a2.environment === b3.environment;
@@ -252736,7 +252963,7 @@ function createDevWorkspaceInvitations(input) {
       if (duplicate)
         return { status: "already_invited" };
       const invitationId = crypto.randomUUID();
-      const expiresAt = new Date(input.clock().getTime() + TTL_MS).toISOString();
+      const expiresAt = new Date(input.clock().getTime() + TTL_MS2).toISOString();
       invitations.set(invitationId, {
         invitationId,
         projectId: request.projectId,
@@ -253111,12 +253338,17 @@ function createDevRegistry(input) {
   const keyOf4 = (i2) => `${i2.projectId}:${i2.subject}:${i2.key}`;
   const hashes = new Map;
   const webApps = Object.values(manifest2.apps).filter((app) => app.kind === "web");
+  const invitationPrincipals = Object.entries(DEV_PRINCIPALS).map(([name3, p3]) => ({
+    userId: p3.userId,
+    accountName: name3,
+    isAnonymous: p3.isAnonymous
+  }));
   const workspaceInvitations = createDevWorkspaceInvitations({
-    principals: Object.entries(DEV_PRINCIPALS).map(([name3, p3]) => ({
-      userId: p3.userId,
-      accountName: name3,
-      isAnonymous: p3.isAnonymous
-    })),
+    principals: invitationPrincipals,
+    clock: () => new Date
+  });
+  const userInvitations = createDevUserInvitations({
+    principals: invitationPrincipals,
     clock: () => new Date
   });
   return {
@@ -253228,6 +253460,8 @@ function createDevRegistry(input) {
     listWorkspaceInvitations: workspaceInvitations.list,
     acceptWorkspaceInvitation: workspaceInvitations.accept,
     declineWorkspaceInvitation: workspaceInvitations.decline,
+    createUserInvitation: userInvitations.create,
+    listUserInvitations: userInvitations.list,
     async claimIdempotency(request) {
       const key = keyOf4(request);
       const stored = idempotency.get(key);
@@ -255891,9 +256125,9 @@ function classifyChange(path, changes) {
   }
   return false;
 }
-function watchRoot(root, changed, failed) {
+function watchRoot(root, changed, failed2) {
   const watcher = watchFiles(root, { recursive: true }, (_event, path) => changed(path ? relative3(root, `${root}/${path}`) : null));
-  watcher.on("error", failed);
+  watcher.on("error", failed2);
   return watcher;
 }
 function preparationDiagnostic(error51, capabilities) {
@@ -256282,9 +256516,9 @@ async function startLiveDev(options2, manifest2) {
       closers.push(vite.close);
     };
     const started = await Promise.allSettled([startHost(), ...webApps.map(startApp)]);
-    const failed = started.find((result) => result.status === "rejected");
-    if (failed)
-      throw failed.reason;
+    const failed2 = started.find((result) => result.status === "rejected");
+    if (failed2)
+      throw failed2.reason;
     const host = started[0].value;
     return {
       hostUrl: host.url,
@@ -257820,8 +258054,8 @@ class ValidationFailed extends Error {
   report;
   name = "ValidationFailed";
   constructor(report2) {
-    const failed = report2.stages.filter((stage) => stage.status !== "passed").map((s3) => s3.stage);
-    super(`the version did not pass (${failed.join(", ")}); see report.json`);
+    const failed2 = report2.stages.filter((stage) => stage.status !== "passed").map((s3) => s3.stage);
+    super(`the version did not pass (${failed2.join(", ")}); see report.json`);
     this.report = report2;
   }
 }
@@ -257839,7 +258073,7 @@ import { existsSync as existsSync25 } from "node:fs";
 import { mkdtemp as mkdtemp5, rm as rm16 } from "node:fs/promises";
 import { tmpdir as tmpdir2 } from "node:os";
 import { join as join41 } from "node:path";
-var failed = (message2) => ({
+var failed2 = (message2) => ({
   code: "ERASE_TEST_FAILED",
   path: PROJECT_PATHS.eraseTest,
   message: message2
@@ -257872,11 +258106,11 @@ async function runEraseTest(options2) {
     try {
       test = (await importModule(join41(root, PROJECT_PATHS.eraseTest))).default;
     } catch (error51) {
-      return { errors: [failed(`could not be loaded: ${describe4(error51)}`)], warnings: [] };
+      return { errors: [failed2(`could not be loaded: ${describe4(error51)}`)], warnings: [] };
     }
     if (typeof test !== "function") {
       return {
-        errors: [failed("must export default async function eraseTest({ db, erase })")],
+        errors: [failed2("must export default async function eraseTest({ db, erase })")],
         warnings: []
       };
     }
@@ -257900,13 +258134,13 @@ async function runEraseTest(options2) {
     try {
       await test({ db: client, erase });
     } catch (error51) {
-      return { errors: [failed(describe4(error51))], warnings: [] };
+      return { errors: [failed2(describe4(error51))], warnings: [] };
     }
     const broken = await db.execute("PRAGMA foreign_key_check");
     if (broken.rows.length > 0) {
       const tables = [...new Set(broken.rows.map((row) => String(row.table)))].join(", ");
       return {
-        errors: [failed(`foreign keys are broken after the erase (${tables})`)],
+        errors: [failed2(`foreign keys are broken after the erase (${tables})`)],
         warnings: []
       };
     }

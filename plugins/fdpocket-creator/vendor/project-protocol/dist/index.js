@@ -42,6 +42,7 @@ export * from "./storage.js";
 export * from "./storage-download.js";
 export * from "./storage-egress.js";
 export * from "./token.js";
+export * from "./user-invitations.js";
 export * from "./validation-report.js";
 export * from "./version.js";
 export * from "./workspaces.js";

@@ -14,4 +14,5 @@ export type { Safety } from './safety/client.ts';
 export type { SeedContext, SeedOperation, SeedPlan, TestIdentity } from './seed.ts';
 export type { Bucket, Storage, StorageFileMeta, UploadOptions, UploadProgress, } from './storage/client.ts';
 export type { Ui } from './ui/client.ts';
+export type { UserInvitation, UserInvitationResult, UserInvitations, Users, } from './users/client.ts';
 export type { Workspaces } from './workspaces/client.ts';

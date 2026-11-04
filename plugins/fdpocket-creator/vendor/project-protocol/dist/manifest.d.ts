@@ -134,6 +134,9 @@ declare const baseSchema: z.ZodObject<{
                 presenceRead: "presenceRead";
                 presenceTrack: "presenceTrack";
             }>>>>;
+            users: z.ZodOptional<z.ZodObject<{
+                invite: z.ZodBoolean;
+            }, z.core.$strict>>;
             ai: z.ZodOptional<z.ZodObject<{
                 chat: z.ZodBoolean;
             }, z.core.$strict>>;
@@ -336,6 +339,9 @@ export declare const projectManifestSchema: z.ZodObject<{
                 presenceRead: "presenceRead";
                 presenceTrack: "presenceTrack";
             }>>>>;
+            users: z.ZodOptional<z.ZodObject<{
+                invite: z.ZodBoolean;
+            }, z.core.$strict>>;
             ai: z.ZodOptional<z.ZodObject<{
                 chat: z.ZodBoolean;
             }, z.core.$strict>>;
@@ -532,6 +538,9 @@ export interface NormalizedAppCapabilities {
     buckets: Record<string, BucketOperation[]>;
     ai?: {
         chat: boolean;
+    };
+    users?: {
+        invite: boolean;
     };
     connections?: ConnectionCapabilities;
     /** python の App → 依頼できるタスク（名前順） */

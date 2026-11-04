@@ -104,6 +104,9 @@ declare const activeSchema: z.ZodObject<{
             ai: z.ZodOptional<z.ZodObject<{
                 chat: z.ZodBoolean;
             }, z.core.$strict>>;
+            users: z.ZodOptional<z.ZodObject<{
+                invite: z.ZodBoolean;
+            }, z.core.$strict>>;
             connections: z.ZodOptional<z.ZodRecord<z.ZodEnum<{
                 "google-drive": "google-drive";
                 "google-mail": "google-mail";
@@ -288,6 +291,9 @@ export declare const gatewayResolveResultSchema: z.ZodDiscriminatedUnion<[z.ZodO
             }>>>>;
             ai: z.ZodOptional<z.ZodObject<{
                 chat: z.ZodBoolean;
+            }, z.core.$strict>>;
+            users: z.ZodOptional<z.ZodObject<{
+                invite: z.ZodBoolean;
             }, z.core.$strict>>;
             connections: z.ZodOptional<z.ZodRecord<z.ZodEnum<{
                 "google-drive": "google-drive";

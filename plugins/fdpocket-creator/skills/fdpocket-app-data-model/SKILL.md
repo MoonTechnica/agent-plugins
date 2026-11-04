@@ -77,7 +77,7 @@ model Task {
 - Permission の名前は `<対象>.<操作>`（`tasks.manage`, `reports.read`）。`platform.` で始まる名前は予約。
 - Role は `infra/project.yaml` の `roles` に Permission の一覧で宣言し、`defaultRoles`（初めて使った人）と `ownerBootstrap`（作者）を決める。
   管理画面の `requiredPermission`（例: `app.access.admin`）もこの中の Permission。
-- 基底の Permission: `workspace.create`（Workspace を作れる）/ `roles.manage`（Role を編集）/ `users.manage`（人に Role を付ける）/ `audit.read`（監査を読む）。
+- 基底の Permission: `workspace.create`（Workspace を作れる）/ `roles.manage`（Role を編集）/ `users.manage`（人に Role を付ける）/ `audit.read`（監査を読む）。業務 admin が顧客を招くアプリは `users.invite`（`client.users.invite`。spec.md §3.7a。App の `capabilities.users.invite: true` も要る）。
 - Workspace の中の役割（owner / admin / editor / viewer）は `Membership.role` で、Project 全体の Role とは別。
 - **共有（家族・チーム）を作るなら**: Workspace の作成・招待・受諾は `client.workspaces`（spec.md §3.6）を使う。
   `client.db.workspace.create` / `client.db.membership.create` では最初の owner を入れられない。`defaultRoles` の Role に

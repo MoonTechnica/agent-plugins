@@ -30,6 +30,7 @@ const capabilitiesSchema = z.strictObject({
         .record(z.string(), z.array(z.enum(['broadcastReceive', 'broadcastSend', 'presenceRead', 'presenceTrack'])))
         .optional(),
     ai: z.strictObject({ chat: z.boolean() }).optional(),
+    users: z.strictObject({ invite: z.boolean() }).optional(),
     connections: connectionCapabilitiesSchema.optional(),
 });
 const resolvedBucketSchema = z.strictObject({

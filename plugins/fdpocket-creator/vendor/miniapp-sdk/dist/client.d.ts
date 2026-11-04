@@ -11,6 +11,7 @@ import { type Realtime, type RealtimeSocketFactory } from './realtime/client.ts'
 import { type Safety } from './safety/client.ts';
 import { type Storage } from './storage/client.ts';
 import { type Ui } from './ui/client.ts';
+import { type Users } from './users/client.ts';
 import { type Workspaces } from './workspaces/client.ts';
 /** bridge に要る window の最小の形（テストでは偽物を渡す） */
 export interface HostWindow {
@@ -80,6 +81,8 @@ export interface ProjectClient<S extends SchemaDef = SchemaDef> {
     readonly notifications: Notifications;
     /** Project 内 Workspace の作成・招待・受諾（gateway.md §5。sdk.md §3.4） */
     readonly workspaces: Workspaces;
+    /** 利用者の招待（業務 admin が、まだ使えない人を名指しで招く。gateway.md §5。sdk.md §3.4） */
+    readonly users: Users;
     /** ミニアプリ内 AI（使った本人のクレジットから引く。project-ai.md §7） */
     readonly ai: Ai;
     /** python の App のタスク（GPU の AI 処理など。費用は本人。python-backend.md §4.2） */

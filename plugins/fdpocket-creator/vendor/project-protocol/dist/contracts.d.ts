@@ -648,6 +648,48 @@ export declare const CONTRACTS: {
         }, z.core.$strip>>;
         readonly direction: "read";
     };
+    readonly 'users.invitation': {
+        readonly contract: Contract<z.ZodObject<{
+            invitationId: z.ZodUUID;
+            status: z.ZodEnum<{
+                pending: "pending";
+                expired: "expired";
+            }>;
+            invitee: z.ZodNullable<z.ZodString>;
+            appSlug: z.ZodNullable<z.ZodString>;
+            expiresAt: z.ZodString;
+            createdAt: z.ZodString;
+        }, z.core.$strip>>;
+        readonly direction: "read";
+    };
+    readonly 'users.invitationResult': {
+        readonly contract: Contract<z.ZodObject<{
+            kind: z.ZodEnum<{
+                invited: "invited";
+                workspace_invited: "workspace_invited";
+                already_has_access: "already_has_access";
+            }>;
+            invitationId: z.ZodOptional<z.ZodUUID>;
+            expiresAt: z.ZodOptional<z.ZodString>;
+        }, z.core.$strip>>;
+        readonly direction: "read";
+    };
+    readonly 'users.invitations': {
+        readonly contract: Contract<z.ZodObject<{
+            invitations: z.ZodArray<z.ZodObject<{
+                invitationId: z.ZodUUID;
+                status: z.ZodEnum<{
+                    pending: "pending";
+                    expired: "expired";
+                }>;
+                invitee: z.ZodNullable<z.ZodString>;
+                appSlug: z.ZodNullable<z.ZodString>;
+                expiresAt: z.ZodString;
+                createdAt: z.ZodString;
+            }, z.core.$strip>>;
+        }, z.core.$strip>>;
+        readonly direction: "read";
+    };
     readonly 'workspaces.invitation': {
         readonly contract: Contract<z.ZodObject<{
             invitationId: z.ZodUUID;

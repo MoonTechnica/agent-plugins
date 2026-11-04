@@ -170,6 +170,9 @@ export declare const reportSchema: z.ZodObject<{
                     presenceRead: "presenceRead";
                     presenceTrack: "presenceTrack";
                 }>>>>;
+                users: z.ZodOptional<z.ZodObject<{
+                    invite: z.ZodBoolean;
+                }, z.core.$strict>>;
                 ai: z.ZodOptional<z.ZodObject<{
                     chat: z.ZodBoolean;
                 }, z.core.$strict>>;

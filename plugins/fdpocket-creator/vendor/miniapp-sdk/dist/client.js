@@ -12,6 +12,7 @@ import { createSafety } from "./safety/client.js";
 import { createStorage } from "./storage/client.js";
 import { createTransport, gatewayBase, readResponse } from "./transport.js";
 import { createUiBridge } from "./ui/client.js";
+import { createUsers } from "./users/client.js";
 import { createWorkspaces } from "./workspaces/client.js";
 /** 期限のこれだけ前に更新する */
 const REFRESH_MARGIN_MS = 60_000;
@@ -271,6 +272,7 @@ export function createClient(options) {
         safety: createSafety(transport, bridge),
         notifications: createNotifications(transport, bridge),
         workspaces: createWorkspaces(transport),
+        users: createUsers(transport),
         ai: createAi(transport, gateway),
         python: createPython(transport),
         get gateway() {

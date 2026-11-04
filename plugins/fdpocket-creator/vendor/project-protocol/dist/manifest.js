@@ -107,6 +107,8 @@ const appSchema = z.strictObject({
         realtime: z
             .record(z.string(), uniqueList(z.enum(['broadcastReceive', 'broadcastSend', 'presenceRead', 'presenceTrack'])))
             .optional(),
+        /** 利用者の招待（user-invitations.md §3.3.3）。アプリ内の Permission `users.invite` も要る */
+        users: z.strictObject({ invite: z.boolean() }).optional(),
         /** ミニアプリ内 AI（project-ai.md §4）。費用は使った利用者本人 */
         ai: z.strictObject({ chat: z.boolean() }).optional(),
         connections: connectionCapabilitiesSchema.optional(),
@@ -662,6 +664,7 @@ export function normalizeProjectManifest(manifest) {
                     ? { realtime: sortedRecord(app.capabilities.realtime, sorted) }
                     : {}),
                 ...(app.capabilities?.ai ? { ai: { chat: app.capabilities.ai.chat } } : {}),
+                ...(app.capabilities?.users ? { users: { invite: app.capabilities.users.invite } } : {}),
                 ...(app.capabilities?.python
                     ? { python: sortedRecord(app.capabilities.python, sorted) }
                     : {}),

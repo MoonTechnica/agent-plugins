@@ -112,6 +112,7 @@ apps:
       models:
         order: [read, create]
       ai: { chat: true }                     # ミニアプリ内 AI（§3.8）。使う web App だけ
+      users: { invite: true }                # 利用者の招待（§3.7a）。業務 admin が顧客を招く web App だけ
     network:
       browser: [https://maps.googleapis.com]   # ブラウザから直接呼ぶ公開 API（https のオリジン。CSP に足す）
   partner-api:
@@ -423,6 +424,24 @@ notifications:
 - 失敗: Workspace の owner / admin でない → `FORBIDDEN`、居ない人・使えない人・ブロックし合っている人 → `NOT_FOUND`、
   既に招待済み・既にメンバー → `CONFLICT`、期限切れの受諾 → `NOT_FOUND`（`details.reason = 'expired'`）、匿名 → `FORBIDDEN`。
 - メンバーの一覧・役割の変更・外すのは `client.db.membership`（owner / admin のポリシーのとおり）。
+
+### 3.7a `client.users` — 利用者の招待（`Users`・`UserInvitations`）
+
+業務 admin（顧客を管理する人）が、**まだこのミニアプリを使えない人**を名指しで招く。`restricted` のアプリや、
+顧客を 1 人ずつ呼ぶ業務アプリで使う。使える条件は 2 つ（どちらかが欠けると `FORBIDDEN`）:
+`capabilities.users.invite: true`（web App に宣言）と、`infra/project.yaml` の Role の Permission **`users.invite`**。
+本番（prod）の環境だけ（制作中の main やチャットの環境では実際には出せない。`kit dev` は記録するだけ）。
+
+| やること | 書き方 |
+|---|---|
+| 招待する | `client.users.invite({ email })`（まだ FDPocket に居ない人も可）か `{ userId }`（この Project を使ったことのある人の User.id）。`workspace: { id, role }` を添えると、**受諾した人に Workspace の招待が届く**（招く人がその owner / admin であること。role は `admin` / `editor` / `viewer`、既定 `editor`） |
+| 結果（`UserInvitationResult`） | `{ kind, invitationId?, expiresAt? }`。`invited`（招待を出した）/ `workspace_invited`（既に使える人に Workspace の招待だけを出した）/ `already_has_access`（既に使える人で、出すものが無い） |
+| 出した招待の状態（`UserInvitation`） | `client.users.invitations.list()` → `[{ invitationId, status, invitee, appSlug, expiresAt, createdAt }]`。`status` は `pending` / `expired`（受諾された招待は消える）。`invitee` はアカウント名かマスクしたメール（`a***@example.com`） |
+
+- 招待された人にはメール（既存ユーザーには通知も）が届き、「アプリを開く」でこのアプリを使えるようになる。リンクを知っているだけでは参加できない。
+- 失敗: capability / Permission が無い・匿名 → `FORBIDDEN`、居ない人・使えない人・ブロックし合っている人 → `NOT_FOUND`、
+  既に招待済み・既にその Workspace のメンバー → `CONFLICT`、1 日の上限 → `QUOTA_EXCEEDED`。
+- **宛先は入力させる側が確かめる**: メールの打ち間違いはそのまま別の人への招待になる。送る前に確認の画面を置く。
 
 ### 3.8 `client.ai` — ミニアプリ内 AI（`Ai`）
 

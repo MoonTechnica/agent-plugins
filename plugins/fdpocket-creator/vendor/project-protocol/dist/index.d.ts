@@ -42,6 +42,7 @@ export * from './storage.ts';
 export * from './storage-download.ts';
 export * from './storage-egress.ts';
 export * from './token.ts';
+export * from './user-invitations.ts';
 export * from './validation-report.ts';
 export * from './version.ts';
 export * from './workspaces.ts';
