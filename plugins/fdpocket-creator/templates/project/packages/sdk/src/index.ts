@@ -13,4 +13,4 @@ export const client = createClient<SchemaType>({
   projectId: __PROJECT_ID__,
   app: __APP_SLUG__,
 })
-export type { SeedContext, SeedOperation, SeedPlan, TestIdentity } from "@workspace/miniapp-sdk"
+export type { SamplePlan, SeedContext, SeedOperation, SeedPlan, TestIdentity } from "@workspace/miniapp-sdk"

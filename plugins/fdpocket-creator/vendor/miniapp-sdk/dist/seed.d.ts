@@ -15,5 +15,14 @@ export interface SeedPlan<S extends SchemaDef> {
     version: 1;
     operations: readonly SeedOperation<S>[];
 }
+/** Repeatable samples are declared separately from one-time initialization. */
+export interface SamplePlan<S extends SchemaDef> {
+    version: 2;
+    rows: readonly {
+        model: Uncapitalize<Exclude<GetModels<S>, (typeof SESSION_SEED_SYSTEM_MODELS)[number]>>;
+        key: string;
+        data: Readonly<Record<string, string | number | boolean | null>>;
+    }[];
+}
 export type SeedContext = SessionSeedContext;
 export type TestIdentity = SessionSeedIdentity;

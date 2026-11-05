@@ -7,6 +7,8 @@ export declare const SESSION_LIVE_SOURCE_MAX_FILES = 2000;
 export interface SessionSyncContext {
     revision: string | null;
     schemaSql: string;
+    /** The current session DB initialization, or null while it is being recreated. */
+    initializationId?: string | null;
 }
 export interface SessionSourceDescriptor {
     hash: string;
@@ -46,6 +48,12 @@ export interface SessionPythonPayload {
     appSlug: string;
     manifest: NormalizedProjectManifest;
 }
+export interface SessionSamplePayload {
+    hash: string;
+    baseRevision: string;
+    source: SessionSourceDescriptor;
+    manifest: NormalizedProjectManifest;
+}
 export interface SessionSyncJob {
     id: string;
     status: 'uploading' | 'pending' | 'running' | 'done' | 'failed' | 'replan';
@@ -55,6 +63,9 @@ export interface SessionSyncJob {
 export type SessionLiveNotification = {
     kind: 'schema';
     payload: SessionSchemaPayload;
+} | {
+    kind: 'sample';
+    payload: SessionSamplePayload;
 } | {
     kind: 'worker';
     payload: SessionWorkerPayload;

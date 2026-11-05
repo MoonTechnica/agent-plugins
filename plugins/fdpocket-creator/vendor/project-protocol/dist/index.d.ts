@@ -38,6 +38,8 @@ export * from './safety.ts';
 export * from './sandbox-dispatch.ts';
 export * from './session-environment.ts';
 export * from './session-live-events.ts';
+export * from './session-sample-action.ts';
+export * from './session-sample-plan.ts';
 export * from './session-seed.ts';
 export * from './storage.ts';
 export * from './storage-download.ts';

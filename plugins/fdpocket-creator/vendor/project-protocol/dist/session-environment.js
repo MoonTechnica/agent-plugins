@@ -120,6 +120,23 @@ export const sessionEnvironmentViewSchema = z.object({
         failure: failureDiagnosticSchema.nullish(),
         /** The app's own seed crashed, so the preview runs without sample data (the preview still works). */
         seedFailure: failureDiagnosticSchema.nullish(),
+        sampleSync: z
+            .object({
+            operationId: z.uuid(),
+            state: z.enum(['pending', 'applied', 'conflict', 'failed', 'not_requested']),
+            sourceHash: z
+                .string()
+                .regex(/^[a-f0-9]{64}$/)
+                .optional(),
+            schemaRevision: z
+                .string()
+                .regex(/^[a-f0-9]{64}$/)
+                .optional(),
+            applied: z.number().int().nonnegative().optional(),
+            conflicts: z.number().int().nonnegative().optional(),
+            errorCode: z.string().optional(),
+        })
+            .nullish(),
         /** The Kit reported code it could not build or hand over; cleared when the same step recovers. */
         kitFailure: failureDiagnosticSchema.nullish(),
         /**

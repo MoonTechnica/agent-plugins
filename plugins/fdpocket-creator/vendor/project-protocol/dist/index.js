@@ -38,6 +38,8 @@ export * from "./safety.js";
 export * from "./sandbox-dispatch.js";
 export * from "./session-environment.js";
 export * from "./session-live-events.js";
+export * from "./session-sample-action.js";
+export * from "./session-sample-plan.js";
 export * from "./session-seed.js";
 export * from "./storage.js";
 export * from "./storage-download.js";

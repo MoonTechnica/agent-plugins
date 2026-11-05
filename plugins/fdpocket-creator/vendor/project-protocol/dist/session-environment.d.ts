@@ -196,6 +196,21 @@ export declare const sessionEnvironmentViewSchema: z.ZodObject<{
             }>;
             detail: z.ZodString;
         }, z.core.$strip>>>;
+        sampleSync: z.ZodOptional<z.ZodNullable<z.ZodObject<{
+            operationId: z.ZodUUID;
+            state: z.ZodEnum<{
+                failed: "failed";
+                pending: "pending";
+                applied: "applied";
+                conflict: "conflict";
+                not_requested: "not_requested";
+            }>;
+            sourceHash: z.ZodOptional<z.ZodString>;
+            schemaRevision: z.ZodOptional<z.ZodString>;
+            applied: z.ZodOptional<z.ZodNumber>;
+            conflicts: z.ZodOptional<z.ZodNumber>;
+            errorCode: z.ZodOptional<z.ZodString>;
+        }, z.core.$strip>>>;
         kitFailure: z.ZodOptional<z.ZodNullable<z.ZodObject<{
             code: z.ZodEnum<{
                 unknown: "unknown";
