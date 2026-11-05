@@ -26,7 +26,7 @@ App は Project 専用のオリジン（`https://{project}.{apps-domain}`）で�
 │   ├── web/                 # src/main.tsx, src/routes/（ファイルベースのルート）, vite.config.ts
 │   └── admin/               # 任意
 ├── packages/
-│   ├── db-schema/           # schema.zmodel（編集する）, platform.zmodel（Kit が置く）, migrations/, seed.ts, erase.test.ts
+│   ├── db-schema/           # schema.zmodel（編集する）, platform.zmodel（Kit が置く）, migrations/, masters.ts, seed.ts, erase.test.ts
 │   ├── sdk/                 # src/index.ts（client と schema）+ src/zenstack/（kit generate の生成物）。編集しない。commit する
 │   ├── ui/                  # shadcn の部品と globals.css
 │   ├── <name>/              # 共有 package（任意。複数の App で使うコード。@workspace/<name>。足し方は $fdpocket-app-structure）
@@ -728,6 +728,7 @@ SDK は失敗を `null` / `[]` で隠さず `SdkError` を投げる。メンバ�
 | `pending/intent.yaml` | Agent（破壊的な変更のときだけ。`migrate` の前に） | 意図: `rename`（列の名前の変更）/ `drop`（消す）/ `retype`（型・NOT NULL・一意制約を変える）/ `contract`（公開の後に消す予約）。`migrate` が使って消す（commit しない） |
 | `pending/data.sql` | Agent（任意。`migrate` の前に） | データの移し替え（埋め戻し・名前変更のコピー）。`migrate` が migration.sql に取り込んで消す |
 | `pending/migration-policy.json` | Agent（任意） | 本番の値の変更の宣言。`migrate` が取り込んで消す |
+| `masters.ts` | Agent（任意） | **マスタデータ**（カテゴリ・プラン・都道府県など、アプリが前提にする固定の行）。`kit db migrate` が migration の SQL にするので、セッション・main・本番のすべてに届く |
 | `seed.ts` | Agent | `kit dev` などの試用データ（本番では流れない） |
 | `erase.test.ts` | Agent | 消去のテスト。動的検証が seed の後の新しい DB で流す（seed の利用者を 1 人 `erase` して、本人のデータが残らず他人のデータが壊れないこと） |
 
@@ -761,6 +762,26 @@ export default async function seed(context: SeedContext): Promise<SeedPlan<Schem
 
 ```
 
+
+**マスタデータ**（`masters.ts`）は本番にも要る固定の行。試用データ（`seed.ts`）とは別に書く。
+
+```ts
+// packages/db-schema/masters.ts
+import type { MasterData, SchemaType } from '@workspace/sdk'
+
+export default {
+  category: [
+    { id: 'food', name: '食品', sortOrder: 1 },
+    { id: 'drink', name: '飲み物', sortOrder: 2 },
+  ],
+} satisfies MasterData<SchemaType>
+```
+
+- 行は**文字列の `id` を必ず書く**（環境が違っても同じ行を指すため。業務データはこの id を参照する）。値はスカラー（String・Int・Float・Boolean・DateTime・enum・Json）だけ。並びは参照される側を先に。
+- マスタのモデルは**アプリから書けない**ようにする（`@@allow('read', …)` だけ。create / update / delete / all を許すと `MASTER_MODEL_WRITABLE`）。管理画面から編集したいデータはマスタではなく普通のモデルにする。
+- 足す・直したら `kit db migrate --slug <slug>`。前の migration との差分が INSERT / UPDATE になり、同じ migration に入る（マスタだけの変更も migration になる）。`@updatedAt`・`@default(now())` の列は migration の時刻で埋まる。
+- **行は消せない**（`MASTER_ROW_REMOVED`。業務データが参照しているかもしれない）。使わなくなった行は `active` などの列で無効にする。
+- 直し忘れは `kit check` の `MASTERS_NOT_MIGRATED` が止める。
 
 `SeedOperation<SchemaType>` は一つの型付きモデル操作、`SeedPlan<SchemaType>` はその一覧。
 `SeedContext.environmentId` と `SeedContext.resourceGeneration` は対象セッションの固定世代、

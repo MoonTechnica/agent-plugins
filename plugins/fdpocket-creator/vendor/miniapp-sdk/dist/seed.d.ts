@@ -24,5 +24,11 @@ export interface SamplePlan<S extends SchemaDef> {
         data: Readonly<Record<string, string | number | boolean | null>>;
     }[];
 }
+/** Source-owned reference rows (`packages/db-schema/masters.ts`). `kit db migrate` turns changes into migration SQL. */
+export type MasterData<S extends SchemaDef> = {
+    readonly [M in Exclude<GetModels<S>, (typeof SESSION_SEED_SYSTEM_MODELS)[number]> as Uncapitalize<M>]?: readonly ({
+        readonly id: string;
+    } & Readonly<Record<string, string | number | boolean | null | Date | readonly unknown[] | object>>)[];
+};
 export type SeedContext = SessionSeedContext;
 export type TestIdentity = SessionSeedIdentity;

@@ -37,7 +37,7 @@ Project は利用者向けの `web` と、必要なら管理用の `admin` の A
 | Skill | いつ |
 |---|---|
 | `$fdpocket-app-design` | **必ず・最初に**。依頼を「誰が・何のために・どの画面で・どのデータを」に分け、画面とデータの案を決める。企画ターン（`concept`）にする条件、必須チェック |
-| `$fdpocket-app-data-model` | **データに触れるとき必ず**。ZModel とポリシーの書き方・保護する列・Workspace と Role、migration（`kit db migrate`・`migrations/`）、`seed.ts` |
+| `$fdpocket-app-data-model` | **データに触れるとき必ず**。ZModel とポリシーの書き方・保護する列・Workspace と Role、migration（`kit db migrate`・`migrations/`）、`masters.ts`、`seed.ts` |
 | `$fdpocket-app-ui` | **必ず**。画面の作り方（shadcn・Tailwind・スマホ幅とキーボード・5 つの状態・一覧のページング・エラーの出し方） |
 | `$fdpocket-app-testing` | **必ず**（データと画面ができたときと着地の前）。Vitest、`kit dev` での確認、`kit check`、`kit build` の結果の読み方 |
 | `$fdpocket-app-listing` | **必ず**（版を作るターン）。掲載情報（名前・キャッチコピー・説明・カテゴリ・タグ・アイコン・カバー） |

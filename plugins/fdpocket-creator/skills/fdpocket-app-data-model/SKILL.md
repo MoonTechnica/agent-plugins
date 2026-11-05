@@ -1,6 +1,6 @@
 ---
 name: fdpocket-app-data-model
-description: ミニアプリのデータを ZModel（packages/db-schema/schema.zmodel）で設計する。deny by default のポリシー、所有者と Workspace の分け方、保護する列の post-update の対、Role と Permission、一覧の index、利用者の削除の方針（onDelete・@@platform.retain・erase.test.ts）、migration（kit generate → kit db migrate → migrations/、破壊的な変更の pending/intent.yaml と data.sql）、seed.ts の書き方。モデルを足す・変えるときに使う。
+description: ミニアプリのデータを ZModel（packages/db-schema/schema.zmodel）で設計する。deny by default のポリシー、所有者と Workspace の分け方、保護する列の post-update の対、Role と Permission、一覧の index、利用者の削除の方針（onDelete・@@platform.retain・erase.test.ts）、migration（kit generate → kit db migrate → migrations/、破壊的な変更の pending/intent.yaml と data.sql）、マスタデータ（masters.ts）と seed.ts の書き方。モデルを足す・変えるときに使う。
 ---
 
 # データモデルと migration
@@ -177,6 +177,42 @@ export default async function eraseTest({ db, erase }: {
 削除・列削除・表削除は本番コピーで実測した影響をオーナー/管理者に示し、承認まで公開を止める。
 `migration`・`max_rows`や承認済みフラグを宣言しない。これらはPlatformが管理し、Agentによる自己承認はできない。
 検証不可・ユーザーが問題ありとしたときは公開を進めず、チャットの指摘に沿って修正する。本番値はAgentへ渡されない。
+
+## 8a. マスタデータ（`packages/db-schema/masters.ts`）
+
+アプリが前提にする固定の行（カテゴリ・プラン・都道府県・ステータスの選択肢など）は、本番にも要るので試用データではなくマスタデータにする。
+ZenStack / Prisma の流儀どおり migration で配る: `kit db migrate` が、これまでの migration との差分を INSERT / UPDATE の SQL にして新しい migration に入れる。
+そのためセッション・main・本番のすべてに、スキーマと同じ順番で届く（本番は本番コピーでの事前検証も通る）。
+
+```ts
+import type { MasterData, SchemaType } from '@workspace/sdk'
+
+export default {
+  category: [
+    { id: 'food', name: '食品', sortOrder: 1, active: true },
+    { id: 'drink', name: '飲み物', sortOrder: 2, active: true },
+  ],
+  product: [{ id: 'apple', name: 'りんご', categoryId: 'food' }],   // 参照される側を先に
+} satisfies MasterData<SchemaType>
+```
+
+```zmodel
+model Category {
+  id        String    @id          // 意味のある文字列の id を masters.ts で決める（@default は付けなくてよい）
+  name      String
+  sortOrder Int
+  active    Boolean   @default(true)
+  products  Product[]
+
+  @@allow('read', true)            // マスタは読むだけ。create / update / delete / all を許さない
+}
+```
+
+- `id` は必ず書く。どの環境でも同じ行を指し、業務データの参照（`categoryId: 'food'`）がそのまま通る。
+- 値はスカラーだけ（relation の nested create は書けない。外部キーの列に id を書く）。
+- 直す・足すたびに `kit db migrate --slug <slug>` → `migrations/` を commit。忘れると `kit check` の `MASTERS_NOT_MIGRATED`。
+- 行を消すと `MASTER_ROW_REMOVED` で止まる。やめた行は `active: false` などで無効にし、画面で絞る。
+- 管理画面で編集したいデータはマスタにしない（普通のモデルにして、初期値は管理者が画面から入れる）。
 
 ## 8. 試用データ（`packages/db-schema/seed.ts`）
 

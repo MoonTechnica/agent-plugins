@@ -21,6 +21,7 @@ export * from './listing.ts';
 export * from './live-bridge.ts';
 export * from './live-preview.ts';
 export * from './manifest.ts';
+export * from './master-data.ts';
 export * from './mcp.ts';
 export * from './network.ts';
 export * from './network-mocks.ts';

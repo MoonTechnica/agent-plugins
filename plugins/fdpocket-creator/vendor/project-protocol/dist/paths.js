@@ -12,6 +12,8 @@ export const PROJECT_PATHS = {
     pending: 'packages/db-schema/pending',
     /** Agent が書く試用データ（lifecycle.md §2.5。`kit dev` が DB を作ったときに流す） */
     seed: 'packages/db-schema/seed.ts',
+    /** Agent が書くマスタデータ（master-data.md。`kit db migrate` が migration の SQL にして全環境へ届く） */
+    masters: 'packages/db-schema/masters.ts',
     /** Agent が書く消去のテスト（lifecycle.md §3.3。動的検証が seed の後の DB で 1 人を消して流す） */
     eraseTest: 'packages/db-schema/erase.test.ts',
     generated: '.kit/generated',

@@ -21,6 +21,7 @@ export * from "./listing.js";
 export * from "./live-bridge.js";
 export * from "./live-preview.js";
 export * from "./manifest.js";
+export * from "./master-data.js";
 export * from "./mcp.js";
 export * from "./network.js";
 export * from "./network-mocks.js";

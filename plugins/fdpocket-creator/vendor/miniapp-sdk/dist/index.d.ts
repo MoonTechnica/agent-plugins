@@ -11,7 +11,7 @@ export type { Profile } from './profile/client.ts';
 export type { Python, PythonRunHandle } from './python/client.ts';
 export type { BroadcastMessage, ChangeFilter, ChannelOptions, PresenceState, Realtime, RealtimeChange, RealtimeChannel, RealtimeSnapshot, RealtimeSocketFactory, RealtimeStatus, } from './realtime/client.ts';
 export type { Safety } from './safety/client.ts';
-export type { SamplePlan, SeedContext, SeedOperation, SeedPlan, TestIdentity } from './seed.ts';
+export type { MasterData, SamplePlan, SeedContext, SeedOperation, SeedPlan, TestIdentity, } from './seed.ts';
 export type { Bucket, Storage, StorageFileMeta, UploadOptions, UploadProgress, } from './storage/client.ts';
 export type { Ui } from './ui/client.ts';
 export type { UserInvitation, UserInvitationResult, UserInvitations, Users, } from './users/client.ts';
