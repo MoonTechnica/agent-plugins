@@ -82525,6 +82525,7 @@ async function diffDatabase(options2) {
   return {
     sql: diff.body,
     empty: diff.body === "",
+    migrations: diff.migrations,
     changes,
     destructive: changes.some((change) => change.destructive)
   };
@@ -82552,7 +82553,7 @@ async function prepareSchemaPlan({ root, kitRoot }, baseline, signal = new Abort
   const intent2 = parseIntent(await optionalFile(join19(root, PROJECT_PATHS.pending, "intent.yaml")));
   if (intent2.error)
     throw new DevError(intent2.error);
-  const migrations = await readMigrations(root);
+  const { migrations } = pending;
   const generatedSql = pending.sql;
   const rawDelta = await renderSchemaDelta(root, baseline.schemaSql);
   const changes = baseline.revision === null ? pending.changes : await classifyDiff({
