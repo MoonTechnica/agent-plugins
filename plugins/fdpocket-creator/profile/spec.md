@@ -780,6 +780,7 @@ export default {
 - 行は**文字列の `id` を必ず書く**（環境が違っても同じ行を指すため。業務データはこの id を参照する）。値はスカラー（String・Int・Float・Boolean・DateTime・enum・Json）だけ。並びは参照される側を先に。
 - マスタのモデルは**アプリから書けない**ようにする（`@@allow('read', …)` だけ。create / update / delete / all を許すと `MASTER_MODEL_WRITABLE`）。管理画面から編集したいデータはマスタではなく普通のモデルにする。
 - 足す・直したら `kit db migrate --slug <slug>`。前の migration との差分が INSERT / UPDATE になり、同じ migration に入る（マスタだけの変更も migration になる）。`@updatedAt`・`@default(now())` の列は migration の時刻で埋まる。
+- **値の直しは `masters.ts` を直すだけ**。`pending/migration-policy.json` に `transforms`（`map` など）を書かない（マスタの表は本番の値の保全の対象外で、不要）。
 - **行は消せない**（`MASTER_ROW_REMOVED`。業務データが参照しているかもしれない）。使わなくなった行は `active` などの列で無効にする。
 - 直し忘れは `kit check` の `MASTERS_NOT_MIGRATED` が止める。
 

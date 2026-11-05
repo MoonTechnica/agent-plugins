@@ -211,6 +211,7 @@ model Category {
 - `id` は必ず書く。どの環境でも同じ行を指し、業務データの参照（`categoryId: 'food'`）がそのまま通る。
 - 値はスカラーだけ（relation の nested create は書けない。外部キーの列に id を書く）。
 - 直す・足すたびに `kit db migrate --slug <slug>` → `migrations/` を commit。忘れると `kit check` の `MASTERS_NOT_MIGRATED`。
+- 値を直すときも `masters.ts` を直すだけ。`pending/migration-policy.json` の `transforms`（`map` など）は書かない（マスタの表は本番の値の保全の対象外）。
 - 行を消すと `MASTER_ROW_REMOVED` で止まる。やめた行は `active: false` などで無効にし、画面で絞る。
 - 管理画面で編集したいデータはマスタにしない（普通のモデルにして、初期値は管理者が画面から入れる）。
 
