@@ -19,7 +19,8 @@ user-invocable: false
    どちらも Kit が `get_git_bundles` を呼ぶ（初回だけブラウザでログインの許可を求められる）。
    `pull` は commit していない変更があると断るので、先に `git commit` する（`<kit>/profile/instructions.md` §8.3 / §8.4）。
 4. 結果の `status` が `conflict` なら、示されたファイルの衝突を解き `git add` → `git rebase --continue`（§8.4）。
-   `packages/db-schema/pending/generated.sql` は解かずに `kit.mjs db diff` で作り直す。
+   `packages/db-schema/migrations/` は時刻の名前のファイルを足すだけなので、通常は衝突しない（commit 済みの migration は書き換えない）。
+   ZModel を解いたあと `kit.mjs db diff` で `empty: true` を確かめ、差分が残っていれば `kit.mjs db migrate --slug <slug>` で新しい migration にする。
 5. 取り込んだら `source/` で `bun install` → `node <kit>/scripts/kit.mjs generate`（同梱の SDK と型を Kit の版にそろえる）。
 6. **参照を許可された最新の main だけを自分のブランチへ取り込む**: `main` が返る場合だけ行う（一般参加者には公開済みの版だけが渡される）。
    main は `refs/remotes/fdpocket/heads/main` に fetch される。自分のブランチの上で `git merge refs/remotes/fdpocket/heads/main` し、

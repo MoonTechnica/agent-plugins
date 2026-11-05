@@ -211,8 +211,8 @@ Any agent that supports Skills and remote MCP servers can use the Kit.
 the agent rebases your commits onto it (like `git pull --rebase`) and resolves any conflicts.
 
 **Change the data model** — Ask in plain language. The agent edits `packages/db-schema/schema.zmodel`, runs `kit generate`
-and `kit db diff`, and commits the pending migration. Changes that can destroy data (dropping or renaming a column) are
-written down with their intent, and the Platform asks for confirmation when merging into main.
+and `kit db migrate --slug <slug>`, and commits the new `migrations/{timestamp}_{slug}/` directory. Changes that can destroy
+data (dropping or renaming a column) are written down with their intent before `migrate`; a committed migration is never edited.
 
 **Contribute to someone else's app** — `remix <app page URL>` → make one focused change → `push`
 → wait until it is validated → `propose`. The owner reviews it and can merge it into their main.
@@ -233,7 +233,8 @@ node <kit>/scripts/kit.mjs <command> [--flag value]
 | `push` | Build, check, send, and wait for the Platform's validation in one step (`--message`; `--open` opens the editor when it is ready). |
 | `new` | Place the template project into an empty `source/`. |
 | `generate` | Check `infra/project.yaml`, place the base data model, and generate the typed client from the ZModel. |
-| `db diff` | Regenerate the branch's pending migration (`pending/generated.sql`) and report destructive changes. |
+| `db diff` | Read-only: show what the ZModel changes compared with the committed `migrations/` and whether it is destructive. |
+| `db migrate --slug <slug>` | Turn that difference into `migrations/{UTC timestamp}_{slug}/` (migration.sql + meta.json). Commit it. |
 | `dev` | Run every app locally with the Platform's Gateway, a local database and file store, and the development host page. |
 | `check` | Run the pre-push checks locally (exit code 2 when something fails). |
 | `build` | Install with the lockfile and build every app into `source/dist/`. The only way to build. |

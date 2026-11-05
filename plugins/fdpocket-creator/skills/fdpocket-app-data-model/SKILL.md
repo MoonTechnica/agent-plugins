@@ -1,6 +1,6 @@
 ---
 name: fdpocket-app-data-model
-description: ミニアプリのデータを ZModel（packages/db-schema/schema.zmodel）で設計する。deny by default のポリシー、所有者と Workspace の分け方、保護する列の post-update の対、Role と Permission、一覧の index、利用者の削除の方針（onDelete・@@platform.retain・erase.test.ts）、migration（kit generate → kit db diff → pending/、破壊的な変更の intent.yaml と data.sql）、seed.ts の書き方。モデルを足す・変えるときに使う。
+description: ミニアプリのデータを ZModel（packages/db-schema/schema.zmodel）で設計する。deny by default のポリシー、所有者と Workspace の分け方、保護する列の post-update の対、Role と Permission、一覧の index、利用者の削除の方針（onDelete・@@platform.retain・erase.test.ts）、migration（kit generate → kit db migrate → migrations/、破壊的な変更の pending/intent.yaml と data.sql）、seed.ts の書き方。モデルを足す・変えるときに使う。
 ---
 
 # データモデルと migration
@@ -136,32 +136,36 @@ export default async function eraseTest({ db, erase }: {
 
 1. `schema.zmodel` を変える。
 2. `node <kit>/scripts/kit.mjs generate`（型 `packages/sdk/src/zenstack/` と `.kit/generated/` を作り直す。エラーは ZModel の行で出る）。
-3. `node <kit>/scripts/kit.mjs db diff` → `pending/generated.sql` が作り直される（手で書かない・直さない）。結果を読む:
+3. `node <kit>/scripts/kit.mjs db diff` で差分を**見る**（何も書かない）。結果を読む:
    - `changes`: 変更の一覧（`kind` と表・列）。`destructive`: データを壊しうる変更があるか。
    - `destructive: true` なら `pending/intent.yaml` に意図を書く（spec §6）。変更ごとに対応する意図が要る: 削除は `drop`、
      型・NOT NULL 化・一意制約の追加は対象の列の `retype`。名前の変更は ZenStack から見ると「削除 + 追加」なので、
-     必ず `rename` と書く（値は合流で Platform が表の作り直しの写しに足して移す。`data.sql` では写せない）。
+     必ず `rename` と書く（値は `migrate` が表の作り直しの写しに足して移す。`data.sql` では写せない）。
    - **公開中の版が使っている列**を消す・名前を変えるときは 2 段に分ける: 今回は新しい列を足して両方に書き（`data.sql` で
      `UPDATE "Task" SET "name" = "title";` のように埋める）、古い列は残して `- contract: { table: Task, column: title }` を書く。
      古い列の削除は、新しい版の公開の後に Platform が起票するターン（作者が承認したときだけ動く）で行う。
      そのターンでは、公開中の版がまだ古い列を読んでいるなら、先に古い列を `@omit` にしてコードから外した版を作る
      （公開中の版が読む列は消せない。その版が公開されてから消す）。
    - NOT NULL・既定値の無い列を既存の表に足すと、行があると落ちる。既定値を付けるか、NULL 可で足して `data.sql` で埋める。
-4. `packages/sdk/src/zenstack/`・`pending/` を commit する。**`migrations/` は Platform だけが書く**（変えると `kit check` が落ちる）。
-5. 通常のローカル `kit dev` で型と主要な操作を確かめる。利用者の `kit dev --live` は watcher が保存を検出し、
+4. `node <kit>/scripts/kit.mjs db migrate --slug <slug>`（slug は変更を表す英小文字・数字・`_`。例: `add_task_note`）。
+   `migrations/{UTC時刻}_{slug}/`（`migration.sql` + `meta.json`）ができ、使い終わった `pending/` の下書きは消える。
+   止まったとき（`status: blocked`）は `findings` を直してもう一度回す（意図の不足・余り、`data.sql` が当たらない、など）。
+5. `packages/sdk/src/zenstack/`・`migrations/` を commit する。**commit 済みの migration は書き換えない・消さない**
+   （変えると `kit check` が落ちる）。あとで ZModel をまた変えたら、新しい migration を作る。取り込み（main への merge）は migration に何もしない。
+6. 通常のローカル `kit dev` で型と主要な操作を確かめる。利用者の `kit dev --live` は watcher が保存を検出し、
    生成・差分の検証・本物の session DB への反映を行う。反映成功を確かめる。このために利用者の live を再起動しない。
    説明できる migration は既存の試用データを保って当てる。意図の無い破壊的な変更ではセッションの試用データが作り直されるため、
    その変更を選ぶ前に試用データが消えることを知らせる。通常の再開や seed の編集だけを理由に、本物の DB を毎回作り直さない。
    **main / prod の DB はセッションの処理では変更・消去しない**。本物のポリシーの確認が必要なら `$fdpocket-app-testing` に従い、
    `design/test-plan.md` を書いてテスト利用者で E2E を行う。
 
-`kit check` は `begin_build` の前にも走り、`pending/generated.sql` が古い・`migrations/` を変えた・`platform.zmodel` を変えたときに終了コード 2 で止める。
+`kit check` は `begin_build` の前にも走り、ZModel に migration にしていない変更が残っている（`MIGRATION_MISSING`）・commit 済みの `migrations/` を変えた・`platform.zmodel` を変えたときに終了コード 2 で止める。
 
 ### 本番の値を変えるとき
 
 利用者へSQLや検証条件を書かせない。Agentが変更を作り、Platformが本番の隔離コピーと本番transaction内で検査する。
 列のrename/drop・String/Int間の型変更は、上の`intent.yaml`からPlatformが宣言を確定SQLに含める。
-既存の値の一対一の名称変更や行削除は、`pending/migration-policy.json`を用意する（確定後は消える）。例:
+既存の値の一対一の名称変更や行削除は、`migrate` の前に`pending/migration-policy.json`を用意する（migration に取り込まれて消える）。例:
 
 ```json
 {"transforms":[{"table":"Task","column":"status","kind":"map","forward":{"open":"todo"},"reverse":{"todo":"open"}}],"deletions":[]}

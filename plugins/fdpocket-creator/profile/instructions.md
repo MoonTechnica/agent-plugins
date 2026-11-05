@@ -37,7 +37,7 @@ Project は利用者向けの `web` と、必要なら管理用の `admin` の A
 | Skill | いつ |
 |---|---|
 | `$fdpocket-app-design` | **必ず・最初に**。依頼を「誰が・何のために・どの画面で・どのデータを」に分け、画面とデータの案を決める。企画ターン（`concept`）にする条件、必須チェック |
-| `$fdpocket-app-data-model` | **データに触れるとき必ず**。ZModel とポリシーの書き方・保護する列・Workspace と Role、migration（`kit db diff`・`pending/`）、`seed.ts` |
+| `$fdpocket-app-data-model` | **データに触れるとき必ず**。ZModel とポリシーの書き方・保護する列・Workspace と Role、migration（`kit db migrate`・`migrations/`）、`seed.ts` |
 | `$fdpocket-app-ui` | **必ず**。画面の作り方（shadcn・Tailwind・スマホ幅とキーボード・5 つの状態・一覧のページング・エラーの出し方） |
 | `$fdpocket-app-testing` | **必ず**（データと画面ができたときと着地の前）。Vitest、`kit dev` での確認、`kit check`、`kit build` の結果の読み方 |
 | `$fdpocket-app-listing` | **必ず**（版を作るターン）。掲載情報（名前・キャッチコピー・説明・カテゴリ・タグ・アイコン・カバー） |
@@ -87,7 +87,8 @@ Project は利用者向けの `web` と、必要なら管理用の `admin` の A
 
 1. **brief**（`$fdpocket-app-design`）: 依頼を分解して `design/brief.md` に書く。画面一覧を `design/screens.md`、データを `design/data-model.md` に。
 2. **データ**（`$fdpocket-app-data-model`）: `packages/db-schema/schema.zmodel` に業務モデルとポリシーを書き、
-   `node <kit>/scripts/kit.mjs generate` → `node <kit>/scripts/kit.mjs db diff`。結果の `destructive` が true なら `pending/intent.yaml`（と `pending/data.sql`）。
+   `node <kit>/scripts/kit.mjs generate` → `node <kit>/scripts/kit.mjs db migrate --slug <slug>` で `migrations/` に新しい migration を作り、commit する
+   （commit 済みの migration は書き換えない。次の変更は新しい migration）。破壊的な変更（`kit db diff` の `destructive` が true）なら、`migrate` の前に `pending/intent.yaml`（と `pending/data.sql`）を書く。
    試用データを `packages/db-schema/seed.ts` に。
 3. **project.yaml**: 各 App が使うモデル × 操作・バケット × 操作だけを capability に宣言し、Role と Permission を決める（spec §2。`$fdpocket-app-admin`）。
 4. **画面**（`$fdpocket-app-ui`）: `apps/<slug>` の各web Appを `@workspace/sdk` の `client` と `@workspace/miniapp-sdk/react` のフックで作る。
@@ -228,7 +229,7 @@ MCP の `project_id` は Project の内部 ID（`.fdpocket.json` の `project_id
    （`get_git_bundles({ project_id, session_id })` の結果の JSON を `--bundles '<JSON>'` で渡してもよい）。
    `pull` は commit していない変更があると断るので、先に `git commit` する。結果の `status` が `conflict` なら §8.4。
    空の Project なら §5 の `kit.mjs new` から。
-2. **作る**: §3 の工程。`source/` で `bun install`、ZModel を変えたら `kit.mjs generate` → `kit.mjs db diff`、`kit.mjs dev` で確かめる。区切りごとに `git commit` する。
+2. **作る**: §3 の工程。`source/` で `bun install`、ZModel を変えたら `kit.mjs generate` → `kit.mjs db migrate --slug <slug>`、`kit.mjs dev` で確かめる。区切りごとに `git commit` する。
 3. **出力の申告**: 変更を `git commit` し、`source/listing/` の掲載情報を用意し（今の値は `get_project` の `listing`）、
    `outputs/build-report.json` に申告（`notes`・`listingRequested`・`stage`）を書く（spec §11。`project`・`apps`・`schemaVersion`・
    `migrations` は `kit push` が build の結果から埋める）。貢献のブランチなら `get_contribution_policy` で規約を読み、差分全体が守っているか確かめる。
@@ -250,7 +251,7 @@ MCP の `project_id` は Project の内部 ID（`.fdpocket.json` の `project_id
 
 1. `kit.mjs pull`。
 2. `status` が `conflict` なら衝突を解き（`git diff` で両方の変更を見る。依頼の意図を残す）、`git add` → `git rebase --continue`。
-   `packages/db-schema/pending/generated.sql` の衝突は解かずに `kit.mjs db diff` で作り直す。
+   `packages/db-schema/migrations/` は時刻の名前のファイルを足すだけなので衝突しない。ZModel を解いたあと `kit.mjs db diff` が `empty: true` を返さなければ、`kit.mjs db migrate --slug <slug>` で新しい migration にする。
 3. `kit.mjs push` で送り直す。
 
 main の参照権限がある場合は、同じ `session_id` の `get_git_bundles` の `main` があれば `refs/remotes/fdpocket/heads/main` が最新の main。

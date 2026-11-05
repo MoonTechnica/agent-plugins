@@ -1,6 +1,6 @@
 ---
 name: fdpocket-app-merge
-description: 同じ Project のブランチから main への変更を合わせるターンで使う。./input/merge-report.json があるとき、またはリポジトリが git merge の途中（MERGE_HEAD がある）のときは必ず使う。衝突を両方の意図を保って解き、ZModel と pending/（generated.sql・intent.yaml・data.sql）を合わせ直し、いつもどおりビルドして出力する。
+description: 同じ Project のブランチから main への変更を合わせるターンで使う。./input/merge-report.json があるとき、またはリポジトリが git merge の途中（MERGE_HEAD がある）のときは必ず使う。衝突を両方の意図を保って解き、ZModel を合わせ直し、`migrations/` との差分が残れば新しい migration にし、いつもどおりビルドして出力する。
 ---
 
 # 2 つの版を合わせる（マージ）
@@ -58,11 +58,12 @@ main と提出済み PR の最新の内容は Platform が用意した実際の 
 
 - `packages/db-schema/schema.zmodel` の衝突は、両方のモデル・列・ポリシーを残す形に解く（同じ列を両側が違う型にしたら `intent` に近い方）。
   **ポリシーを緩める方向で解かない**（迷ったら厳しい方）。
-- **`pending/generated.sql` は解かない**（`merge=ours` で衝突しない。中身は古い）。ZModel を解いたら
-  `node <kit>/scripts/kit.mjs generate` → `node <kit>/scripts/kit.mjs db diff` で作り直す。
-- `migrations/` には触れない（Platform が合流のあとに確定する）。
+- `migrations/` は時刻の名前のファイルが両側から足されるだけなので、衝突しない。**どちらの migration も書き換えず、消さない**。
+  ZModel を解いたら `node <kit>/scripts/kit.mjs generate` → `node <kit>/scripts/kit.mjs db diff` を回し、`empty: true` なら何もしない。
+  差分が残る（2 つのブランチの変更を合わせた結果が、足された migration だけでは ZModel と食い違う）なら、
+  `node <kit>/scripts/kit.mjs db migrate --slug <slug>` で、その差分だけの新しい migration を作る。
 - `kit db diff` が `destructive: true` を返す、または `merge-report.json` の `migration` が意図の確認を求めているなら、
-  `pending/intent.yaml` に両方のブランチの意図を残して書き（列名の変更は `rename`）、必要なら `pending/data.sql` でデータを移す（`$fdpocket-app-data-model` §7）。
+  `migrate` の前に `pending/intent.yaml` に両方のブランチの意図を残して書き（列名の変更は `rename`）、必要なら `pending/data.sql` でデータを移す（`$fdpocket-app-data-model` §7）。
   意図が読み取れない削除は、**消さずに残す**（ZModel に列を戻す）方で解き、`notes` に書く。
 - `seed.ts` は両方の試用データを残し、ZModel の制約に合うように直す。
 
@@ -77,7 +78,7 @@ main と提出済み PR の最新の内容は Platform が用意した実際の 
 
 - [ ] `git grep -nE '^(<<<<<<<|>>>>>>>) '` が何も返さず、`git status` に `Unmerged paths` が無い
 - [ ] `package.json` / `listing/listing.json` が JSON として読め、`infra/project.yaml` が `kit generate` を通る
-- [ ] `kit db diff` を回し直し、`pending/` と `packages/sdk/src/zenstack/` を commit した
+- [ ] `kit db diff` が `empty: true`（残る差分は `kit db migrate` で新しい migration にした）で、`migrations/` と `packages/sdk/src/zenstack/` を commit した
 - [ ] `kit check` と `kit build` が通る。`kit dev` で主要な画面が開く（`$fdpocket-app-testing`）
 - [ ] `notes` に衝突ごとの解き方を書いた（衝突 0 件なら「衝突なし」と、直したこと）
 - [ ] 新しい機能・見た目の変更を足していない

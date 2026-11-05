@@ -1,2 +1,0 @@
-# 未確定の migration の差分は合流のときに Platform が作り直す（中身の衝突は無視してよい。lifecycle.md §2.1）
-packages/db-schema/pending/generated.sql merge=ours

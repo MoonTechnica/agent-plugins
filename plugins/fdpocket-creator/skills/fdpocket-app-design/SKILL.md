@@ -50,5 +50,5 @@ description: ミニアプリの依頼を「誰が・何のために・どの画�
 
 ## 5. 工程の順番
 
-brief → データ（ZModel → `kit generate` → `kit db diff`）→ project.yaml → 画面 → 確かめる（`$fdpocket-app-testing`）→ 掲載（`$fdpocket-app-listing`）→ 着地。
+brief → データ（ZModel → `kit generate` → `kit db migrate`）→ project.yaml → 画面 → 確かめる（`$fdpocket-app-testing`）→ 掲載（`$fdpocket-app-listing`）→ 着地。
 データを先に決めると、画面で使う型（`@workspace/sdk`）が先にそろい、作り直しが減る。

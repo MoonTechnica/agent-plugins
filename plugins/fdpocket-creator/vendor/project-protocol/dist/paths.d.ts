@@ -8,7 +8,7 @@ export declare const PROJECT_PATHS: {
     readonly sdk: "packages/sdk/src/zenstack";
     /** 確定済みの migration（Platform だけが書く。lifecycle.md §2.1） */
     readonly migrations: "packages/db-schema/migrations";
-    /** このブランチの未確定の差分（`kit db diff` が作る generated.sql と、Agent が書く data.sql / intent.yaml） */
+    /** `kit db migrate` に渡す下書き（Agent が書く data.sql / intent.yaml / migration-policy.json。migrate が使って消す） */
     readonly pending: "packages/db-schema/pending";
     /** Agent が書く試用データ（lifecycle.md §2.5。`kit dev` が DB を作ったときに流す） */
     readonly seed: "packages/db-schema/seed.ts";

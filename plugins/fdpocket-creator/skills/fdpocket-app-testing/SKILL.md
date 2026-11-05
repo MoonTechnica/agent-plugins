@@ -26,7 +26,7 @@ description: ミニアプリが動くことを確かめる。Vitest で書くテ
 - `member` は `defaultRoles`、`admin` は `ownerBootstrap` の Role を持つ**テスト利用者**。admin でも本人のアカウントではない。
   `anonymous` も匿名のテスト主体。追加の主体は `seed.ts` の `testIdentities` に宣言する。
 - admin を member で開くと、必要な `requiredPermission` が無ければ `FORBIDDEN` が正しい。
-- 起動時に migration と pending を当て、DB を初期化したときだけ seed の計画を使う。通常のローカル dev の SQL や seed を
+- 起動時に commit 済みの migration を当て（ZModel だけにある変更は最後に足す）、DB を初期化したときだけ seed の計画を使う。通常のローカル dev の SQL や seed を
   変えて作り直すと、そのローカル試用データは消える。本物の session DB の通常の再開では seed を再投入しない。
 - 通常のローカル確認で ZModel を変えたときは `kit generate` の後に通常 dev を起動し直す。
   利用者の live は watcher が同期するので、この理由で再起動しない。
@@ -107,8 +107,8 @@ HAR・storageState・trace・スクリーンショットは自動保存しない
 | `infra/project.yaml` の形 | 理由のパスを直す |
 | `platform.zmodel` / 同梱の SDK（`packages/miniapp-sdk/`・`packages/project-protocol/`）が Kit の版か | `kit generate` で戻す |
 | `bun.lock`（npm レジストリの版 + integrity と `workspace:` だけ） | git・URL・`file:` の依存を外して `bun install` |
-| `migrations/` が取り込んだ版から変わっていない | 変更を戻す（`git checkout <base> -- packages/db-schema/migrations`） |
-| `pending/generated.sql` が最新 | `kit db diff` → commit |
+| commit 済みの `migrations/` を書き換えていない（新しい migration を足すのは可） | 変更を戻す（`git checkout <base> -- <変えた migration>`）。変えたいなら新しい migration |
+| ZModel と `migrations/` が一致（`MIGRATION_MISSING`） | `kit db migrate --slug <slug>` → commit |
 | 型（`apps/<slug>/tsconfig.json` のある App を `tsc -b`。`TYPE_ERROR` に場所が付く） | 型の誤りを直す。SDK の API の使い方の誤り（例: `client.python.run()` を `await` せずに `.wait()`）もここで落ちる。`// @ts-ignore` や `any` で黙らせない |
 
 通っても Platform 側の検証（取り込み・静的・画面を開く動的検証）は必ず走る。

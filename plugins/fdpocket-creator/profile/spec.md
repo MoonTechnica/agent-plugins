@@ -26,7 +26,7 @@ App は Project 専用のオリジン（`https://{project}.{apps-domain}`）で�
 │   ├── web/                 # src/main.tsx, src/routes/（ファイルベースのルート）, vite.config.ts
 │   └── admin/               # 任意
 ├── packages/
-│   ├── db-schema/           # schema.zmodel（編集する）, platform.zmodel（Kit が置く）, migrations/, pending/, seed.ts, erase.test.ts
+│   ├── db-schema/           # schema.zmodel（編集する）, platform.zmodel（Kit が置く）, migrations/, seed.ts, erase.test.ts
 │   ├── sdk/                 # src/index.ts（client と schema）+ src/zenstack/（kit generate の生成物）。編集しない。commit する
 │   ├── ui/                  # shadcn の部品と globals.css
 │   ├── <name>/              # 共有 package（任意。複数の App で使うコード。@workspace/<name>。足し方は $fdpocket-app-structure）
@@ -724,16 +724,17 @@ SDK は失敗を `null` / `[]` で隠さず `SdkError` を投げる。メンバ�
 | ファイル | 書く人 | 内容 |
 |---|---|---|
 | `schema.zmodel` | Agent | 正本 |
-| `migrations/` | **Platform だけ** | 確定済み。ブランチで変えない・足さない |
-| `pending/generated.sql` | `kit db diff` | このブランチの未確定の差分。手で書かない |
-| `pending/intent.yaml` | Agent（破壊的な変更のときだけ） | 意図: `rename`（列の名前の変更）/ `drop`（消す）/ `retype`（型・NOT NULL・一意制約を変える）/ `contract`（公開の後に消す予約） |
-| `pending/data.sql` | Agent（任意） | データの移し替え（埋め戻し・名前変更のコピー） |
+| `migrations/{UTC時刻}_{slug}/` | `kit db migrate`（Agent が回す） | `migration.sql` + `meta.json`。commit する。**commit 済みのものは書き換えない・消さない**（変えると `kit check` が落ちる）。次の変更は新しい migration |
+| `pending/intent.yaml` | Agent（破壊的な変更のときだけ。`migrate` の前に） | 意図: `rename`（列の名前の変更）/ `drop`（消す）/ `retype`（型・NOT NULL・一意制約を変える）/ `contract`（公開の後に消す予約）。`migrate` が使って消す（commit しない） |
+| `pending/data.sql` | Agent（任意。`migrate` の前に） | データの移し替え（埋め戻し・名前変更のコピー）。`migrate` が migration.sql に取り込んで消す |
+| `pending/migration-policy.json` | Agent（任意） | 本番の値の変更の宣言。`migrate` が取り込んで消す |
 | `seed.ts` | Agent | `kit dev` などの試用データ（本番では流れない） |
 | `erase.test.ts` | Agent | 消去のテスト。動的検証が seed の後の新しい DB で流す（seed の利用者を 1 人 `erase` して、本人のデータが残らず他人のデータが壊れないこと） |
 
-ZModel を変えたら `kit generate` → `kit db diff` → `pending/` と `packages/sdk/src/zenstack/` を commit。
+ZModel を変えたら `kit generate` → `kit db migrate --slug <slug>` → `migrations/` と `packages/sdk/src/zenstack/` を commit
+（普通の開発の `prisma migrate dev` と同じ。`kit db diff` は差分を見るだけで何も書かない）。
 `kit db diff` の `destructive: true`（列・表の削除、型の変更、NOT NULL 化、一意制約の追加、既定値の無い必須列の追加）なら
-`pending/intent.yaml` を書き、データを移すなら `pending/data.sql` も書く。
+`migrate` の**前に** `pending/intent.yaml` を書き、データを移すなら `pending/data.sql` も書く。
 
 ```yaml
 # pending/intent.yaml
@@ -743,9 +744,9 @@ ZModel を変えたら `kit generate` → `kit db diff` → `pending/` と `pack
 - contract: { table: Task, column: title }   # 公開中の版が使う列は今は残し、次の公開の後に消す
 ```
 
-合流では Platform が、意図の無い破壊的な変更・どの変更にも当たらない意図を止め、影の DB（prod のスキーマ + 試用の行）で
-行数と `rename` / `retype` の値が保たれるか、**公開中の版がまだ読めるか**を確かめる。公開中の版が読む列を消す・名前を
-変える変更は 2 段に分ける: 今回は新しい列を足して両方に書く（expand。`data.sql` で埋める）、古い列は `contract` で予約する。
+`kit db migrate` が、意図の無い破壊的な変更・どの変更にも当たらない意図を止め、影の DB（試用の行）で
+行数と `rename` / `retype` の値が保たれるかを確かめる。**公開中の版がまだ読めるか**は、main の配備で Platform が確かめる。
+公開中の版が読む列を消す・名前を変える変更は 2 段に分ける: 今回は新しい列を足して両方に書く（expand。`data.sql` で埋める）、古い列は `contract` で予約する。
 
 ```ts
 // packages/db-schema/seed.ts（DB client を受け取らず、初期化計画を返す）
@@ -837,7 +838,6 @@ key はモデル内で安定した名前で、data には ID を書かない。�
   "project": { "…": "infra/project.yaml をそのまま JSON にしたもの" },
   "apps": { "web": { "entry": "dist/web/index.html" }, "admin": { "entry": "dist/admin/index.html" } },
   "schemaVersion": "kit build の schema_version",
-  "migrations": ["pending/generated.sql", "pending/data.sql"],
   "notes": ["実装できなかった要求・Skill と食い違った点・掲載情報を直した理由など（無ければ省く）"],
   "listingRequested": ["title"],
   "stage": "build",
@@ -850,7 +850,6 @@ key はモデル内で安定した名前で、data には ID を書かない。�
 | `stage` | `"build"`（作った）/ `"concept"`（企画だけ。dist なし）/ `"reply"`（答えただけ）/ `"refused"`（規約で断った）/ `"settings"`（規約の設定だけ） |
 | `listingRequested` | 利用者が手で直した掲載項目を、依頼どおりに変えたときだけ |
 | `policy_revision` | 貢献ブランチで読んだ規約の revision、または設定ツールが返した revision |
-| `migrations` | このブランチの `pending/` のファイル（無ければ空） |
 
 ## Realtime（DB変更・Broadcast・Presence）
 
