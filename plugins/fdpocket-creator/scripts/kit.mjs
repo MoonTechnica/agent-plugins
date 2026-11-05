@@ -256167,7 +256167,7 @@ function completeBuildReport(input) {
     apps: Object.fromEntries(Object.entries(input.apps).map(([slug, app]) => [slug, { entry: `dist/${app.entry}` }])),
     schemaVersion: input.schemaVersion
   };
-  for (const key of ["notes", "listingRequested"]) {
+  for (const key of ["notes", "listingRequested", "releaseNotes"]) {
     if (existing[key] !== undefined)
       report2[key] = existing[key];
   }

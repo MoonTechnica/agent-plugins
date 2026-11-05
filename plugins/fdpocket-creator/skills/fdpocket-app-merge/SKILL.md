@@ -71,7 +71,7 @@ main と提出済み PR の最新の内容は Platform が用意した実際の 
 
 - **外部参加者の提案（`requires_proposal: true`）では main の掲載情報を保つ**（Platform が `listing/` を ours に戻している）。
 - **作者・チームの通常編集（`false`）では `listing/` も普通に合わせる**。`input/listing.json` の古い値で巻き戻さない。
-- どちらでも `releaseNotes` は `$fdpocket-app-listing` §2 に従い、**取り込んだ変更の要約**を書く（誰の提案かは書かない）。
+- どちらでも `releaseNotes`（build-report.json）は `$fdpocket-app-listing` §2 に従い、**取り込んだ変更の要約**を書く（誰の提案かは書かない）。
 - `listing/icon.*` / `listing/cover.*` が `binary` で衝突したら ours を残す。
 
 ## 5. 出力前のチェック

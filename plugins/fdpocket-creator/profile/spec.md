@@ -849,7 +849,7 @@ key はモデル内で安定した名前で、data には ID を書かない。�
 `screenshots` はアプリ詳細のギャラリーに撮るページの宣言（`mobile` / `desktop` 各 5 枚まで。`{ app, path, as, caption, requested }`）。
 画像は Platform が検証で公開物から撮る。利用者が指定したページ（`requested: true`）と作者のアップロードは Platform が残す。
 
-`releaseNotes` は版の差分・実施した検証とその結果を記録する。未実施のテストや推測を確認済みと記載しない。作者メッセージはPlatformの別欄で扱う。
+`releaseNotes`（`outputs/build-report.json` に書く。`listing/listing.json` には書かない）は版の差分・実施した検証とその結果を記録する。未実施のテストや推測を確認済みと記載しない。作者メッセージはPlatformの別欄で扱う。
 
 ## 11. `build-report.json`
 
@@ -862,6 +862,7 @@ key はモデル内で安定した名前で、data には ID を書かない。�
   "schemaVersion": "kit build の schema_version",
   "notes": ["実装できなかった要求・Skill と食い違った点・掲載情報を直した理由など（無ければ省く）"],
   "listingRequested": ["title"],
+  "releaseNotes": "## 変更内容の短い見出し\n\nこの版で変わったこと",
   "stage": "build",
   "policy_revision": 0
 }
