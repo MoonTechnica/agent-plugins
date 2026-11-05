@@ -182,7 +182,7 @@ export default async function eraseTest({ db, erase }: {
 
 `kit dev` とセッション DB の初期作成時に、Sandbox で初期化計画を生成し、信頼側が一つのトランザクションで適用する。本番には流さず、通常の再開では再投入しない。seed の評価に失敗した場合もプレビューは起動できるが、試用データが入ったとは扱わない。
 
-更新されるサンプルは、初期化用の `seed` とは別に `samples(context): Promise<SamplePlan<SchemaType>>` を export する。`{ version: 2, rows: [{ model, key, data }] }` を返し、安定した key と scalar 値だけを宣言する。ID は Platform が割り当てるため data に含めず、他のサンプル行を参照するときは `await context.id(key)` を使う。単一文字列 ID のモデルに限り、複合主キーは使えない。利用者が変えた行は保護され、衝突は保留される。v1 がすでに作った行を v2 の管理対象として勝手に採用しない。
+更新されるサンプルは、初期化用の `seed` とは別に `samples(context): Promise<SamplePlan<SchemaType>>` を export する。`{ version: 2, rows: [{ model, key, data }] }` を返し、安定した key と scalar 値だけを宣言する。ID は Platform が割り当てるため data に含めず、他のサンプル行を参照するときは `await context.id(key)` を使う。単一文字列 ID のモデルに限り、複合主キーは使えない。同じ key のサンプルは最新版で更新される。投入に失敗したときはエラーを調べ、seed またはスキーマを修正する。
 
 ```ts
 import type { SchemaType, SeedContext, SeedPlan, TestIdentity } from '@workspace/sdk'

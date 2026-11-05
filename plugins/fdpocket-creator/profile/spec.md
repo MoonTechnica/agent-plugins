@@ -772,8 +772,8 @@ export default async function seed(context: SeedContext): Promise<SeedPlan<Schem
 `SamplePlan<SchemaType>` はプレビュー用サンプルの宣言的な更新計画。`seed.ts` の名前付き
 `samples(context): Promise<SamplePlan<SchemaType>>` が `{ version: 2, rows: [{ model, key, data }] }` を返す。
 key はモデル内で安定した名前で、data には ID を書かない。別のサンプルへの参照には `await context.id(key)`、
-主体への参照には `context.users` を使う。scalar のみ、単一文字列 ID のモデルに限る。利用者が編集した値は保護し、
-競合する行は保留する。v1 の `SeedPlan` は初期化専用であり、同じ行を v1 と v2 の両方に作らない。
+主体への参照には `context.users` を使う。scalar のみ、単一文字列 ID のモデルに限る。同じ key の行は
+最新版のサンプルで更新される。投入に失敗したら seed やスキーマを修正する。v1 の `SeedPlan` は初期化専用。
 
 ## 7. 上限
 
