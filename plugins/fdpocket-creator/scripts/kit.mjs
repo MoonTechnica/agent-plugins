@@ -77890,8 +77890,10 @@ function createSampleWriter(schemaInput, planInput) {
         throw new Error("unbound sample field");
       return quote4(mappedName3(entry.model.fields[field2], "@map") ?? field2);
     };
-    return { ...entry, table, column };
+    const stamped = Object.entries(entry.model.fields).filter(([, field2]) => field2.updatedAt === true).map(([field2]) => quote4(mappedName3(entry.model.fields[field2], "@map") ?? field2));
+    return { ...entry, table, column, stamped };
   };
+  const now2 = () => new Date().toISOString();
   const toDb = (value2) => typeof value2 === "boolean" ? Number(value2) : value2;
   const fromDb = (value2, type) => {
     if (value2 === null)
@@ -77925,10 +77927,11 @@ function createSampleWriter(schemaInput, planInput) {
     insert: async (tx, model, id, data) => {
       const entry = binding(model);
       const fields = Object.keys(data);
-      const columns = ["id", ...fields].map(entry.column);
+      const stamped = entry.stamped.filter((column) => !fields.map(entry.column).includes(column));
+      const columns = [...["id", ...fields].map(entry.column), ...stamped];
       await tx.execute({
         sql: `INSERT INTO ${entry.table}(${columns.join(",")}) VALUES(${columns.map(() => "?").join(",")})`,
-        args: [id, ...fields.map((field2) => toDb(data[field2]))]
+        args: [id, ...fields.map((field2) => toDb(data[field2])), ...stamped.map(now2)]
       });
     },
     update: async (tx, model, id, data) => {
@@ -77936,9 +77939,11 @@ function createSampleWriter(schemaInput, planInput) {
       const fields = Object.keys(data);
       if (!fields.length)
         return;
+      const given = fields.map(entry.column);
+      const stamped = entry.stamped.filter((column) => !given.includes(column));
       const result = await tx.execute({
-        sql: `UPDATE ${entry.table} SET ${fields.map((field2) => `${entry.column(field2)}=?`).join(",")} WHERE ${entry.column("id")}=?`,
-        args: [...fields.map((field2) => toDb(data[field2])), id]
+        sql: `UPDATE ${entry.table} SET ${[...given, ...stamped].map((column) => `${column}=?`).join(",")} WHERE ${entry.column("id")}=?`,
+        args: [...fields.map((field2) => toDb(data[field2])), ...stamped.map(now2), id]
       });
       if (result.rowsAffected !== 1)
         throw new Error("sample row changed during update");
