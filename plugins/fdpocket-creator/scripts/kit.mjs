@@ -26693,6 +26693,7 @@ async function planMasterSql(input) {
   const schema = input.schema;
   const models = schema.models ?? {};
   const now = input.now.toISOString();
+  const upsert = input.mode === "upsert";
   const findings = [];
   const statements = [];
   const tables = new Set;
@@ -26718,7 +26719,7 @@ async function planMasterSql(input) {
     }
     const scalars = Object.entries(model.fields).filter(([, field2]) => !field2.relation && !field2.array && !field2.computed && (SCALARS.has(field2.type) || schema.enums?.[field2.type] !== undefined));
     const column = (field2) => columnOf(field2, model.fields[field2]);
-    const existing = new Map((await input.db.execute(`SELECT * FROM ${quote(table)}`)).rows.map((row) => [
+    const existing = new Map(upsert ? [] : (await input.db.execute(`SELECT * FROM ${quote(table)}`)).rows.map((row) => [
       String(row[column("id")]),
       row
     ]));
@@ -26735,7 +26736,7 @@ async function planMasterSql(input) {
       }
       if (values.size !== Object.keys(row).length)
         continue;
-      const stored = existing.get(String(row.id));
+      const stored = upsert ? undefined : existing.get(String(row.id));
       const stamped = scalars.filter(([field2, def]) => !values.has(field2) && isNow(def));
       if (!stored) {
         const missing = scalars.filter(([field2, def]) => !values.has(field2) && !def.optional && def.default === undefined && !isNow(def));
@@ -26746,7 +26747,9 @@ async function planMasterSql(input) {
         for (const [field2] of stamped)
           values.set(field2, now);
         const fields = [...values.keys()];
-        statements.push(`INSERT INTO ${quote(table)} (${fields.map((f2) => quote(column(f2))).join(", ")}) VALUES (${fields.map((f2) => sqlValue(values.get(f2))).join(", ")});`);
+        const set2 = fields.filter((f2) => f2 !== "id");
+        const onConflict = upsert ? ` ON CONFLICT(${quote(column("id"))}) DO ${set2.length > 0 ? `UPDATE SET ${set2.map((f2) => `${quote(column(f2))}=excluded.${quote(column(f2))}`).join(", ")}` : "NOTHING"}` : "";
+        statements.push(`INSERT INTO ${quote(table)} (${fields.map((f2) => quote(column(f2))).join(", ")}) VALUES (${fields.map((f2) => sqlValue(values.get(f2))).join(", ")})${onConflict};`);
         tables.add(table);
         continue;
       }
@@ -26759,13 +26762,15 @@ async function planMasterSql(input) {
       statements.push(`UPDATE ${quote(table)} SET ${changed.map(([f2, v2]) => `${quote(column(f2))}=${sqlValue(v2)}`).join(", ")} WHERE ${quote(column("id"))}=${text(String(row.id))};`);
       tables.add(table);
     }
+    if (upsert)
+      continue;
     const kept = new Set(rows.map((row) => String(row.id)));
     const removed = [...existing.keys()].filter((existingId) => !kept.has(existingId));
     if (removed.length > 0) {
       fail2("MASTER_ROW_REMOVED", `${name3} rows ${removed.join(", ")} are in earlier migrations but not in ${PATH}; keep them (mark them unused with a column instead of removing)`);
     }
   }
-  for (const table of input.knownTables) {
+  for (const table of upsert ? [] : input.knownTables) {
     if (declared.has(table))
       continue;
     const exists = await input.db.execute({
@@ -77772,123 +77777,15 @@ var init_session_seed2 = __esm(() => {
   systemModels = new Set(SESSION_SEED_SYSTEM_MODELS.map((name3) => name3.toLowerCase()));
 });
 
-// frontend/packages/project-gateway/src/session-sample-validate.ts
-async function validateSamplePlan(input) {
-  const raw2 = sessionSamplePlanSchema.parse(input.plan);
-  const schema2 = schemaOf(JSON.stringify(input.schema));
-  const protectedModels = new Set(SESSION_SEED_SYSTEM_MODELS.map((name3) => name3.toLowerCase()));
-  const rows = raw2.rows.map((row) => {
-    const name3 = Object.keys(schema2.models).find((candidate) => capabilityKeyOf(candidate) === capabilityKeyOf(row.model));
-    if (!name3 || protectedModels.has(name3.toLowerCase()))
-      throw new Error("unknown or protected sample model");
-    const model = schema2.models[name3];
-    const ids2 = Object.entries(model.fields).filter(([, field2]) => field2.id);
-    if (ids2.length !== 1 || ids2[0]?.[0] !== "id" || ids2[0]?.[1].type !== "String")
-      throw new Error("sample model must have one string id");
-    const data = { ...row.data };
-    for (const [key, value2] of Object.entries(data)) {
-      const field2 = model.fields[key];
-      if (!field2 || field2.relation || field2.array || field2.id)
-        throw new Error("invalid sample field");
-      if (value2 === null) {
-        if (!field2.optional)
-          throw new Error("invalid null sample field");
-      } else if (field2.type === "String" && typeof value2 === "string") {} else if (field2.type === "DateTime" && typeof value2 === "string" && /^\d{4}-\d\d-\d\dT\d\d:\d\d:\d\d(?:\.\d{1,3})?Z$/.test(value2) && Number.isFinite(Date.parse(value2))) {
-        data[key] = new Date(value2).toISOString();
-      } else if (field2.type === "Boolean" && typeof value2 === "boolean") {} else if (["Int", "Float"].includes(field2.type) && typeof value2 === "number" && (field2.type !== "Int" || Number.isSafeInteger(value2))) {} else
-        throw new Error("invalid sample scalar value");
-    }
-    return { ...row, model: name3, data };
-  });
-  const plan = sessionSamplePlanSchema.parse({ version: 2, rows });
-  const ids = new Map;
-  for (const row of rows)
-    ids.set(JSON.stringify([row.model, await sessionSeedDataId(input.initializationId, row.key)]), {
-      model: row.model,
-      key: row.key
-    });
-  const dependencies = new Map;
-  for (const row of rows) {
-    const needs = [];
-    for (const field2 of Object.values(schema2.models[row.model].fields)) {
-      const relation = field2.relation;
-      if (!relation?.fields?.length)
-        continue;
-      if (relation.fields.length !== 1 || relation.references?.length !== 1 || relation.references[0] !== "id")
-        throw new Error("unsupported sample reference");
-      const value2 = row.data[relation.fields[0]];
-      if (value2 === undefined || value2 === null)
-        continue;
-      if (typeof value2 !== "string")
-        throw new Error("invalid sample reference");
-      if (field2.type === "User" && input.testUserIds.includes(value2))
-        continue;
-      const target = ids.get(JSON.stringify([field2.type, value2]));
-      if (!target)
-        throw new Error("unknown sample reference");
-      needs.push(target);
-    }
-    dependencies.set(JSON.stringify([row.model, row.key]), needs);
-  }
-  return { plan, dependencies };
-}
-var init_session_sample_validate = __esm(() => {
-  init_src();
-  init_args();
-  init_session_seed2();
-});
-
 // frontend/packages/project-gateway/src/session-sample-sync.ts
-async function syncValidatedSessionSamples(input) {
-  const validated = await validateSamplePlan({
-    schema: input.schema,
-    initializationId: input.initializationId,
-    testUserIds: input.testUserIds,
-    plan: input.plan
-  });
+async function syncCloudSessionSamples(input) {
   return syncSessionSamples({
     ...input,
-    plan: validated.plan,
-    writer: {
-      read: (tx, model, id) => input.writer.read(tx, model, id),
-      insert: (tx, model, id, data) => input.writer.insert(tx, model, id, data),
-      update: (tx, model, id, changes) => input.writer.update(tx, model, id, changes),
-      dependencies: (row) => validated.dependencies.get(JSON.stringify([row.model, row.key])) ?? []
-    }
+    fenceSchemaHash: await sessionSeedDigest(input.schemaJson)
   });
-}
-async function syncCloudSessionSamples(input) {
-  const schemaHash = await sessionSeedDigest(input.schemaJson);
-  const schema2 = JSON.parse(input.schemaJson);
-  return syncValidatedSessionSamples({ ...input, schema: schema2, fenceSchemaHash: schemaHash });
 }
 async function syncSessionSamples(input) {
   const plan = sessionSamplePlanSchema.parse(input.plan);
-  const rowKey = (row) => JSON.stringify([row.model, row.key]);
-  const byKey2 = new Map(plan.rows.map((row) => [rowKey(row), row]));
-  const visiting = new Set;
-  const visited = new Set;
-  const ordered = [];
-  function visit2(row) {
-    const key = rowKey(row);
-    if (visiting.has(key))
-      throw new Error("cyclic session sample dependencies");
-    if (visited.has(key))
-      return;
-    visiting.add(key);
-    const needs = input.writer.dependencies(row).map(rowKey);
-    for (const need of needs) {
-      const parent = byKey2.get(need);
-      if (!parent)
-        throw new Error("unknown session sample dependency");
-      visit2(parent);
-    }
-    visiting.delete(key);
-    visited.add(key);
-    ordered.push(row);
-  }
-  for (const row of plan.rows)
-    visit2(row);
   const expected = {
     operationId: input.operationId,
     generation: input.generation,
@@ -77900,6 +77797,7 @@ async function syncSessionSamples(input) {
   await prepareSampleMetadata(input.db);
   const tx = await input.db.transaction("write");
   try {
+    await tx.execute("PRAGMA defer_foreign_keys=ON");
     const previousReceipt = await readSampleReceipt(tx, expected);
     if (previousReceipt) {
       await tx.rollback();
@@ -77927,7 +77825,7 @@ async function syncSessionSamples(input) {
       });
     await removeLegacySampleTriggers(tx);
     let applied = 0;
-    for (const row of ordered) {
+    for (const row of plan.rows) {
       const id = await sessionSeedDataId(input.initializationId, row.key);
       const current = await input.writer.read(tx, row.model, id);
       if (current) {
@@ -77955,7 +77853,6 @@ var init_session_sample_sync = __esm(() => {
   init_session_sample_fence();
   init_session_sample_identities();
   init_session_sample_store();
-  init_session_sample_validate();
   init_session_seed2();
 });
 
@@ -77973,19 +77870,20 @@ function createSampleWriter(schemaInput, planInput) {
     const ids = Object.entries(model.fields).filter(([, field2]) => field2.id);
     if (ids.length !== 1 || ids[0]?.[0] !== "id" || ids[0]?.[1].type !== "String")
       throw new Error("sample model must have one string id");
-    const entry = bound2.get(name3) ?? { model, columns: new Set };
+    const entry = bound2.get(capabilityKeyOf(name3)) ?? { model, columns: new Set, name: name3 };
     for (const fieldName of Object.keys(row.data)) {
       const field2 = model.fields[fieldName];
       if (!field2 || field2.id || field2.relation || field2.array || !["String", "DateTime", "Boolean", "Int", "Float"].includes(field2.type))
         throw new Error("invalid sample field");
       entry.columns.add(fieldName);
     }
-    bound2.set(name3, entry);
+    bound2.set(capabilityKeyOf(name3), { ...entry, name: name3 });
   }
-  const binding = (name3) => {
-    const entry = bound2.get(name3);
+  const binding = (modelName) => {
+    const entry = bound2.get(capabilityKeyOf(modelName));
     if (!entry)
       throw new Error("unbound sample model");
+    const { name: name3 } = entry;
     const table = quote4(mappedName3(entry.model, "@@map") ?? name3);
     const column = (field2) => {
       if (field2 !== "id" && !entry.columns.has(field2))
@@ -78012,9 +77910,6 @@ function createSampleWriter(schemaInput, planInput) {
     throw new Error("unsupported sample database value");
   };
   return {
-    dependencies: () => {
-      throw new Error("sample references must be schema validated");
-    },
     read: async (tx, model, id) => {
       const entry = binding(model);
       const names = [...entry.columns];
@@ -78316,16 +78211,23 @@ function registerSessionSampleRoute(app, adapters, logger) {
       artifactHash,
       credentialHash
     };
+    let writer;
+    try {
+      writer = createSampleWriter(JSON.parse(data.schemaJson), bundle.data.plan);
+    } catch (error51) {
+      throw new GatewayError("VALIDATION_FAILED", `invalid sample plan: ${error51.message}`, {
+        details: { reason: "SAMPLE_PLAN_INVALID" }
+      });
+    }
     try {
       const db = await adapters.turso.connectSample(target.db, proof);
       try {
         const current = await resolve2();
         if (!current || JSON.stringify(current) !== JSON.stringify(target))
           throw new GatewayError("FORBIDDEN", "sample authority expired");
-        const schema2 = JSON.parse(data.schemaJson);
         const receipt = await syncCloudSessionSamples({
           db,
-          writer: createSampleWriter(schema2, bundle.data.plan),
+          writer,
           schemaJson: data.schemaJson,
           plan: bundle.data.plan,
           generation: target.context.resourceGeneration,
@@ -78333,7 +78235,6 @@ function registerSessionSampleRoute(app, adapters, logger) {
           schemaRevision: target.schemaRevision,
           operationId: target.operationId,
           artifactHash,
-          testUserIds: users.map((user) => user.id),
           fenceTestUsers: users,
           sampleIdentities: users,
           initializedAt: target.context.initializedAt
@@ -82299,11 +82200,9 @@ async function runSampleSeed(input) {
   }
   const schema2 = JSON.parse(bundle.schemaJson);
   const artifactHash = await sessionSeedDigest(JSON.stringify({ context: input.context, bundle }));
-  return syncValidatedSessionSamples({
+  return syncSessionSamples({
     db: input.db,
     writer: createSampleWriter(schema2, bundle.plan),
-    schema: schema2,
-    testUserIds: testUsers.map((user) => user.id),
     initializationId: input.context.initializationId,
     generation: input.context.resourceGeneration,
     schemaRevision: input.schemaRevision,
@@ -82603,6 +82502,21 @@ async function writeSchemaPlan(options2) {
     throw new DevError("Invalid schema baseline");
   const baseline = { revision: record3.revision, schemaSql: record3.schemaSql };
   const plan = await prepareSchemaPlan(options2, baseline);
+  const masters = await projectMasters(options2.root, options2.importModule)();
+  if (masters !== null) {
+    const upsert = await planMasterSql({
+      schema: JSON.parse(plan.schemaJson),
+      data: masters,
+      knownTables: [],
+      now: new Date(0),
+      mode: "upsert"
+    });
+    if (upsert.findings.length > 0)
+      throw new DevError(upsert.findings.map((f3) => `${f3.code}: ${f3.message}`).join(`
+`));
+    plan.dataSql = [plan.dataSql, upsert.sql].filter((part) => part.trim() !== "").join(`
+`);
+  }
   const output = JSON.stringify(plan);
   if (Buffer.byteLength(output) > 4 * 1024 * 1024)
     throw new DevError("Schema plan exceeds size limit");
@@ -82624,6 +82538,7 @@ var init_schema_plan = __esm(() => {
   init_src();
   init_src2();
   init_diff();
+  init_masters2();
   init_generate();
   init_runtime2();
   init_session_runtime();
@@ -83211,6 +83126,56 @@ var init_runtime2 = __esm(() => {
   silentLogger = { log: () => {
     return;
   } };
+});
+
+// frontend/packages/miniapp-kit/src/db/masters.ts
+import { existsSync as existsSync14 } from "node:fs";
+import { readFile as readFile16 } from "node:fs/promises";
+import { join as join21 } from "node:path";
+function projectMasters(root, importModule) {
+  return async () => {
+    const path = join21(root, PROJECT_PATHS.masters);
+    if (!existsSync14(path))
+      return null;
+    let value2;
+    try {
+      const load = importModule ?? defaultImporter(root, (await readManifest(root)).manifest);
+      value2 = JSON.parse(JSON.stringify((await load(path)).default ?? null));
+    } catch (error51) {
+      throw new DbError(`${PROJECT_PATHS.masters} could not be loaded: ${error51 instanceof Error ? error51.message : String(error51)}`);
+    }
+    const parsed = masterDataSchema.safeParse(value2);
+    if (!parsed.success) {
+      throw new DbError(`${PROJECT_PATHS.masters} must export default { <model>: [{ id: '…', … }] }: ${parsed.error.issues.map((issue3) => `${issue3.path.join(".") || "(root)"} ${issue3.message}`).join("; ")}`);
+    }
+    return parsed.data;
+  };
+}
+async function planProjectMasters(input) {
+  const schemaPath = join21(input.root, PROJECT_PATHS.generated, "schema.json");
+  if (!existsSync14(schemaPath))
+    throw new DbError("run kit.mjs generate first (no schema.json)");
+  const db = input.createClient({ url: ":memory:" });
+  try {
+    for (const sql3 of [...input.migrations.map((m3) => m3.sql), ...input.pending]) {
+      await applySql(db, sql3);
+    }
+    return await planMasterSql({
+      db,
+      schema: JSON.parse(await readFile16(schemaPath, "utf8")),
+      data: input.data,
+      knownTables: input.migrations.flatMap((m3) => masterTablesOf(m3.sql)),
+      now: input.now
+    });
+  } finally {
+    db.close();
+  }
+}
+var init_masters2 = __esm(() => {
+  init_src();
+  init_src2();
+  init_runtime2();
+  init_generate();
 });
 
 // frontend/node_modules/source-map/lib/base64.js
@@ -254946,57 +254911,10 @@ function splitFlag(flag) {
 // frontend/packages/miniapp-kit/src/check.ts
 init_src();
 init_src2();
+init_masters2();
 import { createRequire as createRequire9 } from "node:module";
 import { join as join27 } from "node:path";
 import { pathToFileURL as pathToFileURL8 } from "node:url";
-
-// frontend/packages/miniapp-kit/src/db/masters.ts
-init_src();
-init_src2();
-init_runtime2();
-init_generate();
-import { existsSync as existsSync14 } from "node:fs";
-import { readFile as readFile16 } from "node:fs/promises";
-import { join as join21 } from "node:path";
-function projectMasters(root, importModule) {
-  return async () => {
-    const path = join21(root, PROJECT_PATHS.masters);
-    if (!existsSync14(path))
-      return null;
-    let value2;
-    try {
-      const load = importModule ?? defaultImporter(root, (await readManifest(root)).manifest);
-      value2 = JSON.parse(JSON.stringify((await load(path)).default ?? null));
-    } catch (error51) {
-      throw new DbError(`${PROJECT_PATHS.masters} could not be loaded: ${error51 instanceof Error ? error51.message : String(error51)}`);
-    }
-    const parsed = masterDataSchema.safeParse(value2);
-    if (!parsed.success) {
-      throw new DbError(`${PROJECT_PATHS.masters} must export default { <model>: [{ id: '…', … }] }: ${parsed.error.issues.map((issue3) => `${issue3.path.join(".") || "(root)"} ${issue3.message}`).join("; ")}`);
-    }
-    return parsed.data;
-  };
-}
-async function planProjectMasters(input) {
-  const schemaPath = join21(input.root, PROJECT_PATHS.generated, "schema.json");
-  if (!existsSync14(schemaPath))
-    throw new DbError("run kit.mjs generate first (no schema.json)");
-  const db = input.createClient({ url: ":memory:" });
-  try {
-    for (const sql3 of [...input.migrations.map((m3) => m3.sql), ...input.pending]) {
-      await applySql(db, sql3);
-    }
-    return await planMasterSql({
-      db,
-      schema: JSON.parse(await readFile16(schemaPath, "utf8")),
-      data: input.data,
-      knownTables: input.migrations.flatMap((m3) => masterTablesOf(m3.sql)),
-      now: input.now
-    });
-  } finally {
-    db.close();
-  }
-}
 
 // frontend/packages/miniapp-kit/src/mcp-catalog.ts
 init_src();
@@ -256192,6 +256110,7 @@ init_diff();
 init_src();
 init_src2();
 init_generate();
+init_masters2();
 import { createHash as createHash9 } from "node:crypto";
 import { existsSync as existsSync20 } from "node:fs";
 import { mkdir as mkdir12, readFile as readFile21, rm as rm13, writeFile as writeFile14 } from "node:fs/promises";
