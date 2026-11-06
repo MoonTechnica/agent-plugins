@@ -254840,6 +254840,8 @@ var COMMANDS = {
   login: { required: [], optional: ["mcp-url"] },
   assets: { actions: ["add"], required: ["url", "sha256", "path"], optional: [] },
   open: { required: ["url"], optional: [] },
+  read: { required: ["file", "out"], optional: ["pages", "max-chars"] },
+  shot: { required: ["out"], optional: ["host", "app", "as", "path", "widths", "locale"] },
   "codex-config": { required: [], optional: [], switches: ["write"] }
 };
 var USAGE = `usage: node <kit>/scripts/kit.mjs <command> [--flag value]…
@@ -255416,9 +255418,9 @@ async function changedMigrations(options2) {
 // frontend/packages/miniapp-kit/src/commands.ts
 import { createHash as createHash14, randomUUID as randomUUID4 } from "node:crypto";
 import { existsSync as existsSync28 } from "node:fs";
-import { mkdir as mkdir20, readdir as readdir16, readFile as readFile34, writeFile as writeFile23 } from "node:fs/promises";
+import { mkdir as mkdir22, readdir as readdir17, readFile as readFile35, writeFile as writeFile24 } from "node:fs/promises";
 import { homedir } from "node:os";
-import { dirname as dirname13, join as join48, resolve as resolve4 } from "node:path";
+import { dirname as dirname13, join as join50, resolve as resolve4 } from "node:path";
 import { createInterface } from "node:readline";
 
 // frontend/packages/project-host/src/bridge.ts
@@ -256073,6 +256075,17 @@ async function viteBuild({ appDir, env }) {
 
 // frontend/packages/miniapp-kit/src/build-report.ts
 init_dist();
+var AGENT_FIELDS = [
+  "notes",
+  "listingRequested",
+  "releaseNotes",
+  "assumptions",
+  "acceptance",
+  "setup",
+  "next_step",
+  "summary",
+  "questions"
+];
 function completeBuildReport(input) {
   const existing = input.existing ?? {};
   const report2 = {
@@ -256080,7 +256093,7 @@ function completeBuildReport(input) {
     apps: Object.fromEntries(Object.entries(input.apps).map(([slug, app]) => [slug, { entry: `dist/${app.entry}` }])),
     schemaVersion: input.schemaVersion
   };
-  for (const key of ["notes", "listingRequested", "releaseNotes"]) {
+  for (const key of AGENT_FIELDS) {
     if (existing[key] !== undefined)
       report2[key] = existing[key];
   }
@@ -260724,10 +260737,223 @@ function nextStep(error51) {
   }
 }
 
+// frontend/packages/miniapp-kit/src/read.ts
+import { execFile as execFile3 } from "node:child_process";
+import { mkdir as mkdir17, readdir as readdir15, readFile as readFile30, stat as stat3, writeFile as writeFile19 } from "node:fs/promises";
+import { extname, join as join41 } from "node:path";
+var DOCUMENT_MAX_BYTES = 50 * 1024 * 1024;
+var TEXT_MAX_CHARS = 300000;
+var PAGES_MAX = 60;
+var UNCOMPRESSED_MAX_BYTES = 300 * 1024 * 1024;
+var ZIP_ENTRIES_MAX = 5000;
+var TOOL_TIMEOUT_MS = 120000;
+var DEFAULT_IMAGE_PAGES = 10;
+var TOOL_OUTPUT_MAX_BYTES = 256 * 1024 * 1024;
+var KINDS = {
+  ".pdf": "pdf",
+  ".docx": "docx",
+  ".pptx": "pptx",
+  ".xlsx": "xlsx",
+  ".csv": "csv",
+  ".md": "text",
+  ".txt": "text"
+};
+var SAVE_AS = {
+  ".doc": "Save it as .docx or PDF",
+  ".ppt": "Save it as .pptx or PDF",
+  ".xls": "Save it as .xlsx or PDF",
+  ".docm": "Save it as .docx (without macros) or PDF",
+  ".pptm": "Save it as .pptx (without macros) or PDF",
+  ".xlsm": "Save it as .xlsx (without macros) or PDF"
+};
+
+class ToolMissingError extends Error {
+  tool;
+  name = "ToolMissingError";
+  constructor(tool) {
+    super(`${tool} is not installed in this sandbox`);
+    this.tool = tool;
+  }
+}
+
+class ReadError extends Error {
+  name = "ReadError";
+}
+var realDeps = {
+  run: (command, args, { timeoutMs }) => new Promise((resolve4, reject) => {
+    execFile3(command, args, { timeout: timeoutMs, maxBuffer: TOOL_OUTPUT_MAX_BYTES, encoding: "utf8" }, (error51, stdout) => {
+      if (!error51)
+        return resolve4(stdout);
+      if (error51.code === "ENOENT")
+        return reject(new ToolMissingError(command));
+      reject(new ReadError(`${command} failed: ${error51.message}`));
+    });
+  })
+};
+function zipStats(bytes3) {
+  const view = new DataView(bytes3.buffer, bytes3.byteOffset, bytes3.byteLength);
+  const end = findEndOfCentralDirectory(view);
+  if (end === null)
+    return null;
+  const entries = view.getUint16(end + 10, true);
+  let cursor2 = view.getUint32(end + 16, true);
+  let uncompressedBytes = 0;
+  for (let index2 = 0;index2 < entries; index2 += 1) {
+    if (cursor2 + 46 > bytes3.byteLength || view.getUint32(cursor2, true) !== 33639248)
+      return null;
+    uncompressedBytes += view.getUint32(cursor2 + 24, true);
+    cursor2 += 46 + view.getUint16(cursor2 + 28, true) + view.getUint16(cursor2 + 30, true) + view.getUint16(cursor2 + 32, true);
+  }
+  return { entries, uncompressedBytes };
+}
+function findEndOfCentralDirectory(view) {
+  const lowest = Math.max(0, view.byteLength - 22 - 65535);
+  for (let at = view.byteLength - 22;at >= lowest; at -= 1) {
+    if (view.getUint32(at, true) === 101010256)
+      return at;
+  }
+  return null;
+}
+function kindOf(file2) {
+  const extension = extname(file2).toLowerCase();
+  const kind = KINDS[extension];
+  if (kind)
+    return kind;
+  const hint = SAVE_AS[extension] ?? "Export it as PDF";
+  throw new ReadError(`${extension || "this file type"} cannot be read. ${hint}. Supported: PDF, docx, pptx, xlsx, csv, md, txt`);
+}
+function checkContent(kind, bytes3, name3) {
+  if (kind === "pdf") {
+    const head2 = Buffer.from(bytes3.subarray(0, 5)).toString("latin1");
+    if (head2 !== "%PDF-")
+      throw new ReadError(`${name3} is not a PDF file`);
+    return;
+  }
+  if (kind === "docx" || kind === "pptx" || kind === "xlsx") {
+    checkZip(kind, bytes3, name3);
+    return;
+  }
+  if (bytes3.includes(0))
+    throw new ReadError(`${name3} does not look like a text file`);
+}
+function checkZip(kind, bytes3, name3) {
+  const stats = zipStats(bytes3);
+  if (stats === null)
+    throw new ReadError(`${name3} is not a valid ${kind} file (not a zip archive)`);
+  if (stats.entries > ZIP_ENTRIES_MAX || stats.uncompressedBytes > UNCOMPRESSED_MAX_BYTES) {
+    throw new ReadError(`${name3} is too large once uncompressed (${stats.entries} entries, ${stats.uncompressedBytes} bytes)`);
+  }
+}
+function parsePages(spec, total) {
+  const match2 = /^(\d+)(?:-(\d+))?$/.exec(spec);
+  if (!match2)
+    throw new ReadError("--pages must look like 3 or 2-5");
+  const first = Number(match2[1]);
+  const last = Number(match2[2] ?? match2[1]);
+  if (first < 1 || last < first)
+    throw new ReadError("--pages: the first page must come first");
+  if (last - first + 1 > PAGES_MAX)
+    throw new ReadError(`--pages: at most ${PAGES_MAX} pages`);
+  if (total > 0 && first > total)
+    throw new ReadError(`--pages: the file has ${total} pages`);
+  return { first, last: total > 0 ? Math.min(last, total) : last };
+}
+function cut(text2, maxChars) {
+  if (text2.length <= maxChars)
+    return { body: text2, truncated: false, note: null };
+  const note = `text truncated to ${maxChars} of ${text2.length} characters`;
+  return { body: `${text2.slice(0, maxChars)}
+
+[${note}]`, truncated: true, note };
+}
+async function pdfText(file2, deps) {
+  const raw2 = await deps.run("pdftotext", ["-layout", "-enc", "UTF-8", file2, "-"], {
+    timeoutMs: TOOL_TIMEOUT_MS
+  });
+  const pages = raw2.split("\f");
+  if (pages.at(-1)?.trim() === "")
+    pages.pop();
+  const text2 = pages.map((page, index2) => `## Page ${index2 + 1}
+
+${page.trim()}`).join(`
+
+`);
+  return { text: text2, pages: pages.length };
+}
+async function pdfImages(file2, out, range, deps) {
+  const directory = join41(out, "pages");
+  await mkdir17(directory, { recursive: true });
+  try {
+    await deps.run("pdftoppm", [
+      "-png",
+      "-r",
+      "80",
+      "-f",
+      String(range.first),
+      "-l",
+      String(range.last),
+      file2,
+      join41(directory, "page")
+    ], { timeoutMs: TOOL_TIMEOUT_MS });
+  } catch (error51) {
+    if (!(error51 instanceof ToolMissingError))
+      throw error51;
+    return { images: [], note: "page images are unavailable: pdftoppm is not installed" };
+  }
+  const names = (await readdir15(directory)).filter((name3) => name3.endsWith(".png")).sort();
+  return { images: names.map((name3) => join41(directory, name3)), note: null };
+}
+async function officeText(file2, deps) {
+  return await deps.run("markitdown", [file2], { timeoutMs: TOOL_TIMEOUT_MS });
+}
+async function readDocument(options2, deps = realDeps) {
+  const maxBytes = options2.maxBytes ?? DOCUMENT_MAX_BYTES;
+  const kind = kindOf(options2.file);
+  if ((await stat3(options2.file)).size > maxBytes) {
+    throw new ReadError(`${options2.file} is too large (limit ${maxBytes} bytes)`);
+  }
+  checkContent(kind, await readFile30(options2.file), options2.file);
+  await mkdir17(options2.out, { recursive: true });
+  const notes = [];
+  let pageCount = null;
+  let images = [];
+  let text2;
+  if (kind === "pdf") {
+    const extracted = await pdfText(options2.file, deps);
+    text2 = extracted.text;
+    pageCount = extracted.pages;
+    if (pageCount === 0)
+      notes.push("no text could be extracted (a scanned PDF?); read the page images");
+    const range = options2.pages ? parsePages(options2.pages, pageCount) : { first: 1, last: Math.max(1, Math.min(DEFAULT_IMAGE_PAGES, pageCount)) };
+    const drawn = await pdfImages(options2.file, options2.out, range, deps);
+    images = drawn.images;
+    if (drawn.note)
+      notes.push(drawn.note);
+  } else if (kind === "docx" || kind === "pptx" || kind === "xlsx") {
+    text2 = await officeText(options2.file, deps);
+  } else {
+    text2 = (await readFile30(options2.file)).toString("utf8");
+  }
+  const kept = cut(text2, options2.maxChars ?? TEXT_MAX_CHARS);
+  if (kept.note)
+    notes.push(kept.note);
+  const textPath = join41(options2.out, "text.md");
+  await writeFile19(textPath, kept.body);
+  return {
+    kind,
+    textPath,
+    chars: kept.body.length,
+    truncated: kept.truncated,
+    pages: pageCount,
+    images,
+    notes
+  };
+}
+
 // frontend/packages/miniapp-kit/src/repo.ts
 import { existsSync as existsSync25 } from "node:fs";
-import { appendFile, mkdir as mkdir17, readFile as readFile30, rm as rm15, writeFile as writeFile19 } from "node:fs/promises";
-import { join as join41 } from "node:path";
+import { appendFile, mkdir as mkdir18, readFile as readFile31, rm as rm15, writeFile as writeFile20 } from "node:fs/promises";
+import { join as join42 } from "node:path";
 class RepoError extends Error {
   name = "RepoError";
 }
@@ -260745,10 +260971,10 @@ async function configureRepo(git2, source, config3, author) {
   await set2(git2, source, `branch.${branch}.remote`, ".");
   await set2(git2, source, `branch.${branch}.merge`, trackingRef(config3.thread_ref));
   await set2(git2, source, `branch.${branch}.rebase`, "true");
-  const info = join41(source, ".git", "info");
-  await mkdir17(info, { recursive: true });
-  const excludePath = join41(info, "exclude");
-  const excluded = existsSync25(excludePath) ? (await readFile30(excludePath, "utf8")).split(`
+  const info = join42(source, ".git", "info");
+  await mkdir18(info, { recursive: true });
+  const excludePath = join42(info, "exclude");
+  const excluded = existsSync25(excludePath) ? (await readFile31(excludePath, "utf8")).split(`
 `) : [];
   const missing = EXCLUDES.filter((line) => !excluded.includes(line));
   if (missing.length > 0)
@@ -260757,12 +260983,12 @@ async function configureRepo(git2, source, config3, author) {
 `);
 }
 function requireRepo(source) {
-  if (!existsSync25(join41(source, ".git"))) {
+  if (!existsSync25(join42(source, ".git"))) {
     throw new RepoError(`${source} is not a git repository; run kit.mjs clone in a new directory`);
   }
 }
 async function requireClean(git2, source, what) {
-  if (existsSync25(join41(source, ".git", "rebase-merge")) || existsSync25(join41(source, ".git", "rebase-apply"))) {
+  if (existsSync25(join42(source, ".git", "rebase-merge")) || existsSync25(join42(source, ".git", "rebase-apply"))) {
     throw new RepoError("a git rebase is in progress in source/; finish it (git rebase --continue) first");
   }
   if (await gitOk(git2, source, ["status", "--porcelain"]) !== "") {
@@ -260772,14 +260998,14 @@ async function requireClean(git2, source, what) {
 async function fetchBundles(git2, source, pulled, already, download2) {
   const listed = new Set(pulled.bundles.map((bundle2) => bundle2.sha256));
   const fetched = already.filter((sha) => listed.has(sha));
-  const dir = join41(source, ".git", "fdpocket-bundles");
-  await mkdir17(dir, { recursive: true });
+  const dir = join42(source, ".git", "fdpocket-bundles");
+  await mkdir18(dir, { recursive: true });
   for (const bundle2 of fetchOrder(pulled.bundles)) {
     if (fetched.includes(bundle2.sha256))
       continue;
     const bytes3 = await download2(`bundle ${bundle2.seq}`, bundle2.url, bundle2.sha256);
-    const file2 = join41(dir, `${bundle2.sha256}.bundle`);
-    await writeFile19(file2, bytes3);
+    const file2 = join42(dir, `${bundle2.sha256}.bundle`);
+    await writeFile20(file2, bytes3);
     try {
       await gitOk(git2, source, [
         "fetch",
@@ -260833,19 +261059,180 @@ async function integrate(git2, source, threadRef) {
 
 // frontend/packages/miniapp-kit/src/sdk-fingerprint.ts
 import { createHash as createHash13 } from "node:crypto";
-import { readdir as readdir15, readFile as readFile31 } from "node:fs/promises";
-import { join as join42, relative as relative6, sep as sep4 } from "node:path";
+import { readdir as readdir16, readFile as readFile32 } from "node:fs/promises";
+import { join as join43, relative as relative6, sep as sep4 } from "node:path";
 async function sdkVendorHash(kitRoot) {
-  const root = join42(kitRoot, "vendor");
-  const entries = await readdir15(root, { recursive: true, withFileTypes: true });
-  const files = entries.filter((entry2) => entry2.isFile()).map((entry2) => relative6(root, join42(entry2.parentPath, entry2.name)).split(sep4).join("/")).sort();
+  const root = join43(kitRoot, "vendor");
+  const entries = await readdir16(root, { recursive: true, withFileTypes: true });
+  const files = entries.filter((entry2) => entry2.isFile()).map((entry2) => relative6(root, join43(entry2.parentPath, entry2.name)).split(sep4).join("/")).sort();
   const digest4 = createHash13("sha256");
   for (const path of files) {
-    const content = await readFile31(join42(root, path));
+    const content = await readFile32(join43(root, path));
     digest4.update(`${path}\x00${createHash13("sha256").update(content).digest("hex")}
 `);
   }
   return digest4.digest("hex");
+}
+
+// frontend/packages/miniapp-kit/src/shot.ts
+import { mkdir as mkdir19 } from "node:fs/promises";
+import { join as join44 } from "node:path";
+class ShotError extends Error {
+  name = "ShotError";
+}
+var DEFAULT_WIDTHS = [390, 1280];
+var MIN_WIDTH = 280;
+var MAX_WIDTH = 2560;
+var MAX_WIDTHS = 4;
+var MIN_HEIGHT = 700;
+var MAX_HEIGHT = 6000;
+var TAP_TARGET_PX = 44;
+var PHONE_MAX_WIDTH = 480;
+var MIN_TEXT_PX = 12;
+var SETTLE_MS = 5000;
+var REPORTED_TARGETS = 8;
+function defaultHost(env) {
+  return env.KIT_LIVE ? "http://localhost:4420" : "http://localhost:4320";
+}
+function parseWidths(spec) {
+  if (spec === undefined)
+    return [...DEFAULT_WIDTHS];
+  const widths = spec.split(",").map((part) => Number(part.trim()));
+  const valid = widths.every((width) => Number.isInteger(width) && width >= MIN_WIDTH && width <= MAX_WIDTH);
+  const unique = [...new Set(widths)];
+  if (!valid || unique.length > MAX_WIDTHS) {
+    throw new ShotError(`--widths must be up to ${MAX_WIDTHS} integers between ${MIN_WIDTH} and ${MAX_WIDTH}, e.g. 390,1280`);
+  }
+  return unique;
+}
+var LOOPBACK = new Set(["localhost", "127.0.0.1", "[::1]"]);
+function hostPageUrl(options2) {
+  let host;
+  try {
+    host = new URL(options2.host);
+  } catch {
+    throw new ShotError(`--host is not a URL: ${options2.host}`);
+  }
+  if (host.protocol !== "http:" || !LOOPBACK.has(host.hostname)) {
+    throw new ShotError("--host must be the local kit dev page (http://localhost:<port>)");
+  }
+  if (!/^\/(?!\/)/.test(options2.path)) {
+    throw new ShotError('--path must start with a single "/" (a path inside the app)');
+  }
+  host.search = new URLSearchParams({
+    app: options2.app,
+    as: options2.as,
+    path: options2.path,
+    locale: options2.locale,
+    chrome: "none"
+  }).toString();
+  return host.href;
+}
+function inspectPage(limits2) {
+  const visible = (element) => {
+    const rect = element.getBoundingClientRect();
+    const style = getComputedStyle(element);
+    return rect.width > 0 && rect.height > 0 && style.visibility !== "hidden" && style.display !== "none";
+  };
+  const labelOf = (element) => (element.getAttribute("aria-label") || element.innerText || element.getAttribute("name") || element.tagName.toLowerCase()).trim().slice(0, 40);
+  const smallTargets = [];
+  if (limits2.phone) {
+    const targets = document.querySelectorAll('button, [role="button"], a[href], input:not([type="hidden"]), select, textarea');
+    for (const element of targets) {
+      if (!visible(element))
+        continue;
+      if (element.tagName === "A" && getComputedStyle(element).display === "inline")
+        continue;
+      const rect = element.getBoundingClientRect();
+      if (rect.width < limits2.tap || rect.height < limits2.tap) {
+        smallTargets.push({
+          label: labelOf(element),
+          width: Math.round(rect.width),
+          height: Math.round(rect.height)
+        });
+      }
+    }
+  }
+  let smallTextCount = 0;
+  const walker2 = document.createTreeWalker(document.body, NodeFilter.SHOW_TEXT);
+  const counted = new Set;
+  for (let node = walker2.nextNode();node; node = walker2.nextNode()) {
+    const parent = node.parentElement;
+    if (!parent || counted.has(parent) || !node.textContent?.trim() || !visible(parent))
+      continue;
+    if (Number.parseFloat(getComputedStyle(parent).fontSize) < limits2.text) {
+      counted.add(parent);
+      smallTextCount += 1;
+    }
+  }
+  const root = document.documentElement;
+  return {
+    horizontalOverflow: root.scrollWidth > window.innerWidth + 1,
+    smallTargets: smallTargets.slice(0, limits2.reported),
+    smallTextCount,
+    height: Math.max(root.scrollHeight, document.body?.scrollHeight ?? 0)
+  };
+}
+async function appFrame(page) {
+  const handle = await page.waitForSelector("#frame[src]", { timeout: 30000 });
+  const frame2 = await handle.contentFrame();
+  if (!frame2)
+    throw new ShotError("the app did not open in the kit dev page (is kit dev running?)");
+  await frame2.waitForLoadState("load");
+  return frame2;
+}
+async function takeShots(options2, launch = launchChromium) {
+  const url3 = hostPageUrl(options2);
+  await mkdir19(options2.out, { recursive: true });
+  const browser = await launch();
+  const notes = [];
+  const shots = [];
+  try {
+    for (const width of options2.widths) {
+      const page = await browser.newPage({ viewport: { width, height: MIN_HEIGHT } });
+      const consoleErrors = [];
+      page.on("console", (message2) => {
+        if (message2.type() !== "error" || message2.location().url.endsWith("/favicon.ico"))
+          return;
+        consoleErrors.push(message2.text().slice(0, 200));
+      });
+      page.on("pageerror", (error51) => consoleErrors.push(String(error51).slice(0, 200)));
+      try {
+        await page.goto(url3);
+        const frame2 = await appFrame(page);
+        await frame2.waitForLoadState("networkidle", { timeout: SETTLE_MS }).catch(() => {
+          notes.push(`${width}px: the page kept loading; the screenshot may be early`);
+        });
+        const limits2 = {
+          tap: TAP_TARGET_PX,
+          phone: width <= PHONE_MAX_WIDTH,
+          text: MIN_TEXT_PX,
+          reported: REPORTED_TARGETS
+        };
+        const inspected = await frame2.evaluate(inspectPage, limits2);
+        const height = Math.min(MAX_HEIGHT, Math.max(MIN_HEIGHT, inspected.height));
+        await page.setViewportSize({ width, height });
+        const file2 = join44(options2.out, `${options2.app}-${width}.png`);
+        await page.screenshot({ path: file2, type: "png" });
+        shots.push({
+          width,
+          height,
+          file: file2,
+          checks: {
+            horizontalOverflow: inspected.horizontalOverflow,
+            smallTargets: inspected.smallTargets,
+            smallTextCount: inspected.smallTextCount,
+            consoleErrors
+          }
+        });
+      } finally {
+        await page.close();
+      }
+    }
+  } finally {
+    await browser.close();
+  }
+  return { url: url3, shots, notes };
 }
 
 // frontend/packages/miniapp-kit/src/commands.ts
@@ -260893,8 +261280,8 @@ function captureName(id) {
 // frontend/packages/miniapp-kit/src/verify/external-history.ts
 init_src();
 init_src2();
-import { readFile as readFile32 } from "node:fs/promises";
-import { join as join43 } from "node:path";
+import { readFile as readFile33 } from "node:fs/promises";
+import { join as join45 } from "node:path";
 function parseExternalHistoryContext(text2) {
   if (Buffer.byteLength(text2, "utf8") > 1024 * 1024)
     throw new Error("External history context is too large");
@@ -260953,7 +261340,7 @@ async function verifyExternalHistory(options2) {
         return migration;
       let meta3 = null;
       try {
-        meta3 = JSON.parse(await readFile32(join43(root, PROJECT_PATHS.migrations, migration.name, "meta.json"), "utf8"));
+        meta3 = JSON.parse(await readFile33(join45(root, PROJECT_PATHS.migrations, migration.name, "meta.json"), "utf8"));
       } catch {}
       return { ...migration, meta: meta3 };
     }));
@@ -260984,13 +261371,13 @@ class ValidationFailed extends Error {
 // frontend/packages/miniapp-kit/src/verify/validate.ts
 init_src();
 init_src2();
-import { mkdir as mkdir19, writeFile as writeFile21 } from "node:fs/promises";
-import { join as join46 } from "node:path";
+import { mkdir as mkdir21, writeFile as writeFile22 } from "node:fs/promises";
+import { join as join48 } from "node:path";
 
 // frontend/packages/miniapp-kit/src/verify/dynamic.ts
 init_src2();
-import { mkdir as mkdir18, writeFile as writeFile20 } from "node:fs/promises";
-import { join as join45 } from "node:path";
+import { mkdir as mkdir20, writeFile as writeFile21 } from "node:fs/promises";
+import { join as join47 } from "node:path";
 
 // frontend/packages/miniapp-kit/src/verify/erase.ts
 init_src3();
@@ -261001,7 +261388,7 @@ init_seed();
 import { existsSync as existsSync26 } from "node:fs";
 import { mkdtemp as mkdtemp5, rm as rm16 } from "node:fs/promises";
 import { tmpdir as tmpdir2 } from "node:os";
-import { join as join44 } from "node:path";
+import { join as join46 } from "node:path";
 var failed3 = (message2) => ({
   code: "ERASE_TEST_FAILED",
   path: PROJECT_PATHS.eraseTest,
@@ -261010,7 +261397,7 @@ var failed3 = (message2) => ({
 var describe4 = (error51) => error51 instanceof Error ? error51.message : String(error51);
 async function runEraseTest(options2) {
   const { root } = options2;
-  if (!existsSync26(join44(root, PROJECT_PATHS.eraseTest))) {
+  if (!existsSync26(join46(root, PROJECT_PATHS.eraseTest))) {
     return {
       errors: [],
       warnings: [
@@ -261025,15 +261412,15 @@ async function runEraseTest(options2) {
   const manifest2 = JSON.parse(await readGenerated(root, "project.json"));
   const schema2 = JSON.parse(await readGenerated(root, "schema.json"));
   const importModule = options2.importModule ?? defaultImporter(root, manifest2);
-  const dir = await mkdtemp5(join44(tmpdir2(), "kit-erase-"));
-  const db = options2.createLibsqlClient({ url: `file:${join44(dir, "erase.db")}` });
+  const dir = await mkdtemp5(join46(tmpdir2(), "kit-erase-"));
+  const db = options2.createLibsqlClient({ url: `file:${join46(dir, "erase.db")}` });
   try {
     for (const part of await devDatabaseSql(root))
       await applySql(db, part.sql);
     await runSeed({ root, db, manifest: manifest2, importModule });
     let test;
     try {
-      test = (await importModule(join44(root, PROJECT_PATHS.eraseTest))).default;
+      test = (await importModule(join46(root, PROJECT_PATHS.eraseTest))).default;
     } catch (error51) {
       return { errors: [failed3(`could not be loaded: ${describe4(error51)}`)], warnings: [] };
     }
@@ -261268,7 +261655,7 @@ async function runDynamicChecks(options2) {
   });
   const browser = await (options2.launch ?? launchChromium)();
   try {
-    await mkdir18(join45(options2.outDir, "screenshots"), { recursive: true });
+    await mkdir20(join47(options2.outDir, "screenshots"), { recursive: true });
     const observations = [];
     const at = (app) => ({
       hostUrl: dev.hostUrl,
@@ -261304,7 +261691,7 @@ async function runDynamicChecks(options2) {
       gatewayUrl: dev.gatewayUrl,
       appsOrigin: dev.appsOrigin
     });
-    await writeFile20(join45(options2.outDir, "permission-matrix.json"), `${JSON.stringify(matrix, null, 1)}
+    await writeFile21(join47(options2.outDir, "permission-matrix.json"), `${JSON.stringify(matrix, null, 1)}
 `);
     const erase = await runEraseTest({
       root: options2.root,
@@ -261312,7 +261699,7 @@ async function runDynamicChecks(options2) {
     });
     const judged = judgeDynamic(options2.manifest, observations);
     const workerResults = await dev.checkWorkers();
-    await writeFile20(join45(options2.outDir, "worker-mocks.json"), `${JSON.stringify({ results: workerResults, events: dev.workerEvents() }, null, 1)}
+    await writeFile21(join47(options2.outDir, "worker-mocks.json"), `${JSON.stringify({ results: workerResults, events: dev.workerEvents() }, null, 1)}
 `);
     const workerErrors = workerResults.filter((result) => result.status >= (result.kind === "jobs" ? 400 : 500)).map((result) => ({
       code: "WORKER_RUNTIME_FAILED",
@@ -261390,7 +261777,7 @@ async function observe(context, visit2, at, shot) {
     if (shot)
       await page.waitForTimeout(shot.settleMs);
     const name3 = shot?.name ?? `screenshots/${visit2.app}-${visit2.principal}.png`;
-    await writeFile20(join45(at.outDir, name3), await page.locator("#frame").screenshot());
+    await writeFile21(join47(at.outDir, name3), await page.locator("#frame").screenshot());
     observation.screenshot = name3;
     return observation;
   } finally {
@@ -261477,19 +261864,19 @@ async function validateVersion(options2) {
     ...result.report,
     ...externalHistory ? { externalHistoryChecked: externalHistory.errors.length === 0 } : {}
   });
-  await mkdir19(options2.outDir, { recursive: true });
-  await writeFile21(join46(options2.outDir, "report.json"), `${JSON.stringify(report2, null, 2)}
+  await mkdir21(options2.outDir, { recursive: true });
+  await writeFile22(join48(options2.outDir, "report.json"), `${JSON.stringify(report2, null, 2)}
 `);
   if (result.schemaJson !== undefined) {
-    await writeFile21(join46(options2.outDir, "schema.json"), result.schemaJson);
+    await writeFile22(join48(options2.outDir, "schema.json"), result.schemaJson);
   }
   return report2;
 }
 
 // frontend/packages/miniapp-kit/src/workdir.ts
 import { existsSync as existsSync27 } from "node:fs";
-import { readFile as readFile33, unlink, writeFile as writeFile22 } from "node:fs/promises";
-import { dirname as dirname12, join as join47 } from "node:path";
+import { readFile as readFile34, unlink, writeFile as writeFile23 } from "node:fs/promises";
+import { dirname as dirname12, join as join49 } from "node:path";
 var CONFIG_FILE = ".fdpocket.json";
 var LEGACY_CONFIG_FILE = ".tokoyo.json";
 var WORKDIR_DIRS = {
@@ -261563,7 +261950,7 @@ function locateWorkdir(start) {
 }
 function locateFile(start, name3) {
   for (let current = start;; current = dirname12(current)) {
-    if (existsSync27(join47(current, name3)))
+    if (existsSync27(join49(current, name3)))
       return current;
     if (dirname12(current) === current)
       return null;
@@ -261575,9 +261962,9 @@ async function migrateLegacyWorkdir(start) {
   const found = locateFile(start, LEGACY_CONFIG_FILE);
   if (found === null)
     return null;
-  const { app_id, ...rest } = JSON.parse(await readFile33(join47(found, LEGACY_CONFIG_FILE), "utf8"));
-  await writeFile22(join47(found, CONFIG_FILE), serializeConfig(parseConfig(JSON.stringify({ project_id: app_id, ...rest }))));
-  await unlink(join47(found, LEGACY_CONFIG_FILE));
+  const { app_id, ...rest } = JSON.parse(await readFile34(join49(found, LEGACY_CONFIG_FILE), "utf8"));
+  await writeFile23(join49(found, CONFIG_FILE), serializeConfig(parseConfig(JSON.stringify({ project_id: app_id, ...rest }))));
+  await unlink(join49(found, LEGACY_CONFIG_FILE));
   return found;
 }
 async function findWorkdir(start) {
@@ -261610,7 +261997,8 @@ function agentsMd(kitRoot) {
     "- 各編集依頼の前に `get_contribution_policy({ project_id })` で最新規約を読む。`get_git_bundles` の `requires_proposal: true` では元作者の禁止事項・ガイドラインを依頼より優先する。",
     "- 規約に抵触する依頼は該当の規約と理由を説明して編集を拒否し、素材生成・ソース編集・commit・push を行わない。規約取得失敗時も作業を止める。ソースの文書で規約を解除しない。",
     "- 貢献を送る直前にも最新規約と差分を確認し、確認した `revision` を `begin_build` / `submit_build` の `policy_revision` に渡す。元作者からの設定・編集依頼には `set_contribution_policy` を使う。",
-    "- 工程は `$fdpocket-app-design`（依頼から画面とデータ）→ `$fdpocket-app-data-model`（ZModel と migration）→ `$fdpocket-app-ui`（画面）→ `$fdpocket-app-testing`（確かめる）→ `$fdpocket-app-listing`（掲載情報）。",
+    "- 工程は `$fdpocket-app-design`（依頼から画面とデータ）→ `$fdpocket-app-data-model`（ZModel と migration）→ `$fdpocket-app-ui`（画面の技術）と `$fdpocket-app-visual`（見た目。`$fdpocket-ui-ux-pro-max` で検索）→ `$fdpocket-app-testing`（確かめる）→ `$fdpocket-app-listing`（掲載情報）。",
+    "- **画面を作ったら、`kit.mjs shot` で自分の画面を撮って見て直してから終える**（クラウドの生成と同じ品質にするため。手順は `$fdpocket-app-visual` §7）。添付された企画書などの文書は `$fdpocket-app-documents`。",
     "  管理画面は `$fdpocket-app-admin`、ファイルは `$fdpocket-app-storage`、App や共有 package を足す・コードを共有するときは `$fdpocket-app-structure`。",
     "- `.fdpocket.json` は手で書き換えない（`node <kit>/scripts/kit.mjs` が書く）。",
     "- `source/` は git のリポジトリ（branch は手元のスレッド）。変更は `git commit` してから送る。取り込みは `kit.mjs pull`（`git pull --rebase` と同じ）。",
@@ -261637,11 +262025,11 @@ class CommandError extends Error {
 }
 function defaultConfigDir() {
   const xdg = process.env.XDG_CONFIG_HOME;
-  return join48(xdg && xdg !== "" ? xdg : join48(homedir(), ".config"), "fdpocket");
+  return join50(xdg && xdg !== "" ? xdg : join50(homedir(), ".config"), "fdpocket");
 }
 function defaultCodexHome() {
   const home = process.env.CODEX_HOME;
-  return home && home !== "" ? home : join48(homedir(), ".codex");
+  return home && home !== "" ? home : join50(homedir(), ".codex");
 }
 async function readStdin() {
   const chunks = [];
@@ -261732,9 +262120,13 @@ async function runCommand(args, context) {
         return await openEditor(context, flags);
       case "codex-config":
         return await codexConfig(context, flags);
+      case "read":
+        return await readCommand(context, flags);
+      case "shot":
+        return await shotCommand(context, flags);
     }
   } catch (error51) {
-    if (error51 instanceof RepoError || error51 instanceof PulledError || error51 instanceof GenerateError || error51 instanceof NewProjectError || error51 instanceof BuildError || error51 instanceof DevError || error51 instanceof DbError || error51 instanceof VendorError || error51 instanceof PushError || error51 instanceof McpToolError) {
+    if (error51 instanceof RepoError || error51 instanceof PulledError || error51 instanceof GenerateError || error51 instanceof NewProjectError || error51 instanceof BuildError || error51 instanceof DevError || error51 instanceof DbError || error51 instanceof VendorError || error51 instanceof PushError || error51 instanceof ReadError || error51 instanceof ShotError || error51 instanceof ToolMissingError || error51 instanceof McpToolError) {
       throw new CommandError(error51.message);
     }
     if (error51 instanceof McpAuthError) {
@@ -261746,31 +262138,31 @@ async function runCommand(args, context) {
 var print = (context, value2) => context.stdout(JSON.stringify(value2, null, 2));
 var mcpUrlOf = (flag) => flag ?? process.env.CREATOR_MCP_URL ?? DEFAULT_MCP_URL;
 async function kitVersion(kitRoot) {
-  const manifest2 = join48(kitRoot, ".claude-plugin", "plugin.json");
+  const manifest2 = join50(kitRoot, ".claude-plugin", "plugin.json");
   if (!existsSync28(manifest2))
     throw new CommandError(`${manifest2} is missing; reinstall the Kit`);
-  const version3 = JSON.parse(await readFile34(manifest2, "utf8")).version;
+  const version3 = JSON.parse(await readFile35(manifest2, "utf8")).version;
   if (typeof version3 !== "string")
     throw new CommandError(`${manifest2} has no version`);
   return version3;
 }
 async function readConfig(workdir) {
-  return parseConfig(await readFile34(join48(workdir, CONFIG_FILE), "utf8"));
+  return parseConfig(await readFile35(join50(workdir, CONFIG_FILE), "utf8"));
 }
 async function saveConfig(workdir, config3) {
-  await writeFile23(join48(workdir, CONFIG_FILE), serializeConfig(config3));
+  await writeFile24(join50(workdir, CONFIG_FILE), serializeConfig(config3));
 }
-var sourceOf = (workdir) => join48(workdir, WORKDIR_DIRS.source);
+var sourceOf = (workdir) => join50(workdir, WORKDIR_DIRS.source);
 var AGENTS_TITLE = agentsMd("").split(`
 `)[0];
 async function writeAgentFiles(workdir, kitRoot) {
-  const agents = join48(workdir, "AGENTS.md");
-  if (!existsSync28(agents) || (await readFile34(agents, "utf8")).startsWith(AGENTS_TITLE)) {
-    await writeFile23(agents, agentsMd(kitRoot));
+  const agents = join50(workdir, "AGENTS.md");
+  if (!existsSync28(agents) || (await readFile35(agents, "utf8")).startsWith(AGENTS_TITLE)) {
+    await writeFile24(agents, agentsMd(kitRoot));
   }
-  const claude = join48(workdir, "CLAUDE.md");
+  const claude = join50(workdir, "CLAUDE.md");
   if (!existsSync28(claude))
-    await writeFile23(claude, CLAUDE_MD);
+    await writeFile24(claude, CLAUDE_MD);
 }
 async function fetchVerified(context, name3, url3, sha2562) {
   const bytes3 = await context.download(url3);
@@ -261795,7 +262187,7 @@ async function clone4(context, flags) {
   }
   const pulled = parsePulled(bundles);
   const workdir = context.cwd;
-  const path = join48(workdir, CONFIG_FILE);
+  const path = join50(workdir, CONFIG_FILE);
   if (existsSync28(path)) {
     const existing = await readConfig(workdir);
     if (existing.project_id !== pulled.project_id) {
@@ -261804,11 +262196,11 @@ async function clone4(context, flags) {
     throw new CommandError(`${workdir} already has App ${pulled.project_id}; run kit.mjs pull instead`);
   }
   const source = sourceOf(workdir);
-  if (existsSync28(source) && (await readdir16(source)).length > 0) {
+  if (existsSync28(source) && (await readdir17(source)).length > 0) {
     throw new CommandError(`${source} is not empty; clone into a new directory`);
   }
   for (const dir of Object.values(WORKDIR_DIRS))
-    await mkdir20(join48(workdir, dir), { recursive: true });
+    await mkdir22(join50(workdir, dir), { recursive: true });
   const branch = threadBranch(pulled.thread_ref);
   await gitOk(context.git, workdir, ["init", "-q", "-b", branch, source]);
   const config3 = {
@@ -261966,16 +262358,16 @@ async function push(context, flags) {
   print(context, { ...result, ...update.status === "outdated" ? { kit_update: update } : {} });
 }
 async function writeBuildReport(workdir, built, policyRevision) {
-  const path = join48(workdir, WORKDIR_DIRS.outputs, "build-report.json");
+  const path = join50(workdir, WORKDIR_DIRS.outputs, "build-report.json");
   const report2 = completeBuildReport({
-    existing: existsSync28(path) ? JSON.parse(await readFile34(path, "utf8")) : null,
-    projectYaml: await readFile34(join48(sourceOf(workdir), "infra", "project.yaml"), "utf8"),
+    existing: existsSync28(path) ? JSON.parse(await readFile35(path, "utf8")) : null,
+    projectYaml: await readFile35(join50(sourceOf(workdir), "infra", "project.yaml"), "utf8"),
     apps: built.apps,
     schemaVersion: built.schema_version,
     ...policyRevision === undefined ? {} : { policyRevision }
   });
-  await mkdir20(dirname13(path), { recursive: true });
-  await writeFile23(path, `${JSON.stringify(report2, null, 2)}
+  await mkdir22(dirname13(path), { recursive: true });
+  await writeFile24(path, `${JSON.stringify(report2, null, 2)}
 `);
 }
 async function mcpServe(context, flags) {
@@ -262013,7 +262405,7 @@ async function doctor(context) {
     throw new CommandError('some checks failed; follow each "fix" above');
 }
 async function kitUpdate(context) {
-  const manifest2 = JSON.parse(await readFile34(join48(context.kitRoot, ".claude-plugin", "plugin.json"), "utf8"));
+  const manifest2 = JSON.parse(await readFile35(join50(context.kitRoot, ".claude-plugin", "plugin.json"), "utf8"));
   const current = typeof manifest2.version === "string" ? manifest2.version : "unknown";
   if (process.env.KIT_TOOL_ROOT)
     return { status: "unknown", current };
@@ -262141,7 +262533,7 @@ async function validate(context, flags) {
     root,
     kitRoot: context.kitRoot,
     git: context.git,
-    archive: new Uint8Array(await readFile34(resolve4(context.cwd, flags.archive))),
+    archive: new Uint8Array(await readFile35(resolve4(context.cwd, flags.archive))),
     outDir: resolve4(context.cwd, flags.out),
     projectId: flags["project-id"],
     gatewayUrl: flags["gateway-url"],
@@ -262149,9 +262541,9 @@ async function validate(context, flags) {
     sdkUpdate: flags["sdk-update"] === "true",
     skipDynamic: flags["skip-dynamic"] === "true",
     ...flags["external-history"] ? {
-      externalHistory: parseExternalHistoryContext(await readFile34(resolve4(context.cwd, flags["external-history"]), "utf8"))
+      externalHistory: parseExternalHistoryContext(await readFile35(resolve4(context.cwd, flags["external-history"]), "utf8"))
     } : {},
-    ...flags.captures ? { captures: parseCaptures(await readFile34(resolve4(context.cwd, flags.captures), "utf8")) } : {}
+    ...flags.captures ? { captures: parseCaptures(await readFile35(resolve4(context.cwd, flags.captures), "utf8")) } : {}
   });
   print(context, {
     passed: report2.passed,
@@ -262220,7 +262612,7 @@ async function connectedDev(context, workdir, config3, as) {
     throw new CommandError("--connect needs at least one web App");
   const appPorts = allocateAppPorts(webSlugs);
   await assertConnectedPorts([4320, ...Object.values(appPorts)]);
-  const projectPackage = JSON.parse(await readFile34(join48(root, "package.json"), "utf8"));
+  const projectPackage = JSON.parse(await readFile35(join50(root, "package.json"), "utf8"));
   const name3 = projectPackage && typeof projectPackage === "object" && "name" in projectPackage && typeof projectPackage.name === "string" ? projectPackage.name : "project";
   const scope = {
     projectId: config3.project_id,
@@ -262349,16 +262741,16 @@ async function pack(context) {
   if (tip === base) {
     throw new CommandError("no new commits since the head kit.mjs pull took (base_commit_oid); git commit first");
   }
-  const outputs = join48(workdir, WORKDIR_DIRS.outputs);
-  const reportPath = join48(outputs, "build-report.json");
+  const outputs = join50(workdir, WORKDIR_DIRS.outputs);
+  const reportPath = join50(outputs, "build-report.json");
   if (!existsSync28(reportPath)) {
     throw new CommandError("outputs/build-report.json is missing; write it first (instructions.md §2)");
   }
-  const dist = join48(source, "dist");
+  const dist = join50(source, "dist");
   if (!existsSync28(dist))
     throw new CommandError("source/dist is missing; kit.mjs build first");
-  await mkdir20(outputs, { recursive: true });
-  const bundlePath = join48(outputs, "source.bundle");
+  await mkdir22(outputs, { recursive: true });
+  const bundlePath = join50(outputs, "source.bundle");
   await gitOk(context.git, source, [
     "bundle",
     "create",
@@ -262368,12 +262760,12 @@ async function pack(context) {
     ...base === null ? [] : [`^${base}`]
   ]);
   const distArchive = buildDistArchive(await collectFiles(dist));
-  await writeFile23(join48(outputs, "dist.tar.gz"), distArchive);
+  await writeFile24(join50(outputs, "dist.tar.gz"), distArchive);
   print(context, {
     files: {
-      "source.bundle": describeFile(new Uint8Array(await readFile34(bundlePath))),
+      "source.bundle": describeFile(new Uint8Array(await readFile35(bundlePath))),
       "dist.tar.gz": describeFile(distArchive),
-      "build-report.json": describeFile(new Uint8Array(await readFile34(reportPath)))
+      "build-report.json": describeFile(new Uint8Array(await readFile35(reportPath)))
     },
     project_id: config3.project_id,
     session_id: config3.session_id,
@@ -262397,7 +262789,7 @@ async function uploadOutputs(context, flags) {
       throw new CommandError(`--urls has no URL for ${name3}`);
   }
   for (const [name3, contentType2] of Object.entries(OUTPUT_FILES)) {
-    const bytes3 = new Uint8Array(await readFile34(join48(workdir, WORKDIR_DIRS.outputs, name3)));
+    const bytes3 = new Uint8Array(await readFile35(join50(workdir, WORKDIR_DIRS.outputs, name3)));
     await upload(name3, urls[name3], bytes3, contentType2, context.fetch);
   }
   print(context, { uploaded: Object.keys(OUTPUT_FILES) });
@@ -262458,9 +262850,9 @@ async function addAsset(context, flags) {
   }
   const workdir = await findWorkdir(context.cwd);
   const bytes3 = await fetchVerified(context, path, flags.url, flags.sha256);
-  const target2 = join48(sourceOf(workdir), ...segments);
-  await mkdir20(dirname13(target2), { recursive: true });
-  await writeFile23(target2, bytes3);
+  const target2 = join50(sourceOf(workdir), ...segments);
+  await mkdir22(dirname13(target2), { recursive: true });
+  await writeFile24(target2, bytes3);
   print(context, {
     path,
     ...describeFile(bytes3),
@@ -262493,8 +262885,8 @@ async function codexConfig(context, flags) {
     context.stdout(codexApprovalToml(pluginId, MCP_SERVER_NAME));
     return;
   }
-  const path = join48(context.codexHome, "config.toml");
-  const existing = existsSync28(path) ? await readFile34(path, "utf8") : "";
+  const path = join50(context.codexHome, "config.toml");
+  const existing = existsSync28(path) ? await readFile35(path, "utf8") : "";
   let merged;
   try {
     merged = mergeCodexApproval(existing, pluginId, MCP_SERVER_NAME);
@@ -262505,14 +262897,39 @@ async function codexConfig(context, flags) {
   }
   const changed = merged !== existing;
   if (changed) {
-    await mkdir20(context.codexHome, { recursive: true });
-    await writeFile23(path, merged);
+    await mkdir22(context.codexHome, { recursive: true });
+    await writeFile24(path, merged);
   }
   print(context, {
     written: path,
     changed,
     next: "start a new Codex session so it reads the approval settings"
   });
+}
+async function shotCommand(context, flags) {
+  const result = await takeShots({
+    host: flags.host ?? defaultHost(process.env),
+    app: flags.app ?? "web",
+    as: flags.as ?? "member",
+    path: flags.path ?? "/",
+    widths: parseWidths(flags.widths),
+    out: resolve4(context.cwd, flags.out),
+    locale: flags.locale ?? "ja"
+  });
+  print(context, result);
+}
+async function readCommand(context, flags) {
+  const maxChars = flags["max-chars"] === undefined ? undefined : Number(flags["max-chars"]);
+  if (maxChars !== undefined && !(Number.isInteger(maxChars) && maxChars > 0)) {
+    throw new CommandError("--max-chars must be a positive integer");
+  }
+  const result = await readDocument({
+    file: resolve4(context.cwd, flags.file),
+    out: resolve4(context.cwd, flags.out),
+    ...flags.pages === undefined ? {} : { pages: flags.pages },
+    ...maxChars === undefined ? {} : { maxChars }
+  });
+  print(context, result);
 }
 async function seedPlanCommand(context, flags) {
   const contextFile = flags["context-file"];

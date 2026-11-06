@@ -1,0 +1,33 @@
+ui-ux-pro-max — vendored for the FDPocket Creator Kit
+=====================================================
+
+Upstream : https://github.com/nextlevelbuilder/ui-ux-pro-max-skill
+License  : MIT (LICENSE.txt, Copyright (c) 2024 Next Level Builder)
+Pinned   : skills-lock.json of this repository, skill "ui-ux-pro-max",
+           computedHash 523b8063c07eedd2b8a1ca94d7a0be9ad340026bd9f21a1eda0b6be2a855298f
+
+Why this one
+------------
+Compared with the other published UI/UX skills (see docs/_research/2026-11-07-miniapp-design-quality.md):
+it is the one built for *product* UI (SaaS, health, finance, tools), it ships a searchable local
+knowledge base (styles, palettes, type pairings, 119 UX guidelines) and a design-system generator,
+it has React / shadcn / Tailwind guidance, it needs only the Python standard library and no network
+(so it runs inside the offline generation sandbox), and it is MIT-licensed.
+
+What was removed (not needed at run time)
+-----------------------------------------
+- scripts/tests/**, scripts/validate_data.py            (the upstream's own tests / data checks)
+- data/*.json                                           (provenance and catalog metadata; never read by search.py)
+- data/stacks/*.csv except react, shadcn, html-tailwind (the Creator Kit builds Vite + React + Tailwind apps only)
+
+What was changed in SKILL.md
+----------------------------
+- The path of search.py:  ${CLAUDE_PLUGIN_ROOT}/.claude/skills/ui-ux-pro-max/scripts/search.py
+                          -> {{KIT}}/skills/ui-ux-pro-max/scripts/search.py   (works in the sandbox and in the plugin)
+- A section "FDPocket のミニアプリで使うとき" at the top: the platform's promises (no CDN fonts, no landing
+  patterns, one --brand-hue, no --persist) win over search results.
+- The list of stacks, and the example stack, now name the three that are shipped.
+Everything else (scripts, data, references) is byte-identical to the pinned upstream.
+
+To update: re-run the copy from the pinned upstream, re-apply the three SKILL.md changes above,
+and run the Kit tests (src/profile/vendored-design-skill.test.ts).

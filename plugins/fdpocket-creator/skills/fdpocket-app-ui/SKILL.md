@@ -5,6 +5,8 @@ description: ミニアプリの画面を作る。shadcn の部品（packages/ui�
 
 # 画面を作る
 
+*この Skill は技術的な約束（ルート・データ・状態・スマホ幅）。**見た目**（色・余白・画面の型・自分の画面の確認）は `$fdpocket-app-visual`。画面を作る・直すときは両方を使う。*
+
 ## 1. 構成
 
 - ルートは `apps/<slug>/src/routes/` のファイルベース（TanStack Router）。`routeTree.gen.ts` はプラグインが作る（手で書かない）。

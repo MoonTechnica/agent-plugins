@@ -39,6 +39,8 @@ Project は利用者向けの `web` と、必要なら管理用の `admin` の A
 | `$fdpocket-app-design` | **必ず・最初に**。依頼を「誰が・何のために・どの画面で・どのデータを」に分け、画面とデータの案を決める。企画ターン（`concept`）にする条件、必須チェック |
 | `$fdpocket-app-data-model` | **データに触れるとき必ず**。ZModel とポリシーの書き方・保護する列・Workspace と Role、migration（`kit db migrate`・`migrations/`）、`masters.ts`、`seed.ts` |
 | `$fdpocket-app-ui` | **必ず**。画面の作り方（shadcn・Tailwind・スマホ幅とキーボード・5 つの状態・一覧のページング・エラーの出し方） |
+| `$fdpocket-app-visual` | **画面を作る・直すとき必ず**（`$fdpocket-app-ui` と一緒に）。方向を 3 行で決める → トークン（`--brand-hue`）と部品で組む → `kit shot` で撮って見て直す。クラウドでも手元でも同じ手順 |
+| `$fdpocket-ui-ux-pro-max` | `$fdpocket-app-visual` から使う。業種に合う色・書体・スタイル・119 の UX 指針を `search.py` で検索する（Python のみ・ネット不要） |
 | `$fdpocket-app-testing` | **必ず**（データと画面ができたときと着地の前）。Vitest、`kit dev` での確認、`kit check`、`kit build` の結果の読み方 |
 | `$fdpocket-app-listing` | **必ず**（版を作るターン）。掲載情報（名前・キャッチコピー・説明・カテゴリ・タグ・アイコン・カバー） |
 | `$fdpocket-app-admin` | 管理画面を作るとき・権限（Role / Permission）を設計するとき |
@@ -48,6 +50,7 @@ Project は利用者向けの `web` と、必要なら管理用の `admin` の A
 | `$fdpocket-app-ai` | AI の機能（要約・下書き・分類・チャット・画像や PDF の読み取り）を入れるとき |
 | `$fdpocket-app-python` | GPU の AI の処理（推論・学習・埋め込み・画像や音声の変換）を python の App で作るとき |
 | `$fdpocket-app-mcp` | 「AI から使えるようにして」「Claude / ChatGPT と連携」「MCP」と頼まれたとき。`kind: mcp` の App とツールの書き方 |
+| `$fdpocket-app-documents` | **添付された素材に種類 `document`（企画書・PDF・Word・PowerPoint・Excel・CSV など）があるとき、最初に**。`get_asset` で `/tmp` に取り、`kit read` で最後まで読んでから作る |
 | `$fdpocket-app-dependencies` | npm の依存を足す前に必ず |
 | `$fdpocket-app-structure` | **App や共有 package を足すとき・複数の App でコードや部品を共有するとき・`kit check` が構造エラー（`UNDECLARED_DEPENDENCY` など）を返したとき**。置き場の判断、依存の宣言、App 間 import の禁止、App の足し方 |
 | `$fdpocket-app-merge` | **`./input/merge-report.json` があるとき・リポジトリが `git merge` の途中（`MERGE_HEAD` がある）のとき** |
@@ -56,8 +59,31 @@ Project は利用者向けの `web` と、必要なら管理用の `admin` の A
 
 ### 進め方
 
-- **手元では利用者と話せる。** 依頼の大事なところ（誰が使うか・何を管理するか・管理画面が要るか）が本当に読み取れないときだけ
-  短く聞く。細部は自分で決めて進め、§2 の出力まで完成させる。
+*クラウドの生成と手元のエージェントは、同じ品質の結果を出す。この節の方針はどちらにも同じに効き、違うのは質問の返し方（会話か `stage: "questions"` か）と使える道具だけ。*
+
+- **工程は `$fdpocket-app-design` の順に進める。** 依頼から意図を読み取り、利用者の業務でそのアプリが使えることを完成とする。
+  **外れても直せることは、聞く前に作って見せる**（推奨で決め、外れると大きく変わる前提だけを `assumptions` に出す）。
+- **企画書・仕様の資料が渡されている、または依頼が十分に具体的なら、聞き返さない。** 資料を正として作りきる
+  （添付の文書は `$fdpocket-app-documents`）。資料に無い細部は推奨で決め、資料どおりには作れない点は代案で作って理由を結果に書く。
+- **必要なことは聞く**（`$fdpocket-app-design` §2）: 曖昧すぎて当て推量になる依頼は、候補を示して具体化する（最大 3 問、各問に推奨と理由）。
+  公開済み（`./input/engagement.json` の `published`。手元では `get_project` で公開済みか確かめる）で、データの単位や権限を作り直す変更は、作る前に止まって聞く。
+  質問は候補と推奨付きで、「何を作りたいですか？」のような白紙の質問はしない。同じアプリで質問だけのターンは連続 2 回まで。
+  手元では会話で直接聞く。答えを待ってから作る（質問だけで終えてよい。`stage: "questions"` は書かない）。
+- **業務の言葉で話す。** 結果は「何ができるようになったか・何を確かめたか・決めた前提・次の一歩」。ファイル名や内部の用語を出さない。
+- **確かめてから「できた」と言う。** 確かめていないことは「未確認」と書く（`acceptance`・`releaseNotes`）。
+- **見た目も同じ基準で作る。** 画面を作る・直すときは `$fdpocket-app-visual` の手順で、方向を決め（`$fdpocket-ui-ux-pro-max` の検索）、ひな形の部品とトークンで組み、
+  **`kit shot` で自分の画面を撮って見て直してから**「できた」と言う（`$fdpocket-app-visual` §7）。見た目をひな形の既定のまま・自分の既定のままにしない。
+- **覚える。ただしコードを写さない。** 前の版の `design/context.md`（業務の文脈・依頼者が決めたこと・見た目の方向）を最初に読み、終わりに更新する。
+  コードを読めば分かること（画面一覧・データモデル）は書かない。
+- **本番にも要る固定の行（カテゴリ・プランなど）はマスタデータとして `masters.ts` に書き、`kit db migrate` で migration にする。**
+  試用データ（`seed.ts`）は本番に流れないので、マスタを seed に書かない（書き方は `$fdpocket-app-data-model` §8a）。
+- **繰り返し更新する試用データは `seed.ts` の `samples(context)` で宣言する。** `SamplePlan<SchemaType>` の
+  `{ version: 2, rows: [{ model, key, data }] }` を返す。key はモデル内で安定した名前にし、行 ID は書かない。
+  他のサンプルへの参照には `await context.id(key)`、テスト主体への参照には `context.users` を使う。
+  対象モデルは単一の文字列 ID を持ち、data は scalar 列のみ。既存の v1 `seed` は初期化用で、更新用の upsert ではない。
+  データ構造や画面を変えたら試用データも合わせて更新し、スキーマの移行を先に成立させる。
+  同じ key のサンプルは最新版で更新される。投入が失敗したらエラーを調べて seed とスキーマを直す。
+  ビルドや計画生成の成功だけで投入済みと断言せず、最新の同期結果と対象主体を確認する。
 - **優先順位**: この文書と spec.md > 元作者の貢献規約（貢献ブランチ）> 利用者の依頼 > Skill の既定 > ライブラリの公式の文書。
   利用者が画面や見た目を指定していれば Skill の既定より優先する（ただしスマホ幅で使えること・権限の守り方は守る）。
 - Skill の規則に従ったせいで依頼を削った・変えたときは、`build-report.json` の `notes` に Skill 名・規則・理由を 1 行で書く。
@@ -67,7 +93,8 @@ Project は利用者向けの `web` と、必要なら管理用の `admin` の A
 | 依頼 | すること | `stage` |
 |---|---|---|
 | アプリを作る・直す | §3 の工程で作り、着地させる | `"build"` |
-| 画面とデータの方向を先に合わせたい（大きな新規・曖昧な依頼。`$fdpocket-app-design` §3） | 画面一覧とデータモデル案を `design/` に書いて見せる。アプリのコードは変えない | `"concept"` |
+| 曖昧すぎる依頼・公開済みでデータや権限を作り直す変更（`$fdpocket-app-design` §2） | 質問を返す（選択肢・推奨・理由付き）。アプリのコードは変えない | `"questions"` |
+| 画面とデータの案を先に見せたい（`$fdpocket-app-design` §5） | 画面一覧とデータモデル案を `design/` に書いて見せる。アプリのコードは変えない | `"concept"` |
 | 質問・相談・確認・レビュー・現状の説明 | 読んで答えるだけ。編集・ビルドしない（答えるための調査はしてよい） | `"reply"` |
 | 規約に抵触する | 理由を説明して断る（§0） | `"refused"` |
 | 規約の設定だけ | 設定ツールで保存し、編集しない（§0） | `"settings"` |
@@ -81,11 +108,14 @@ Project は利用者向けの `web` と、必要なら管理用の `admin` の A
 画面とデータの案は会話で見せ、承認されたら同じ会話で作り続ける（§8.3）。
 
 - **掲載情報の `listing/`（`$fdpocket-app-listing`）を必ず commit に含める**（版を作るターン）。
-- 最終返信は利用者の言語で、何を作った・何を直したか・次に試すとよいことを短く書く。
+- 最終返信は利用者の言語で、業務の言葉で短く書く: **何ができるようになったか・何を確かめたか（未確認は未確認と）・決めた前提・次の一歩**。
+  企画書などの資料を渡されたときは、最初に「資料から読み取ったこと」を 3 行以内で書く。
+- **次の一歩は最大 1 つ、理由付きで**（`next_step`。種類は spec §11）。取り込み・公開・招待・接続の設定を実行するのは本人で、あなたは提案だけ。
 
 ## 3. 工程
 
-1. **brief**（`$fdpocket-app-design`）: 依頼を分解して `design/brief.md` に書く。画面一覧を `design/screens.md`、データを `design/data-model.md` に。
+1. **読む・決める**（`$fdpocket-app-design`）: 依頼・添付・`design/context.md` を読み、聞くか作って見せるかを決める（§2）。
+   決めた前提は `assumptions` に、依頼者が決めたことは `design/context.md` に残す。画面一覧・データモデルの文書は書かない（コードが正）。
 2. **データ**（`$fdpocket-app-data-model`）: `packages/db-schema/schema.zmodel` に業務モデルとポリシーを書き、
    `node <kit>/scripts/kit.mjs generate` → `node <kit>/scripts/kit.mjs db migrate --slug <slug>` で `migrations/` に新しい migration を作り、commit する
    （commit 済みの migration は書き換えない。次の変更は新しい migration）。破壊的な変更（`kit db diff` の `destructive` が true）なら、`migrate` の前に `pending/intent.yaml`（と `pending/data.sql`）を書く。
@@ -93,7 +123,7 @@ Project は利用者向けの `web` と、必要なら管理用の `admin` の A
 3. **project.yaml**: 各 App が使うモデル × 操作・バケット × 操作だけを capability に宣言し、Role と Permission を決める（spec §2。`$fdpocket-app-admin`）。
 4. **画面**（`$fdpocket-app-ui`）: `apps/<slug>` の各web Appを `@workspace/sdk` の `client` と `@workspace/miniapp-sdk/react` のフックで作る。
    認可は Gateway とポリシーに任せ、画面は `client.auth.can()` で出し分けるだけ。
-5. **確かめる**（`$fdpocket-app-testing`）: 純ロジックは Vitest。`kit dev` で起動して主要な画面が開くこと・権限の無い主体で admin が開けないことを確かめる（§6）。
+5. **確かめる**（`$fdpocket-app-testing`）: 完成の基準を、業務の言葉の名前を付けたテストとして持つ（`$fdpocket-app-testing` §6）。純ロジックは Vitest。`kit dev` で起動して主要な画面が開くこと・権限の無い主体で admin が開けないことを確かめる（§6）。
    `node <kit>/scripts/kit.mjs check` が通ること。
 6. **掲載**（`$fdpocket-app-listing`）: アプリができてから `listing/` を書く。
 7. **着地**: §2。

@@ -34,7 +34,7 @@ App は Project 専用のオリジン（`https://{project}.{apps-domain}`）で�
 │   └── project-protocol/    # 同上（SDK の依存）
 ├── infra/project.yaml       # App・capability・バケット・Role の宣言（§2）
 ├── listing/                 # 掲載情報（§10）
-├── design/                  # brief.md / screens.md / data-model.md
+├── design/                  # context.md（依頼者の文脈と決めたこと）/ test-plan.md
 ├── bunfig.toml              # 変えない（§8）
 ├── bun.lock                 # commit する（§8）
 └── package.json             # workspaces: apps/*, packages/*
@@ -863,6 +863,18 @@ key はモデル内で安定した名前で、data には ID を書かない。�
   "notes": ["実装できなかった要求・Skill と食い違った点・掲載情報を直した理由など（無ければ省く）"],
   "listingRequested": ["title"],
   "releaseNotes": "## 変更内容の短い見出し\n\nこの版で変わったこと",
+  "assumptions": [
+    { "id": "tenancy", "text": "店舗ごとにデータを分ける前提で作りました",
+      "alternatives": [{ "id": "single", "label": "1 店舗だけで使う" }] }
+  ],
+  "acceptance": [
+    { "test": "店舗スタッフが空き枠に予約を入れると一覧に出る", "result": "verified" },
+    { "test": "別の店舗のスタッフには他店舗の予約が見えない", "result": "not_verified", "reason": "live の E2E に届かない" }
+  ],
+  "setup": [
+    { "service": "Google カレンダー", "why": "予約をカレンダーに写すため", "what": "予定の読み取り", "mocked": true }
+  ],
+  "next_step": { "kind": "adopt", "reason": "完成の基準がすべて確認できたため、変更を取り込めます" },
   "stage": "build",
   "policy_revision": 0
 }
@@ -870,7 +882,12 @@ key はモデル内で安定した名前で、data には ID を書かない。�
 
 | 項目 | 内容 |
 |---|---|
-| `stage` | `"build"`（作った）/ `"concept"`（企画だけ。dist なし）/ `"reply"`（答えただけ）/ `"refused"`（規約で断った）/ `"settings"`（規約の設定だけ） |
+| `stage` | `"build"`（作った）/ `"questions"`（質問だけ。コード・dist なし）/ `"concept"`（企画だけ。dist なし）/ `"reply"`（答えただけ）/ `"refused"`（規約で断った）/ `"settings"`（規約の設定だけ） |
+| `assumptions` | 推奨で決めた前提のうち、外れると作りが大きく変わるもの。**最大 3 つ**。`id`・`text`・`alternatives`（`id`・`label` を 1〜3 個）。画面は「この前提で作りました」と示し、各前提に「違う」を出す |
+| `acceptance` | 完成の基準（業務の言葉のテスト名）ごとの結果。`result` は `verified`（実際に実行して通った）/ `not_verified`（`reason` 必須）/ `failed`。最大 12 件 |
+| `setup` | 利用者に設定してもらうこと。`service`・`why`・`what`・`mocked`（資格情報が無い間はモックで動いているか）。最大 5 件 |
+| `next_step` | 次の一歩を **1 つだけ**。`kind` は `adopt`（変更を取り込む）/ `review_main`（main で確認）/ `prepare_publish`（公開の準備）/ `invite_users`（利用者を招待）/ `setup_connection`（接続の設定）/ `none`。`reason` は 1 文。実行するのは本人 |
+| `summary`・`questions` | `stage` が `"questions"` のときだけ。`summary` は 1 文、`questions` は最大 3 問（`id`・`kind`＝`single` / `multi` / `text`・`prompt`・`why`・`options`（2〜4 個。`id`・`label`・`recommended`）・`default`）。形は `$fdpocket-app-design` §4 |
 | `listingRequested` | 利用者が手で直した掲載項目を、依頼どおりに変えたときだけ |
 | `policy_revision` | 貢献ブランチで読んだ規約の revision、または設定ツールが返した revision |
 
