@@ -59,7 +59,7 @@ export const sessionEnvironmentViewSchema = z.object({
         .object({
         desiredRevision: z.number().int().nonnegative(),
         observedRevision: z.number().int().nonnegative(),
-        desiredMode: z.enum(['working', 'built', 'cooled', 'absent']).nullable(),
+        desiredMode: z.enum(['working', 'cooled', 'absent']).nullable(),
         desiredReason: z.enum(['capacity', 'idle', 'retention', 'user']).nullable(),
         status: z
             .enum(['queued', 'running', 'retrying', 'complete', 'blocked', 'failed', 'superseded'])
@@ -89,30 +89,6 @@ export const sessionEnvironmentViewSchema = z.object({
         .default([]),
     jobs: liveSessionInspectionSchema.shape.jobs.optional().default([]),
     jobRuns: liveJobRunsSchema.optional().default([]),
-    built: z.object({
-        originHost: z.string().nullable(),
-        versionId: z.string().nullable(),
-        canOpen: z.boolean(),
-        deployment: z
-            .object({
-            id: z.string(),
-            status: z.enum([
-                'pending',
-                'staged',
-                'migrating',
-                'publishing_assets',
-                'deploying_workers',
-                'registering',
-                'awaiting_review',
-                'active',
-                'failed',
-                'superseded',
-            ]),
-            errorCode: z.string().nullable(),
-            versionId: z.string(),
-        })
-            .nullable(),
-    }),
     live: z.object({
         kind: z.enum(['sandbox', 'connect']).nullable(),
         status: z.enum(['starting', 'running', 'stopped', 'failed']).nullable(),

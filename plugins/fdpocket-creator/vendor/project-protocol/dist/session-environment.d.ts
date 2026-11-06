@@ -54,7 +54,6 @@ export declare const sessionEnvironmentViewSchema: z.ZodObject<{
         observedRevision: z.ZodNumber;
         desiredMode: z.ZodNullable<z.ZodEnum<{
             working: "working";
-            built: "built";
             cooled: "cooled";
             absent: "absent";
         }>>;
@@ -100,28 +99,6 @@ export declare const sessionEnvironmentViewSchema: z.ZodObject<{
         lastError: z.ZodNullable<z.ZodString>;
         createdAt: z.ZodString;
     }, z.core.$strict>>>>;
-    built: z.ZodObject<{
-        originHost: z.ZodNullable<z.ZodString>;
-        versionId: z.ZodNullable<z.ZodString>;
-        canOpen: z.ZodBoolean;
-        deployment: z.ZodNullable<z.ZodObject<{
-            id: z.ZodString;
-            status: z.ZodEnum<{
-                failed: "failed";
-                pending: "pending";
-                active: "active";
-                superseded: "superseded";
-                staged: "staged";
-                migrating: "migrating";
-                publishing_assets: "publishing_assets";
-                deploying_workers: "deploying_workers";
-                registering: "registering";
-                awaiting_review: "awaiting_review";
-            }>;
-            errorCode: z.ZodNullable<z.ZodString>;
-            versionId: z.ZodString;
-        }, z.core.$strip>>;
-    }, z.core.$strip>;
     live: z.ZodObject<{
         kind: z.ZodNullable<z.ZodEnum<{
             sandbox: "sandbox";

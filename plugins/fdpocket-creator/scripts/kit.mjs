@@ -18195,7 +18195,7 @@ var init_session_environment = __esm(() => {
     reconciliation: exports_external.object({
       desiredRevision: exports_external.number().int().nonnegative(),
       observedRevision: exports_external.number().int().nonnegative(),
-      desiredMode: exports_external.enum(["working", "built", "cooled", "absent"]).nullable(),
+      desiredMode: exports_external.enum(["working", "cooled", "absent"]).nullable(),
       desiredReason: exports_external.enum(["capacity", "idle", "retention", "user"]).nullable(),
       status: exports_external.enum(["queued", "running", "retrying", "complete", "blocked", "failed", "superseded"]).nullable(),
       errorCode: exports_external.string().nullable(),
@@ -18213,28 +18213,6 @@ var init_session_environment = __esm(() => {
     })).max(20).optional().default([]),
     jobs: liveSessionInspectionSchema.shape.jobs.optional().default([]),
     jobRuns: liveJobRunsSchema.optional().default([]),
-    built: exports_external.object({
-      originHost: exports_external.string().nullable(),
-      versionId: exports_external.string().nullable(),
-      canOpen: exports_external.boolean(),
-      deployment: exports_external.object({
-        id: exports_external.string(),
-        status: exports_external.enum([
-          "pending",
-          "staged",
-          "migrating",
-          "publishing_assets",
-          "deploying_workers",
-          "registering",
-          "awaiting_review",
-          "active",
-          "failed",
-          "superseded"
-        ]),
-        errorCode: exports_external.string().nullable(),
-        versionId: exports_external.string()
-      }).nullable()
-    }),
     live: exports_external.object({
       kind: exports_external.enum(["sandbox", "connect"]).nullable(),
       status: exports_external.enum(["starting", "running", "stopped", "failed"]).nullable(),
