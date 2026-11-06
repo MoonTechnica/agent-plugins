@@ -82451,7 +82451,12 @@ __export(exports_schema_plan, {
 import { createHash as createHash5 } from "node:crypto";
 import { readFile as readFile14, writeFile as writeFile8 } from "node:fs/promises";
 import { join as join19 } from "node:path";
-async function prepareSchemaPlan({ root, kitRoot }, baseline, signal = new AbortController().signal) {
+async function prepareSchemaPlan({
+  root,
+  kitRoot,
+  importModule,
+  withMasters = true
+}, baseline, signal = new AbortController().signal) {
   const { manifest: manifest2 } = await prepareSessionRuntime(root);
   const pending = await diffDatabase({ root, kitRoot });
   await generateProject({ root, kitRoot });
@@ -82488,6 +82493,21 @@ async function prepareSchemaPlan({ root, kitRoot }, baseline, signal = new Abort
     intent: intent2.intent,
     schemaJson: await readFile14(join19(root, PROJECT_PATHS.generated, "schema.json"), "utf8")
   };
+  const masters = withMasters ? await projectMasters(root, importModule)() : null;
+  if (masters !== null) {
+    const upsert = await planMasterSql({
+      schema: JSON.parse(payload.schemaJson),
+      data: masters,
+      knownTables: [],
+      now: new Date(0),
+      mode: "upsert"
+    });
+    if (upsert.findings.length > 0)
+      throw new DevError(upsert.findings.map((f3) => `${f3.code}: ${f3.message}`).join(`
+`));
+    payload.dataSql = [payload.dataSql, upsert.sql].filter((part) => part.trim() !== "").join(`
+`);
+  }
   return payload;
 }
 async function writeSchemaPlan(options2) {
@@ -82502,21 +82522,6 @@ async function writeSchemaPlan(options2) {
     throw new DevError("Invalid schema baseline");
   const baseline = { revision: record3.revision, schemaSql: record3.schemaSql };
   const plan = await prepareSchemaPlan(options2, baseline);
-  const masters = await projectMasters(options2.root, options2.importModule)();
-  if (masters !== null) {
-    const upsert = await planMasterSql({
-      schema: JSON.parse(plan.schemaJson),
-      data: masters,
-      knownTables: [],
-      now: new Date(0),
-      mode: "upsert"
-    });
-    if (upsert.findings.length > 0)
-      throw new DevError(upsert.findings.map((f3) => `${f3.code}: ${f3.message}`).join(`
-`));
-    plan.dataSql = [plan.dataSql, upsert.sql].filter((part) => part.trim() !== "").join(`
-`);
-  }
   const output = JSON.stringify(plan);
   if (Buffer.byteLength(output) > 4 * 1024 * 1024)
     throw new DevError("Schema plan exceeds size limit");
@@ -82869,7 +82874,7 @@ async function applyLocalSchemaChanges(options2, db) {
   const schemaSql = ddl.rows.map((row) => `${String(row.sql)};`).join(`
 `);
   const { prepareSchemaPlan: prepareSchemaPlan2 } = await Promise.resolve().then(() => (init_schema_plan(), exports_schema_plan));
-  const plan = await prepareSchemaPlan2({ root: options2.root, kitRoot: options2.kitRoot }, { revision: createHash6("sha256").update(schemaSql).digest("hex"), schemaSql });
+  const plan = await prepareSchemaPlan2({ root: options2.root, kitRoot: options2.kitRoot, withMasters: false }, { revision: createHash6("sha256").update(schemaSql).digest("hex"), schemaSql });
   if (plan.destructiveWithoutIntent || plan.dataSql.trim())
     throw new DevError("local schema update requires data migration or destructive changes; existing data was preserved");
   const body = plan.deltaSql.replace(/^\s*--.*$/gm, "").trim();
