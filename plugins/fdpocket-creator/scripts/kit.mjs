@@ -82129,34 +82129,34 @@ async function recoverLegacySamplePlan(seed, context) {
       const id = await context.id(label);
       const previous = labels.get(id);
       if (previous !== undefined && previous !== label)
-        throw new Error("legacy recovery id collision");
+        throw new LegacyRecoveryUnsupported("legacy recovery id collision");
       labels.set(id, label);
       return id;
     }
   });
   const result = await seed(trackedContext);
   if (!result || typeof result !== "object" || !("version" in result) || result.version !== 1 || !("operations" in result) || !Array.isArray(result.operations))
-    throw new Error("invalid legacy recovery plan");
+    throw new LegacyRecoveryUnsupported("invalid legacy recovery plan");
   const rows = [];
   for (const operation of result.operations) {
     if (!operation || typeof operation !== "object" || !["create", "createMany"].includes(operation.operation) || typeof operation.model !== "string" || !operation.args || typeof operation.args !== "object" || Object.keys(operation.args).some((key) => key !== "data"))
-      throw new Error("legacy recovery permits scalar creates only");
+      throw new LegacyRecoveryUnsupported("legacy recovery permits scalar creates only");
     const values = operation.operation === "createMany" ? operation.args.data : [operation.args.data];
     if (!Array.isArray(values))
-      throw new Error("invalid legacy recovery rows");
+      throw new LegacyRecoveryUnsupported("invalid legacy recovery rows");
     for (const value2 of values) {
       if (!value2 || typeof value2 !== "object" || Array.isArray(value2) || typeof value2.id !== "string")
-        throw new Error("invalid legacy recovery row");
+        throw new LegacyRecoveryUnsupported("invalid legacy recovery row");
       const key = labels.get(value2.id);
       if (!key)
-        throw new Error("legacy recovery row id was not derived from its key");
+        throw new LegacyRecoveryUnsupported("legacy recovery row id was not derived from its key");
       const data = {};
       for (const [field2, raw2] of Object.entries(value2)) {
         if (field2 === "id")
           continue;
         const scalar2 = raw2 instanceof Date ? raw2.toISOString() : raw2;
         if (scalar2 !== null && typeof scalar2 !== "string" && typeof scalar2 !== "boolean" && !(typeof scalar2 === "number" && Number.isFinite(scalar2)))
-          throw new Error("legacy recovery permits scalar values only");
+          throw new LegacyRecoveryUnsupported("legacy recovery permits scalar values only");
         data[field2] = scalar2;
       }
       rows.push({ model: operation.model, key, data });
@@ -82176,13 +82176,17 @@ async function generateSampleBundle(input) {
     if (module.samples === undefined && (!input.legacyRecovery || module.default === undefined))
       return sessionSampleBundleSchema.parse({ version: 2, schemaJson, identities, plan: null });
     const context = await createSessionSeedContext(data, identities);
-    if (module.samples === undefined)
-      return sessionSampleBundleSchema.parse({
-        version: 2,
-        schemaJson,
-        identities,
-        plan: await recoverLegacySamplePlan(module.default, context)
-      });
+    if (module.samples === undefined) {
+      let plan;
+      try {
+        plan = await recoverLegacySamplePlan(module.default, context);
+      } catch (error51) {
+        if (!(error51 instanceof LegacyRecoveryUnsupported))
+          throw error51;
+        plan = null;
+      }
+      return sessionSampleBundleSchema.parse({ version: 2, schemaJson, identities, plan });
+    }
     if (typeof module.samples !== "function")
       throw new Error("samples must be a function");
     return sessionSampleBundleSchema.parse({
@@ -82337,7 +82341,7 @@ async function projectSeedImporter(root) {
     throw new SeedError("seed planning requires a Project App dependency tree");
   return viteImporter(resolveViteEntry(join18(root, "apps", app.slug)), root);
 }
-var SeedError, LOCAL_SEED_ENVIRONMENT_ID = "00000000-0000-4000-8000-00000000de01";
+var SeedError, LOCAL_SEED_ENVIRONMENT_ID = "00000000-0000-4000-8000-00000000de01", LegacyRecoveryUnsupported;
 var init_seed = __esm(() => {
   init_session_sample();
   init_session_seed2();
@@ -82345,6 +82349,9 @@ var init_seed = __esm(() => {
   init_session_runtime();
   SeedError = class SeedError extends Error {
     name = "SeedError";
+  };
+  LegacyRecoveryUnsupported = class LegacyRecoveryUnsupported extends Error {
+    name = "LegacyRecoveryUnsupported";
   };
 });
 
