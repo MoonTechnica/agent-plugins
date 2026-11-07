@@ -1,7 +1,5 @@
 import { z } from 'zod';
 import type { SdkErrorCode } from './errors.ts';
-export { ORIGIN_HOST_PATTERN } from './origin.ts';
-/** Project 専用オリジンのホスト名のラベル（preview.md §1.1。DB の `platform.origin_host` と同じ形） */
 /**
  * `platform.gateway_resolve(...)` の応答（gateway.md §2）。Gateway はリクエストごとに 1 回呼ぶ。
  *
@@ -130,7 +128,6 @@ declare const activeSchema: z.ZodObject<{
             write: z.ZodBoolean;
         }, z.core.$strict>;
         originHost: z.ZodString;
-        providerOrigin: z.ZodOptional<z.ZodNullable<z.ZodString>>;
     }, z.core.$strict>;
     user: z.ZodObject<{
         bootstrap: z.ZodObject<{
@@ -320,7 +317,6 @@ export declare const gatewayResolveResultSchema: z.ZodDiscriminatedUnion<[z.ZodO
             write: z.ZodBoolean;
         }, z.core.$strict>;
         originHost: z.ZodString;
-        providerOrigin: z.ZodOptional<z.ZodNullable<z.ZodString>>;
     }, z.core.$strict>;
     user: z.ZodObject<{
         bootstrap: z.ZodObject<{
@@ -423,6 +419,7 @@ export declare const originResolveResultSchema: z.ZodDiscriminatedUnion<[z.ZodOb
     environmentId: z.ZodUUID;
     versionId: z.ZodUUID;
     noindex: z.ZodBoolean;
+    app: z.ZodNullable<z.ZodString>;
     apps: z.ZodArray<z.ZodObject<{
         slug: z.ZodString;
         kind: z.ZodLiteral<"web">;
@@ -437,3 +434,4 @@ export declare const originResolveResultSchema: z.ZodDiscriminatedUnion<[z.ZodOb
     }>;
 }, z.core.$strict>], "status">;
 export type OriginResolveResult = z.infer<typeof originResolveResultSchema>;
+export {};

@@ -12,8 +12,13 @@ import { type ContractVersion } from './version.ts';
  * ZModel にモデルが存在するかの突合は validator（tasks/0428）が行う。
  */
 export declare const PROJECT_MANIFEST_VERSION = 1;
-/** App の slug（URL のパス・トークンの `app` claim） */
+/**
+ * App の slug（オリジンのラベル・トークンの `app` claim。app-origins.md §3）。2〜32 文字の英小文字・数字を
+ * 1 つの `-` でつなぐ。`--` はラベルの区切り、`main` と `s-{12 桁}` は環境の印なので使えない。
+ */
+export declare const APP_SLUG_SHAPE = "[a-z][a-z0-9]*(?:-[a-z0-9]+)*";
 export declare const APP_SLUG_PATTERN: RegExp;
+export declare function isAppSlug(slug: string): boolean;
 /** 論理バケット名（R2 の prefix に入る） */
 export declare const BUCKET_NAME_PATTERN: RegExp;
 /** Permission 名（例: `app.access.admin`） */

@@ -4,7 +4,6 @@ export declare function configuredAppsDomain(value: string | null | undefined): 
  * Shared URL rule for Host clients and Platform runtime components.
  *
  * - explicit URL: always wins.
- * - `{subdomain}.workers.dev` apps domain: the account's `platform-gateway` Worker.
  * - custom apps domain (e.g. `fdpocket.dev`): the Gateway is not on that domain,
  *   so the explicit URL is required. Missing it is a configuration error, never a
  *   silent fallback to the local Worker.

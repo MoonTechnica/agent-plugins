@@ -13,7 +13,7 @@ import { liveClientScript } from "./live-client.js";
  * export default createAppConfig('web', import.meta.dirname)
  * ```
  *
- * 配信の場所（`/` と `/<slug>/`。project-runtime.md §3）、出力（Project の根の `dist/<slug>/`）、ビルド時の定数
+ * 配信の場所（App ごとのオリジンの `/`。app-origins.md §4.4）、出力（Project の根の `dist/<slug>/`）、ビルド時の定数
  * （`__PROJECT_ID__` / `__GATEWAY_URL__` / `__APP_SLUG__`）を Platform の決まりどおりに揃える。定数の値は
  * `kit build` / `kit dev` が環境変数で渡す（Agent が書かない）。
  */
@@ -53,7 +53,10 @@ export function createAppConfig(slug, appRoot, env = process.env) {
     const port = appPorts[slug];
     const live = liveOf(env);
     const root = live?.base ?? '/';
-    const base = slug === 'web' ? root : `${root}${slug}/`;
+    // App はそれぞれ自分のオリジンの `/` に置く（app-origins.md §4.4）。ライブプレビューの Sandbox の中だけは、
+    // 1 つの公開ポートを App で分け合うので今のパス（web は `/lp/{token}/`、ほかは `/lp/{token}/<slug>/`）のまま。
+    // origin Worker が App のホストからこのパスへ中継する（§4.6）
+    const base = live && slug !== 'web' ? `${root}${slug}/` : root;
     return {
         root: appRoot,
         base,
@@ -65,7 +68,7 @@ export function createAppConfig(slug, appRoot, env = process.env) {
                         return;
                     return {
                         define: {
-                            'import.meta.env.BASE_URL': JSON.stringify(`${DELIVERY_BUILD_BASE}${slug === 'web' ? '' : `${slug}/`}`),
+                            'import.meta.env.BASE_URL': JSON.stringify(DELIVERY_BUILD_BASE),
                         },
                     };
                 },
@@ -125,7 +128,7 @@ export function createAppConfig(slug, appRoot, env = process.env) {
                 ...(slug === primaryApp
                     ? {
                         proxy: {
-                            ...otherAppProxies(root, appPorts, slug, true),
+                            ...otherAppProxies(root, appPorts, slug),
                             [`${root}api/`]: {
                                 target: live.sessionOrigin,
                                 headers: { 'X-Session-Live': live.token },
@@ -140,30 +143,19 @@ export function createAppConfig(slug, appRoot, env = process.env) {
                 ...(port === undefined ? {} : { port, strictPort: true }),
                 // IPv4 に固定する（`localhost` だと ::1 だけで待ち受けることがあり、中継や Host が 127.0.0.1 を先に試して詰まる）
                 host: '127.0.0.1',
-                // kit dev: 本番と同じく 1 つのオリジン（web が `/`、ほかは `/<slug>/`）に載せるため、web の Vite が
-                // ほかの App のパスをその App の Vite へ中継する
-                ...(slug === primaryApp
-                    ? {
-                        proxy: {
-                            ...otherAppProxies(root, appPorts, slug, false),
-                            ...(env.KIT_DEV_API_URL
-                                ? { '/api/': { target: env.KIT_DEV_API_URL, changeOrigin: true } }
-                                : {}),
-                        },
-                    }
-                    : {}),
-                // HMR の WebSocket の upgrade は web の Vite が `vite-hmr` として自分で受けてしまい中継に届かないので、
-                // ほかの App の HMR は自分の Vite のポートへ直接つなぐ（ページは web の Vite 経由のまま）
-                ...(slug !== primaryApp && port !== undefined ? { ws: { clientPort: port } } : {}),
+                // kit dev: App ごとのホスト（`{Project}--{App}.localhost`）を Kit の入口が受けてこの Vite へ中継する。
+                // `/api/` は入口が自分で答える。HMR の WebSocket は入口を通さず、この Vite のポートへ直接つなぐ
+                ...(port === undefined ? {} : { ws: { clientPort: port } }),
             },
     };
 }
-function otherAppProxies(root, appPorts, currentSlug, changeOrigin) {
+/** ライブ: Sandbox の 1 つの公開ポートの上で、web の Vite がほかの App のパスをその App の Vite へ中継する */
+function otherAppProxies(root, appPorts, currentSlug) {
     return Object.fromEntries(Object.entries(appPorts)
         .filter(([slug]) => slug !== currentSlug)
         .map(([slug, port]) => [
         `${root}${slug}/`,
-        { target: `http://127.0.0.1:${port}`, ...(changeOrigin ? { changeOrigin, ws: true } : {}) },
+        { target: `http://127.0.0.1:${port}`, changeOrigin: true, ws: true },
     ]));
 }
 const LIVE_BASE_PATTERN = /^\/lp\/[A-Za-z0-9_-]{32,128}\/$/;

@@ -20,7 +20,7 @@ export const DISPATCH_MAX_SKEW_SECONDS = 60;
 /** HMAC の鍵の最短の長さ（文字） */
 export const DISPATCH_SECRET_MIN_LENGTH = 32;
 const UUID = '[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}';
-export const USER_WORKER_SLUG = '[a-z][a-z0-9-]{1,31}';
+export const USER_WORKER_SLUG = '[a-z][a-z0-9]*(?:-[a-z0-9]+)*';
 const EXACT_UUID = new RegExp(`^${UUID}$`);
 const EXACT_SLUG = new RegExp(`^${USER_WORKER_SLUG}$`);
 const WORKER_NAME_PATTERN = new RegExp(`^(?:p-${UUID}-(?:main|prod)-(${USER_WORKER_SLUG})|p-s-[0-9a-f]{12}-(${USER_WORKER_SLUG}|[0-9a-f]{32}))$`);

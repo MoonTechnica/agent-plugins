@@ -10,7 +10,6 @@ export function configuredAppsDomain(value) {
  * Shared URL rule for Host clients and Platform runtime components.
  *
  * - explicit URL: always wins.
- * - `{subdomain}.workers.dev` apps domain: the account's `platform-gateway` Worker.
  * - custom apps domain (e.g. `fdpocket.dev`): the Gateway is not on that domain,
  *   so the explicit URL is required. Missing it is a configuration error, never a
  *   silent fallback to the local Worker.
@@ -24,9 +23,6 @@ export function resolveProjectGatewayUrl(input) {
         return input.explicitUrl.replace(/\/+$/, '');
     }
     const appsDomain = configuredAppsDomain(input.appsDomain);
-    if (appsDomain?.endsWith('.workers.dev')) {
-        return `https://platform-gateway.${appsDomain}`;
-    }
     if (appsDomain && !LOCAL_APPS_DOMAIN.test(appsDomain)) {
         throw new Error(`An explicit Project Gateway URL is required for the custom apps domain ${appsDomain}`);
     }

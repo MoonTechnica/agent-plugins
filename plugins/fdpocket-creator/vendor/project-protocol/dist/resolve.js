@@ -2,10 +2,8 @@ import { z } from 'zod';
 import { connectionCapabilitiesSchema } from "./connections.js";
 import { APP_ACCESSES, APP_KINDS, APP_SLUG_PATTERN, BUCKET_OPERATIONS, localizedNameSchema, MODEL_OPERATIONS, NOTIFICATION_LIMITS, normalizedNotificationTriggerSchema, PERMISSION_PATTERN, } from "./manifest.js";
 import { notificationStatusSchema } from "./notifications.js";
-import { ORIGIN_HOST_PATTERN, providerOriginSchema } from "./origin.js";
+import { parseOriginLabel } from "./origin.js";
 import { realtimeManifestSchema } from "./realtime.js";
-export { ORIGIN_HOST_PATTERN } from "./origin.js";
-/** Project 専用オリジンのホスト名のラベル（preview.md §1.1。DB の `platform.origin_host` と同じ形） */
 /**
  * `platform.gateway_resolve(...)` の応答（gateway.md §2）。Gateway はリクエストごとに 1 回呼ぶ。
  *
@@ -93,11 +91,12 @@ const activeSchema = z.strictObject({
         capabilities: capabilitiesSchema,
         anonymous: z.strictObject({ allowed: z.boolean(), write: z.boolean() }),
         /**
-         * CORS で許す Project 専用オリジンのホスト名のラベル（`{slug}-{id}[--main|--s-{gen12}]`。
-         * preview.md §1.1）。アプリ用ドメインは Gateway の設定が持つ（DB に焼き込まない）。
+         * CORS で許すこの App 専用オリジンのホスト名のラベル（`{Project}--{App}[--{環境}]`。app-origins.md §3）。
+         * アプリ用ドメインは Gateway の設定が持つ（DB に焼き込まない）。
          */
-        originHost: z.string().regex(ORIGIN_HOST_PATTERN),
-        providerOrigin: providerOriginSchema.nullable().optional(),
+        originHost: z
+            .string()
+            .refine((label) => parseOriginLabel(label)?.app != null, 'invalid app origin label'),
     }),
     user: z.strictObject({
         bootstrap: z.strictObject({
@@ -206,6 +205,8 @@ export const originResolveResultSchema = z.discriminatedUnion('status', [
         versionId: z.uuid(),
         /** prod 以外は検索に載せない */
         noindex: z.boolean(),
+        /** ホストの App（入口のホストなら null）。`apps` は App のホストならその App だけ（app-origins.md §3） */
+        app: z.string().regex(APP_SLUG_PATTERN).nullable(),
         apps: z.array(z.strictObject({
             slug: z.string().regex(APP_SLUG_PATTERN),
             kind: z.literal('web'),

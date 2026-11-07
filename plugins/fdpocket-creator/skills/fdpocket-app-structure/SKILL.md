@@ -83,7 +83,9 @@ import { parseTaskInput } from '../../admin/src/lib/task'       // ❌ 別の Ap
 管理画面（`$fdpocket-app-admin`）・api / jobs（`$fdpocket-app-integrations`）・python（`$fdpocket-app-python`）が要るときに、同じ Project に App を足す。
 `kit new` は最初の 1 回だけなので、すでにある Project には次の手順で足す。
 
-1. **slug を決める**: 英小文字とハイフン。任意の名前でよい（1 つの Project に 1〜16 個）。画面 App の slug に `api` は使えない（API のパスに予約）。
+1. **slug を決める**: 2〜32 文字。英小文字で始め、英小文字・数字を 1 つの `-` でつなぐ（`--` と末尾の `-` は不可）。
+   任意の名前でよい（1 つの Project に 1〜16 個）。画面 App の slug に `api` は使えない（API のパスに予約）。
+   `main` と `s-` + 16 進 12 桁も使えない（App のホスト名の環境の印に重なる）。
 2. **ファイルを作る**
    - 画面（web）: 既存の画面 App を `apps/<slug>/` に写す。無ければ `<kit>/templates/project/apps/web/` を写す。
      `package.json` の `name` を slug にし、`vite.config.ts` の `createAppConfig("<slug>", …)` の slug も直す。
@@ -118,3 +120,13 @@ import { parseTaskInput } from '../../admin/src/lib/task'       // ❌ 別の Ap
 
 - 構造エラーは**検査を無効にして通さない**。指定子を `eval` や文字列の組み立てで隠さない。
 - 直したら `node <kit>/scripts/kit.mjs check` をもう一度実行し、エラーが無いことを確かめてから commit する。
+
+## 6. 画面の App はそれぞれ自分のオリジンを持つ
+
+画面の App は App ごとに別のオリジン（`{project}--{slug}.{apps-domain}`）で配られ、どれもそのオリジンの `/` に置かれる。
+
+- **別の App へ相対パスでリンクしない**（`<a href="/admin/">` や `navigate({ to: '/admin/' })` は自分の App の中のルートになる）。
+  別の App を開くときは SDK の `client.ui.navigate({ app: '<slug>', path: '/…' })` を使う。
+- **App の間で localStorage・sessionStorage・IndexedDB・Cookie を共有しない**（オリジンが違うので見えない）。
+  App をまたいで残したいものは DB（`$fdpocket-app-data-model`）に置く。
+- 同じ Project の `api` / `python` の App は、どの画面 App からも同じ相対パス `/api/<slug>/` で呼べる（CORS は書かない）。

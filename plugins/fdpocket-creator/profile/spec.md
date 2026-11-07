@@ -17,7 +17,10 @@
 
 Appは任意名で1〜16個。同kindを複数持て、webを持たない構成もよい。web/adminは命名例。画面Appのslug apiはAPIルーティング用に予約する。
 
-App は Project 専用のオリジン（`https://{project}.{apps-domain}`）で配られ、web は `/`、ほかの App は `/<slug>/` に置かれる。
+画面の App は **App ごとのオリジン**（`https://{project}--{slug}.{apps-domain}`。main・プレビューは末尾に環境の印が付く）で配られ、
+どの App もそのオリジンの `/` に置かれる。同じ Project の別の App とはオリジンが違うので、localStorage・IndexedDB・Cookie・
+端末機能の許可は App ごとに分かれる。別の App へは相対パス（`/admin/` など）でリンクせず、SDK の `client.ui.navigate({ app, path })` で開く。
+`/api/<slug>/` はどの画面 App のオリジンでも同じ相対パスで呼べる。
 スーパーアプリ（Web / iOS / Android）からは iframe / WebView に埋め込まれて開く。直接開かれることもある。
 
 ```text
@@ -46,7 +49,8 @@ App は別の App を import しない（共有するコードは `packages/` �
 
 `kit new` がこの形を作る。App の `vite.config.ts` は `createAppConfig('<slug>', import.meta.dirname)`
 （`@workspace/miniapp-sdk/vite`）を呼ぶだけにする。配信の場所・出力（Project の根の `dist/<slug>/`）・
-TanStack Router / React / Tailwind のプラグイン・`kit dev` のポート（`APP_DEV_PORTS`: web 5173 / admin 5174）・
+TanStack Router / React / Tailwind のプラグイン・`kit dev` の App の開き先（`http://{project}--{slug}.localhost:5173/`。5173 の入口が
+ホスト名で App を選び、App ごとの Vite へ中継する）・
 ビルド時の定数（`__PROJECT_ID__` / `__APP_SLUG__`）を決める。定数の値は `kit build` / `kit dev` が渡す。Gateway の URL は成果物に焼き込まず、`createClient` が Host の `context.gatewayUrl` から受け取る（契約の互換性。`contract-compatibility.md` §3.4）。
 
 ## 2. `infra/project.yaml`
@@ -92,7 +96,7 @@ ownerBootstrap: [admin]                  # Project の作者に付く
 
 | 規則 | 内容 |
 |---|---|
-| App | 1〜16個、任意slug `[a-z][a-z0-9-]{1,31}`。kindはweb/api/jobs、同kindも複数可。画面Appのapi slugは予約 |
+| App | 1〜16個、任意slug（2〜32 文字。英小文字で始め、英小文字・数字を 1 つの `-` でつなぐ: `[a-z][a-z0-9]*(-[a-z0-9]+)*`。`--`・末尾の `-` は不可。`main` と `s-` + 16 進 12 桁は環境の印なので不可）。kindはweb/api/jobs、同kindも複数可。画面Appのapi slugは予約 |
 | capability | **App が使うモデル × 操作・バケット × 操作だけ**を宣言する。宣言していない操作は Gateway がポリシーより先に `FORBIDDEN` にする。広すぎる宣言は審査で指摘される |
 | 宣言できない操作 | `user` の create、`storageFile` の create / update、`auditEvent` の create / update / delete（Platform だけが書く） |
 | バケット | 10 個まで。名前は `[a-z][a-z0-9-]{1,31}` |

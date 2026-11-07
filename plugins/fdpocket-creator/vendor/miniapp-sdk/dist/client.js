@@ -124,14 +124,9 @@ export function createClient(options) {
             if (!win.location)
                 throw new SdkError('HOST_UNAVAILABLE', 'browser navigation is unavailable');
             const current = new URL(win.location.href);
+            // The App is the one this origin serves (app-origins.md §4.2); its path is the whole pathname
             const target = new URL(DIRECT_AUTH_START_PATH, current.origin);
-            target.searchParams.set('app', options.app);
-            const appPrefix = `/${options.app}`;
-            const pathname = options.app !== 'web' &&
-                (current.pathname === appPrefix || current.pathname.startsWith(`${appPrefix}/`))
-                ? current.pathname.slice(appPrefix.length) || '/'
-                : current.pathname;
-            target.searchParams.set('path', `${pathname}${current.search}${current.hash}`);
+            target.searchParams.set('path', `${current.pathname}${current.search}${current.hash}`);
             win.location.assign(target.href);
         },
         fromHost({ timeoutMs = HOST_TIMEOUT_MS } = {}) {

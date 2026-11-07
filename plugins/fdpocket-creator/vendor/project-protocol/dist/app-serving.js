@@ -1,8 +1,8 @@
 /**
- * App の静的配信の規則（project-runtime.md §3）。Project オリジン（本番）と `kit validate` の動的検証が同じ関数で
+ * App の静的配信の規則（app-origins.md §4.2）。App のオリジン（本番）と `kit validate` の動的検証が同じ関数で
  * パスを解き、同じヘッダーを付ける。
  *
- * - web は `/`、ほかの App は `/<slug>/`（同じオリジン）。`/<slug>` は `/<slug>/` へ
+ * - App はホストで決まり、そのオリジンの `/` から配る（ほかの App の slug はパスの接頭辞にならない）
  * - 見つからないとき、拡張子の無いパス（SPA のルート）だけ App の入口（`index.html`）に戻す
  */
 const CONTENT_TYPES = {
@@ -57,23 +57,10 @@ function entryInApp(app) {
     return app.entry.replace(/^dist\//, '').slice(app.slug.length + 1);
 }
 /** `pathname` はデコード済み（`decodeURIComponent`）のパス */
-export function routeAppRequest(pathname, apps) {
+export function appFileOf(pathname, app) {
     if (pathname.split('/').some((segment) => segment === '..'))
         return { kind: 'not_found' };
-    const [first = '', ...rest] = pathname.replace(/^\/+/, '').split('/');
-    const other = apps.find((app) => app.slug === first && app.slug !== 'web');
-    if (other && rest.length === 0 && !pathname.endsWith('/')) {
-        return { kind: 'redirect', location: `/${other.slug}/` };
-    }
-    const target = other ?? apps.find((app) => app.slug === 'web');
-    if (target === undefined)
-        return { kind: 'not_found' };
-    const relative = other ? rest.join('/') : pathname.replace(/^\/+/, '');
+    const relative = pathname.replace(/^\/+/, '');
     const file = relative === '' ? 'index.html' : relative;
-    return {
-        kind: 'file',
-        slug: target.slug,
-        file,
-        entry: extensionOf(file) === null ? entryInApp(target) : null,
-    };
+    return { kind: 'file', file, entry: extensionOf(file) === null ? entryInApp(app) : null };
 }

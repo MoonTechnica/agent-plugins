@@ -26,7 +26,7 @@ export interface UserWorkerTarget {
     resourceGeneration?: string;
     app: string;
 }
-export declare const USER_WORKER_SLUG = "[a-z][a-z0-9-]{1,31}";
+export declare const USER_WORKER_SLUG = "[a-z][a-z0-9]*(?:-[a-z0-9]+)*";
 export declare function userWorkerName(target: UserWorkerTarget): string;
 export declare function isUserWorkerName(name: string): boolean;
 export declare function userWorkerApp(name: string): string | null;

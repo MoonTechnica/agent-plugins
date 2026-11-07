@@ -16368,7 +16368,7 @@ function refineManifest(m2, ctx) {
   let mcpSeen = false;
   for (const [slug, app] of Object.entries(m2.apps).sort(([a], [b2]) => byKey(a, b2))) {
     if (!APP_SLUG_PATTERN.test(slug)) {
-      report(ctx, ["apps", slug], "invalid_slug", "app slugs are [a-z][a-z0-9-]{1,31}");
+      report(ctx, ["apps", slug], "invalid_slug", "app slugs are 2-32 lowercase letters and digits joined by single hyphens; main and s-<12 hex> are reserved");
     }
     if (app.kind === "mcp") {
       if (mcpSeen)
@@ -16579,7 +16579,7 @@ function normalizeTrigger(trigger) {
     exceptActor: trigger.except === "actor"
   };
 }
-var PROJECT_MANIFEST_VERSION = 1, APP_SLUG_PATTERN, BUCKET_NAME_PATTERN, PERMISSION_PATTERN, RESERVED_PERMISSION_PREFIX = "platform.", ROLE_NAME_PATTERN, MODEL_KEY_PATTERN, CONTENT_TYPE_PATTERN, APP_KINDS, SERVER_APP_KINDS, WORKER_APP_KINDS, MCP_CAPABILITY_KEYS, SERVICE_PERMISSIONS, SECRET_NAME_PATTERN, RESERVED_SECRET_NAMES, RESERVED_SECRET_PREFIX = "PLATFORM_", SECRETS_PER_APP_MAX = 50, NETWORK_HOSTS_MAX = 50, APP_ACCESSES, MODEL_OPERATIONS, BUCKET_OPERATIONS, FORBIDDEN_MODEL_OPERATIONS, permissionSchema, localizedNameSchema, localizedDescription, secretSchema, appSchema, bucketSchema, NOTIFICATION_LIMITS, TEMPLATE_KEY_PATTERN, PARAM_NAME_PATTERN, NOTIFICATION_CATEGORY_PATTERN, PLACEHOLDER_PATTERN, localizedText = (max) => exports_external.strictObject({
+var PROJECT_MANIFEST_VERSION = 1, APP_SLUG_SHAPE = "[a-z][a-z0-9]*(?:-[a-z0-9]+)*", APP_SLUG_PATTERN, BUCKET_NAME_PATTERN, PERMISSION_PATTERN, RESERVED_PERMISSION_PREFIX = "platform.", ROLE_NAME_PATTERN, MODEL_KEY_PATTERN, CONTENT_TYPE_PATTERN, APP_KINDS, SERVER_APP_KINDS, WORKER_APP_KINDS, MCP_CAPABILITY_KEYS, SERVICE_PERMISSIONS, SECRET_NAME_PATTERN, RESERVED_SECRET_NAMES, RESERVED_SECRET_PREFIX = "PLATFORM_", SECRETS_PER_APP_MAX = 50, NETWORK_HOSTS_MAX = 50, APP_ACCESSES, MODEL_OPERATIONS, BUCKET_OPERATIONS, FORBIDDEN_MODEL_OPERATIONS, permissionSchema, localizedNameSchema, localizedDescription, secretSchema, appSchema, bucketSchema, NOTIFICATION_LIMITS, TEMPLATE_KEY_PATTERN, PARAM_NAME_PATTERN, NOTIFICATION_CATEGORY_PATTERN, PLACEHOLDER_PATTERN, localizedText = (max) => exports_external.strictObject({
   ja: exports_external.string().trim().min(1).max(max),
   en: exports_external.string().trim().min(1).max(max)
 }), notificationTemplateSchema, NOTIFICATION_TRIGGER_OPS, TRIGGER_FIELD_PATTERN, TRIGGER_VALUE_PATTERN, triggerField, notificationTriggerSchema, notificationsSchema, SENSITIVE_NAME_PATTERN, placeholdersOf = (text) => [...(text ?? "").matchAll(PLACEHOLDER_PATTERN)].map((m2) => m2[1]), AI_INSTRUCTIONS_KEY_PATTERN, AI_SCHEMA_KEY_PATTERN, AI_PROMPTS_PER_KIND_MAX = 8, AI_PROMPT_MAX_BYTES = 8192, AI_MAX_OUTPUT_TOKENS_DEFAULT = 16384, AI_MAX_OUTPUT_TOKENS_LIMIT = 65536, aiModelSchema, aiSchema, baseSchema, PYTHON_ONLY_KEYS, projectManifestSchema, normalizedNotificationTriggerSchema, byKey = (a, b2) => a < b2 ? -1 : a > b2 ? 1 : 0, sorted = (list) => [...list ?? []].sort(byKey), entryOf = (slug, kind) => `dist/${appEntryOf(slug, kind)}`;
@@ -16593,7 +16593,7 @@ var init_manifest = __esm(() => {
   init_realtime();
   init_schedules();
   init_version();
-  APP_SLUG_PATTERN = /^[a-z][a-z0-9-]{1,31}$/;
+  APP_SLUG_PATTERN = new RegExp(`^(?!main$)(?!s-[0-9a-f]{12}$)(?=[a-z0-9-]{2,32}$)${APP_SLUG_SHAPE}$`);
   BUCKET_NAME_PATTERN = /^[a-z][a-z0-9-]{1,31}$/;
   PERMISSION_PATTERN = /^[a-z]+(\.[a-z_]+)+$/;
   ROLE_NAME_PATTERN = /^[a-z][a-z0-9_-]{0,31}$/;
@@ -16841,25 +16841,12 @@ function appCacheControl(file2, fallback) {
 function entryInApp(app) {
   return app.entry.replace(/^dist\//, "").slice(app.slug.length + 1);
 }
-function routeAppRequest(pathname, apps) {
+function appFileOf(pathname, app) {
   if (pathname.split("/").some((segment) => segment === ".."))
     return { kind: "not_found" };
-  const [first = "", ...rest] = pathname.replace(/^\/+/, "").split("/");
-  const other = apps.find((app) => app.slug === first && app.slug !== "web");
-  if (other && rest.length === 0 && !pathname.endsWith("/")) {
-    return { kind: "redirect", location: `/${other.slug}/` };
-  }
-  const target = other ?? apps.find((app) => app.slug === "web");
-  if (target === undefined)
-    return { kind: "not_found" };
-  const relative = other ? rest.join("/") : pathname.replace(/^\/+/, "");
+  const relative = pathname.replace(/^\/+/, "");
   const file2 = relative === "" ? "index.html" : relative;
-  return {
-    kind: "file",
-    slug: target.slug,
-    file: file2,
-    entry: extensionOf(file2) === null ? entryInApp(target) : null
-  };
+  return { kind: "file", file: file2, entry: extensionOf(file2) === null ? entryInApp(app) : null };
 }
 var CONTENT_TYPES;
 var init_app_serving = __esm(() => {
@@ -17791,22 +17778,81 @@ var init_notifications = __esm(() => {
 });
 
 // frontend/packages/project-protocol/src/origin.ts
-function resolveAppOrigin(input) {
-  if (!ORIGIN_HOST_PATTERN.test(input.originHost))
-    throw new Error("invalid app origin label");
-  if (input.appsDomain) {
-    if (!/^[a-z0-9.-]+(?::\d{1,5})?$/.test(input.appsDomain))
-      throw new Error("invalid app domain");
-    const scheme = input.scheme ?? (/^localhost(:\d+)?$/.test(input.appsDomain) ? "http" : "https");
-    return `${scheme}://${input.originHost}.${input.appsDomain}`;
-  }
-  return providerOriginSchema.parse(input.providerOrigin);
+function environmentSuffix(environment) {
+  if (environment.kind === "prod")
+    return "";
+  if (environment.kind === "main")
+    return "--main";
+  if (!/^[0-9a-f]{12}$/.test(environment.generation))
+    throw new Error("invalid session generation");
+  return `--s-${environment.generation}`;
 }
-var ORIGIN_HOST_PATTERN, providerOriginSchema;
+function originLabel(input) {
+  if (!ORIGIN_ID.test(input.originId))
+    throw new Error("invalid origin id");
+  if (input.app !== null && !APP_SLUG_PATTERN.test(input.app))
+    throw new Error("invalid app slug");
+  const tail = `${input.originId}${input.app === null ? "" : `--${input.app}`}${environmentSuffix(input.environment)}`;
+  const room = ORIGIN_LABEL_MAX - tail.length - 1;
+  const slug = input.originSlug.slice(0, Math.max(room, 0)).replace(/-+$/, "");
+  return slug === "" ? tail : `${slug}-${tail}`;
+}
+function parseOriginLabel(label) {
+  if (label.length === 0 || label.length > ORIGIN_LABEL_MAX)
+    return null;
+  const [project = "", ...rest] = label.split("--");
+  if (!PROJECT_PART.test(project) || rest.length > 2)
+    return null;
+  let app = null;
+  let environment = { kind: "prod" };
+  for (const [index, part] of rest.entries()) {
+    const session2 = SESSION_PART.test(part);
+    if (part === "main" || session2) {
+      if (index !== rest.length - 1)
+        return null;
+      environment = session2 ? { kind: "session", generation: part.slice(2) } : { kind: "main" };
+    } else if (index === 0 && APP_SLUG_PATTERN.test(part)) {
+      app = part;
+    } else {
+      return null;
+    }
+  }
+  return { originId: project.slice(-10), app, environment };
+}
+function appLabelFromEntrance(entrance, app) {
+  const parsed = parseOriginLabel(entrance);
+  if (parsed === null || parsed.app !== null || !APP_SLUG_PATTERN.test(app))
+    return null;
+  const project = entrance.split("--")[0] ?? "";
+  return originLabel({
+    originSlug: project.slice(0, -(parsed.originId.length + 1)),
+    originId: parsed.originId,
+    app,
+    environment: parsed.environment
+  });
+}
+function sameOriginEnvironment(a, b2) {
+  const left = parseOriginLabel(a);
+  const right = parseOriginLabel(b2);
+  return left !== null && right !== null && left.originId === right.originId && JSON.stringify(left.environment) === JSON.stringify(right.environment);
+}
+function isOriginLabel(label) {
+  return parseOriginLabel(label) !== null;
+}
+function resolveAppOrigin(input) {
+  if (!isOriginLabel(input.originHost))
+    throw new Error("invalid app origin label");
+  if (!/^[a-z0-9.-]+(?::\d{1,5})?$/.test(input.appsDomain))
+    throw new Error("invalid app domain");
+  const scheme = input.scheme ?? (/^localhost(:\d+)?$/.test(input.appsDomain) ? "http" : "https");
+  return `${scheme}://${input.originHost}.${input.appsDomain}`;
+}
+var ORIGIN_LABEL_MAX = 63, ORIGIN_ID, PROJECT_PART, SESSION_PART;
 var init_origin = __esm(() => {
-  init_zod();
-  ORIGIN_HOST_PATTERN = /^[a-z0-9]+(?:-[a-z0-9]+)*-[0-9a-f]{10}(?:--(?:main|s-[0-9a-f]{12}))?$/;
-  providerOriginSchema = exports_external.string().regex(/^https:\/\/[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?\.[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?\.workers\.dev$(?![\s\S])/);
+  init_manifest();
+  ORIGIN_ID = /^[0-9a-f]{10}$/;
+  PROJECT_PART = /^(?:[a-z0-9]+(?:-[a-z0-9]+)*-)?[0-9a-f]{10}$/;
+  SESSION_PART = /^s-[0-9a-f]{12}$/;
 });
 
 // frontend/packages/project-protocol/src/origin-listing.ts
@@ -17953,7 +17999,7 @@ function isWorkerOutboundPolicy(worker, value) {
   const generation = /^p-s-([a-f0-9]{12})-/.exec(worker);
   return generation ? parsed.data.resourceGeneration !== null && parsed.data.resourceGeneration.replaceAll("-", "").slice(0, 12) === generation[1] : parsed.data.mode === "real" && parsed.data.resourceGeneration === null;
 }
-var API_EXECUTION_MODE_HEADER = "x-platform-execution-mode", DISPATCH_HEADER = "x-platform-dispatch", DISPATCH_SIGNATURE_HEADER = "x-platform-signature", DISPATCH_HEADERS_MAX_BYTES, DISPATCH_MAX_SKEW_SECONDS = 60, DISPATCH_SECRET_MIN_LENGTH = 32, UUID = "[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}", USER_WORKER_SLUG = "[a-z][a-z0-9-]{1,31}", EXACT_UUID, EXACT_SLUG, WORKER_NAME_PATTERN, encoder;
+var API_EXECUTION_MODE_HEADER = "x-platform-execution-mode", DISPATCH_HEADER = "x-platform-dispatch", DISPATCH_SIGNATURE_HEADER = "x-platform-signature", DISPATCH_HEADERS_MAX_BYTES, DISPATCH_MAX_SKEW_SECONDS = 60, DISPATCH_SECRET_MIN_LENGTH = 32, UUID = "[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}", USER_WORKER_SLUG = "[a-z][a-z0-9]*(?:-[a-z0-9]+)*", EXACT_UUID, EXACT_SLUG, WORKER_NAME_PATTERN, encoder;
 var init_platform_dispatch = __esm(() => {
   init_network_mocks();
   DISPATCH_HEADERS_MAX_BYTES = 64 * 1024;
@@ -17996,7 +18042,6 @@ var init_resolve = __esm(() => {
   init_notifications();
   init_origin();
   init_realtime();
-  init_origin();
   RESOLVE_STATUSES = [
     "active",
     "not_found",
@@ -18058,8 +18103,7 @@ var init_resolve = __esm(() => {
       requiredPermission: exports_external.string().regex(PERMISSION_PATTERN).nullable(),
       capabilities: capabilitiesSchema,
       anonymous: exports_external.strictObject({ allowed: exports_external.boolean(), write: exports_external.boolean() }),
-      originHost: exports_external.string().regex(ORIGIN_HOST_PATTERN),
-      providerOrigin: providerOriginSchema.nullable().optional()
+      originHost: exports_external.string().refine((label) => parseOriginLabel(label)?.app != null, "invalid app origin label")
     }),
     user: exports_external.strictObject({
       bootstrap: exports_external.strictObject({
@@ -18117,6 +18161,7 @@ var init_resolve = __esm(() => {
       environmentId: exports_external.uuid(),
       versionId: exports_external.uuid(),
       noindex: exports_external.boolean(),
+      app: exports_external.string().regex(APP_SLUG_PATTERN).nullable(),
       apps: exports_external.array(exports_external.strictObject({
         slug: exports_external.string().regex(APP_SLUG_PATTERN),
         kind: exports_external.literal("web"),
@@ -30859,11 +30904,11 @@ var init_errors4 = __esm(() => {
 });
 
 // frontend/packages/project-gateway/src/cors.ts
-function projectOriginOf(originHost, appsDomain, scheme = "https", providerOrigin) {
-  if (!ORIGIN_HOST_PATTERN.test(originHost) || appsDomain !== null && !APPS_DOMAIN_PATTERN.test(appsDomain)) {
+function projectOriginOf(originHost, appsDomain, scheme = "https") {
+  if (!isOriginLabel(originHost) || !APPS_DOMAIN_PATTERN.test(appsDomain)) {
     throw new Error("invalid project origin");
   }
-  return resolveAppOrigin({ originHost, appsDomain, scheme, providerOrigin });
+  return resolveAppOrigin({ originHost, appsDomain, scheme });
 }
 function assertProjectOrigin(origin2, resolved) {
   if (origin2 === undefined)
@@ -30872,7 +30917,7 @@ function assertProjectOrigin(origin2, resolved) {
     return;
   let expected;
   try {
-    expected = projectOriginOf(resolved.originHost, resolved.appsDomain, resolved.scheme, resolved.providerOrigin);
+    expected = projectOriginOf(resolved.originHost, resolved.appsDomain, resolved.scheme);
   } catch (cause) {
     throw new GatewayError("FORBIDDEN", "origin not configured", { cause });
   }
@@ -30881,14 +30926,12 @@ function assertProjectOrigin(origin2, resolved) {
   }
 }
 function isProjectOriginShape(origin2, appsDomain, scheme = "https") {
-  if (appsDomain === null)
-    return providerOriginSchema.safeParse(origin2).success;
   const suffix = `.${appsDomain}`;
   const prefix = `${scheme}://`;
   if (!origin2.startsWith(prefix) || !origin2.endsWith(suffix))
     return false;
   const label = origin2.slice(prefix.length, origin2.length - suffix.length);
-  return ORIGIN_HOST_PATTERN.test(label);
+  return isOriginLabel(label);
 }
 function isSafeLiveOrigin(origin2) {
   try {
@@ -31036,13 +31079,12 @@ function createBaseApp(config2, logger, liveOriginAllowed = async () => false) {
   });
   return app;
 }
-function allowProjectOrigin(c, config2, originHost, providerOrigin, liveOrigin) {
+function allowProjectOrigin(c, config2, originHost, liveOrigin) {
   const origin2 = c.req.header("origin");
   assertProjectOrigin(origin2, {
     originHost,
     appsDomain: config2.appsDomain,
     scheme: config2.appsScheme,
-    providerOrigin,
     liveOrigin
   });
   if (origin2 === undefined)
@@ -46196,7 +46238,7 @@ async function resolveProjectClaims(c, adapters, config2, cost, claims, options2
     cost
   }));
   if (!options2.hostOrigin) {
-    allowProjectOrigin(c, config2, resolved.app.originHost, resolved.app.providerOrigin, claims.env === "session" ? resolved.liveOrigin : null);
+    allowProjectOrigin(c, config2, resolved.app.originHost, claims.env === "session" ? resolved.liveOrigin : null);
   }
   if (resolved.realtime?.models.length)
     c.set("realtimeWakeScope", await realtimeScopeOf(claims, resolved));
@@ -47143,7 +47185,7 @@ function registerApiAuthorizationRoutes(app, adapters, config2) {
     if (!parsed.success)
       throw new GatewayError("VALIDATION_FAILED", "invalid API authorization");
     const input = parsed.data;
-    if (input.projectId !== claims.aud || input.environment !== claims.env || input.environmentId !== claims.envId || input.versionId !== source.versionId || (input.schemaRevision ?? null) !== (source.schemaRevision ?? null) || input.versionId === null && (input.environment !== "session" || !input.schemaRevision) || input.originHost !== source.app.originHost)
+    if (input.projectId !== claims.aud || input.environment !== claims.env || input.environmentId !== claims.envId || input.versionId !== source.versionId || (input.schemaRevision ?? null) !== (source.schemaRevision ?? null) || input.versionId === null && (input.environment !== "session" || !input.schemaRevision) || !sameOriginEnvironment(input.originHost, source.app.originHost))
       throw new GatewayError("TOKEN_SCOPE_MISMATCH", "API scope changed");
     const db = await adapters.turso.connect(source.db);
     const actor = await loadProjectActor(db, claims.sub, [], source.user.bootstrap);
@@ -47156,7 +47198,7 @@ function registerApiAuthorizationRoutes(app, adapters, config2) {
       jti: null,
       cost: 1
     }));
-    if (!["api", "python"].includes(destination.app.kind) || destination.versionId !== input.versionId || (destination.schemaRevision ?? null) !== (input.schemaRevision ?? null) || destination.app.originHost !== input.originHost || destination.db.name !== source.db.name || destination.db.group !== source.db.group)
+    if (!["api", "python"].includes(destination.app.kind) || destination.versionId !== input.versionId || (destination.schemaRevision ?? null) !== (input.schemaRevision ?? null) || destination.db.name !== source.db.name || destination.db.group !== source.db.group)
       throw new GatewayError("TOKEN_SCOPE_MISMATCH", "API deployment changed");
     if (claims.anon && !destination.app.anonymous.allowed)
       throw new GatewayError("FORBIDDEN", "sign-in required");
@@ -75616,7 +75658,7 @@ function registerDeliveryRoutes(app, adapters, config3) {
     if (resolved.app.kind !== "web" || input.app !== claims.app || input.versionId !== lease.versionId || resolved.versionId !== lease.versionId || input.originHost !== resolved.app.originHost) {
       throw new GatewayError("NOT_FOUND", "not found");
     }
-    allowProjectOrigin(c2, config3, resolved.app.originHost, resolved.app.providerOrigin, claims.env === "session" ? resolved.liveOrigin : null);
+    allowProjectOrigin(c2, config3, resolved.app.originHost, claims.env === "session" ? resolved.liveOrigin : null);
     await assertActor(adapters, lease, resolved);
     return c2.body(null, 204);
   });
@@ -75685,7 +75727,6 @@ function registerDirectAuthRoutes(app, adapters, config3) {
     }));
     if (resolved.app.kind !== "web" || resolveAppOrigin({
       originHost: resolved.app.originHost,
-      providerOrigin: resolved.app.providerOrigin,
       appsDomain: config3.appsDomain,
       scheme: config3.appsScheme
     }) !== input.origin)
@@ -75824,7 +75865,6 @@ function registerDirectAuthRoutes(app, adapters, config3) {
     }));
     if (resolved.app.kind !== "web" || resolved.versionId !== versionId || resolveAppOrigin({
       originHost: resolved.app.originHost,
-      providerOrigin: resolved.app.providerOrigin,
       appsDomain: config3.appsDomain,
       scheme: config3.appsScheme
     }) !== origin2)
@@ -82539,10 +82579,21 @@ import { mkdir as mkdir7, readFile as readFile15, rm as rm7, writeFile as writeF
 import { dirname as dirname8, join as join20 } from "node:path";
 function devOriginHost(projectName, projectId) {
   const slug = projectName.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-+|-+$/g, "") || "project";
-  const label = `${slug}-${projectId.replace(/-/g, "").slice(0, 10).toLowerCase()}`;
-  if (!ORIGIN_HOST_PATTERN.test(label)) {
-    throw new DevError(`cannot make an origin label from ${projectName} / ${projectId}`);
+  try {
+    return originLabel({
+      originSlug: slug,
+      originId: projectId.replace(/-/g, "").slice(0, 10).toLowerCase(),
+      app: null,
+      environment: { kind: "prod" }
+    });
+  } catch (cause) {
+    throw new DevError(`cannot make an origin label from ${projectName} / ${projectId}`, { cause });
   }
+}
+function devAppOriginHost(entrance, slug) {
+  const label = appLabelFromEntrance(entrance, slug);
+  if (label === null)
+    throw new DevError(`cannot make an origin label for App ${slug}`);
   return label;
 }
 function versionIdOf(hash4) {
@@ -82781,7 +82832,10 @@ async function createDevRuntime(options2) {
     gateway,
     objects,
     originHost,
-    appsOrigin: `http://${originHost}.localhost:${options2.appsPort}`,
+    appOrigins: Object.fromEntries(Object.values(manifest2.apps).filter((app) => app.kind === "web").map((app) => [
+      app.slug,
+      `http://${devAppOriginHost(originHost, app.slug)}.localhost:${options2.appsPort}`
+    ])),
     recreatedDatabase: recreated,
     hostToken(principal) {
       const { userId, isAnonymous } = DEV_PRINCIPALS[principal];
@@ -83008,7 +83062,7 @@ function createDevRegistry(input) {
           requiredPermission: app.requiredPermission,
           capabilities: app.capabilities,
           anonymous: app.anonymous,
-          originHost: input.originHost
+          originHost: devAppOriginHost(input.originHost, request.appSlug ?? webApps[0]?.slug ?? "web")
         },
         user: {
           bootstrap: {
@@ -255454,8 +255508,7 @@ var openedSchema = exports_external.object({
   environment: exports_external.enum(["main", "session", "prod"]),
   environmentId: exports_external.uuid(),
   app: exports_external.object({ slug: exports_external.string(), kind: exports_external.string(), access: exports_external.string() }),
-  originHost: exports_external.string().min(1),
-  providerOrigin: providerOriginSchema.nullable().optional()
+  originHost: exports_external.string().min(1)
 });
 var EXCHANGE_FAILURES = {
   NOT_FOUND: "not_found",
@@ -256237,6 +256290,17 @@ import { createServer as createServer2 } from "node:net";
 init_src();
 init_runtime2();
 var KIT_LIVE_CONFIG_ENV = "KIT_LIVE";
+function liveAppOrigin(origin2, slug) {
+  const url2 = new URL(origin2);
+  const [label = "", ...domain2] = url2.hostname.split(".");
+  if (parseOriginLabel(label)?.app !== null || domain2.length === 0)
+    return origin2;
+  const appLabel = appLabelFromEntrance(label, slug);
+  if (appLabel === null)
+    return origin2;
+  url2.hostname = [appLabel, ...domain2].join(".");
+  return url2.origin;
+}
 var UUID4 = /^[a-f0-9]{8}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{12}$/i;
 function record3(value2) {
   return typeof value2 === "object" && value2 !== null && !Array.isArray(value2);
@@ -256267,7 +256331,7 @@ function parseLiveConfig(raw2) {
   if (!exactOrigin2(value2.sessionOrigin, false) || !exactOrigin2(value2.gatewayUrl, false) || !Array.isArray(value2.platformOrigins) || value2.platformOrigins.length === 0 || !value2.platformOrigins.every((origin2) => exactOrigin2(origin2, true)) || !Array.isArray(value2.storageOrigins) || !value2.storageOrigins.every((origin2) => exactOrigin2(origin2, false)))
     return invalid();
   const origins = value2.origins;
-  if (!record3(origins) || Object.keys(origins).some((key) => key !== "host" && key !== "apps") || !exactOrigin2(origins.host, true) || !record3(origins.apps) || !Object.keys(origins.apps).length)
+  if (!record3(origins) || Object.keys(origins).some((key) => key !== "host" && key !== "apps" && key !== "appsRelay") || !exactOrigin2(origins.host, true) || origins.appsRelay !== undefined && !exactOrigin2(origins.appsRelay, false) || !record3(origins.apps) || !Object.keys(origins.apps).length)
     return invalid();
   const apps = {};
   for (const [slug, origin2] of Object.entries(origins.apps)) {
@@ -256282,7 +256346,11 @@ function parseLiveConfig(raw2) {
     gatewayUrl: value2.gatewayUrl,
     platformOrigins: [...value2.platformOrigins],
     storageOrigins: [...value2.storageOrigins],
-    origins: { host: origins.host, apps }
+    origins: {
+      host: origins.host,
+      apps,
+      ...typeof origins.appsRelay === "string" ? { appsRelay: origins.appsRelay } : {}
+    }
   };
 }
 function gateLiveRequest(request, token2) {
@@ -256457,24 +256525,24 @@ function createDistHandler(options2) {
     if (request.method !== "GET" && request.method !== "HEAD") {
       return new Response("method not allowed", { status: 405, headers: { allow: "GET, HEAD" } });
     }
+    const slug = options2.appOf(request);
+    const app = options2.apps.find((candidate) => candidate.slug === slug);
+    if (!app)
+      return new Response("not found", { status: 404 });
     const pathname = new URL(request.url).pathname;
     const prefixed = pathname.startsWith(DELIVERY_BUILD_BASE);
     if (pathname.startsWith(DELIVERY_PATH) && !prefixed)
       return new Response("not found", { status: 404 });
     const appPath = prefixed ? `/${pathname.slice(DELIVERY_BUILD_BASE.length)}` : pathname;
-    const route = routeAppRequest(decodeURIComponent(appPath), options2.apps);
-    if (route.kind === "redirect") {
-      const location = prefixed ? `${DELIVERY_BUILD_BASE}${route.location.slice(1)}` : route.location;
-      return new Response(null, { status: 308, headers: { location } });
-    }
+    const route = appFileOf(decodeURIComponent(appPath), app);
     if (route.kind === "not_found")
       return new Response("not found", { status: 404 });
     let file2 = route.file;
-    let body = options2.files.get(`${route.slug}/${file2}`);
+    let body = options2.files.get(`${app.slug}/${file2}`);
     const fallback = body === undefined;
     if (body === undefined && route.entry !== null) {
       file2 = route.entry;
-      body = options2.files.get(`${route.slug}/${file2}`);
+      body = options2.files.get(`${app.slug}/${file2}`);
     }
     if (body === undefined)
       return new Response("not found", { status: 404 });
@@ -256483,7 +256551,7 @@ function createDistHandler(options2) {
       headers: {
         "content-type": contentTypeOf(file2),
         "cache-control": appCacheControl(file2, fallback),
-        "content-security-policy": typeof options2.csp === "string" ? options2.csp : options2.csp(route.slug),
+        "content-security-policy": typeof options2.csp === "string" ? options2.csp : options2.csp(app.slug),
         "x-content-type-options": "nosniff"
       }
     });
@@ -257257,7 +257325,6 @@ function createConnectedHostHandler(options2) {
   const html = renderHostPage({
     projectId: scope.projectId,
     gatewayUrl: scope.gatewayUrl,
-    appsOrigin: new URL(scope.apps[0].url).origin,
     apps: scope.apps,
     principals,
     defaultApp: scope.defaultApp,
@@ -257460,11 +257527,10 @@ async function respond(req, res, hostname3, handle, maxBodyBytes) {
 // frontend/packages/miniapp-kit/src/dev/live-host.ts
 init_src();
 function createLiveHostHandler(options2) {
-  const config3 = {
+  const configFor = (apps) => ({
     projectId: options2.projectId,
     gatewayUrl: options2.live.gatewayUrl,
-    appsOrigin: new URL(options2.apps.find((app) => app.slug === options2.defaultApp)?.url ?? options2.apps[0]?.url ?? options2.live.origins.host).origin,
-    apps: options2.apps,
+    apps,
     principals: options2.principals ?? ["self", "admin", "member", "anonymous"],
     defaultApp: options2.defaultApp ?? options2.apps[0]?.slug ?? "web",
     defaultAs: options2.defaultAs ?? "self",
@@ -257478,13 +257544,16 @@ function createLiveHostHandler(options2) {
       environmentId: options2.live.environmentId,
       platformOrigins: options2.live.platformOrigins
     }
-  };
+  });
+  const studio = configFor(options2.apps);
+  const local = configFor(options2.localApps ?? options2.apps);
   return {
     async fetch(request) {
       const url2 = new URL(request.url);
       if (request.method !== "GET" || url2.pathname !== "/")
         return new Response("not found", { status: 404 });
-      return new Response(renderHostPage(config3), {
+      const inside = url2.hostname === "127.0.0.1" || url2.hostname === "localhost";
+      return new Response(renderHostPage(inside ? local : studio), {
         headers: {
           "content-type": "text/html; charset=utf-8",
           "cache-control": "no-store",
@@ -258937,8 +259006,10 @@ async function startDev(options2) {
     objects: DEV_PORTS.objects + offset
   };
   const webApps = Object.values(manifest2.apps).filter((app) => app.kind === "web").map((app) => app.slug).sort();
-  const appPorts = allocateAppPorts(webApps, 5173 + offset);
+  const appPorts = allocateAppPorts(webApps, 5174 + offset);
   const primaryApp = Object.keys(appPorts)[0];
+  const entrance = devOriginHost(projectName, projectId);
+  const appByLabel = new Map(webApps.map((slug) => [devAppOriginHost(entrance, slug), slug]));
   const closers = [];
   const close = async () => {
     for (const closer of closers.splice(0).reverse())
@@ -258958,18 +259029,14 @@ async function startDev(options2) {
     const host = await listen(ports.host, "127.0.0.1", async (request2) => hostRoutes(request2, runtime, pageConfig, workers));
     closers.push(host.close);
     const dist = options2.dist;
-    const distServer = dist || webApps.length === 0 ? await listen(ports.apps ?? 5173 + offset, "127.0.0.1", async (request2) => {
-      return serveDist(request2);
-    }) : null;
-    if (distServer)
-      closers.push(distServer.close);
+    const appOf = (request2) => {
+      const label = localLabelOf(request2);
+      return label === null ? null : appByLabel.get(label) ?? null;
+    };
     const distHandler = dist ? createDistHandler({
       files: dist.files,
-      apps: webApps.map((slug) => ({
-        slug,
-        entry: `${slug}/index.html`,
-        kind: "web"
-      })),
+      apps: webApps.map((slug) => ({ slug, entry: `${slug}/index.html` })),
+      appOf,
       csp: (slug) => appContentSecurityPolicy({
         browserOrigins: manifest2.apps[slug]?.network.browser ?? [],
         gatewayUrl: dist.gatewayUrl,
@@ -258979,7 +259046,6 @@ async function startDev(options2) {
     }) : null;
     const apiApps = new Set(Object.values(manifest2.apps).filter((app) => app.kind === "api").map((app) => app.slug));
     const pythonServers = new Map;
-    const hasPythonServers = Object.values(manifest2.apps).some((app) => app.kind === "python" && app.python?.server);
     const serveApi = async (request2) => {
       const url2 = new URL(request2.url);
       const route = parseApiPath(url2.pathname);
@@ -258991,11 +259057,24 @@ async function startDev(options2) {
       url2.pathname = route.path;
       return workers ? workers.fetch(route.app, new Request(url2, request2)) : new Response("starting", { status: 503 });
     };
-    const serveDist = async (request2) => {
+    let appUrls = [];
+    const front = await listen(ports.apps ?? 5173 + offset, "127.0.0.1", async (request2) => {
+      const slug = appOf(request2);
+      if (slug === null) {
+        const only = appUrls.length === 1 ? appUrls[0] : undefined;
+        if (only && localLabelOf(request2) === entrance)
+          return new Response(null, { status: 302, headers: { location: only.url } });
+        return new Response("not found", { status: 404 });
+      }
       if (new URL(request2.url).pathname.startsWith("/api/"))
         return serveApi(request2);
-      return distHandler ? distHandler(request2) : new Response("starting", { status: 503 });
-    };
+      if (distHandler)
+        return distHandler(request2);
+      const port = appPorts[slug];
+      return port === undefined ? new Response("not found", { status: 404 }) : forwardApp(request2, port);
+    });
+    closers.push(front.close);
+    const appsPort = Number(new URL(front.url).port);
     let gatewayWorker;
     const devVars = await readDevVars(root, Boolean(dist));
     runtime = await createDevRuntime({
@@ -259018,7 +259097,7 @@ async function startDev(options2) {
       projectName,
       createLibsqlClient,
       hostOrigin: host.url,
-      appsPort: distServer ? Number(new URL(distServer.url).port) : primaryApp ? appPorts[primaryApp] : 5173,
+      appsPort,
       objectsBaseUrl: objects.url,
       ...options2.quiet ? { quiet: true } : {}
     });
@@ -259091,19 +259170,16 @@ async function startDev(options2) {
         started.python.startServer(slug, port);
       }
     }
-    const apiServer = (apiApps.size > 0 || hasPythonServers) && !dist && webApps.length > 0 ? await listen(0, "127.0.0.1", serveApi) : null;
-    if (apiServer)
-      closers.push(apiServer.close);
-    const appsRoot = `${runtime.appsOrigin}${dist ? DELIVERY_BUILD_BASE : "/"}`;
+    const appOrigins = runtime.appOrigins;
     const apps = webApps.map((slug) => ({
       slug,
-      url: `${appsRoot}${slug === "web" ? "" : `${slug}/`}`
+      url: `${appOrigins[slug]}${dist ? DELIVERY_BUILD_BASE : "/"}`
     }));
+    appUrls = apps;
     pageConfig = {
       projectId,
       gatewayUrl,
       ...dist ? { appGatewayUrl: dist.gatewayUrl } : {},
-      appsOrigin: runtime.appsOrigin,
       apps,
       principals: DEV_PRINCIPAL_NAMES,
       defaultApp: primaryApp ?? "",
@@ -259116,9 +259192,7 @@ async function startDev(options2) {
     const env = {
       [KIT_BUILD_ENV.projectId]: projectId,
       [KIT_BUILD_ENV.gatewayUrl]: gatewayUrl,
-      KIT_DEV_APP_PORTS: JSON.stringify(appPorts),
-      KIT_DEV_PRIMARY_APP: primaryApp ?? "",
-      ...apiServer ? { KIT_DEV_API_URL: apiServer.url } : {}
+      KIT_DEV_APP_PORTS: JSON.stringify(appPorts)
     };
     for (const slug of dist ? [] : webApps) {
       const vite = await (options2.startVite ?? viteDev)({
@@ -259164,7 +259238,7 @@ async function startDev(options2) {
       workerEvents: () => workers?.events() ?? [],
       hostUrl: host.url,
       gatewayUrl: gateway.url,
-      appsOrigin: runtime.appsOrigin,
+      appOrigins,
       apps,
       close
     };
@@ -259199,9 +259273,12 @@ async function startLiveDev(options2, manifest2) {
       throw new DevError(`KIT_LIVE has no public origin for App ${slug}`);
     apps.push({ slug, url: `${origin2}${prefix2}${slug === "web" ? "" : `${slug}/`}` });
   }
-  const appsOrigin = live2.origins.apps[primaryApp];
-  if (!appsOrigin)
-    throw new DevError("KIT_LIVE has no primary App origin");
+  const relay = configured.origins.appsRelay;
+  const studioApps = relay ? apps.map((app) => ({
+    slug: app.slug,
+    url: `${liveAppOrigin(relay, app.slug)}${prefix2}${app.slug === "web" ? "" : `${app.slug}/`}`
+  })) : apps;
+  const appOrigins = Object.fromEntries(apps.map((app) => [app.slug, new URL(app.url).origin]));
   const connectedHandler = options2.connected ? createConnectedHostHandler({
     ...options2.connected.callbacks,
     signal: options2.connected.signal,
@@ -259220,7 +259297,8 @@ async function startLiveDev(options2, manifest2) {
   const handler = connectedHandler ?? createLiveHostHandler({
     projectId: options2.projectId,
     live: live2,
-    apps,
+    apps: studioApps,
+    localApps: apps,
     defaultApp: primaryApp,
     ...options2.as ? { defaultAs: options2.as } : {}
   });
@@ -259301,7 +259379,7 @@ async function startLiveDev(options2, manifest2) {
       liveUrl: `${live2.origins.host}${prefix2}`,
       liveCheckUrl: `${host.url}${prefix2}`,
       gatewayUrl: live2.gatewayUrl,
-      appsOrigin,
+      appOrigins,
       apps,
       close,
       checkWorkers: async () => [],
@@ -259399,6 +259477,41 @@ async function forwardPython(request2, path, port) {
     });
   }
 }
+function localLabelOf(request2) {
+  const host = new URL(request2.url).hostname;
+  return host.endsWith(".localhost") ? host.slice(0, -".localhost".length) : null;
+}
+async function forwardApp(request2, port) {
+  const url2 = new URL(request2.url);
+  const headers = new Headers(request2.headers);
+  headers.delete("host");
+  headers.delete("accept-encoding");
+  try {
+    const response = await fetch(`http://127.0.0.1:${port}${url2.pathname}${url2.search}`, {
+      method: request2.method,
+      headers,
+      body: ["GET", "HEAD"].includes(request2.method) ? null : await request2.arrayBuffer(),
+      redirect: "manual"
+    });
+    const out = new Headers(response.headers);
+    for (const name3 of ["content-encoding", "content-length", "transfer-encoding"])
+      out.delete(name3);
+    return new Response(response.body, {
+      status: response.status,
+      statusText: response.statusText,
+      headers: out
+    });
+  } catch (error51) {
+    console.error("kit dev: the App dev server is not ready", {
+      port,
+      name: error51 instanceof Error ? error51.name : "unknown"
+    });
+    return new Response("app dev server is starting", {
+      status: 503,
+      headers: { "retry-after": "1" }
+    });
+  }
+}
 var viteDev = async ({ slug, appDir, port, env }) => {
   const child = spawn6(process.execPath, [resolveViteBin(appDir), "--logLevel", "warn", "--port", String(port), "--strictPort"], {
     cwd: appDir,
@@ -259423,7 +259536,7 @@ var viteDev = async ({ slug, appDir, port, env }) => {
       throw new DevError(`vite for ${slug} exited (code ${child.exitCode}); see the [${slug}] lines above`);
     }
     try {
-      const response = await fetch(`http://127.0.0.1:${port}/${slug === "web" ? "" : `${slug}/`}`);
+      const response = await fetch(`http://127.0.0.1:${port}/`);
       await response.arrayBuffer();
       return { close };
     } catch {
@@ -259587,7 +259700,6 @@ function createLiveE2EHost(options2) {
   const html = renderHostPage({
     projectId: options2.projectId,
     gatewayUrl: options2.live.gatewayUrl,
-    appsOrigin: new URL(options2.apps[0].url).origin,
     apps: options2.apps,
     principals: [options2.identity],
     defaultApp: options2.app,
@@ -261616,7 +261728,12 @@ async function runPermissionMatrix(options2) {
       });
       continue;
     }
-    const read = await fetchImpl(`${options2.gatewayUrl}/v1/db/${item.model}/findMany?q=${encodeURIComponent("{}")}`, { headers: { authorization: `Bearer ${session3.token}`, origin: options2.appsOrigin } });
+    const read = await fetchImpl(`${options2.gatewayUrl}/v1/db/${item.model}/findMany?q=${encodeURIComponent("{}")}`, {
+      headers: {
+        authorization: `Bearer ${session3.token}`,
+        ...options2.appOrigins[item.app] ? { origin: options2.appOrigins[item.app] } : {}
+      }
+    });
     results.push(read.ok ? {
       ...item,
       permissions: session3.permissions,
@@ -261660,7 +261777,7 @@ async function runDynamicChecks(options2) {
     const at = (app) => ({
       hostUrl: dev.hostUrl,
       gatewayUrl: dev.gatewayUrl,
-      appsOrigin: dev.appsOrigin,
+      appOrigins: Object.values(dev.appOrigins),
       bakedGateway: new URL(options2.gatewayUrl),
       browserOrigins: options2.manifest.apps[app]?.network?.browser ?? [],
       outDir: options2.outDir,
@@ -261689,7 +261806,7 @@ async function runDynamicChecks(options2) {
       projectId: options2.projectId,
       hostUrl: dev.hostUrl,
       gatewayUrl: dev.gatewayUrl,
-      appsOrigin: dev.appsOrigin
+      appOrigins: dev.appOrigins
     });
     await writeFile21(join47(options2.outDir, "permission-matrix.json"), `${JSON.stringify(matrix, null, 1)}
 `);
@@ -261733,7 +261850,7 @@ async function observe(context, visit2, at, shot) {
     externalResources: [],
     screenshot: null
   };
-  const local = new Set([at.hostUrl, at.gatewayUrl, at.appsOrigin].map((url3) => new URL(url3).origin));
+  const local = new Set([at.hostUrl, at.gatewayUrl, ...at.appOrigins].map((url3) => new URL(url3).origin));
   try {
     await context.addInitScript(WATCH_CSP);
     await context.route("**/*", async (route) => {

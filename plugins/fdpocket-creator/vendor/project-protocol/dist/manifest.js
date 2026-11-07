@@ -17,8 +17,15 @@ import { SUPPORTED_CONTRACTS } from "./version.js";
  * ZModel にモデルが存在するかの突合は validator（tasks/0428）が行う。
  */
 export const PROJECT_MANIFEST_VERSION = 1;
-/** App の slug（URL のパス・トークンの `app` claim） */
-export const APP_SLUG_PATTERN = /^[a-z][a-z0-9-]{1,31}$/;
+/**
+ * App の slug（オリジンのラベル・トークンの `app` claim。app-origins.md §3）。2〜32 文字の英小文字・数字を
+ * 1 つの `-` でつなぐ。`--` はラベルの区切り、`main` と `s-{12 桁}` は環境の印なので使えない。
+ */
+export const APP_SLUG_SHAPE = '[a-z][a-z0-9]*(?:-[a-z0-9]+)*';
+export const APP_SLUG_PATTERN = new RegExp(`^(?!main$)(?!s-[0-9a-f]{12}$)(?=[a-z0-9-]{2,32}$)${APP_SLUG_SHAPE}$`);
+export function isAppSlug(slug) {
+    return APP_SLUG_PATTERN.test(slug);
+}
 /** 論理バケット名（R2 の prefix に入る） */
 export const BUCKET_NAME_PATTERN = /^[a-z][a-z0-9-]{1,31}$/;
 /** Permission 名（例: `app.access.admin`） */
@@ -529,7 +536,7 @@ function refineManifest(m, ctx) {
     let mcpSeen = false;
     for (const [slug, app] of Object.entries(m.apps).sort(([a], [b]) => byKey(a, b))) {
         if (!APP_SLUG_PATTERN.test(slug)) {
-            report(ctx, ['apps', slug], 'invalid_slug', 'app slugs are [a-z][a-z0-9-]{1,31}');
+            report(ctx, ['apps', slug], 'invalid_slug', 'app slugs are 2-32 lowercase letters and digits joined by single hyphens; main and s-<12 hex> are reserved');
         }
         if (app.kind === 'mcp') {
             if (mcpSeen)
