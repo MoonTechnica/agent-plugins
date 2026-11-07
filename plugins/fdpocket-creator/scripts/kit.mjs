@@ -257862,6 +257862,14 @@ var src_default = {
 
 // frontend/packages/miniapp-kit/src/dev/sandbox-workers.ts
 var PUBLIC_BODY_MAX = 1024 * 1024;
+async function toNodeRequest(request2) {
+  const body2 = ["GET", "HEAD"].includes(request2.method) ? null : await request2.arrayBuffer();
+  return new Request(request2.url, {
+    method: request2.method,
+    headers: new Headers([...request2.headers]),
+    ...body2 === null ? {} : { body: body2 }
+  });
+}
 var publicationSchema = exports_external.object({
   appSlug: exports_external.string().regex(/^[a-z][a-z0-9-]{1,31}$/),
   bundle: exports_external.string().min(1).max(16 * 1024 * 1024),
@@ -257946,7 +257954,7 @@ async function createSandboxWorkers(options2) {
       modules: [{ type: "ESModule", path: "index.js", contents: publication.bundle }],
       bindings: publication.bindings,
       outboundService: async (request2) => {
-        const response = await src_default.fetch(request2, {
+        const response = await src_default.fetch(await toNodeRequest(request2), {
           worker: name3,
           appSlug: publication.appSlug,
           egress: publication.egress,
