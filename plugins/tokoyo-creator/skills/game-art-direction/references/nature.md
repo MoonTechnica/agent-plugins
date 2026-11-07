@@ -89,6 +89,7 @@ add_child(grass)
 | 影 2 分割・地形は影なし、草 8 m 区画・2 段・描画 40 m、遠くは葉の少ない木 | 97 | 23.7 万 |
 
 出発点の予算: スマホの Web で画面内の三角形 30 万以下・描画呼び出し 150 以下、草はそのうち 15 万以下。実機で測って直す。
+低価格スマホ（RAM 4GB・Mali-G52 級）でも動かすため、草の密度は `TokoyoQuality.detail`、描画距離は `TokoyoQuality.distance` を掛け、影を落とす光は `TokoyoQuality.shadows` に従う（`$game-godot`）。`changed` で掛け直す。
 削る順: ① 影（分割・最大距離・影を落とす物）② 草（密度 → 描画距離 → 遠景の割合 → 株の本数）③ 木（遠景の段を早める・遠景の木は枚数を減らして板を大きく〔`tree(…, cards = 10, card_size = 1.7)`〕・遠い森を板や塊に）
 ④ 霧を濃くしてカメラの `far` を縮める ⑤ 解像度（`$game-design` references/performance-risk.md）。見た目を一律に下げない。
 
