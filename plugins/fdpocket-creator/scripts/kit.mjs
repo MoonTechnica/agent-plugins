@@ -83025,7 +83025,7 @@ function createDevRegistry(input) {
         capabilities: { models: {}, buckets: {} },
         anonymous: { allowed: true, write: false }
       } : manifest2.apps[request.appSlug];
-      if (request.projectId !== input.projectId || request.environment !== "session" || request.environmentId !== null && request.environmentId !== DEV_ENVIRONMENT_ID || request.testGrantId || request.testGrantHash || !app || app.kind !== "web" && app.kind !== "mcp" || !principal || !principalName || request.testIdentity !== principalName) {
+      if (request.projectId !== input.projectId || request.environment !== "session" || request.environmentId !== null && request.environmentId !== DEV_ENVIRONMENT_ID || request.testGrantId || request.testGrantHash || !app || app.kind !== "web" && app.kind !== "mcp" && app.kind !== "python" || !principal || !principalName || request.testIdentity !== principalName) {
         return { status: "not_found", ...flags };
       }
       if (principal.isAnonymous && !app.anonymous.allowed)
