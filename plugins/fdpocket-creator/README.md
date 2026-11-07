@@ -89,11 +89,16 @@ When the push succeeds, the editor opens in your browser (the agent also prints 
 | `/fdpocket-creator:remix <app page URL>` | Start a branch of someone else's published app to contribute to it. |
 | `/fdpocket-creator:propose <title>` | Propose your branch's changes to the app's main, like a GitHub pull request. |
 | `/fdpocket-creator:proposals` | Review proposals other people sent to your app, then comment, merge, or decline. |
+| `/fdpocket-creator:release [adopt\|publish]` | Owners and app admins: bring your branch into main, then publish — only after the mandatory checks and your explicit OK. |
 
 You can also just describe what you want in plain language ("push this", "add a search box") — the agent picks the right Skill.
 
 Opening, withdrawing, commenting on, and merging a proposal all reach another person, so Claude Code
-asks you to confirm each one every time (allow rules cannot skip this).
+asks you to confirm each one every time (allow rules cannot skip this). Bringing your branch into main
+(`adopt_branch`) and asking for publication (`publish_project`) are confirmed the same way, and the agent
+first runs a mandatory checklist (checks, a ready push, every changed app and role tried in `kit dev`,
+DB and permission changes reviewed, the main environment checked, the listing and who can use it) and
+asks you before calling them. Posting, deleting, credits, teams and reports stay in the app.
 
 ### Update
 
@@ -142,10 +147,12 @@ In Codex, call the Skills with `$`:
 | `$fdpocket-remix` | Contribute to a published app. |
 | `$fdpocket-propose` | Propose your branch's changes to main. |
 | `$fdpocket-proposals` | Review proposals sent to your app. |
+| `$fdpocket-release` | Owners and app admins: bring your branch into main and publish, after the mandatory checks. |
 
 ### 3. Require approval for proposal actions
 
-Opening, withdrawing, commenting on, and merging a proposal reach other people, so make them approval-only.
+Opening, withdrawing, commenting on, and merging a proposal reach other people, and bringing a branch into
+main or publishing reaches everyone, so make them approval-only.
 Codex plugins cannot ship this setting, so add the following to `~/.codex/config.toml`
 (`node <kit>/scripts/kit.mjs codex-config` prints the same text, and `codex-config --write` writes it there for you,
 replacing an earlier copy and keeping the rest of the file):
@@ -160,10 +167,22 @@ approval_mode = "approve"
 [plugins."fdpocket-creator@moon-technica".mcp_servers.fdpocket.tools.close_proposal]
 approval_mode = "approve"
 
+[plugins."fdpocket-creator@moon-technica".mcp_servers.fdpocket.tools.request_proposal_changes]
+approval_mode = "approve"
+
 [plugins."fdpocket-creator@moon-technica".mcp_servers.fdpocket.tools.comment_proposal]
 approval_mode = "approve"
 
 [plugins."fdpocket-creator@moon-technica".mcp_servers.fdpocket.tools.merge_proposal]
+approval_mode = "approve"
+
+[plugins."fdpocket-creator@moon-technica".mcp_servers.fdpocket.tools.grant_session_consent]
+approval_mode = "approve"
+
+[plugins."fdpocket-creator@moon-technica".mcp_servers.fdpocket.tools.adopt_branch]
+approval_mode = "approve"
+
+[plugins."fdpocket-creator@moon-technica".mcp_servers.fdpocket.tools.publish_project]
 approval_mode = "approve"
 ```
 

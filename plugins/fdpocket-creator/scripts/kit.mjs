@@ -255655,8 +255655,12 @@ init_src2();
 var ASK_A_PERSON_TOOLS = [
   "open_proposal",
   "close_proposal",
+  "request_proposal_changes",
   "comment_proposal",
-  "merge_proposal"
+  "merge_proposal",
+  "grant_session_consent",
+  "adopt_branch",
+  "publish_project"
 ];
 function codexApprovalToml(pluginId, server2) {
   const table = `plugins."${pluginId}".mcp_servers.${server2}`;
@@ -262113,7 +262117,8 @@ function agentsMd(kitRoot) {
     "- ここでの仕事はミニアプリを作ることだけ。作業ディレクトリの外のファイルは触らない。",
     "- ほかのホスティングへのデプロイ・ネイティブアプリ・Platform の外で動くサーバーは作らない（ミニアプリは Platform の Gateway の中だけで動く）。",
     "  使える API は `<kit>/profile/spec.md` にあるものだけ。npm の依存は `$fdpocket-app-dependencies` の基準で調べてから足す。",
-    "- 公開・投稿・削除・クレジット・チームの操作は利用者がアプリで行う（ここからはできない）。",
+    "- main への取り込み（`adopt_branch`）と公開（`publish_project`）はオーナーと管理者だけが MCP からできる。呼ぶ前に `$fdpocket-release` の必須チェックをすべて行い、結果を報告して利用者の明示的な了承を得る（省略しない）。",
+    "- 投稿・削除・クレジット・チーム・通報の操作は利用者がアプリで行う（ここからはできない）。",
     "",
     "## 進め方",
     "",

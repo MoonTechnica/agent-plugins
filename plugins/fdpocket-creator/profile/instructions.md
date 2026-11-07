@@ -301,11 +301,11 @@ main の参照権限がある場合は、同じ `session_id` の `get_git_bundle
 | `FORBIDDEN` | この App を編集できない。利用者に確認する |
 | `INVALID_ACTION` | マージ中・生成中など、今は送れない。`get_project` の `running_job` / `merge_in_progress` を見て待つ |
 
-**公開・非公開・投稿は制作画面で利用者が行う**（MCP には無い）。
+main への取り込みと公開は §8.7（オーナーと管理者だけ）。**投稿・削除・クレジット・チーム・通報は制作画面で利用者が行う**（MCP には無い）。
 
 ### 8.6 リミックスと提案（`$fdpocket-remix` / `$fdpocket-propose` / `$fdpocket-proposals`）
 
-同じ Project のブランチから main へ変更を提案する。別の Project を作らない。元作者・チームメンバーもブランチで編集し、main の確定と公開は制作画面で利用者が操作する。
+同じ Project のブランチから main へ変更を提案する。別の Project を作らない。元作者・チームメンバーもブランチで編集する。main の確定と公開は制作画面か、オーナーと管理者なら §8.7 の MCP で行う。
 
 1. `resolve_project({ reference })` で元の Project・作者・参加可否・自分のブランチを確認する。外部参加は `contribution.allowed` を確認し、既存の `my_branches` を再開するか
    `create_branch({ project_id, request_key })` で公開済みの版（main の参照を許可されていれば最新の main）からブランチを作る。
@@ -313,7 +313,7 @@ main の参照権限がある場合は、同じ `session_id` の `get_git_bundle
 3. 自分のブランチの送信完了したビルド済み head を `open_proposal({ project_id, session_id, title, body })` で提出する。続きの push で提案は自動で差し替わらないので、`update_proposal` で明示的に更新する。
 4. 編集者は `get_proposal_inputs({ proposal_id })` の結果を `kit.mjs fetch-review --inputs '<JSON>'` に渡し、`git diff <base> <theirs>` で差分を読む。
    `merge_proposal` は合流候補を作って検証する操作で、main への反映は制作画面で利用者が確定する。
-5. main への取り込み後も公開版は維持する。公開は制作画面で明示的に行う。
+5. main への取り込み後も公開版は維持する。公開は別の明示的な操作（制作画面か §8.7）。
 
 | エラー | すること |
 |---|---|
@@ -321,6 +321,48 @@ main の参照権限がある場合は、同じ `session_id` の `get_git_bundle
 | `INVALID_ACTION`（`no_validated_version` / `version_not_validated`） | 送信が完了していない、または利用できない版。push して `ready` を待つ。合流結果の検証は取り込み時に行う |
 | `INVALID_ACTION`（`proposal_already_open`） | `update_proposal` で版を差し替える |
 | `RATE_LIMITED` | 提案は 1 日 20 件、コメントは 1 日 200 件まで。待つ |
+
+### 8.7 main への取り込みと公開（`$fdpocket-release`。オーナーと管理者だけ）
+
+オーナーとアプリの管理者は、自分のチャットのブランチを main へ取り込み（`adopt_branch`。制作画面の「変更を取り込む」と同じ）、
+公開を依頼できる（`publish_project`。制作画面の「公開する」と同じ。進めるのはサーバー）。write のコラボレーターや外部の参加者には断られる（`FORBIDDEN` / `not_project_admin`）。
+どちらも**クライアントが利用者に確認を求める**。断られたらそれ以上押さない。
+
+**どちらも、呼ぶ前に下の必須チェックをすべて行い、結果を利用者に報告し、会話で明示的に了承を得る。省略しない。**
+クライアントの確認ダイアログは了承の代わりにならない。チェックで問題が見つかったら呼ばずに直す。
+
+#### `adopt_branch` の前の必須チェック
+
+1. `kit.mjs check` が通り、`kit.mjs push` で送った版が `ready` で、未解決の警告が無い。
+2. 変更した画面 App すべてを `kit.mjs dev`（またはチャットのプレビュー）で動かした: 各 App のホストを開き、主な流れ・App 間の移動（`ui.navigate`）・API の呼び出し・
+   権限の違い（admin / member / 匿名）を通した。コンソールにエラーが無い。
+3. DB・権限の変更を読んだ: migration は意図どおりで、データを失わない。ZModel のポリシー・capability の変更を説明できる。
+4. main に入るもの（差分の要約・リスク）を利用者に示し、会話で明示的に了承を得た。
+
+`adopt_branch({ project_id, session_id })` は、いまの main とチャットの head を使う（確かめた内容から進んでいたら `REVISION_CONFLICT`。取り直して確かめ直す）。
+`MERGE_CONFLICTS` は取り込まれていない。`conflicts` のファイルをチャットのブランチで直す:
+`kit.mjs pull` → `git merge refs/remotes/fdpocket/heads/main` → 衝突を解く → `kit.mjs check` → commit → `kit.mjs push`（`ready` を待つ）→ チェックをやり直してから呼び直す。
+取り込むと main の配備が始まる。公開はしない。
+
+#### `publish_project` の前の必須チェック
+
+1. 公開する版が main にあり、main（確認用の環境。公開中とは別のデータ）で確かめた: 各画面 App を `--{app}--main` のホストで開き、取り込みの前と同じ流れを通した。
+2. `get_project` の `listing.missing` が空。年齢区分・審査の条件を満たす（`get_publication` の `compatibility.reasons` に止める理由が無い。`REVIEW_REQUIRED` はサーバーが公開の途中で行う）。
+3. 公開範囲 `app_access`（`public` = だれでも / `restricted` = メンバーと招待した人だけ）を利用者に明示的に聞いた。**確認なしに `public` にしない**。
+4. データ削除の確認など人の判断が要るものは MCP で決めない。`publish_url`（制作画面の公開）を示して止める。
+5. 何を・だれに公開するかを示し、会話で明示的に了承を得た。
+
+`publish_project({ project_id, app_access? })` は main の版を、掲載情報を変えずに公開を依頼する（`version_id` で過去のリリースへの切り戻しもできる）。
+呼んだあとは `get_publication({ project_id })` を数秒おきに見て、`ended: true` まで待ち、結果を利用者に伝える（`failed` / `stopped` は `error_code` と `error_detail`）。
+`needs_person: true`（`awaiting_review`。データ削除の確認）は MCP では決めず、`publish_url` を示して利用者の判断を待つ。
+
+| エラー | すること |
+|---|---|
+| `FORBIDDEN`（`not_project_admin`） | オーナーと管理者だけの操作。制作画面で権限のある人に頼むよう伝えて止まる |
+| `FORBIDDEN`（`requires_proposal`） | 外部参加のブランチは直接取り込めない。`open_proposal` で提案する（§8.6） |
+| `NOT_PUBLISHABLE` | `reasons` を利用者に伝えて直す（`ARTIFACT_UNAVAILABLE` は main の配備を待つ） |
+| `INVALID_ACTION`（`publication_in_progress`） | 別の公開が進んでいる。`get_publication` で見る |
+| `REVISION_CONFLICT`（`main_changed` / `published_changed`） | 確かめたあとで main か公開版が変わった。確かめ直してから呼び直す |
 
 ## 公開の安全条件
 

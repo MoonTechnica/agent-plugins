@@ -26,6 +26,6 @@ user-invocable: false
    - `status: "failed"` → `reports[].report_url` を取得して読み、直して commit し、3. をやり直す。
    - `status: "timed_out"` → 利用者に伝え、後で `get_build({ job_id })` を見る。
    - `kit_update` があれば Kit が古い。結果を伝えたあとに更新を勧める（`kit_update.update` の手順）。
-5. 公開・投稿は制作画面で利用者が行う（MCP と Kit には無い）。
+5. main への取り込みと公開は `$fdpocket-release`（オーナーと管理者だけ。必須チェックのあとで）。投稿は制作画面で利用者が行う。
 
 MCP の `begin_build` / `submit_build` / `get_build` を直接呼ぶ手順（§8.3 の詳細）も残っているが、普段は `kit push` を使う。
