@@ -17448,6 +17448,7 @@ var init_live_bridge = __esm(() => {
     nonce: liveHostNonceSchema,
     environmentId: exports_external.uuid(),
     controls: exports_external.literal("studio"),
+    trace: exports_external.object({ attemptId: exports_external.uuid() }).strict().optional(),
     selectedIdentity: testIdentitySlotSchema.nullable(),
     identities: exports_external.array(exports_external.object({ slot: testIdentitySlotSchema, displayName: exports_external.string().min(1).max(100) }).strict()).max(35)
   }).strict().refine((data) => data.selectedIdentity === null || data.identities.some((identity) => identity.slot === data.selectedIdentity), { message: "Selected identity must be declared by Studio" });
@@ -81972,6 +81973,28 @@ var init_compiler_fingerprint = __esm(() => {
   init_pack();
 });
 
+// frontend/packages/miniapp-kit/src/generation-inputs.ts
+function standardGenerationInputs(schema2) {
+  let text2 = schema2.split(/\r?\n/).filter((line) => !line.trimStart().startsWith("//")).join(`
+`);
+  if (text2.includes("//") || text2.includes("/*") || text2.includes("*/"))
+    return false;
+  const imports = /^\s*import\s+(['"])platform\1\s*$/gm;
+  if ([...text2.matchAll(imports)].length !== 1)
+    return false;
+  text2 = text2.replace(imports, "");
+  const policy = /\bplugin\s+policy\s*\{\s*provider\s*=\s*(['"])@zenstackhq\/plugin-policy\1\s*\}/g;
+  if ([...text2.matchAll(policy)].length !== 1)
+    return false;
+  text2 = text2.replace(policy, "");
+  return !/\b(import|plugin|generator)\b/.test(text2);
+}
+function generationUiInput(path, webApps) {
+  const parts = path.split("/");
+  return (path.startsWith("packages/ui/src/") || parts[0] === "apps" && parts[2] === "src" && webApps.includes(parts[1])) && /\.(ts|tsx|js|jsx|css|scss|sass|less|svg|png|jpg|jpeg|gif|webp|avif|ico)$/.test(path);
+}
+var GENERATION_INPUT_POLICY = "generation-v2-ui-only";
+
 // frontend/packages/miniapp-kit/src/generate-cache.ts
 import { createHash as createHash7 } from "node:crypto";
 import { mkdir as mkdir5, mkdtemp as mkdtemp2, readFile as readFile13, rename, rm as rm5, writeFile as writeFile5 } from "node:fs/promises";
@@ -81979,9 +82002,12 @@ import { dirname as dirname5, join as join17 } from "node:path";
 function included(path) {
   return !path.split("/").some((part) => SKIP.has(part)) && !path.split("/").some((part) => part.startsWith(".env") || part.endsWith(".pyc")) && path !== "packages/sdk" && !path.startsWith("packages/sdk/") && (ROOTS.has(path.split("/")[0]) || ROOT_FILES.has(path));
 }
-async function generationKey(root, kitRoot, cli, manifest2) {
-  const hash4 = createHash7("sha256").update(`generation-v1\x00${process.version}\x00`).update(manifest2);
-  const inputs = await collectFiles(root, { include: included });
+async function generationKey(root, kitRoot, cli, manifest2, webApps) {
+  const reduced = standardGenerationInputs(await readFile13(join17(root, PROJECT_PATHS.schema), "utf8"));
+  const hash4 = createHash7("sha256").update(`${GENERATION_INPUT_POLICY}\x00${reduced ? "standard" : "full"}\x00${process.version}\x00`).update(manifest2);
+  const inputs = await collectFiles(root, {
+    include: (path) => included(path) && !(reduced && generationUiInput(path, webApps))
+  });
   for (const { path, bytes: bytes3 } of inputs)
     hash4.update(path).update("\x00").update(createHash7("sha256").update(bytes3).digest());
   for (const path of ["platform", "templates/project/packages/sdk"]) {
@@ -82153,7 +82179,8 @@ async function generateProject(options2) {
     vendored["fdpocket-py"] = await placePythonSdk(root, options2.kitRoot);
   const cli = cliOf(root, options2.resolveCli ?? resolveZenStackCli);
   await assertSdkScaffoldPaths(root);
-  const key = await generationKey(root, options2.kitRoot, cli, stableJson(manifest2));
+  const webApps = Object.entries(manifest2.apps).filter(([, app]) => app.kind === "web").map(([slug]) => slug);
+  const key = await generationKey(root, options2.kitRoot, cli, stableJson(manifest2), webApps);
   const cached2 = await cachedGeneration(root, key);
   if (cached2) {
     console.info("kit: generation prepared", {
@@ -82214,7 +82241,7 @@ async function generateProject(options2) {
     ],
     warnings
   };
-  if (key === await generationKey(root, options2.kitRoot, cli, stableJson(manifest2)))
+  if (key === await generationKey(root, options2.kitRoot, cli, stableJson(manifest2), webApps))
     await cacheGeneration(root, key, result.files);
   console.info("kit: generation prepared", {
     cacheHit: false,
@@ -257045,6 +257072,31 @@ function renderHostPage(config3) {
 <script type="application/json" id="kit-dev-config">${scriptJson(config3)}</script>
 <script type="module">
 const config = JSON.parse(document.getElementById('kit-dev-config').textContent)
+const traceUuid=value=>typeof value==='string'&&/^[a-f0-9]{8}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{12}$/i.test(value)
+let traceAttempt=traceUuid(window.__kitPreviewTraceAttempt)?window.__kitPreviewTraceAttempt:null
+let traceFallback=null
+try{traceFallback=crypto.randomUUID()}catch{console.warn('kit: preview trace unavailable')}
+let traceSequence=0,traceQueue=[],traceFlushTimer=null
+function flushTrace(){
+  if(!config.tracePath||traceQueue.length===0)return
+  const events=traceQueue.splice(0,64)
+  try{void fetch(config.tracePath,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({events}),credentials:'omit',keepalive:true}).catch(()=>console.warn('kit: preview trace delivery failed'))}catch{console.warn('kit: preview trace delivery failed')}
+}
+function scheduleTrace(){if(traceFlushTimer===null)traceFlushTimer=setTimeout(()=>{traceFlushTimer=null;flushTrace()},50)}
+window.addEventListener('pagehide',()=>{adoptTrace(null);flushTrace()})
+function adoptTrace(value){
+  traceAttempt=traceUuid(value?.attemptId)?value.attemptId:traceAttempt||traceFallback
+  for(const item of traceQueue)item.attemptId=traceAttempt
+  scheduleTrace()
+}
+function traceMark(event,reason){
+  if(traceSequence>=64||(!traceAttempt&&!traceFallback))return
+  const mark={version:1,source:'host',attemptId:traceAttempt||traceFallback,sequence:++traceSequence,event,elapsedMs:Math.min(600000,Math.max(0,Math.round(performance.now())))}
+  if(reason)mark.reason=reason
+  traceQueue.push(mark)
+  if(traceAttempt||!config.bridge)scheduleTrace()
+}
+traceMark('host_loaded')
 const parseLivePreviewDiagnostic = ${parseLivePreviewDiagnostic.toString()}
 const appSelect = document.getElementById('app')
 const asSelect = document.getElementById('as')
@@ -257095,13 +257147,16 @@ function studioReply(data) {
   if (!pending || pending.app !== data.app || pending.identity !== data.testIdentity) return
   studioRequests.delete(data.requestId)
   clearTimeout(pending.timer)
-  if (data.ok && typeof data.session?.token === 'string' && typeof data.session?.expiresAt === 'string' && data.session?.session) pending.resolve(data.session)
-  else pending.reject(Object.assign(new Error('session exchange refused'), { code: data.code || 'unavailable' }))
+  if (data.ok && typeof data.session?.token === 'string' && typeof data.session?.expiresAt === 'string' && data.session?.session) {traceMark('exchange_reply');pending.resolve(data.session)}
+  else {traceMark('exchange_failed','protocol');pending.reject(Object.assign(new Error('session exchange refused'), { code: data.code || 'unavailable' }))}
 }
 function attachStudio(data, send, origin) {
-  if (!config.bridge || studioSend || data?.type !== 'kit-session-init' || data.version !== 1 || data.environmentId !== config.bridge.environmentId || !/^[a-f0-9]{32}$/.test(data.nonce)) return false
+  if (!config.bridge || studioSend || data?.type !== 'kit-session-init' || data.version !== 1 || data.environmentId !== config.bridge.environmentId || !/^[a-f0-9]{32}$/.test(data.nonce)) {traceMark('native_init_rejected','protocol');return false}
   if(data.controls!=='studio'||!Array.isArray(data.identities)||data.identities.length>35||!data.identities.every(item=>item&&typeof item.slot==='string'&&/^[a-z][a-z0-9_-]{0,31}$/.test(item.slot)&&typeof item.displayName==='string'&&item.displayName.length>0&&item.displayName.length<=100))return false
   if(data.selectedIdentity!==null&&!data.identities.some(item=>item.slot===data.selectedIdentity))return false
+  if(data.trace!==undefined&&(!data.trace||Object.keys(data.trace).length!==1||!traceUuid(data.trace.attemptId))){traceMark('native_init_rejected','protocol');return false}
+  adoptTrace(data.trace)
+  traceMark('native_init')
   studioIdentity=data.selectedIdentity
   asSelect.replaceChildren(new Option(roleLabel('self'), 'self'))
   for(const identity of data.identities)asSelect.add(new Option(identity.displayName,identity.slot))
@@ -257134,14 +257189,15 @@ async function exchangeViaStudio(app, principal) {
   if(identity!==studioIdentity)throw Object.assign(new Error('Studio identity changed'),{code:'forbidden'})
   const requestId = crypto.randomUUID()
   return new Promise((resolve, reject) => {
-    const timer = setTimeout(() => { studioRequests.delete(requestId); reject(Object.assign(new Error('session exchange timed out'), {code:'unavailable'})) }, 30000)
+    const timer = setTimeout(() => { studioRequests.delete(requestId); traceMark('exchange_failed','timeout');reject(Object.assign(new Error('session exchange timed out'), {code:'unavailable'})) }, 30000)
     studioRequests.set(requestId, {app,identity,resolve,reject,timer})
+    traceMark('exchange_request')
     studioSend({type:'kit-session-request',version:1,nonce:studioNonce,requestId,environmentId:config.bridge.environmentId,app,testIdentity:identity})
   })
 }
 function waitForStudio(){
   return new Promise((resolve,reject)=>{
-    const timer=setTimeout(()=>reject(Object.assign(new Error('Studio connection timed out'),{code:'unavailable'})),30000)
+    const timer=setTimeout(()=>{adoptTrace(null);traceMark('failure','timeout');reject(Object.assign(new Error('Studio connection timed out'),{code:'unavailable'}))},30000)
     studioReady.then(()=>{clearTimeout(timer);resolve()})
   })
 }
@@ -257204,10 +257260,12 @@ async function open() {
   }
   const slug = appSelect.value
   const as = asSelect.value
-  const nextUrl = new URL(location.href)
-  nextUrl.searchParams.set('app', slug)
-  nextUrl.searchParams.set('as', as)
-  history.replaceState(null, '', nextUrl)
+  if(!config.bridge){
+    const nextUrl = new URL(location.href)
+    nextUrl.searchParams.set('app', slug)
+    nextUrl.searchParams.set('as', as)
+    history.replaceState(null, '', nextUrl)
+  }
   document.getElementById('app-title').textContent = slug
   clearInterval(refreshTimer)
   port?.close()
@@ -257221,6 +257279,7 @@ async function open() {
     session = exchanged
   } catch (error) {
     if (generation !== openingGeneration) return
+    traceMark('failure','protocol')
     frame.removeAttribute('src')
     setStatus(error.code + ': ' + slug + ' · ' + roleLabel(as), true)
     markStatus('error:' + error.code)
@@ -257228,6 +257287,7 @@ async function open() {
   }
   setStatus(slug + ' · ' + roleLabel(as) + ' · ' + session.session.permissions.join(', '))
   const base = config.apps.find((a) => a.slug === slug).url
+  traceMark('app_src_set')
   frame.src = base + pendingPath.replace(/^\\//, '')
   pendingPath = ''
   refreshTimer = setInterval(refresh, 5 * 60 * 1000)
@@ -257269,6 +257329,8 @@ function reply(target, op) {
 
 frame.addEventListener('load', () => {
   if (!session || !frame.getAttribute('src')) return
+  traceMark('app_load')
+  frame.contentWindow.postMessage({type:'kit-preview-trace-init',version:1,attemptId:traceAttempt||traceFallback},new URL(frame.src).origin)
   // Plain HTML remains visible; SDK-ready is only acknowledged after its nonce-bound hello.
   const channel = new MessageChannel()
   nonce = Array.from(crypto.getRandomValues(new Uint8Array(16)), (b) => b.toString(16).padStart(2, '0')).join('')
@@ -257287,12 +257349,24 @@ frame.addEventListener('load', () => {
         locale,
         safeArea: { top: 0, right: 0, bottom: 0, left: 0 },
       })
+      traceMark('sdk_ready')
       if (config.live) notifyStudio({ type: 'kit-live', event: 'ready' })
     } else if (message?.type === 'op') {
       reply(channel.port1, message)
     }
   }
   frame.contentWindow.postMessage({ type: 'init', nonce, launchId: crypto.randomUUID() }, new URL(config.apps.find(app => app.slug === appSelect.value).url).origin, [channel.port2])
+})
+
+window.addEventListener('message',event=>{
+  const data=event.data
+  if(!session||!frame.getAttribute('src')||event.source!==frame.contentWindow||event.origin!==new URL(frame.src).origin||data?.version!==1)return
+  if(data.type==='kit-preview-trace-request'){
+    frame.contentWindow.postMessage({type:'kit-preview-trace-init',version:1,attemptId:traceAttempt||traceFallback},event.origin)
+    return
+  }
+  if(data.type!=='kit-preview-timing'||data.attemptId!==(traceAttempt||traceFallback)||!['app_fcp','app_fcp_unsupported'].includes(data.event))return
+  notifyStudio({type:'kit-preview-timing',version:1,attemptId:data.attemptId,event:data.event})
 })
 
 if (config.live) {
@@ -257702,6 +257776,7 @@ function createLiveHostHandler(options2) {
     defaultAs: options2.defaultAs ?? "self",
     tokenPath: "",
     eventsPath: livePrefix(options2.live.token) + "kit-dev/events",
+    tracePath: livePrefix(options2.live.token) + "kit-dev/timing",
     live: {
       eventsPath: livePrefix(options2.live.token) + "kit-dev/events",
       activityKinds: [...LIVE_ACTIVITY_KINDS]
@@ -257726,6 +257801,214 @@ function createLiveHostHandler(options2) {
           "referrer-policy": "no-referrer"
         }
       });
+    }
+  };
+}
+
+// frontend/packages/miniapp-kit/src/dev/preview-trace.ts
+function parseBrowserTraceBatch(value2) {
+  if (!value2 || typeof value2 !== "object" || Object.keys(value2).length !== 1 || !("events" in value2) || !Array.isArray(value2.events) || value2.events.length < 1 || value2.events.length > 64)
+    return null;
+  const events = value2.events;
+  const kinds = {
+    host: [
+      "host_loaded",
+      "native_init",
+      "native_init_rejected",
+      "exchange_request",
+      "exchange_reply",
+      "exchange_failed",
+      "app_src_set",
+      "app_load",
+      "sdk_ready",
+      "failure"
+    ],
+    app: ["app_fcp", "app_fcp_unsupported"]
+  };
+  for (const event of events) {
+    if (!event || typeof event !== "object" || Object.keys(event).some((key) => ![
+      "version",
+      "source",
+      "attemptId",
+      "sequence",
+      "event",
+      "elapsedMs",
+      "reason",
+      "httpStatus"
+    ].includes(key)))
+      return null;
+    if (event.version !== 1 || event.source !== "host" && event.source !== "app" || typeof event.attemptId !== "string" || !/^[a-f0-9]{8}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{12}$/i.test(event.attemptId) || typeof event.event !== "string" || !kinds[event.source].includes(event.event))
+      return null;
+    if (!Number.isInteger(event.sequence) || Number(event.sequence) < 1 || Number(event.sequence) > 64 || !Number.isInteger(event.elapsedMs) || Number(event.elapsedMs) < 0 || Number(event.elapsedMs) > 600000)
+      return null;
+    if (event.reason !== undefined && (typeof event.reason !== "string" || !["network", "timeout", "protocol", "http", "unknown"].includes(event.reason)))
+      return null;
+    if (event.httpStatus !== undefined && (!Number.isInteger(event.httpStatus) || Number(event.httpStatus) < 100 || Number(event.httpStatus) > 599))
+      return null;
+  }
+  return events;
+}
+async function forwardBrowserTrace(events, options2) {
+  if (!options2.notifyUrl || !options2.notifyKey)
+    return false;
+  try {
+    const url2 = new URL(options2.notifyUrl);
+    if (!/\/events\/?$/.test(url2.pathname))
+      return false;
+    url2.pathname = url2.pathname.replace(/\/events\/?$/, "/preview-traces");
+    const response = await (options2.request ?? fetch)(url2.toString(), {
+      method: "POST",
+      headers: { Authorization: `Bearer ${options2.notifyKey}`, "Content-Type": "application/json" },
+      body: JSON.stringify({ events }),
+      redirect: "error",
+      credentials: "omit",
+      signal: AbortSignal.timeout(5000)
+    });
+    await response.body?.cancel();
+    if (!response.ok)
+      console.warn("kit: preview trace delivery failed", { reason: "http" });
+    return response.ok;
+  } catch {
+    console.warn("kit: preview trace delivery failed", { reason: "network" });
+    return false;
+  }
+}
+function createPreviewTraceHandler(options2, parse9, forward) {
+  const seen = new Map;
+  let windowStart = Date.now(), count = 0;
+  return async (request) => {
+    try {
+      if (request.method !== "POST")
+        return new Response(null, { status: 404 });
+      let text2 = "";
+      const reader = request.body?.getReader();
+      if (!reader)
+        return new Response(null, { status: 400 });
+      const decoder2 = new TextDecoder;
+      let bytes3 = 0;
+      while (true) {
+        const item = await reader.read();
+        if (item.done)
+          break;
+        bytes3 += item.value.byteLength;
+        if (bytes3 > 16384) {
+          await reader.cancel();
+          return new Response(null, { status: 413 });
+        }
+        text2 += decoder2.decode(item.value, { stream: true });
+      }
+      let value2;
+      try {
+        value2 = JSON.parse(text2);
+      } catch {
+        return new Response(null, { status: 400 });
+      }
+      const events = parse9(value2);
+      if (!events)
+        return new Response(null, { status: 400 });
+      if (Date.now() - windowStart >= 60000) {
+        windowStart = Date.now();
+        count = 0;
+      }
+      const fresh = events.filter((event) => {
+        const key = event.source + ":" + event.attemptId;
+        if (!seen.has(key)) {
+          if (seen.size >= 32)
+            seen.delete(seen.keys().next().value);
+          seen.set(key, new Set);
+        }
+        const sequences = seen.get(key);
+        if (sequences.has(event.sequence) || count >= 256)
+          return false;
+        sequences.add(event.sequence);
+        count += 1;
+        return true;
+      });
+      if (fresh.length)
+        await forward(fresh, options2);
+      return new Response(null, { status: 204 });
+    } catch {
+      console.warn("kit: preview trace collection failed", { reason: "network" });
+      return new Response(null, { status: 204 });
+    }
+  };
+}
+function appPaintScript(endpoint) {
+  return `(() => {
+let attemptId=null, parentOrigin=null, firstPaint=null, unsupported=false, sent=false;
+function report(){
+  if(sent||!attemptId||(!firstPaint&&!unsupported))return;
+  sent=true;
+  const event=unsupported?'app_fcp_unsupported':'app_fcp';
+  const mark={version:1,source:'app',attemptId,sequence:1,event,elapsedMs:Math.min(600000,Math.max(0,Math.round(firstPaint?.startTime??performance.now())))};
+  try{void fetch(${JSON.stringify(endpoint)},{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({events:[mark]}),credentials:'omit',keepalive:true}).catch(()=>console.warn('kit: preview trace delivery failed'))}catch{console.warn('kit: preview trace delivery failed')}
+  window.parent.postMessage({type:'kit-preview-timing',version:1,attemptId,event},parentOrigin);
+}
+window.addEventListener('message',message=>{
+  const data=message.data;
+  if(message.source!==window.parent||message.origin==='null'||data?.type!=='kit-preview-trace-init'||data.version!==1||typeof data.attemptId!=='string'||!/^[a-f0-9]{8}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{12}$/i.test(data.attemptId))return;
+  if(attemptId&&attemptId!==data.attemptId)return;
+  attemptId=data.attemptId;parentOrigin=message.origin;report();
+});
+window.parent.postMessage({type:'kit-preview-trace-request',version:1},'*');
+if(typeof PerformanceObserver==='undefined'||!PerformanceObserver.supportedEntryTypes?.includes('paint')){unsupported=true;report();return}
+try {
+const observer=new PerformanceObserver(list=>{
+  const paint=list.getEntries().find(entry=>entry.name==='first-contentful-paint');
+  if(paint){firstPaint=paint;observer.disconnect();report()}
+});
+observer.observe({type:'paint',buffered:true});
+} catch { unsupported=true;report() }
+})();`;
+}
+function createViteTracePlugin(options2, handlerFactory, parser2, forwarder, paint) {
+  const handle = handlerFactory(options2, parser2, forwarder);
+  let base = "/";
+  return {
+    name: "kit-preview-timing",
+    configResolved(config3) {
+      base = config3.base;
+    },
+    configureServer(server2) {
+      if (!options2.enabled)
+        return;
+      server2.middlewares.use(async (request, response, next) => {
+        if (request.url?.split("?")[0] !== base + "__kit/timing")
+          return next();
+        try {
+          let body2 = "";
+          for await (const chunk of request) {
+            body2 += chunk.toString();
+            if (Buffer.byteLength(body2) > 16384) {
+              response.statusCode = 413;
+              response.end();
+              return;
+            }
+          }
+          const result = await handle(new Request("http://kit.invalid/kit-dev/timing", {
+            method: request.method,
+            ...request.method === "POST" ? { body: body2 } : {}
+          }));
+          response.statusCode = result.status;
+          response.end();
+        } catch {
+          console.warn("kit: preview trace collection failed", { reason: "network" });
+          response.statusCode = 204;
+          response.end();
+        }
+      });
+    },
+    transformIndexHtml() {
+      if (!options2.enabled)
+        return;
+      return [
+        {
+          tag: "script",
+          attrs: { type: "module" },
+          injectTo: "head-prepend",
+          children: paint(base + "__kit/timing")
+        }
+      ];
     }
   };
 }
@@ -259549,6 +259832,10 @@ async function startLiveDev(options2, manifest2) {
     defaultApp: primaryApp,
     ...options2.as ? { defaultAs: options2.as } : {}
   });
+  const traceHandler = createPreviewTraceHandler({
+    notifyUrl: process.env.KIT_LIVE_NOTIFY_URL,
+    notifyKey: process.env.KIT_LIVE_NOTIFY
+  }, parseBrowserTraceBatch, forwardBrowserTrace);
   const sync = [];
   const closers = [];
   const close = async () => {
@@ -259587,6 +259874,8 @@ async function startLiveDev(options2, manifest2) {
         const gated = gateLiveRequest(request2, live2.token);
         if (!gated)
           return notFound();
+        if (new URL(gated.url).pathname === "/kit-dev/timing")
+          return traceHandler(gated);
         if (new URL(gated.url).pathname === "/kit-dev/events")
           return Response.json({ sync: sync.slice(), workers: await workers?.info() ?? [] }, { headers: { "cache-control": "no-store" } });
         return handler.fetch(gated);
@@ -259776,8 +260065,10 @@ function stop(code = 0) {
 }
 try {
   const { createServer } = await import(pathToFileURL(entry).href);
+  const timing = (${createViteTracePlugin.toString()})({ enabled: Boolean(process.env.MINIAPP_SESSION_LIVE_TOKEN), notifyUrl: process.env.KIT_LIVE_NOTIFY_URL, notifyKey: process.env.KIT_LIVE_NOTIFY }, ${createPreviewTraceHandler.toString()}, ${parseBrowserTraceBatch.toString()}, ${forwardBrowserTrace.toString()}, ${appPaintScript.toString()});
   server = await createServer({
     root,
+    plugins: [timing],
     logLevel: 'warn',
     server: { port: Number(process.argv[1]), strictPort: true, warmup: { clientFiles: ['./index.html'] } },
   });

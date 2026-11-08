@@ -7,6 +7,9 @@ export declare const liveHostInitSchema: z.ZodObject<{
     nonce: z.ZodString;
     environmentId: z.ZodUUID;
     controls: z.ZodLiteral<"studio">;
+    trace: z.ZodOptional<z.ZodObject<{
+        attemptId: z.ZodUUID;
+    }, z.core.$strict>>;
     selectedIdentity: z.ZodNullable<z.ZodString>;
     identities: z.ZodArray<z.ZodObject<{
         slot: z.ZodString;

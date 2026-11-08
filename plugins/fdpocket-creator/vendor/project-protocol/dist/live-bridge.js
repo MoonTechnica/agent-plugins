@@ -9,6 +9,7 @@ export const liveHostInitSchema = z
     nonce: liveHostNonceSchema,
     environmentId: z.uuid(),
     controls: z.literal('studio'),
+    trace: z.object({ attemptId: z.uuid() }).strict().optional(),
     selectedIdentity: testIdentitySlotSchema.nullable(),
     identities: z
         .array(z.object({ slot: testIdentitySlotSchema, displayName: z.string().min(1).max(100) }).strict())
