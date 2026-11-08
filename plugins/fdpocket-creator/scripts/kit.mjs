@@ -81817,16 +81817,283 @@ var init_env_types = __esm(() => {
   init_src();
 });
 
+// frontend/packages/miniapp-kit/src/tar.ts
+import { gzipSync } from "node:zlib";
+function writeTar(files) {
+  const sorted2 = [...files].sort((a2, b3) => a2.path < b3.path ? -1 : a2.path > b3.path ? 1 : 0);
+  const parts = [];
+  for (const file2 of sorted2) {
+    parts.push(header2(file2.path, file2.bytes.byteLength));
+    const padded = new Uint8Array(Math.ceil(file2.bytes.byteLength / BLOCK2) * BLOCK2);
+    padded.set(file2.bytes);
+    parts.push(padded);
+  }
+  parts.push(new Uint8Array(BLOCK2 * 2));
+  const out = new Uint8Array(parts.reduce((sum2, part) => sum2 + part.byteLength, 0));
+  let offset = 0;
+  for (const part of parts) {
+    out.set(part, offset);
+    offset += part.byteLength;
+  }
+  return out;
+}
+function gzipTar(files) {
+  return new Uint8Array(gzipSync(writeTar(files)));
+}
+function header2(path, size) {
+  const [prefix2, name3] = splitPath2(path);
+  const block = new Uint8Array(BLOCK2);
+  field2(block, 0, name3);
+  field2(block, 100, "0000644\x00");
+  field2(block, 108, "0000000\x00");
+  field2(block, 116, "0000000\x00");
+  field2(block, 124, `${size.toString(8).padStart(11, "0")}\x00`);
+  field2(block, 136, "00000000000\x00");
+  field2(block, 148, "        ");
+  block[156] = 48;
+  field2(block, 257, "ustar\x00");
+  field2(block, 263, "00");
+  field2(block, 345, prefix2);
+  let sum2 = 0;
+  for (const byte of block)
+    sum2 += byte;
+  field2(block, 148, `${sum2.toString(8).padStart(6, "0")}\x00 `);
+  return block;
+}
+function splitPath2(path) {
+  if (encoder6.encode(path).byteLength <= NAME_MAX)
+    return ["", path];
+  for (let at = path.indexOf("/");at > 0; at = path.indexOf("/", at + 1)) {
+    const prefix2 = path.slice(0, at);
+    const name3 = path.slice(at + 1);
+    if (encoder6.encode(prefix2).byteLength <= PREFIX_MAX && encoder6.encode(name3).byteLength <= NAME_MAX) {
+      return [prefix2, name3];
+    }
+  }
+  throw new Error(`${path} does not fit a ustar header (100-byte name, 155-byte prefix)`);
+}
+function field2(block, offset, value2) {
+  block.set(encoder6.encode(value2), offset);
+}
+var BLOCK2 = 512, NAME_MAX = 100, PREFIX_MAX = 155, encoder6;
+var init_tar2 = __esm(() => {
+  encoder6 = new TextEncoder;
+});
+
+// frontend/packages/miniapp-kit/src/pack.ts
+import { createHash as createHash5 } from "node:crypto";
+import { lstat, readdir as readdir9, readFile as readFile11 } from "node:fs/promises";
+import { join as join16 } from "node:path";
+async function collectFiles(root, options2 = {}) {
+  let size = 0;
+  const files = [];
+  const walk = async (relative) => {
+    const entries = await readdir9(join16(root, relative), { withFileTypes: true });
+    for (const entry of entries) {
+      const path = relative === "" ? entry.name : `${relative}/${entry.name}`;
+      if (options2.include && !options2.include(path, entry.isDirectory()))
+        continue;
+      const info = await lstat(join16(root, path));
+      if (info.isSymbolicLink()) {
+        throw new PackError(`${path} is a symbolic link; Platform rejects links, copy the file instead`);
+      }
+      if (info.isDirectory())
+        await walk(path);
+      else if (info.isFile()) {
+        if (files.length >= (options2.maxFiles ?? Infinity) || size + info.size > (options2.maxBytes ?? Infinity))
+          throw new PackError("Source collection exceeds the file or byte limit");
+        const bytes3 = new Uint8Array(await readFile11(join16(root, path)));
+        size += bytes3.byteLength;
+        if (size > (options2.maxBytes ?? Infinity))
+          throw new PackError("Source collection exceeds the byte limit");
+        files.push({ path, bytes: bytes3 });
+      }
+    }
+  };
+  await walk("");
+  return files.sort((a2, b3) => a2.path < b3.path ? -1 : a2.path > b3.path ? 1 : 0);
+}
+function buildDistArchive(files) {
+  const indexFile = files.find((file2) => file2.path === ARTIFACT_INDEX_PATH);
+  if (indexFile === undefined) {
+    throw new PackError(`source/dist has no ${ARTIFACT_INDEX_PATH}; run kit.mjs build first`);
+  }
+  const parsed = artifactIndexSchema.safeParse(JSON.parse(new TextDecoder().decode(indexFile.bytes)));
+  if (!parsed.success) {
+    throw new PackError(`source/dist/${ARTIFACT_INDEX_PATH} is not kit build's; run kit.mjs build`);
+  }
+  const expected = new Map(parsed.data.files.map((file2) => [file2.path, file2.sha256]));
+  const content = files.filter((file2) => file2.path !== ARTIFACT_INDEX_PATH);
+  const changed = [
+    ...content.filter((file2) => expected.get(file2.path) !== describeFile(file2.bytes).sha256).map((file2) => file2.path),
+    ...[...expected.keys()].filter((path) => !content.some((file2) => file2.path === path))
+  ].sort();
+  if (changed.length > 0) {
+    throw new PackError(`source/dist changed after kit build (${changed.join(", ")}); run kit.mjs build again`);
+  }
+  return gzipTar(content);
+}
+function describeFile(bytes3) {
+  return { size: bytes3.byteLength, sha256: createHash5("sha256").update(bytes3).digest("hex") };
+}
+var PackError;
+var init_pack = __esm(() => {
+  init_src();
+  init_tar2();
+  PackError = class PackError extends Error {
+    name = "PackError";
+  };
+});
+
+// frontend/packages/miniapp-kit/src/compiler-fingerprint.ts
+import { createHash as createHash6 } from "node:crypto";
+import { readFile as readFile12 } from "node:fs/promises";
+import { fileURLToPath } from "node:url";
+function compilerFingerprint() {
+  fingerprint ??= hashImplementation();
+  return fingerprint;
+}
+async function hashImplementation() {
+  const hash4 = createHash6("sha256");
+  if (fileURLToPath(import.meta.url).endsWith(".ts")) {
+    for (const path of ["./", "../../project-validator/src/", "../../project-protocol/src/"]) {
+      for (const file2 of await collectFiles(fileURLToPath(new URL(path, import.meta.url)), {
+        include: (name3) => !name3.split("/").some((part) => ["__fixtures__", "test-helpers", "__tests__"].includes(part)) && !name3.endsWith(".test.ts")
+      }))
+        hash4.update(`${path}${file2.path}\x00`).update(createHash6("sha256").update(file2.bytes).digest());
+    }
+  } else {
+    hash4.update(await readFile12(new URL(import.meta.url)));
+  }
+  return hash4.digest("hex");
+}
+var fingerprint;
+var init_compiler_fingerprint = __esm(() => {
+  init_pack();
+});
+
+// frontend/packages/miniapp-kit/src/generate-cache.ts
+import { createHash as createHash7 } from "node:crypto";
+import { mkdir as mkdir5, mkdtemp as mkdtemp2, readFile as readFile13, rename, rm as rm5, writeFile as writeFile5 } from "node:fs/promises";
+import { dirname as dirname5, join as join17 } from "node:path";
+function included(path) {
+  return !path.split("/").some((part) => SKIP.has(part)) && !path.split("/").some((part) => part.startsWith(".env") || part.endsWith(".pyc")) && path !== "packages/sdk" && !path.startsWith("packages/sdk/") && (ROOTS.has(path.split("/")[0]) || ROOT_FILES.has(path));
+}
+async function generationKey(root, kitRoot, cli, manifest2) {
+  const hash4 = createHash7("sha256").update(`generation-v1\x00${process.version}\x00`).update(manifest2);
+  const inputs = await collectFiles(root, { include: included });
+  for (const { path, bytes: bytes3 } of inputs)
+    hash4.update(path).update("\x00").update(createHash7("sha256").update(bytes3).digest());
+  for (const path of ["platform", "templates/project/packages/sdk"]) {
+    for (const file2 of await collectFiles(join17(kitRoot, path), {
+      include: (name3) => !name3.split("/").some((part) => SKIP.has(part))
+    }))
+      hash4.update(`${path}/${file2.path}\x00`).update(createHash7("sha256").update(file2.bytes).digest());
+  }
+  for (const path of ["package.json", "bun.lock"]) {
+    try {
+      hash4.update(`kit/${path}\x00`).update(await readFile13(join17(kitRoot, path)));
+    } catch (error51) {
+      if (!missing(error51))
+        throw error51;
+      hash4.update(`kit/${path}:absent\x00`);
+    }
+  }
+  hash4.update(await readFile13(cli)).update(await compilerFingerprint());
+  return hash4.digest("hex");
+}
+async function outputHash(root) {
+  try {
+    const files = await collectFiles(join17(root, "packages/sdk"), {
+      include: (path) => !path.split("/").some((part) => SKIP.has(part))
+    });
+    const hash4 = createHash7("sha256");
+    for (const { path, bytes: bytes3 } of files)
+      hash4.update(path).update("\x00").update(createHash7("sha256").update(bytes3).digest());
+    for (const path of [
+      SERVER_ENV_TYPES_PATH,
+      `${PROJECT_PATHS.generated}/project.json`,
+      `${PROJECT_PATHS.generated}/schema.json`
+    ])
+      hash4.update(path).update("\x00").update(await readFile13(join17(root, path)));
+    return hash4.digest("hex");
+  } catch (error51) {
+    if (!missing(error51))
+      throw error51;
+    return null;
+  }
+}
+function missing(error51) {
+  return error51 instanceof Error && "code" in error51 && error51.code === "ENOENT";
+}
+async function cachedGeneration(root, key) {
+  let saved;
+  try {
+    saved = JSON.parse(await readFile13(join17(root, CACHE), "utf8"));
+  } catch (error51) {
+    if (missing(error51))
+      return null;
+    if (!(error51 instanceof SyntaxError))
+      throw error51;
+    console.warn("kit: invalid generation cache; regenerating");
+    return null;
+  }
+  if (!saved || saved.key !== key || !Array.isArray(saved.files) || !saved.files.every((file2) => typeof file2 === "string") || typeof saved.output !== "string" || saved.output !== await outputHash(root))
+    return null;
+  return saved.files;
+}
+async function cacheGeneration(root, key, files) {
+  const target = join17(root, CACHE);
+  await mkdir5(dirname5(target), { recursive: true });
+  const temporary = await mkdtemp2(join17(dirname5(target), ".generation-"));
+  try {
+    const path = join17(temporary, "cache.json");
+    await writeFile5(path, JSON.stringify({ key, output: await outputHash(root), files }));
+    await rename(path, target);
+  } finally {
+    await rm5(temporary, { recursive: true, force: true });
+  }
+}
+var CACHE = ".kit/cache/generation.json", SKIP, ROOTS, ROOT_FILES;
+var init_generate_cache = __esm(() => {
+  init_src();
+  init_compiler_fingerprint();
+  init_env_types();
+  init_pack();
+  SKIP = new Set([
+    "node_modules",
+    ".git",
+    ".kit",
+    "dist",
+    ".venv",
+    "__pycache__",
+    ".cache",
+    ".next",
+    ".turbo",
+    ".pytest_cache",
+    ".mypy_cache",
+    ".ruff_cache"
+  ]);
+  ROOTS = new Set(["apps", "packages", "infra", "ai"]);
+  ROOT_FILES = new Set([
+    "package.json",
+    "bun.lock",
+    "bunfig.toml",
+    "tsconfig.json",
+    "tsconfig.base.json"
+  ]);
+});
+
 // frontend/packages/miniapp-kit/src/sdk-scaffold.ts
-import { lstat, mkdir as mkdir5, mkdtemp as mkdtemp2, readFile as readFile11, rename, rm as rm5, writeFile as writeFile5 } from "node:fs/promises";
-import { dirname as dirname5, join as join16 } from "node:path";
+import { lstat as lstat2, mkdir as mkdir6, mkdtemp as mkdtemp3, readFile as readFile14, rename as rename2, rm as rm6, writeFile as writeFile6 } from "node:fs/promises";
+import { dirname as dirname6, join as join18 } from "node:path";
 async function assertSdkScaffoldPaths(root) {
   for (const file2 of SDK_SCAFFOLD) {
     let path = root;
     for (const part of ["packages", "sdk", ...file2.split("/")]) {
-      path = join16(path, part);
+      path = join18(path, part);
       try {
-        if ((await lstat(path)).isSymbolicLink())
+        if ((await lstat2(path)).isSymbolicLink())
           throw new Error("SDK scaffold path is a symlink");
       } catch (error51) {
         if (!(error51 instanceof Error && ("code" in error51) && error51.code === "ENOENT"))
@@ -81845,25 +82112,25 @@ async function restoreFiles(root, kitRoot, files) {
   await assertSdkScaffoldPaths(root);
   const templates = await Promise.all(files.map(async (file2) => ({
     file: file2,
-    bytes: await readFile11(join16(kitRoot, "templates/project/packages/sdk", file2))
+    bytes: await readFile14(join18(kitRoot, "templates/project/packages/sdk", file2))
   })));
   for (const { file: file2, bytes: bytes3 } of templates) {
-    const target = join16(root, "packages/sdk", file2);
+    const target = join18(root, "packages/sdk", file2);
     try {
-      if ((await readFile11(target)).equals(bytes3))
+      if ((await readFile14(target)).equals(bytes3))
         continue;
     } catch (error51) {
       if (!(error51 instanceof Error && ("code" in error51) && error51.code === "ENOENT"))
         throw error51;
     }
-    await mkdir5(dirname5(target), { recursive: true });
-    const temporary = await mkdtemp2(join16(dirname5(target), ".sdk-scaffold-"));
+    await mkdir6(dirname6(target), { recursive: true });
+    const temporary = await mkdtemp3(join18(dirname6(target), ".sdk-scaffold-"));
     try {
-      const staged = join16(temporary, "replacement");
-      await writeFile5(staged, bytes3);
-      await rename(staged, target);
+      const staged = join18(temporary, "replacement");
+      await writeFile6(staged, bytes3);
+      await rename2(staged, target);
     } finally {
-      await rm5(temporary, { recursive: true, force: true });
+      await rm6(temporary, { recursive: true, force: true });
     }
   }
 }
@@ -81874,9 +82141,10 @@ var init_sdk_scaffold = __esm(() => {
 
 // frontend/packages/miniapp-kit/src/generate.ts
 import { existsSync as existsSync11 } from "node:fs";
-import { mkdir as mkdir6, mkdtemp as mkdtemp3, readdir as readdir9, readFile as readFile12, rename as rename2, rm as rm6, writeFile as writeFile6 } from "node:fs/promises";
-import { dirname as dirname6, join as join17, relative } from "node:path";
+import { mkdir as mkdir7, mkdtemp as mkdtemp4, readdir as readdir10, readFile as readFile15, rename as rename3, rm as rm7, writeFile as writeFile7 } from "node:fs/promises";
+import { dirname as dirname7, join as join19, relative } from "node:path";
 async function generateProject(options2) {
+  const started = performance.now();
   const { root } = options2;
   const { manifest: manifest2, warnings } = await readManifest(root);
   const platform = await placePlatform(root, options2.kitRoot);
@@ -81885,11 +82153,20 @@ async function generateProject(options2) {
     vendored["fdpocket-py"] = await placePythonSdk(root, options2.kitRoot);
   const cli = cliOf(root, options2.resolveCli ?? resolveZenStackCli);
   await assertSdkScaffoldPaths(root);
-  const sdk = join17(root, PROJECT_PATHS.sdk);
-  const generated = join17(root, PROJECT_PATHS.generated);
-  await mkdir6(generated, { recursive: true });
-  await mkdir6(dirname6(sdk), { recursive: true });
-  const staging = await mkdtemp3(join17(dirname6(sdk), ".zenstack-"));
+  const key = await generationKey(root, options2.kitRoot, cli, stableJson(manifest2));
+  const cached2 = await cachedGeneration(root, key);
+  if (cached2) {
+    console.info("kit: generation prepared", {
+      cacheHit: true,
+      durationMs: Math.round(performance.now() - started)
+    });
+    return { platform, vendored, files: cached2, warnings };
+  }
+  const sdk = join19(root, PROJECT_PATHS.sdk);
+  const generated = join19(root, PROJECT_PATHS.generated);
+  await mkdir7(generated, { recursive: true });
+  await mkdir7(dirname7(sdk), { recursive: true });
+  const staging = await mkdtemp4(join19(dirname7(sdk), ".zenstack-"));
   let sdkFiles;
   try {
     await runZen(cli, root, [
@@ -81903,29 +82180,29 @@ async function generateProject(options2) {
       "--silent"
     ], fail3);
     const schema2 = stableJson(await loadSchema(root, staging, fail3));
-    const names = (await readdir9(staging)).sort();
+    const names = (await readdir10(staging)).sort();
     await restoreSdkScaffold(root, options2.kitRoot);
-    await mkdir6(sdk, { recursive: true });
+    await mkdir7(sdk, { recursive: true });
     for (const name3 of names)
-      await publishGeneratedFile(join17(staging, name3), join17(sdk, name3));
-    for (const name3 of await readdir9(sdk)) {
+      await publishGeneratedFile(join19(staging, name3), join19(sdk, name3));
+    for (const name3 of await readdir10(sdk)) {
       if (!names.includes(name3))
-        await rm6(join17(sdk, name3), { recursive: true, force: true });
+        await rm7(join19(sdk, name3), { recursive: true, force: true });
     }
     for (const [name3, target, content] of [
-      ["project.json", join17(generated, "project.json"), stableJson(manifest2)],
-      ["schema.json", join17(generated, "schema.json"), schema2],
-      ["env.ts", join17(root, SERVER_ENV_TYPES_PATH), renderServerEnvTypes(manifest2)]
+      ["project.json", join19(generated, "project.json"), stableJson(manifest2)],
+      ["schema.json", join19(generated, "schema.json"), schema2],
+      ["env.ts", join19(root, SERVER_ENV_TYPES_PATH), renderServerEnvTypes(manifest2)]
     ]) {
-      const staged = join17(staging, name3);
-      await writeFile6(staged, content);
+      const staged = join19(staging, name3);
+      await writeFile7(staged, content);
       await publishGeneratedFile(staged, target);
     }
     sdkFiles = names.map((name3) => `${PROJECT_PATHS.sdk}/${name3}`);
   } finally {
-    await rm6(staging, { recursive: true, force: true });
+    await rm7(staging, { recursive: true, force: true });
   }
-  return {
+  const result = {
     platform,
     vendored,
     files: [
@@ -81937,25 +82214,32 @@ async function generateProject(options2) {
     ],
     warnings
   };
+  if (key === await generationKey(root, options2.kitRoot, cli, stableJson(manifest2)))
+    await cacheGeneration(root, key, result.files);
+  console.info("kit: generation prepared", {
+    cacheHit: false,
+    durationMs: Math.round(performance.now() - started)
+  });
+  return result;
 }
 async function publishGeneratedFile(staged, target) {
-  const bytes3 = await readFile12(staged);
+  const bytes3 = await readFile15(staged);
   try {
-    if (bytes3.equals(await readFile12(target)))
+    if (bytes3.equals(await readFile15(target)))
       return;
   } catch (error51) {
     if (error51.code !== "ENOENT")
       throw error51;
   }
-  await mkdir6(dirname6(target), { recursive: true });
-  await rename2(staged, target);
+  await mkdir7(dirname7(target), { recursive: true });
+  await rename3(staged, target);
 }
 async function readManifestSource(root) {
-  const path = join17(root, PROJECT_PATHS.manifest);
+  const path = join19(root, PROJECT_PATHS.manifest);
   if (!existsSync11(path))
     throw new GenerateError(`${PROJECT_PATHS.manifest} is missing`);
   try {
-    return $parse(await readFile12(path, "utf8"));
+    return $parse(await readFile15(path, "utf8"));
   } catch (error51) {
     throw new GenerateError(`${PROJECT_PATHS.manifest} is not valid YAML: ${error51 instanceof Error ? error51.message : String(error51)}`);
   }
@@ -81972,13 +82256,13 @@ ${lines.join(`
   return { manifest: normalizeProjectManifest(parsed.manifest).manifest, warnings: parsed.warnings };
 }
 async function placePlatform(root, kitRoot) {
-  const kitCopy = await readFile12(join17(kitRoot, KIT_PLATFORM_ZMODEL), "utf8");
-  const path = join17(root, PROJECT_PATHS.platform);
-  const current = existsSync11(path) ? await readFile12(path, "utf8") : null;
+  const kitCopy = await readFile15(join19(kitRoot, KIT_PLATFORM_ZMODEL), "utf8");
+  const path = join19(root, PROJECT_PATHS.platform);
+  const current = existsSync11(path) ? await readFile15(path, "utf8") : null;
   if (current === kitCopy)
     return "unchanged";
-  await mkdir6(dirname6(path), { recursive: true });
-  await writeFile6(path, kitCopy);
+  await mkdir7(dirname7(path), { recursive: true });
+  await writeFile7(path, kitCopy);
   return current === null ? "created" : "restored";
 }
 function cliOf(root, resolve3) {
@@ -81994,6 +82278,7 @@ var init_generate = __esm(() => {
   init_src2();
   init_dist();
   init_env_types();
+  init_generate_cache();
   init_sdk_scaffold();
   init_vendor();
   GenerateError = class GenerateError extends Error {
@@ -82020,9 +82305,9 @@ var init_session_runtime = __esm(() => {
 // frontend/packages/miniapp-kit/src/dev/seed.ts
 import { randomUUID as randomUUID2 } from "node:crypto";
 import { existsSync as existsSync12, readFileSync as readFileSync2 } from "node:fs";
-import { readFile as readFile13, writeFile as writeFile7 } from "node:fs/promises";
+import { readFile as readFile16, writeFile as writeFile8 } from "node:fs/promises";
 import { createRequire as createRequire6 } from "node:module";
-import { dirname as dirname7, join as join18 } from "node:path";
+import { dirname as dirname8, join as join20 } from "node:path";
 import { pathToFileURL as pathToFileURL5 } from "node:url";
 function viteImporter(viteEntry, root) {
   return async (path) => {
@@ -82036,12 +82321,12 @@ function viteImporter(viteEntry, root) {
   };
 }
 function resolveViteEntry(appDir) {
-  const manifestPath = createRequire6(join18(appDir, "package.json")).resolve("vite/package.json");
+  const manifestPath = createRequire6(join20(appDir, "package.json")).resolve("vite/package.json");
   const entry = JSON.parse(readFileSync2(manifestPath, "utf8")).exports?.["."];
   const file2 = typeof entry === "string" ? entry : entry?.import?.default ?? entry?.import;
   if (typeof file2 !== "string")
     throw new Error("vite has no ESM entry");
-  return join18(dirname7(manifestPath), file2);
+  return join20(dirname8(manifestPath), file2);
 }
 async function recoverLegacySamplePlan(seed, context) {
   if (typeof seed !== "function")
@@ -82075,13 +82360,13 @@ async function recoverLegacySamplePlan(seed, context) {
       if (!key)
         throw new LegacyRecoveryUnsupported("legacy recovery row id was not derived from its key");
       const data = {};
-      for (const [field2, raw2] of Object.entries(value2)) {
-        if (field2 === "id")
+      for (const [field3, raw2] of Object.entries(value2)) {
+        if (field3 === "id")
           continue;
         const scalar2 = raw2 instanceof Date ? raw2.toISOString() : raw2;
         if (scalar2 !== null && typeof scalar2 !== "string" && typeof scalar2 !== "boolean" && !(typeof scalar2 === "number" && Number.isFinite(scalar2)))
           throw new LegacyRecoveryUnsupported("legacy recovery permits scalar values only");
-        data[field2] = scalar2;
+        data[field3] = scalar2;
       }
       rows.push({ model: operation.model, key, data });
     }
@@ -82089,9 +82374,9 @@ async function recoverLegacySamplePlan(seed, context) {
   return { version: 2, rows };
 }
 async function generateSampleBundle(input) {
-  const schemaJson = await readFile13(join18(input.root, PROJECT_PATHS.generated, "schema.json"), "utf8");
+  const schemaJson = await readFile16(join20(input.root, PROJECT_PATHS.generated, "schema.json"), "utf8");
   const data = sessionSeedContextSchema.parse(input.context);
-  const path = join18(input.root, PROJECT_PATHS.seed);
+  const path = join20(input.root, PROJECT_PATHS.seed);
   if (!existsSync12(path))
     return sessionSampleBundleSchema.parse({ version: 2, schemaJson, identities: [], plan: null });
   try {
@@ -82124,10 +82409,10 @@ async function generateSampleBundle(input) {
   }
 }
 async function generateSeedBundle(input) {
-  const schemaJson = await readFile13(join18(input.root, PROJECT_PATHS.generated, "schema.json"), "utf8");
+  const schemaJson = await readFile16(join20(input.root, PROJECT_PATHS.generated, "schema.json"), "utf8");
   const { aiPrompts } = await prepareSessionRuntime(input.root);
   const data = sessionSeedContextSchema.parse(input.context);
-  const path = join18(input.root, PROJECT_PATHS.seed);
+  const path = join20(input.root, PROJECT_PATHS.seed);
   if (input.skipSeed || !existsSync12(path))
     return sessionSeedBundleSchema.parse({
       version: 1,
@@ -82159,8 +82444,8 @@ async function runSeed(input) {
       kind: "snapshot",
       sha256: await sessionSeedDigest(JSON.stringify({
         manifest: input.manifest,
-        schema: await readFile13(join18(input.root, PROJECT_PATHS.generated, "schema.json"), "utf8"),
-        seed: existsSync12(join18(input.root, PROJECT_PATHS.seed)) ? await readFile13(join18(input.root, PROJECT_PATHS.seed), "utf8") : null
+        schema: await readFile16(join20(input.root, PROJECT_PATHS.generated, "schema.json"), "utf8"),
+        seed: existsSync12(join20(input.root, PROJECT_PATHS.seed)) ? await readFile16(join20(input.root, PROJECT_PATHS.seed), "utf8") : null
       }))
     },
     initializedAt: new Date().toISOString()
@@ -82172,7 +82457,7 @@ async function runSeed(input) {
     db: input.db,
     artifactHash: await sessionSeedDigest(JSON.stringify(artifact2))
   });
-  return existsSync12(join18(input.root, PROJECT_PATHS.seed));
+  return existsSync12(join20(input.root, PROJECT_PATHS.seed));
 }
 async function readLocalSeedContext(db) {
   const table = await db.execute("SELECT name FROM sqlite_master WHERE type='table' AND name='_platform_session_seed'");
@@ -82235,7 +82520,7 @@ async function runSampleSeed(input) {
   });
 }
 async function writeSeedPlan(input) {
-  const context = sessionSeedContextSchema.parse(JSON.parse(await readFile13(input.contextFile, "utf8")));
+  const context = sessionSeedContextSchema.parse(JSON.parse(await readFile16(input.contextFile, "utf8")));
   const importModule = input.importModule ?? await projectSeedImporter(input.root);
   const bundle = await generateSeedBundle({
     root: input.root,
@@ -82243,10 +82528,10 @@ async function writeSeedPlan(input) {
     importModule,
     ...input.skipSeed ? { skipSeed: true } : {}
   });
-  await writeFile7(input.output, JSON.stringify(bundle), { mode: 384, flag: "wx" });
+  await writeFile8(input.output, JSON.stringify(bundle), { mode: 384, flag: "wx" });
 }
 async function writeSamplePlan(input) {
-  const context = sessionSeedContextSchema.parse(JSON.parse(await readFile13(input.contextFile, "utf8")));
+  const context = sessionSeedContextSchema.parse(JSON.parse(await readFile16(input.contextFile, "utf8")));
   const importModule = input.importModule ?? await projectSeedImporter(input.root);
   const bundle = await generateSampleBundle({
     root: input.root,
@@ -82254,14 +82539,14 @@ async function writeSamplePlan(input) {
     importModule,
     legacyRecovery: input.legacyRecovery
   });
-  await writeFile7(input.output, JSON.stringify(bundle), { mode: 384, flag: "wx" });
+  await writeFile8(input.output, JSON.stringify(bundle), { mode: 384, flag: "wx" });
 }
 async function projectSeedImporter(root) {
-  const manifest2 = JSON.parse(await readFile13(join18(root, PROJECT_PATHS.generated, "project.json"), "utf8"));
+  const manifest2 = JSON.parse(await readFile16(join20(root, PROJECT_PATHS.generated, "project.json"), "utf8"));
   const app = Object.values(manifest2.apps).find((app2) => app2.kind === "web") ?? Object.values(manifest2.apps)[0];
   if (!app)
     throw new SeedError("seed planning requires a Project App dependency tree");
-  return viteImporter(resolveViteEntry(join18(root, "apps", app.slug)), root);
+  return viteImporter(resolveViteEntry(join20(root, "apps", app.slug)), root);
 }
 var SeedError, LOCAL_SEED_ENVIRONMENT_ID = "00000000-0000-4000-8000-00000000de01", LegacyRecoveryUnsupported;
 var init_seed = __esm(() => {
@@ -82471,9 +82756,9 @@ __export(exports_schema_plan, {
   writeSchemaPlan: () => writeSchemaPlan,
   prepareSchemaPlan: () => prepareSchemaPlan
 });
-import { createHash as createHash5 } from "node:crypto";
-import { readFile as readFile14, writeFile as writeFile8 } from "node:fs/promises";
-import { join as join19 } from "node:path";
+import { createHash as createHash8 } from "node:crypto";
+import { readFile as readFile17, writeFile as writeFile9 } from "node:fs/promises";
+import { join as join21 } from "node:path";
 async function prepareSchemaPlan({
   root,
   kitRoot,
@@ -82484,7 +82769,7 @@ async function prepareSchemaPlan({
   const pending = await diffDatabase({ root, kitRoot });
   await generateProject({ root, kitRoot });
   signal.throwIfAborted();
-  const intent2 = parseIntent(await optionalFile(join19(root, PROJECT_PATHS.pending, "intent.yaml")));
+  const intent2 = parseIntent(await optionalFile(join21(root, PROJECT_PATHS.pending, "intent.yaml")));
   if (intent2.error)
     throw new DevError(intent2.error);
   const { migrations } = pending;
@@ -82510,11 +82795,11 @@ async function prepareSchemaPlan({
     migrations,
     manifest: manifest2,
     contract: CONTRACT_VERSION,
-    zmodelHash: digest2(await readFile14(join19(root, PROJECT_PATHS.schema))),
+    zmodelHash: digest2(await readFile17(join21(root, PROJECT_PATHS.schema))),
     generatedSql,
-    dataSql: await optionalFile(join19(root, PROJECT_PATHS.pending, "data.sql")),
+    dataSql: await optionalFile(join21(root, PROJECT_PATHS.pending, "data.sql")),
     intent: intent2.intent,
-    schemaJson: await readFile14(join19(root, PROJECT_PATHS.generated, "schema.json"), "utf8")
+    schemaJson: await readFile17(join21(root, PROJECT_PATHS.generated, "schema.json"), "utf8")
   };
   const masters = withMasters ? await projectMasters(root, importModule)() : null;
   if (masters !== null) {
@@ -82534,7 +82819,7 @@ async function prepareSchemaPlan({
   return payload;
 }
 async function writeSchemaPlan(options2) {
-  const raw2 = await readFile14(options2.contextFile, "utf8");
+  const raw2 = await readFile17(options2.contextFile, "utf8");
   if (Buffer.byteLength(raw2) > 4 * 1024 * 1024)
     throw new DevError("Schema baseline exceeds size limit");
   const value2 = JSON.parse(raw2);
@@ -82548,14 +82833,14 @@ async function writeSchemaPlan(options2) {
   const output = JSON.stringify(plan);
   if (Buffer.byteLength(output) > 4 * 1024 * 1024)
     throw new DevError("Schema plan exceeds size limit");
-  await writeFile8(options2.output, output);
+  await writeFile9(options2.output, output);
 }
 function digest2(bytes3) {
-  return createHash5("sha256").update(bytes3).digest("hex");
+  return createHash8("sha256").update(bytes3).digest("hex");
 }
 async function optionalFile(path) {
   try {
-    return await readFile14(path, "utf8");
+    return await readFile17(path, "utf8");
   } catch (error51) {
     if (error51 && typeof error51 === "object" && "code" in error51 && error51.code === "ENOENT")
       return "";
@@ -82573,10 +82858,10 @@ var init_schema_plan = __esm(() => {
 });
 
 // frontend/packages/miniapp-kit/src/dev/runtime.ts
-import { createHash as createHash6, randomBytes as randomBytes2 } from "node:crypto";
+import { createHash as createHash9, randomBytes as randomBytes2 } from "node:crypto";
 import { existsSync as existsSync13 } from "node:fs";
-import { mkdir as mkdir7, readFile as readFile15, rm as rm7, writeFile as writeFile9 } from "node:fs/promises";
-import { dirname as dirname8, join as join20 } from "node:path";
+import { mkdir as mkdir8, readFile as readFile18, rm as rm8, writeFile as writeFile10 } from "node:fs/promises";
+import { dirname as dirname9, join as join22 } from "node:path";
 function devOriginHost(projectName, projectId) {
   const slug = projectName.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-+|-+$/g, "") || "project";
   try {
@@ -82600,18 +82885,18 @@ function versionIdOf(hash4) {
   return `${hash4.slice(0, 8)}-${hash4.slice(8, 12)}-4${hash4.slice(13, 16)}-8${hash4.slice(17, 20)}-${hash4.slice(20, 32)}`;
 }
 async function readGenerated(root, file2) {
-  const path = join20(root, PROJECT_PATHS.generated, file2);
+  const path = join22(root, PROJECT_PATHS.generated, file2);
   if (!existsSync13(path)) {
     throw new DevError(`${PROJECT_PATHS.generated}/${file2} is missing; run kit.mjs generate first`);
   }
-  return readFile15(path, "utf8");
+  return readFile18(path, "utf8");
 }
 async function createDevRuntime(options2) {
   const { root, projectId } = options2;
   const manifest2 = JSON.parse(await readGenerated(root, "project.json"));
   const schemaText = await readGenerated(root, "schema.json");
   const schema2 = JSON.parse(schemaText);
-  const schemaHash = createHash6("sha256").update(schemaText).digest("hex");
+  const schemaHash = createHash9("sha256").update(schemaText).digest("hex");
   const versionId = versionIdOf(schemaHash);
   const originHost = devOriginHost(options2.projectName, projectId);
   const { db, recreated, stamp } = await openDevDatabase(options2);
@@ -82624,7 +82909,7 @@ async function createDevRuntime(options2) {
           manifest: manifest2,
           importModule: options2.importModule ?? defaultImporter(root, manifest2)
         });
-        await writeFile9(join20(root, DEV_DB_STAMP), `${stamp}
+        await writeFile10(join22(root, DEV_DB_STAMP), `${stamp}
 `);
       } catch (error51) {
         if (!(error51 instanceof SeedError))
@@ -82646,7 +82931,7 @@ async function createDevRuntime(options2) {
           sql: 'INSERT INTO "_platform_local_seed_failure"(id,initialization_id) VALUES(1,?)',
           args: [fallbackContext.initializationId]
         });
-        await writeFile9(join20(root, DEV_DB_STAMP), `${stamp}
+        await writeFile10(join22(root, DEV_DB_STAMP), `${stamp}
 `);
       }
     }
@@ -82686,7 +82971,7 @@ async function createDevRuntime(options2) {
   }
   const key = await createTestEs256Key("kit-dev");
   const objects = createLocalObjectStore({
-    root: join20(root, DEV_OBJECTS_DIR),
+    root: join22(root, DEV_OBJECTS_DIR),
     baseUrl: options2.objectsBaseUrl,
     secret: crypto.randomUUID()
   });
@@ -82710,7 +82995,7 @@ async function createDevRuntime(options2) {
   }
   const services = {
     async resolve(hash4) {
-      return [...credentials.values()].find((c2) => createHash6("sha256").update(c2.secret).digest("hex") === hash4)?.context ?? null;
+      return [...credentials.values()].find((c2) => createHash9("sha256").update(c2.secret).digest("hex") === hash4)?.context ?? null;
     },
     async current(id) {
       return [...credentials.values()].find((c2) => c2.context.credentialId === id)?.context ?? null;
@@ -82860,16 +83145,16 @@ async function createDevRuntime(options2) {
 async function openDevDatabase(options2) {
   const { root } = options2;
   const sql3 = await devDatabaseSql(root);
-  const hash4 = createHash6("sha256");
+  const hash4 = createHash9("sha256");
   for (const part of sql3)
     hash4.update(`${part.what}\x00${part.sql}\x00`);
   const stamp = `schema-v2:${hash4.copy().digest("hex")}`;
-  const seedPath = join20(root, PROJECT_PATHS.seed);
-  hash4.update(`seed\x00${existsSync13(seedPath) ? await readFile15(seedPath, "utf8") : ""}`);
+  const seedPath = join22(root, PROJECT_PATHS.seed);
+  hash4.update(`seed\x00${existsSync13(seedPath) ? await readFile18(seedPath, "utf8") : ""}`);
   const legacyStamp = hash4.digest("hex");
-  const path = join20(root, DEV_DB_PATH);
-  const stampPath = join20(root, DEV_DB_STAMP);
-  const current = existsSync13(stampPath) ? (await readFile15(stampPath, "utf8")).trim() : null;
+  const path = join22(root, DEV_DB_PATH);
+  const stampPath = join22(root, DEV_DB_STAMP);
+  const current = existsSync13(stampPath) ? (await readFile18(stampPath, "utf8")).trim() : null;
   const recreated = !existsSync13(path);
   if (!recreated && current !== stamp && current !== legacyStamp) {
     if (!current?.startsWith("schema-v2:"))
@@ -82877,7 +83162,7 @@ async function openDevDatabase(options2) {
     const db2 = options2.createLibsqlClient({ url: `file:${path}` });
     try {
       await applyLocalSchemaChanges(options2, db2);
-      await writeFile9(stampPath, `${stamp}
+      await writeFile10(stampPath, `${stamp}
 `);
       return { db: db2, recreated, stamp };
     } catch (error51) {
@@ -82886,12 +83171,12 @@ async function openDevDatabase(options2) {
     }
   }
   if (!recreated && current === legacyStamp)
-    await writeFile9(stampPath, `${stamp}
+    await writeFile10(stampPath, `${stamp}
 `);
   if (recreated) {
     for (const file2 of [stampPath, path, `${path}-wal`, `${path}-shm`, `${path}-journal`])
-      await rm7(file2, { force: true });
-    await mkdir7(dirname8(path), { recursive: true });
+      await rm8(file2, { force: true });
+    await mkdir8(dirname9(path), { recursive: true });
   }
   const db = options2.createLibsqlClient({ url: `file:${path}` });
   if (!recreated)
@@ -82911,7 +83196,7 @@ async function applyLocalSchemaChanges(options2, db) {
   const schemaSql = ddl.rows.map((row) => `${String(row.sql)};`).join(`
 `);
   const { prepareSchemaPlan: prepareSchemaPlan2 } = await Promise.resolve().then(() => (init_schema_plan(), exports_schema_plan));
-  const plan = await prepareSchemaPlan2({ root: options2.root, kitRoot: options2.kitRoot, withMasters: false }, { revision: createHash6("sha256").update(schemaSql).digest("hex"), schemaSql });
+  const plan = await prepareSchemaPlan2({ root: options2.root, kitRoot: options2.kitRoot, withMasters: false }, { revision: createHash9("sha256").update(schemaSql).digest("hex"), schemaSql });
   if (plan.destructiveWithoutIntent || plan.dataSql.trim())
     throw new DevError("local schema update requires data migration or destructive changes; existing data was preserved");
   const body = plan.deltaSql.replace(/^\s*--.*$/gm, "").trim();
@@ -82963,7 +83248,7 @@ function defaultImporter(root, manifest2) {
     for (const slug of slugs) {
       let entry;
       try {
-        entry = resolveViteEntry(join20(root, "apps", slug));
+        entry = resolveViteEntry(join22(root, "apps", slug));
       } catch (error51) {
         reasons.push(`apps/${slug}: ${error51 instanceof Error ? error51.message : String(error51)}`);
         continue;
@@ -83172,11 +83457,11 @@ var init_runtime2 = __esm(() => {
 
 // frontend/packages/miniapp-kit/src/db/masters.ts
 import { existsSync as existsSync14 } from "node:fs";
-import { readFile as readFile16 } from "node:fs/promises";
-import { join as join21 } from "node:path";
+import { readFile as readFile19 } from "node:fs/promises";
+import { join as join23 } from "node:path";
 function projectMasters(root, importModule) {
   return async () => {
-    const path = join21(root, PROJECT_PATHS.masters);
+    const path = join23(root, PROJECT_PATHS.masters);
     if (!existsSync14(path))
       return null;
     let value2;
@@ -83194,7 +83479,7 @@ function projectMasters(root, importModule) {
   };
 }
 async function planProjectMasters(input) {
-  const schemaPath = join21(input.root, PROJECT_PATHS.generated, "schema.json");
+  const schemaPath = join23(input.root, PROJECT_PATHS.generated, "schema.json");
   if (!existsSync14(schemaPath))
     throw new DbError("run kit.mjs generate first (no schema.json)");
   const db = input.createClient({ url: ":memory:" });
@@ -83204,7 +83489,7 @@ async function planProjectMasters(input) {
     }
     return await planMasterSql({
       db,
-      schema: JSON.parse(await readFile16(schemaPath, "utf8")),
+      schema: JSON.parse(await readFile19(schemaPath, "utf8")),
       data: input.data,
       knownTables: input.migrations.flatMap((m3) => masterTablesOf(m3.sql)),
       now: input.now
@@ -83398,7 +83683,7 @@ var require_util = __commonJS((exports) => {
     return path;
   }
   exports.normalize = normalize;
-  function join25(aRoot, aPath) {
+  function join27(aRoot, aPath) {
     if (aRoot === "") {
       aRoot = ".";
     }
@@ -83430,7 +83715,7 @@ var require_util = __commonJS((exports) => {
     }
     return joined;
   }
-  exports.join = join25;
+  exports.join = join27;
   exports.isAbsolute = function(aPath) {
     return aPath.charAt(0) === "/" || urlRegexp.test(aPath);
   };
@@ -83603,7 +83888,7 @@ var require_util = __commonJS((exports) => {
           parsed.path = parsed.path.substring(0, index2 + 1);
         }
       }
-      sourceURL = join25(urlGenerate(parsed), sourceURL);
+      sourceURL = join27(urlGenerate(parsed), sourceURL);
     }
     return normalize(sourceURL);
   }
@@ -87685,7 +87970,7 @@ var require_typescript = __commonJS((exports, module) => {
       walkUpParenthesizedTypesAndGetParentAndChild: () => walkUpParenthesizedTypesAndGetParentAndChild,
       whitespaceOrMapCommentRegExp: () => whitespaceOrMapCommentRegExp,
       writeCommentRange: () => writeCommentRange,
-      writeFile: () => writeFile12,
+      writeFile: () => writeFile13,
       writeFileEnsuringDirectories: () => writeFileEnsuringDirectories,
       zipWith: () => zipWith
     });
@@ -90139,8 +90424,8 @@ ${lanes.join(`
           return 1;
         return compareValues(this.major, other.major) || compareValues(this.minor, other.minor) || compareValues(this.patch, other.patch) || comparePrereleaseIdentifiers(this.prerelease, other.prerelease);
       }
-      increment(field2) {
-        switch (field2) {
+      increment(field3) {
+        switch (field3) {
           case "major":
             return new _Version2(this.major + 1, 0, 0);
           case "minor":
@@ -90148,7 +90433,7 @@ ${lanes.join(`
           case "patch":
             return new _Version2(this.major, this.minor, this.patch + 1);
           default:
-            return Debug.assertNever(field2);
+            return Debug.assertNever(field3);
         }
       }
       with(fields) {
@@ -93481,7 +93766,7 @@ ${lanes.join(`
           writeOutputIsTTY() {
             return process.stdout.isTTY;
           },
-          readFile: readFile19,
+          readFile: readFile22,
           writeFile: writeFile22,
           watchFile: watchFile2,
           watchDirectory,
@@ -93674,7 +93959,7 @@ ${lanes.join(`
         function fsWatchWorker(fileOrDirectory, recursive, callback) {
           return _fs.watch(fileOrDirectory, fsSupportsRecursiveFsWatch ? { persistent: true, recursive: !!recursive } : { persistent: true }, callback);
         }
-        function readFile19(fileName, _encoding) {
+        function readFile22(fileName, _encoding) {
           let buffer;
           try {
             buffer = _fs.readFileSync(fileName);
@@ -105075,7 +105360,7 @@ ${lanes.join(`
       sourceFilePath = isSourceFileInCommonSourceDirectory ? sourceFilePath.substring(commonSourceDirectory.length) : sourceFilePath;
       return combinePaths(newDirPath, sourceFilePath);
     }
-    function writeFile12(host, diagnostics, fileName, text2, writeByteOrderMark, sourceFiles, data) {
+    function writeFile13(host, diagnostics, fileName, text2, writeByteOrderMark, sourceFiles, data) {
       host.writeFile(fileName, text2, writeByteOrderMark, (hostErrorMessage) => {
         diagnostics.add(createCompilerDiagnostic(Diagnostics.Could_not_write_file_0_Colon_1, fileName, hostErrorMessage));
       }, sourceFiles, data);
@@ -115542,8 +115827,8 @@ ${lanes.join(`
       return;
     }
     function tryRenameExternalModule(factory2, moduleName, sourceFile) {
-      const rename3 = sourceFile.renamedDependencies && sourceFile.renamedDependencies.get(moduleName.text);
-      return rename3 ? factory2.createStringLiteral(rename3) : undefined;
+      const rename4 = sourceFile.renamedDependencies && sourceFile.renamedDependencies.get(moduleName.text);
+      return rename4 ? factory2.createStringLiteral(rename4) : undefined;
     }
     function tryGetModuleNameFromFile(factory2, file2, host, options2) {
       if (!file2) {
@@ -120706,10 +120991,10 @@ ${lanes.join(`
             }
         }
         if (modifiersIn) {
-          const missing = createMissingNode(283, true, Diagnostics.Declaration_expected);
-          setTextRangePos(missing, pos);
-          missing.modifiers = modifiersIn;
-          return missing;
+          const missing2 = createMissingNode(283, true, Diagnostics.Declaration_expected);
+          setTextRangePos(missing2, pos);
+          missing2.modifiers = modifiersIn;
+          return missing2;
         }
         return;
       }
@@ -121117,10 +121402,10 @@ ${lanes.join(`
         if (token2() === 86) {
           return parseClassDeclarationOrExpression(pos, hasJSDoc, modifiers, 232);
         }
-        const missing = createMissingNode(283, true, Diagnostics.Expression_expected);
-        setTextRangePos(missing, pos);
-        missing.modifiers = modifiers;
-        return missing;
+        const missing2 = createMissingNode(283, true, Diagnostics.Expression_expected);
+        setTextRangePos(missing2, pos);
+        missing2.modifiers = modifiers;
+        return missing2;
       }
       function parseClassExpression() {
         return parseClassDeclarationOrExpression(getNodePos(), hasPrecedingJSDocComment(), undefined, 232);
@@ -124741,7 +125026,7 @@ ${lanes.join(`
       const possibleOption = getSpellingSuggestion(unknownOption, diagnostics.optionDeclarations, getOptionName);
       return possibleOption ? createDiagnosticForNodeInSourceFileOrCompilerDiagnostic(sourceFile, node, diagnostics.unknownDidYouMeanDiagnostic, unknownOptionErrorText || unknownOption, possibleOption.name) : createDiagnosticForNodeInSourceFileOrCompilerDiagnostic(sourceFile, node, diagnostics.unknownOptionDiagnostic, unknownOptionErrorText || unknownOption);
     }
-    function parseCommandLineWorker(diagnostics, commandLine, readFile19) {
+    function parseCommandLineWorker(diagnostics, commandLine, readFile22) {
       const options2 = {};
       let watchOptions;
       const fileNames = [];
@@ -124779,7 +125064,7 @@ ${lanes.join(`
         }
       }
       function parseResponseFile(fileName) {
-        const text2 = tryReadFile(fileName, readFile19 || ((fileName2) => sys.readFile(fileName2)));
+        const text2 = tryReadFile(fileName, readFile22 || ((fileName2) => sys.readFile(fileName2)));
         if (!isString3(text2)) {
           errors6.push(text2);
           return;
@@ -124882,8 +125167,8 @@ ${lanes.join(`
       unknownDidYouMeanDiagnostic: Diagnostics.Unknown_compiler_option_0_Did_you_mean_1,
       optionTypeMismatchDiagnostic: Diagnostics.Compiler_option_0_expects_an_argument
     };
-    function parseCommandLine(commandLine, readFile19) {
-      return parseCommandLineWorker(compilerOptionsDidYouMeanDiagnostics, commandLine, readFile19);
+    function parseCommandLine(commandLine, readFile22) {
+      return parseCommandLineWorker(compilerOptionsDidYouMeanDiagnostics, commandLine, readFile22);
     }
     function getOptionFromName(optionName, allowShort) {
       return getOptionDeclarationFromName(getOptionsNameMap, optionName, allowShort);
@@ -124951,8 +125236,8 @@ ${lanes.join(`
       result.originalFileName = result.fileName;
       return parseJsonSourceFileConfigFileContent(result, host, getNormalizedAbsolutePath(getDirectoryPath(configFileName), cwd), optionsToExtend, getNormalizedAbsolutePath(configFileName, cwd), undefined, extraFileExtensions, extendedConfigCache, watchOptionsToExtend);
     }
-    function readConfigFile(fileName, readFile19) {
-      const textOrDiagnostic = tryReadFile(fileName, readFile19);
+    function readConfigFile(fileName, readFile22) {
+      const textOrDiagnostic = tryReadFile(fileName, readFile22);
       return isString3(textOrDiagnostic) ? parseConfigFileTextToJson(fileName, textOrDiagnostic) : { config: {}, error: textOrDiagnostic };
     }
     function parseConfigFileTextToJson(fileName, jsonText) {
@@ -124962,14 +125247,14 @@ ${lanes.join(`
         error: jsonSourceFile.parseDiagnostics.length ? jsonSourceFile.parseDiagnostics[0] : undefined
       };
     }
-    function readJsonConfigFile(fileName, readFile19) {
-      const textOrDiagnostic = tryReadFile(fileName, readFile19);
+    function readJsonConfigFile(fileName, readFile22) {
+      const textOrDiagnostic = tryReadFile(fileName, readFile22);
       return isString3(textOrDiagnostic) ? parseJsonText(fileName, textOrDiagnostic) : { fileName, parseDiagnostics: [textOrDiagnostic] };
     }
-    function tryReadFile(fileName, readFile19) {
+    function tryReadFile(fileName, readFile22) {
       let text2;
       try {
-        text2 = readFile19(fileName);
+        text2 = readFile22(fileName);
       } catch (e2) {
         return createCompilerDiagnostic(Diagnostics.Cannot_read_file_0_Colon_1, fileName, e2.message);
       }
@@ -125404,8 +125689,8 @@ ${lanes.join(`
       function newline() {
         result.push("");
       }
-      function emitHeader(header2) {
-        result.push(`${tab}${tab}// ${getLocaleSpecificMessage(header2)}`);
+      function emitHeader(header3) {
+        result.push(`${tab}${tab}// ${getLocaleSpecificMessage(header3)}`);
       }
       function emitOption(setting, defaultValue, commented = "never") {
         const existingOptionIndex = allSetOptions.indexOf(setting);
@@ -131681,8 +131966,8 @@ ${lanes.join(`
     var runtimeDependencyFields = ["dependencies", "peerDependencies", "optionalDependencies"];
     function getAllRuntimeDependencies(packageJson) {
       let result;
-      for (const field2 of runtimeDependencyFields) {
-        const deps = packageJson[field2];
+      for (const field3 of runtimeDependencyFields) {
+        const deps = packageJson[field3];
         if (deps && typeof deps === "object") {
           result = concatenate(result, getOwnKeys(deps));
         }
@@ -149937,8 +150222,8 @@ ${lanes.join(`
         return type.flags & 32 ? emptyStringType : type.flags & 64 ? zeroType : type.flags & 128 ? zeroBigIntType : type === regularFalseType || type === falseType || type.flags & (16 | 4 | 8 | 3) || type.flags & 1024 && type.value === "" || type.flags & 2048 && type.value === 0 || type.flags & 4096 && isZeroBigInt(type) ? type : neverType2;
       }
       function getNullableType(type, flags) {
-        const missing = flags & ~type.flags & (4 | 8);
-        return missing === 0 ? type : missing === 4 ? getUnionType([type, undefinedType2]) : missing === 8 ? getUnionType([type, nullType2]) : getUnionType([type, undefinedType2, nullType2]);
+        const missing2 = flags & ~type.flags & (4 | 8);
+        return missing2 === 0 ? type : missing2 === 4 ? getUnionType([type, undefinedType2]) : missing2 === 8 ? getUnionType([type, nullType2]) : getUnionType([type, undefinedType2, nullType2]);
       }
       function getOptionalType(type, isProperty = false) {
         Debug.assert(strictNullChecks);
@@ -188182,7 +188467,7 @@ ${lanes.join(`
           return;
         }
         const buildInfo = host.getBuildInfo() || { version: version3 };
-        writeFile12(host, emitterDiagnostics, buildInfoPath, getBuildInfoText(buildInfo), false, undefined, { buildInfo });
+        writeFile13(host, emitterDiagnostics, buildInfoPath, getBuildInfoText(buildInfo), false, undefined, { buildInfo });
         emittedFilesList == null || emittedFilesList.push(buildInfoPath);
       }
       function emitJsFileOrBundle(sourceFileOrBundle, jsFilePath, sourceMapFilePath) {
@@ -188341,14 +188626,14 @@ ${lanes.join(`
           }
           if (sourceMapFilePath) {
             const sourceMap = sourceMapGenerator.toString();
-            writeFile12(host, emitterDiagnostics, sourceMapFilePath, sourceMap, false, sourceFiles);
+            writeFile13(host, emitterDiagnostics, sourceMapFilePath, sourceMap, false, sourceFiles);
           }
         } else {
           writer.writeLine();
         }
         const text2 = writer.getText();
         const data = { sourceMapUrlPos, diagnostics: transform22.diagnostics };
-        writeFile12(host, emitterDiagnostics, jsFilePath, text2, !!compilerOptions.emitBOM, sourceFiles, data);
+        writeFile13(host, emitterDiagnostics, jsFilePath, text2, !!compilerOptions.emitBOM, sourceFiles, data);
         writer.clear();
         return !data.skippedDtsWrite;
       }
@@ -192866,12 +193151,12 @@ ${lanes.join(`
     function createCompilerHost(options2, setParentNodes) {
       return createCompilerHostWorker(options2, setParentNodes);
     }
-    function createGetSourceFile(readFile19, setParentNodes) {
+    function createGetSourceFile(readFile22, setParentNodes) {
       return (fileName, languageVersionOrOptions, onError) => {
         let text2;
         try {
           mark("beforeIORead");
-          text2 = readFile19(fileName);
+          text2 = readFile22(fileName);
           mark("afterIORead");
           measure("I/O Read", "beforeIORead", "afterIORead");
         } catch (e2) {
@@ -193662,7 +193947,7 @@ ${lanes.join(`
         getRedirectFromOutput,
         forEachResolvedProjectReference: forEachResolvedProjectReference2
       });
-      const readFile19 = host.readFile.bind(host);
+      const readFile22 = host.readFile.bind(host);
       (_e = tracing) == null || _e.push(tracing.Phase.Program, "shouldProgramCreateNewSourceFiles", { hasOldProgram: !!oldProgram });
       const shouldCreateNewSourceFile = shouldProgramCreateNewSourceFiles(oldProgram, options2);
       (_f = tracing) == null || _f.pop();
@@ -193839,7 +194124,7 @@ ${lanes.join(`
         shouldTransformImportCall,
         emitBuildInfo,
         fileExists,
-        readFile: readFile19,
+        readFile: readFile22,
         directoryExists,
         getSymlinkCache,
         realpath: (_o = host.realpath) == null ? undefined : _o.bind(host),
@@ -202026,7 +202311,7 @@ ${lanes.join(`
     function getHeader(sys2, message2) {
       var _a7;
       const colors = createColors(sys2);
-      const header2 = [];
+      const header3 = [];
       const terminalWidth = ((_a7 = sys2.getWidthOfTerminal) == null ? undefined : _a7.call(sys2)) ?? 0;
       const tsIconLength = 5;
       const tsIconFirstLine = colors.blueBackground("".padStart(tsIconLength));
@@ -202034,13 +202319,13 @@ ${lanes.join(`
       if (terminalWidth >= message2.length + tsIconLength) {
         const rightAlign = terminalWidth > 120 ? 120 : terminalWidth;
         const leftAlign = rightAlign - tsIconLength;
-        header2.push(message2.padEnd(leftAlign) + tsIconFirstLine + sys2.newLine);
-        header2.push("".padStart(leftAlign) + tsIconSecondLine + sys2.newLine);
+        header3.push(message2.padEnd(leftAlign) + tsIconFirstLine + sys2.newLine);
+        header3.push("".padStart(leftAlign) + tsIconSecondLine + sys2.newLine);
       } else {
-        header2.push(message2 + sys2.newLine);
-        header2.push(sys2.newLine);
+        header3.push(message2 + sys2.newLine);
+        header3.push(sys2.newLine);
       }
-      return header2;
+      return header3;
     }
     function printHelp(sys2, commandLine) {
       if (!commandLine.options.all) {
@@ -220193,11 +220478,11 @@ ${newComment.split(`
     }
     function convertNamedExport(sourceFile, assignment, changes, exports2) {
       const { text: text2 } = assignment.left.name;
-      const rename3 = exports2.get(text2);
-      if (rename3 !== undefined) {
+      const rename4 = exports2.get(text2);
+      if (rename4 !== undefined) {
         const newNodes = [
-          makeConst(undefined, rename3, assignment.right),
-          makeExportDeclaration([factory.createExportSpecifier(false, rename3, text2)])
+          makeConst(undefined, rename4, assignment.right),
+          makeExportDeclaration([factory.createExportSpecifier(false, rename4, text2)])
         ];
         changes.replaceNodeWithNodes(sourceFile, assignment.parent, newNodes);
       } else {
@@ -244377,7 +244662,7 @@ ${options2.prefix}` : `
       walkUpParenthesizedTypesAndGetParentAndChild: () => walkUpParenthesizedTypesAndGetParentAndChild,
       whitespaceOrMapCommentRegExp: () => whitespaceOrMapCommentRegExp,
       writeCommentRange: () => writeCommentRange,
-      writeFile: () => writeFile12,
+      writeFile: () => writeFile13,
       writeFileEnsuringDirectories: () => writeFileEnsuringDirectories,
       zipWith: () => zipWith
     });
@@ -254851,8 +255136,8 @@ Additional information: BADCLIENT: Bad error code, ${badCode} not found in range
 });
 
 // frontend/packages/miniapp-kit/src/cli.ts
-import { dirname as dirname14, resolve as resolve5 } from "node:path";
-import { fileURLToPath } from "node:url";
+import { dirname as dirname15, resolve as resolve5 } from "node:path";
+import { fileURLToPath as fileURLToPath2 } from "node:url";
 
 // frontend/packages/miniapp-kit/src/args.ts
 class ArgsError extends Error {
@@ -254957,20 +255242,20 @@ init_src();
 init_src2();
 init_masters2();
 import { createRequire as createRequire9 } from "node:module";
-import { join as join27 } from "node:path";
+import { join as join29 } from "node:path";
 import { pathToFileURL as pathToFileURL8 } from "node:url";
 
 // frontend/packages/miniapp-kit/src/mcp-catalog.ts
 init_src();
 init_src2();
 import { existsSync as existsSync15 } from "node:fs";
-import { mkdir as mkdir9, readFile as readFile18, writeFile as writeFile11 } from "node:fs/promises";
-import { join as join24 } from "node:path";
+import { mkdir as mkdir10, readFile as readFile21, writeFile as writeFile12 } from "node:fs/promises";
+import { join as join26 } from "node:path";
 
 // frontend/packages/miniapp-kit/src/dev/worker-cache.ts
-import { createHash as createHash7 } from "node:crypto";
-import { mkdir as mkdir8, readdir as readdir10, readFile as readFile17, rm as rm8, writeFile as writeFile10 } from "node:fs/promises";
-import { join as join22 } from "node:path";
+import { createHash as createHash10 } from "node:crypto";
+import { mkdir as mkdir9, readdir as readdir11, readFile as readFile20, rm as rm9, writeFile as writeFile11 } from "node:fs/promises";
+import { join as join24 } from "node:path";
 
 // frontend/packages/miniapp-kit/src/scheduled-worker.ts
 function scheduledWorkerSource(entry) {
@@ -255030,7 +255315,7 @@ var CACHE_DIR = ".kit/cache/workers";
 var SKIPPED = new Set(["node_modules", ".git", ".kit", "dist"]);
 var BUILDER_VERSION = 1;
 async function hashTree(hash4, root, relative2) {
-  const entries = await readdir10(join22(root, relative2), { withFileTypes: true }).catch(() => []);
+  const entries = await readdir11(join24(root, relative2), { withFileTypes: true }).catch(() => []);
   for (const entry of entries.sort((a2, b3) => a2.name.localeCompare(b3.name))) {
     if (SKIPPED.has(entry.name))
       continue;
@@ -255038,29 +255323,29 @@ async function hashTree(hash4, root, relative2) {
     if (entry.isDirectory())
       await hashTree(hash4, root, path);
     else if (entry.isFile())
-      hash4.update(path).update("\x00").update(await readFile17(join22(root, path)));
+      hash4.update(path).update("\x00").update(await readFile20(join24(root, path)));
   }
 }
 async function workerCacheKey(root, appSlug, kind) {
-  const hash4 = createHash7("sha256").update(`v${BUILDER_VERSION}\x00${kind}\x00${appSlug}\x00`);
+  const hash4 = createHash10("sha256").update(`v${BUILDER_VERSION}\x00${kind}\x00${appSlug}\x00`);
   hash4.update(kind === "jobs" ? scheduledWorkerSource("/app/src/index.ts") : "");
   for (const file2 of ["package.json", "bun.lock"]) {
-    hash4.update(file2).update(await readFile17(join22(root, file2)).catch(() => ""));
+    hash4.update(file2).update(await readFile20(join24(root, file2)).catch(() => ""));
   }
-  await hashTree(hash4, root, join22("apps", appSlug));
+  await hashTree(hash4, root, join24("apps", appSlug));
   await hashTree(hash4, root, "packages");
   return hash4.digest("hex");
 }
-var entry = (root, appSlug, key) => join22(root, CACHE_DIR, `${appSlug}-${key}.js`);
+var entry = (root, appSlug, key) => join24(root, CACHE_DIR, `${appSlug}-${key}.js`);
 async function readCachedWorker(root, appSlug, key) {
-  return readFile17(entry(root, appSlug, key)).then((bytes3) => new Uint8Array(bytes3), () => null);
+  return readFile20(entry(root, appSlug, key)).then((bytes3) => new Uint8Array(bytes3), () => null);
 }
 async function cacheWorker(root, appSlug, key, bytes3) {
-  await mkdir8(join22(root, CACHE_DIR), { recursive: true });
-  await writeFile10(entry(root, appSlug, key), bytes3);
-  for (const name3 of await readdir10(join22(root, CACHE_DIR))) {
+  await mkdir9(join24(root, CACHE_DIR), { recursive: true });
+  await writeFile11(entry(root, appSlug, key), bytes3);
+  for (const name3 of await readdir11(join24(root, CACHE_DIR))) {
     if (name3.startsWith(`${appSlug}-`) && name3 !== `${appSlug}-${key}.js`)
-      await rm8(join22(root, CACHE_DIR, name3), { force: true });
+      await rm9(join24(root, CACHE_DIR, name3), { force: true });
   }
 }
 
@@ -255070,12 +255355,12 @@ init_generate();
 // frontend/packages/miniapp-kit/src/worker-build.ts
 init_seed();
 import { builtinModules as builtinModules2 } from "node:module";
-import { join as join23 } from "node:path";
+import { join as join25 } from "node:path";
 import { pathToFileURL as pathToFileURL6 } from "node:url";
 var NODE_BUILTINS2 = [/^node:/, ...builtinModules2];
 async function buildWorkerBundle(input) {
   const vite = await import(pathToFileURL6(resolveViteEntry(input.appDir)).href);
-  const scheduledEntry = join23(input.appDir, "__platform_scheduled__.ts");
+  const scheduledEntry = join25(input.appDir, "__platform_scheduled__.ts");
   const scheduledModule = "\x00platform-scheduled";
   await vite.build({
     root: input.appDir,
@@ -255090,19 +255375,19 @@ async function buildWorkerBundle(input) {
             return id === scheduledEntry ? scheduledModule : undefined;
           },
           load(id) {
-            return id === scheduledModule ? scheduledWorkerSource(join23(input.appDir, "src/index.ts")) : undefined;
+            return id === scheduledModule ? scheduledWorkerSource(join25(input.appDir, "src/index.ts")) : undefined;
           }
         }
       ] : []
     ],
     build: {
       target: "es2022",
-      outDir: join23(input.root, "dist", input.slug),
+      outDir: join25(input.root, "dist", input.slug),
       emptyOutDir: true,
       copyPublicDir: false,
       sourcemap: false,
       lib: {
-        entry: input.kind === "jobs" ? scheduledEntry : join23(input.appDir, "src/index.ts"),
+        entry: input.kind === "jobs" ? scheduledEntry : join25(input.appDir, "src/index.ts"),
         formats: ["es"],
         fileName: () => "index.js"
       },
@@ -255130,26 +255415,26 @@ async function extractMcpCatalog(root, slug) {
   if (!app || app.kind !== "mcp")
     throw new McpCatalogError(`apps/${slug} is not an mcp App`);
   const key = await workerCacheKey(root, slug, "mcp");
-  const keyFile = join24(root, CATALOG_KEY_PATH);
-  const catalogFile = join24(root, PROJECT_PATHS.mcpTools);
+  const keyFile = join26(root, CATALOG_KEY_PATH);
+  const catalogFile = join26(root, PROJECT_PATHS.mcpTools);
   if (existsSync15(catalogFile) && existsSync15(keyFile)) {
-    const cached2 = mcpToolsCatalogSchema.safeParse(JSON.parse(await readFile18(catalogFile, "utf8").catch(() => "null")));
-    if (cached2.success && cached2.data.app === slug && await readFile18(keyFile, "utf8") === key)
+    const cached2 = mcpToolsCatalogSchema.safeParse(JSON.parse(await readFile21(catalogFile, "utf8").catch(() => "null")));
+    if (cached2.success && cached2.data.app === slug && await readFile21(keyFile, "utf8") === key)
       return cached2.data;
   }
   try {
-    await buildWorkerBundle({ root, appDir: join24(root, "apps", slug), slug, kind: "mcp" });
+    await buildWorkerBundle({ root, appDir: join26(root, "apps", slug), slug, kind: "mcp" });
   } catch (error51) {
     throw new McpCatalogError(`apps/${slug}: the mcp App could not be bundled (${error51 instanceof Error ? error51.message : String(error51)})`);
   }
   const catalog = await readMcpCatalog({ root, app });
-  await mkdir9(join24(root, ".kit/cache"), { recursive: true });
-  await writeFile11(keyFile, key);
+  await mkdir10(join26(root, ".kit/cache"), { recursive: true });
+  await writeFile12(keyFile, key);
   return catalog;
 }
 async function readMcpCatalog(input) {
   const { root, app } = input;
-  const script = await readFile18(join24(root, "dist", app.slug, "index.js"), "utf8");
+  const script = await readFile21(join26(root, "dist", app.slug, "index.js"), "utf8");
   let runtime;
   try {
     runtime = await createMockWorkerRuntime({
@@ -255206,20 +255491,20 @@ ${lines.join(`
 // frontend/packages/miniapp-kit/src/seed-contract.ts
 init_src();
 import { existsSync as existsSync16 } from "node:fs";
-import { mkdtemp as mkdtemp4, rm as rm9, writeFile as writeFile12 } from "node:fs/promises";
+import { mkdtemp as mkdtemp5, rm as rm10, writeFile as writeFile13 } from "node:fs/promises";
 import { createRequire as createRequire7 } from "node:module";
-import { dirname as dirname9, join as join25, relative as relative2 } from "node:path";
+import { dirname as dirname10, join as join27, relative as relative2 } from "node:path";
 async function checkSeedContract(root, kitRoot) {
-  const seed = join25(root, PROJECT_PATHS.seed);
+  const seed = join27(root, PROJECT_PATHS.seed);
   if (!existsSync16(seed))
     return [];
   const ts = (await Promise.resolve().then(() => __toESM(require_typescript(), 1))).default;
-  const libDirectory = existsSync16(join25(kitRoot, "scripts/typescript-lib/lib.es2023.d.ts")) ? join25(kitRoot, "scripts/typescript-lib") : dirname9(createRequire7(import.meta.url).resolve("typescript/lib/lib.es2023.d.ts"));
-  const temporary = await mkdtemp4(join25(dirname9(seed), ".seed-contract-"));
+  const libDirectory = existsSync16(join27(kitRoot, "scripts/typescript-lib/lib.es2023.d.ts")) ? join27(kitRoot, "scripts/typescript-lib") : dirname10(createRequire7(import.meta.url).resolve("typescript/lib/lib.es2023.d.ts"));
+  const temporary = await mkdtemp5(join27(dirname10(seed), ".seed-contract-"));
   try {
-    const entry2 = join25(temporary, "contract.ts");
-    const sdk = relative2(temporary, join25(root, "packages/sdk/src/index.ts"));
-    await writeFile12(entry2, `import seed from '../seed.ts';
+    const entry2 = join27(temporary, "contract.ts");
+    const sdk = relative2(temporary, join27(root, "packages/sdk/src/index.ts"));
+    await writeFile13(entry2, `import seed from '../seed.ts';
 import type { SeedContext, SeedPlan, SchemaType } from ${JSON.stringify(sdk)};
 const contract: (context: SeedContext) => SeedPlan<SchemaType> | Promise<SeedPlan<SchemaType>> = seed;
 void contract;
@@ -255234,12 +255519,12 @@ void contract;
       allowImportingTsExtensions: true,
       jsx: ts.JsxEmit.ReactJSX,
       types: [],
-      lib: [join25(libDirectory, "lib.es2023.d.ts"), join25(libDirectory, "lib.dom.d.ts")],
-      paths: { "@workspace/sdk": [join25(root, "packages/sdk/src/index.ts")] }
+      lib: [join27(libDirectory, "lib.es2023.d.ts"), join27(libDirectory, "lib.dom.d.ts")],
+      paths: { "@workspace/sdk": [join27(root, "packages/sdk/src/index.ts")] }
     };
     const host = ts.createCompilerHost(options2);
     host.getDefaultLibLocation = () => libDirectory;
-    host.getDefaultLibFileName = () => join25(libDirectory, "lib.d.ts");
+    host.getDefaultLibFileName = () => join27(libDirectory, "lib.d.ts");
     const program = ts.createProgram([entry2], options2, host);
     return ts.getPreEmitDiagnostics(program).map((diagnostic) => ({
       code: "TYPE_ERROR",
@@ -255248,16 +255533,16 @@ void contract;
 `)}`
     }));
   } finally {
-    await rm9(temporary, { recursive: true, force: true });
+    await rm10(temporary, { recursive: true, force: true });
   }
 }
 
 // frontend/packages/miniapp-kit/src/typecheck.ts
 import { execFile } from "node:child_process";
 import { existsSync as existsSync17 } from "node:fs";
-import { readdir as readdir11, rm as rm10 } from "node:fs/promises";
+import { readdir as readdir12, rm as rm11 } from "node:fs/promises";
 import { createRequire as createRequire8 } from "node:module";
-import { join as join26 } from "node:path";
+import { join as join28 } from "node:path";
 import { pathToFileURL as pathToFileURL7 } from "node:url";
 var TSC_LINE = /^(.+?)\((\d+),(\d+)\): error (TS\d+: .*)$/;
 var TSC_GLOBAL = /^error (TS\d+: .*)$/;
@@ -255284,20 +255569,20 @@ function parseTscOutput(slug, output) {
 var defaultTypeCheckDeps = {
   resolveTsc(appDir) {
     try {
-      return createRequire8(join26(appDir, "package.json")).resolve("typescript/bin/tsc");
+      return createRequire8(join28(appDir, "package.json")).resolve("typescript/bin/tsc");
     } catch {
       return null;
     }
   },
   async prepare(appDir) {
-    const routes = join26(appDir, "src", "routes");
-    const tree = join26(appDir, "src", "routeTree.gen.ts");
+    const routes = join28(appDir, "src", "routes");
+    const tree = join28(appDir, "src", "routeTree.gen.ts");
     if (!existsSync17(routes) || existsSync17(tree))
       return async () => {
         return;
       };
     await generateRouteTree(appDir, routes, tree);
-    return async () => rm10(tree, { force: true });
+    return async () => rm11(tree, { force: true });
   },
   run(tsc, appDir) {
     return new Promise((resolve3) => {
@@ -255309,15 +255594,15 @@ var defaultTypeCheckDeps = {
   }
 };
 async function typeCheckApps(root, deps = defaultTypeCheckDeps) {
-  const appsDir = join26(root, "apps");
-  const slugs = existsSync17(appsDir) ? (await readdir11(appsDir, { withFileTypes: true })).filter((entry2) => entry2.isDirectory()).map((entry2) => entry2.name).filter((slug) => existsSync17(join26(appsDir, slug, "tsconfig.json"))).sort() : [];
+  const appsDir = join28(root, "apps");
+  const slugs = existsSync17(appsDir) ? (await readdir12(appsDir, { withFileTypes: true })).filter((entry2) => entry2.isDirectory()).map((entry2) => entry2.name).filter((slug) => existsSync17(join28(appsDir, slug, "tsconfig.json"))).sort() : [];
   const findings = [];
-  const missing = [];
+  const missing2 = [];
   await Promise.all(slugs.map(async (slug) => {
-    const appDir = join26(appsDir, slug);
+    const appDir = join28(appsDir, slug);
     const tsc = deps.resolveTsc(appDir);
     if (tsc === null) {
-      missing.push(slug);
+      missing2.push(slug);
       return;
     }
     const restore = await deps.prepare(appDir);
@@ -255333,10 +255618,10 @@ async function typeCheckApps(root, deps = defaultTypeCheckDeps) {
       }
     ]);
   }));
-  const skipped = missing.length > 0 ? [
+  const skipped = missing2.length > 0 ? [
     {
       check: "type_check",
-      reason: `TypeScript is not installed for ${missing.sort().join(", ")}; run bun install`
+      reason: `TypeScript is not installed for ${missing2.sort().join(", ")}; run bun install`
     }
   ] : [];
   return { findings, skipped };
@@ -255344,7 +255629,7 @@ async function typeCheckApps(root, deps = defaultTypeCheckDeps) {
 async function generateRouteTree(appDir, routes, tree) {
   let entry2;
   try {
-    const plugin = createRequire8(join26(appDir, "package.json")).resolve("@tanstack/router-plugin/package.json");
+    const plugin = createRequire8(join28(appDir, "package.json")).resolve("@tanstack/router-plugin/package.json");
     entry2 = createRequire8(plugin).resolve("@tanstack/router-generator");
   } catch {
     return;
@@ -255356,7 +255641,7 @@ async function generateRouteTree(appDir, routes, tree) {
     routesDirectory: routes,
     generatedRouteTree: tree,
     disableLogging: true,
-    tmpDir: join26(appDir, "node_modules", ".tanstack", "tmp")
+    tmpDir: join28(appDir, "node_modules", ".tanstack", "tmp")
   }, appDir);
   await new generator.Generator({ config: config3, root: appDir }).run();
 }
@@ -255378,7 +255663,7 @@ function projectZModelLoader(root) {
   let loaded;
   return async (entry2, mergeImports) => {
     loaded ??= (async () => {
-      const fromProject = createRequire9(join27(root, "package.json"));
+      const fromProject = createRequire9(join29(root, "package.json"));
       const fromCli = createRequire9(fromProject.resolve("@zenstackhq/cli/package.json"));
       const cjs = fromCli.resolve("@zenstackhq/language");
       return import(pathToFileURL8(cjs.replace(/index\.cjs$/, "index.mjs")).href);
@@ -255470,11 +255755,11 @@ async function changedMigrations(options2) {
 }
 
 // frontend/packages/miniapp-kit/src/commands.ts
-import { createHash as createHash14, randomUUID as randomUUID4 } from "node:crypto";
+import { createHash as createHash17, randomUUID as randomUUID5 } from "node:crypto";
 import { existsSync as existsSync28 } from "node:fs";
-import { mkdir as mkdir22, readdir as readdir17, readFile as readFile35, writeFile as writeFile24 } from "node:fs/promises";
+import { mkdir as mkdir24, readdir as readdir17, readFile as readFile38, writeFile as writeFile26 } from "node:fs/promises";
 import { homedir } from "node:os";
-import { dirname as dirname13, join as join50, resolve as resolve4 } from "node:path";
+import { dirname as dirname14, join as join52, resolve as resolve4 } from "node:path";
 import { createInterface } from "node:readline";
 
 // frontend/packages/project-host/src/bridge.ts
@@ -255686,14 +255971,14 @@ function mergeCodexApproval(existing, pluginId, server2) {
   let dropping = false;
   for (const line of existing.split(`
 `)) {
-    const header2 = tableHeader(line);
-    if (header2 !== null) {
-      current = header2;
-      dropping = header2 === table || header2.startsWith(`${table}.`);
+    const header3 = tableHeader(line);
+    if (header3 !== null) {
+      current = header3;
+      dropping = header3 === table || header3.startsWith(`${table}.`);
     }
     if (dropping)
       continue;
-    if (header2 === null && mentionsServer(current, line, pluginId, server2))
+    if (header3 === null && mentionsServer(current, line, pluginId, server2))
       throw new CodexConfigConflict(`${table} is already set in another form (${line.trim()})`);
     kept.push(line);
   }
@@ -255778,173 +256063,50 @@ init_src2();
 init_generate();
 import { spawn as spawn4 } from "node:child_process";
 import { existsSync as existsSync19, readFileSync as readFileSync3 } from "node:fs";
-import { mkdir as mkdir11, readFile as readFile20, rm as rm12, writeFile as writeFile13 } from "node:fs/promises";
+import { mkdir as mkdir12, readFile as readFile22, rm as rm13, writeFile as writeFile14 } from "node:fs/promises";
 import { createRequire as createRequire10 } from "node:module";
-import { dirname as dirname10, join as join30 } from "node:path";
-
-// frontend/packages/miniapp-kit/src/pack.ts
-init_src();
-import { createHash as createHash8 } from "node:crypto";
-import { lstat as lstat2, readdir as readdir12, readFile as readFile19 } from "node:fs/promises";
-import { join as join28 } from "node:path";
-
-// frontend/packages/miniapp-kit/src/tar.ts
-import { gzipSync } from "node:zlib";
-var BLOCK2 = 512;
-var NAME_MAX = 100;
-var PREFIX_MAX = 155;
-var encoder6 = new TextEncoder;
-function writeTar(files) {
-  const sorted2 = [...files].sort((a2, b3) => a2.path < b3.path ? -1 : a2.path > b3.path ? 1 : 0);
-  const parts = [];
-  for (const file2 of sorted2) {
-    parts.push(header2(file2.path, file2.bytes.byteLength));
-    const padded = new Uint8Array(Math.ceil(file2.bytes.byteLength / BLOCK2) * BLOCK2);
-    padded.set(file2.bytes);
-    parts.push(padded);
-  }
-  parts.push(new Uint8Array(BLOCK2 * 2));
-  const out = new Uint8Array(parts.reduce((sum2, part) => sum2 + part.byteLength, 0));
-  let offset = 0;
-  for (const part of parts) {
-    out.set(part, offset);
-    offset += part.byteLength;
-  }
-  return out;
-}
-function gzipTar(files) {
-  return new Uint8Array(gzipSync(writeTar(files)));
-}
-function header2(path, size) {
-  const [prefix2, name3] = splitPath2(path);
-  const block = new Uint8Array(BLOCK2);
-  field2(block, 0, name3);
-  field2(block, 100, "0000644\x00");
-  field2(block, 108, "0000000\x00");
-  field2(block, 116, "0000000\x00");
-  field2(block, 124, `${size.toString(8).padStart(11, "0")}\x00`);
-  field2(block, 136, "00000000000\x00");
-  field2(block, 148, "        ");
-  block[156] = 48;
-  field2(block, 257, "ustar\x00");
-  field2(block, 263, "00");
-  field2(block, 345, prefix2);
-  let sum2 = 0;
-  for (const byte of block)
-    sum2 += byte;
-  field2(block, 148, `${sum2.toString(8).padStart(6, "0")}\x00 `);
-  return block;
-}
-function splitPath2(path) {
-  if (encoder6.encode(path).byteLength <= NAME_MAX)
-    return ["", path];
-  for (let at = path.indexOf("/");at > 0; at = path.indexOf("/", at + 1)) {
-    const prefix2 = path.slice(0, at);
-    const name3 = path.slice(at + 1);
-    if (encoder6.encode(prefix2).byteLength <= PREFIX_MAX && encoder6.encode(name3).byteLength <= NAME_MAX) {
-      return [prefix2, name3];
-    }
-  }
-  throw new Error(`${path} does not fit a ustar header (100-byte name, 155-byte prefix)`);
-}
-function field2(block, offset, value2) {
-  block.set(encoder6.encode(value2), offset);
-}
-
-// frontend/packages/miniapp-kit/src/pack.ts
-class PackError extends Error {
-  name = "PackError";
-}
-async function collectFiles(root, options2 = {}) {
-  let size = 0;
-  const files = [];
-  const walk = async (relative3) => {
-    const entries = await readdir12(join28(root, relative3), { withFileTypes: true });
-    for (const entry2 of entries) {
-      const path = relative3 === "" ? entry2.name : `${relative3}/${entry2.name}`;
-      if (options2.include && !options2.include(path, entry2.isDirectory()))
-        continue;
-      const info = await lstat2(join28(root, path));
-      if (info.isSymbolicLink()) {
-        throw new PackError(`${path} is a symbolic link; Platform rejects links, copy the file instead`);
-      }
-      if (info.isDirectory())
-        await walk(path);
-      else if (info.isFile()) {
-        if (files.length >= (options2.maxFiles ?? Infinity) || size + info.size > (options2.maxBytes ?? Infinity))
-          throw new PackError("Source collection exceeds the file or byte limit");
-        const bytes3 = new Uint8Array(await readFile19(join28(root, path)));
-        size += bytes3.byteLength;
-        if (size > (options2.maxBytes ?? Infinity))
-          throw new PackError("Source collection exceeds the byte limit");
-        files.push({ path, bytes: bytes3 });
-      }
-    }
-  };
-  await walk("");
-  return files.sort((a2, b3) => a2.path < b3.path ? -1 : a2.path > b3.path ? 1 : 0);
-}
-function buildDistArchive(files) {
-  const indexFile = files.find((file2) => file2.path === ARTIFACT_INDEX_PATH);
-  if (indexFile === undefined) {
-    throw new PackError(`source/dist has no ${ARTIFACT_INDEX_PATH}; run kit.mjs build first`);
-  }
-  const parsed = artifactIndexSchema.safeParse(JSON.parse(new TextDecoder().decode(indexFile.bytes)));
-  if (!parsed.success) {
-    throw new PackError(`source/dist/${ARTIFACT_INDEX_PATH} is not kit build's; run kit.mjs build`);
-  }
-  const expected = new Map(parsed.data.files.map((file2) => [file2.path, file2.sha256]));
-  const content = files.filter((file2) => file2.path !== ARTIFACT_INDEX_PATH);
-  const changed = [
-    ...content.filter((file2) => expected.get(file2.path) !== describeFile(file2.bytes).sha256).map((file2) => file2.path),
-    ...[...expected.keys()].filter((path) => !content.some((file2) => file2.path === path))
-  ].sort();
-  if (changed.length > 0) {
-    throw new PackError(`source/dist changed after kit build (${changed.join(", ")}); run kit.mjs build again`);
-  }
-  return gzipTar(content);
-}
-function describeFile(bytes3) {
-  return { size: bytes3.byteLength, sha256: createHash8("sha256").update(bytes3).digest("hex") };
-}
+import { dirname as dirname11, join as join31 } from "node:path";
+init_pack();
 
 // frontend/packages/miniapp-kit/src/python-build.ts
+init_pack();
 import { existsSync as existsSync18 } from "node:fs";
-import { cp as cp2, mkdir as mkdir10, rm as rm11 } from "node:fs/promises";
-import { basename, join as join29 } from "node:path";
+import { cp as cp2, mkdir as mkdir11, rm as rm12 } from "node:fs/promises";
+import { basename, join as join30 } from "node:path";
+
 class PythonBuildError extends Error {
   name = "PythonBuildError";
 }
-var ROOT_FILES = ["pyproject.toml", "uv.lock", ".python-version"];
+var ROOT_FILES2 = ["pyproject.toml", "uv.lock", ".python-version"];
 var REQUIRED = ["pyproject.toml", "uv.lock"];
 var SKIPPED2 = new Set(["__pycache__", ".venv", ".pytest_cache", ".mypy_cache", ".ruff_cache"]);
 async function copyPythonApp(input) {
-  const appDir = join29(input.root, "apps", input.slug);
+  const appDir = join30(input.root, "apps", input.slug);
   for (const name3 of REQUIRED) {
-    if (!existsSync18(join29(appDir, name3))) {
+    if (!existsSync18(join30(appDir, name3))) {
       throw new PythonBuildError(`apps/${input.slug}/${name3} is missing; python apps need pyproject.toml and a committed uv.lock (uv lock)`);
     }
   }
-  if (!existsSync18(join29(appDir, "src"))) {
+  if (!existsSync18(join30(appDir, "src"))) {
     throw new PythonBuildError(`apps/${input.slug}/src is missing; put the package under src/`);
   }
-  const out = join29(input.root, "dist", input.slug);
-  await rm11(out, { recursive: true, force: true });
-  await mkdir10(out, { recursive: true });
-  for (const name3 of ROOT_FILES) {
-    if (existsSync18(join29(appDir, name3)))
-      await cp2(join29(appDir, name3), join29(out, name3));
+  const out = join30(input.root, "dist", input.slug);
+  await rm12(out, { recursive: true, force: true });
+  await mkdir11(out, { recursive: true });
+  for (const name3 of ROOT_FILES2) {
+    if (existsSync18(join30(appDir, name3)))
+      await cp2(join30(appDir, name3), join30(out, name3));
   }
-  await cp2(join29(appDir, "src"), join29(out, "src"), {
+  await cp2(join30(appDir, "src"), join30(out, "src"), {
     recursive: true,
     filter: (path) => !SKIPPED2.has(basename(path)) && !path.endsWith(".pyc")
   });
   return "";
 }
 async function listPythonAppFiles(input) {
-  const appDir = join29(input.root, "apps", input.slug);
+  const appDir = join30(input.root, "apps", input.slug);
   for (const name3 of [...REQUIRED, "src"]) {
-    if (!existsSync18(join29(appDir, name3)))
+    if (!existsSync18(join30(appDir, name3)))
       throw new PythonBuildError(`apps/${input.slug}/${name3} is missing (uv lock writes uv.lock)`);
   }
   const limits2 = {
@@ -255954,7 +256116,7 @@ async function listPythonAppFiles(input) {
       const parts = path.split("/");
       if (parts.some((part) => SKIPPED2.has(part) || part.endsWith(".pyc") || part.startsWith(".env") || part === ".npmrc" || part === ".pypirc"))
         return false;
-      return path === "src" || path.startsWith("src/") || ROOT_FILES.some((name3) => name3 === path);
+      return path === "src" || path.startsWith("src/") || ROOT_FILES2.some((name3) => name3 === path);
     }
   };
   return collectFiles(appDir, limits2);
@@ -255982,8 +256144,8 @@ async function buildProject(options2) {
     kitRoot,
     ...options2.install ? { install: options2.install } : {}
   });
-  const dist = join30(root, "dist");
-  await rm12(dist, { recursive: true, force: true });
+  const dist = join31(root, "dist");
+  await rm13(dist, { recursive: true, force: true });
   const apps = Object.values(manifest2.apps);
   const env = {
     [KIT_BUILD_ENV.projectId]: options2.projectId,
@@ -255993,7 +256155,7 @@ async function buildProject(options2) {
   for (const app of apps) {
     const input = {
       slug: app.slug,
-      appDir: join30(root, "apps", app.slug),
+      appDir: join31(root, "apps", app.slug),
       env
     };
     const output = app.kind === "web" ? await (options2.runVite ?? viteBuild)(input) : isWorkerAppKind(app.kind) ? await (options2.runWorker ?? buildWorkerBundle)({ ...input, root, kind: app.kind }) : await copyPythonApp({ root, slug: app.slug });
@@ -256011,9 +256173,9 @@ async function buildProject(options2) {
       throw error51;
     }
     const text2 = renderMcpCatalog(mcpTools);
-    await mkdir11(join30(root, PROJECT_PATHS.generated), { recursive: true });
-    await writeFile13(join30(root, PROJECT_PATHS.mcpTools), text2);
-    await writeFile13(join30(dist, mcpToolsDistPath(mcp2.slug)), text2);
+    await mkdir12(join31(root, PROJECT_PATHS.generated), { recursive: true });
+    await writeFile14(join31(root, PROJECT_PATHS.mcpTools), text2);
+    await writeFile14(join31(dist, mcpToolsDistPath(mcp2.slug)), text2);
   }
   let index2;
   try {
@@ -256025,9 +256187,9 @@ async function buildProject(options2) {
   } catch (error51) {
     throw new BuildError(error51 instanceof Error ? error51.message : String(error51));
   }
-  await writeFile13(join30(dist, ARTIFACT_INDEX_PATH), `${JSON.stringify(index2, null, 1)}
+  await writeFile14(join31(dist, ARTIFACT_INDEX_PATH), `${JSON.stringify(index2, null, 1)}
 `);
-  const schemaVersion = schemaVersionOf(await readFile20(join30(root, PROJECT_PATHS.generated, "schema.json"), "utf8"));
+  const schemaVersion = schemaVersionOf(await readFile22(join31(root, PROJECT_PATHS.generated, "schema.json"), "utf8"));
   return {
     artifactHash: index2.artifactHash,
     apps: index2.apps,
@@ -256049,16 +256211,16 @@ async function prepareProject(options2) {
   if (seedFindings.length && options2.seedContract !== "report")
     throw new BuildError(seedFindings.map((finding2) => finding2.message).join(`
 `));
-  const manifest2 = JSON.parse(await readFile20(join30(root, PROJECT_PATHS.generated, "project.json"), "utf8"));
+  const manifest2 = JSON.parse(await readFile22(join31(root, PROJECT_PATHS.generated, "project.json"), "utf8"));
   return { generate, manifest: manifest2, seedFindings };
 }
 async function checkLockfile2(root) {
-  const path = join30(root, "bun.lock");
+  const path = join31(root, "bun.lock");
   if (!existsSync19(path)) {
     throw new BuildError("bun.lock is missing; run bun install in source/ and commit bun.lock");
   }
   try {
-    const violations = checkBunLockfile(await readFile20(path, "utf8"));
+    const violations = checkBunLockfile(await readFile22(path, "utf8"));
     if (violations.length > 0) {
       const lines = violations.map((v3) => `  ${v3.key}: ${v3.reason}`);
       throw new BuildError(`bun.lock may only contain npm registry packages (with sha512 integrity) and workspace packages (sdk.md §5.2):
@@ -256092,15 +256254,15 @@ ${text2}`));
   });
 }
 async function ensureKitRuntimeDependencies(kitRoot) {
-  const manifest2 = join30(kitRoot, "package.json");
+  const manifest2 = join31(kitRoot, "package.json");
   if (!existsSync19(manifest2))
     return;
-  const authored = JSON.parse(await readFile20(manifest2, "utf8"));
+  const authored = JSON.parse(await readFile22(manifest2, "utf8"));
   if (authored.name !== "fdpocket-creator-runtime")
     return;
   const require2 = createRequire10(manifest2);
   try {
-    const installed = JSON.parse(await readFile20(require2.resolve("miniflare/package.json"), "utf8"));
+    const installed = JSON.parse(await readFile22(require2.resolve("miniflare/package.json"), "utf8"));
     if (installed.version === authored.dependencies?.miniflare)
       return;
   } catch (error51) {
@@ -256111,17 +256273,17 @@ async function ensureKitRuntimeDependencies(kitRoot) {
   await run("bun", ["install", "--frozen-lockfile", "--ignore-scripts"], kitRoot, {});
 }
 async function bunInstall(root, kitRoot) {
-  await run("bun", [join30(kitRoot, "scripts/sdk-dependencies.mjs"), root], root, {});
+  await run("bun", [join31(kitRoot, "scripts/sdk-dependencies.mjs"), root], root, {});
   await run("bun", ["install", "--frozen-lockfile", "--ignore-scripts"], root, {});
 }
 function resolveViteBin(appDir) {
   try {
-    const manifestPath = createRequire10(join30(appDir, "package.json")).resolve("vite/package.json");
+    const manifestPath = createRequire10(join31(appDir, "package.json")).resolve("vite/package.json");
     const declared = JSON.parse(readFileSync3(manifestPath, "utf8")).bin;
     const relative3 = typeof declared === "string" ? declared : declared?.vite;
     if (typeof relative3 !== "string")
       throw new Error('vite has no "vite" bin');
-    return join30(dirname10(manifestPath), relative3);
+    return join31(dirname11(manifestPath), relative3);
   } catch (error51) {
     throw new BuildError(`vite is not installed for ${appDir}; run bun install (${error51 instanceof Error ? error51.message : String(error51)})`);
   }
@@ -256169,10 +256331,10 @@ init_src();
 init_src2();
 init_generate();
 init_masters2();
-import { createHash as createHash9 } from "node:crypto";
+import { createHash as createHash11 } from "node:crypto";
 import { existsSync as existsSync20 } from "node:fs";
-import { mkdir as mkdir12, readFile as readFile21, rm as rm13, writeFile as writeFile14 } from "node:fs/promises";
-import { join as join31 } from "node:path";
+import { mkdir as mkdir13, readFile as readFile23, rm as rm14, writeFile as writeFile15 } from "node:fs/promises";
+import { join as join32 } from "node:path";
 var fail5 = (message2) => new DbError(message2);
 var describe3 = (change) => `${change.kind} ${change.table}${change.column ? `.${change.column}` : ""}${change.index ? ` (${change.index})` : ""}`;
 function migrationSlug(text2) {
@@ -256180,7 +256342,7 @@ function migrationSlug(text2) {
   return slug === "" ? "change" : slug;
 }
 async function readIfPresent(path) {
-  return existsSync20(path) ? await readFile21(path, "utf8") : null;
+  return existsSync20(path) ? await readFile23(path, "utf8") : null;
 }
 async function clearDrafts(root) {
   for (const path of [
@@ -256189,19 +256351,19 @@ async function clearDrafts(root) {
     INTENT_PATH,
     `${PROJECT_PATHS.pending}/${PENDING_POLICY_FILE}`
   ]) {
-    await rm13(join31(root, path), { force: true });
+    await rm14(join32(root, path), { force: true });
   }
 }
 async function migrateDatabase(options2) {
   const { root } = options2;
   await placePlatform(root, options2.kitRoot);
   const diff = await renderMigrationDiff(root);
-  const data = (await readIfPresent(join31(root, PENDING_DATA_PATH)))?.trim() ?? "";
-  const parsed = parseIntent(await readIfPresent(join31(root, INTENT_PATH)));
+  const data = (await readIfPresent(join32(root, PENDING_DATA_PATH)))?.trim() ?? "";
+  const parsed = parseIntent(await readIfPresent(join32(root, INTENT_PATH)));
   const hasContract = parsed.intent?.some((item) => ("contract" in item)) ?? false;
   const masters = await projectMasters(root, options2.importModule)();
   if (diff.body === "" && data === "" && !hasContract && masters === null) {
-    await rm13(join31(root, LEGACY_PENDING_SQL_PATH), { force: true });
+    await rm14(join32(root, LEGACY_PENDING_SQL_PATH), { force: true });
     return { status: "empty", migration: null, changes: [] };
   }
   const createClient = options2.createLibsqlClient ?? await loadProjectLibsql(root, fail5);
@@ -256247,11 +256409,11 @@ ${data}
   }) : { sql: "", tables: [], findings: [] };
   findings.push(...master.findings);
   if (draftSql === "" && !hasContract && master.sql === "" && findings.length === 0) {
-    await rm13(join31(root, LEGACY_PENDING_SQL_PATH), { force: true });
+    await rm14(join32(root, LEGACY_PENDING_SQL_PATH), { force: true });
     return { status: "empty", migration: null, changes: [] };
   }
   const sql3 = attachMigrationPolicy([draftSql, master.sql].filter((part) => part !== "").join(`
-`), intent2, await readIfPresent(join31(root, PROJECT_PATHS.pending, PENDING_POLICY_FILE)), changes, master.tables);
+`), intent2, await readIfPresent(join32(root, PROJECT_PATHS.pending, PENDING_POLICY_FILE)), changes, master.tables);
   const shadow = await checkShadow({
     migrations: diff.migrations,
     prodMigrations: null,
@@ -256270,16 +256432,16 @@ ${data}
     at = new Date(Date.UTC(+y2, +mo - 1, +d2, +h2, +mi, +s3 + 1));
   }
   const name3 = `${migrationTimestamp(at)}_${migrationSlug(options2.slug)}`;
-  const dir = join31(root, PROJECT_PATHS.migrations, name3);
-  await mkdir12(dir, { recursive: true });
-  await writeFile14(join31(dir, "migration.sql"), sql3);
+  const dir = join32(root, PROJECT_PATHS.migrations, name3);
+  await mkdir13(dir, { recursive: true });
+  await writeFile15(join32(dir, "migration.sql"), sql3);
   const meta3 = {
     changes,
     intent: intent2 ?? [],
     name: name3,
-    sha256: createHash9("sha256").update(sql3).digest("hex")
+    sha256: createHash11("sha256").update(sql3).digest("hex")
   };
-  await writeFile14(join31(dir, "meta.json"), `${JSON.stringify(meta3, null, 2)}
+  await writeFile15(join32(dir, "meta.json"), `${JSON.stringify(meta3, null, 2)}
 `);
   await clearDrafts(root);
   return { status: "migrated", migration: name3, changes, warnings: shadow.warnings };
@@ -256520,7 +256682,7 @@ init_src();
 init_src2();
 import { spawn as spawn6 } from "node:child_process";
 import { readFileSync as readFileSync4 } from "node:fs";
-import { join as join37 } from "node:path";
+import { join as join39 } from "node:path";
 
 // frontend/packages/miniapp-kit/src/verify/dist-server.ts
 init_src();
@@ -257572,9 +257734,9 @@ function createLiveHostHandler(options2) {
 init_python3();
 
 // frontend/packages/miniapp-kit/src/dev/realtime.ts
-import { readFile as readFile22 } from "node:fs/promises";
+import { readFile as readFile24 } from "node:fs/promises";
 import { createRequire as createRequire11 } from "node:module";
-import { join as join32 } from "node:path";
+import { join as join33 } from "node:path";
 
 // infra/workers/gateway/src/realtime.ts
 init_errors3();
@@ -257623,7 +257785,7 @@ async function wakeRealtime(scope, env) {
 // frontend/packages/miniapp-kit/src/dev/realtime.ts
 async function startRealtimeGateway(options2) {
   const { Miniflare, Response: WorkerResponse } = requireMiniflare(options2.kitRoot);
-  const source = await readFile22(join32(options2.kitRoot, "platform", "realtime-local.js"), "utf8");
+  const source = await readFile24(join33(options2.kitRoot, "platform", "realtime-local.js"), "utf8");
   const runtime = new Miniflare({
     modules: true,
     script: source,
@@ -257716,7 +257878,7 @@ function requireMiniflare(kitRoot) {
   const roots = [process.env.KIT_TOOL_ROOT, kitRoot, process.cwd()].filter((root) => Boolean(root));
   for (const root of roots) {
     try {
-      return createRequire11(join32(root, "package.json"))("miniflare");
+      return createRequire11(join33(root, "package.json"))("miniflare");
     } catch (error51) {
       if (!(error51 instanceof Error) || !("code" in error51) || error51.code !== "MODULE_NOT_FOUND") {
         throw error51;
@@ -257733,8 +257895,8 @@ init_runtime2();
 init_src();
 init_zod();
 import { createHmac, timingSafeEqual } from "node:crypto";
-import { mkdir as mkdir13, readdir as readdir13, readFile as readFile23, rename as rename3, rm as rm14, writeFile as writeFile15 } from "node:fs/promises";
-import { join as join33 } from "node:path";
+import { mkdir as mkdir14, readdir as readdir13, readFile as readFile25, rename as rename4, rm as rm15, writeFile as writeFile16 } from "node:fs/promises";
+import { join as join34 } from "node:path";
 
 // infra/workers/outbound/src/index.ts
 init_network();
@@ -257906,8 +258068,8 @@ async function createSandboxWorkers(options2) {
   const { Miniflare, Response: WorkerResponse } = requireMiniflare(options2.kitRoot);
   const workers = new Map;
   const apps = new Map;
-  const directory = join33(options2.root, ".kit", "session-workers");
-  await mkdir13(directory, { recursive: true, mode: 448 });
+  const directory = join34(options2.root, ".kit", "session-workers");
+  await mkdir14(directory, { recursive: true, mode: 448 });
   let closed = false;
   let hookWindow = 0;
   let hookRequests = 0;
@@ -257942,7 +258104,7 @@ async function createSandboxWorkers(options2) {
     }
     clearTimeout(loaded.timer);
     workers.delete(loaded.name);
-    await rm14(join33(directory, `${loaded.name}.json`), { force: true });
+    await rm15(join34(directory, `${loaded.name}.json`), { force: true });
     await loaded.runtime.dispose();
     await (await loaded.mock)?.dispose();
   };
@@ -258042,7 +258204,7 @@ async function createSandboxWorkers(options2) {
   };
   try {
     for (const file2 of (await readdir13(directory)).filter((file3) => /^[a-z][a-z0-9-]*\.json$/.test(file3))) {
-      const saved = exports_external.object({ name: exports_external.string(), publication: publicationSchema }).parse(JSON.parse(await readFile23(join33(directory, file2), "utf8")));
+      const saved = exports_external.object({ name: exports_external.string(), publication: publicationSchema }).parse(JSON.parse(await readFile25(join34(directory, file2), "utf8")));
       activate(await load(saved.name, saved.publication));
     }
   } catch (error51) {
@@ -258063,7 +258225,7 @@ async function createSandboxWorkers(options2) {
         const existing = workers.get(name3);
         if (existing && apps.get(existing.publication.appSlug) === name3) {
           apps.delete(existing.publication.appSlug);
-          await rm14(join33(directory, `${name3}.json`), { force: true });
+          await rm15(join34(directory, `${name3}.json`), { force: true });
         }
         if (existing)
           await dispose(existing);
@@ -258081,10 +258243,10 @@ async function createSandboxWorkers(options2) {
           return Response.json({ ready: true, worker: name3 });
         }
         loaded = await load(name3, publication);
-        await writeFile15(join33(directory, `${name3}.pending`), JSON.stringify({ name: name3, publication }), {
+        await writeFile16(join34(directory, `${name3}.pending`), JSON.stringify({ name: name3, publication }), {
           mode: 384
         });
-        await rename3(join33(directory, `${name3}.pending`), join33(directory, `${name3}.json`));
+        await rename4(join34(directory, `${name3}.pending`), join34(directory, `${name3}.json`));
         activate(loaded);
         return Response.json({ ready: true, worker: name3 });
       } catch (error51) {
@@ -258171,8 +258333,8 @@ async function createSandboxWorkers(options2) {
 }
 
 // frontend/packages/miniapp-kit/src/dev/vars.ts
-import { readFile as readFile24 } from "node:fs/promises";
-import { join as join34 } from "node:path";
+import { readFile as readFile26 } from "node:fs/promises";
+import { join as join35 } from "node:path";
 import { parseEnv } from "node:util";
 
 // frontend/packages/miniapp-kit/src/git.ts
@@ -258221,7 +258383,7 @@ async function readDevVars(root, hosted) {
   if (hosted)
     return {};
   try {
-    const values = parseEnv(await readFile24(join34(root, ".kit/dev.vars"), "utf8"));
+    const values = parseEnv(await readFile26(join35(root, ".kit/dev.vars"), "utf8"));
     const result = {};
     for (const [name3, value2] of Object.entries(values)) {
       if (value2 !== undefined && name3 !== "GATEWAY_URL" && !name3.startsWith("PLATFORM_"))
@@ -258254,14 +258416,15 @@ import { relative as relative3, sep as sep2 } from "node:path";
 
 // frontend/packages/miniapp-kit/src/dev/watcher-build.ts
 init_src2();
-import { createHash as createHash11 } from "node:crypto";
-import { mkdir as mkdir14, readFile as readFile26, writeFile as writeFile16 } from "node:fs/promises";
-import { join as join36 } from "node:path";
+init_pack();
+import { createHash as createHash14 } from "node:crypto";
+import { mkdir as mkdir16, readFile as readFile29, writeFile as writeFile18 } from "node:fs/promises";
+import { join as join38 } from "node:path";
 
 // frontend/packages/miniapp-kit/src/dev/prebuilt-worker.ts
 import { execFile as execFile2 } from "node:child_process";
-import { readFile as readFile25 } from "node:fs/promises";
-import { join as join35 } from "node:path";
+import { readFile as readFile27 } from "node:fs/promises";
+import { join as join36 } from "node:path";
 import { promisify } from "node:util";
 var run2 = promisify(execFile2);
 var PREBUILT_DIR = ".kit/prebuilt";
@@ -258276,7 +258439,7 @@ async function mismatch(root, appSlug, commit) {
     "--porcelain",
     "--untracked-files=all",
     "--",
-    join35("apps", appSlug),
+    join36("apps", appSlug),
     "packages",
     "package.json",
     "bun.lock"
@@ -258284,9 +258447,9 @@ async function mismatch(root, appSlug, commit) {
   return changed.trim() === "" ? null : "the app or the packages differ from the commit";
 }
 async function readPrebuiltWorker(root, appSlug) {
-  const placed = join35(root, PREBUILT_DIR);
-  const commit = await readFile25(join35(placed, "commit"), "utf8").then((text2) => text2.trim(), () => null);
-  const bytes3 = await readFile25(join35(placed, `${appSlug}.js`)).then((content) => new Uint8Array(content), () => null);
+  const placed = join36(root, PREBUILT_DIR);
+  const commit = await readFile27(join36(placed, "commit"), "utf8").then((text2) => text2.trim(), () => null);
+  const bytes3 = await readFile27(join36(placed, `${appSlug}.js`)).then((content) => new Uint8Array(content), () => null);
   if (!commit || !bytes3)
     return null;
   try {
@@ -258303,15 +258466,21 @@ async function readPrebuiltWorker(root, appSlug) {
 // frontend/packages/miniapp-kit/src/dev/watcher-build.ts
 init_runtime2();
 init_schema_plan();
-init_session_runtime();
+
+// frontend/packages/miniapp-kit/src/dev/schema-plan-cache.ts
+init_compiler_fingerprint();
+import { createHash as createHash13, randomUUID as randomUUID4 } from "node:crypto";
+import { mkdir as mkdir15, readFile as readFile28, rename as rename5, writeFile as writeFile17 } from "node:fs/promises";
+import { join as join37 } from "node:path";
 
 // frontend/packages/miniapp-kit/src/dev/source-snapshot.ts
 init_src();
-import { createHash as createHash10 } from "node:crypto";
+init_pack();
+import { createHash as createHash12 } from "node:crypto";
 var SOURCE_MAX_BYTES = SESSION_LIVE_SOURCE_MAX_BYTES;
 var SOURCE_MAX_FILES = SESSION_LIVE_SOURCE_MAX_FILES;
-var ROOTS = new Set(["apps", "packages", "infra", "ai"]);
-var ROOT_FILES2 = new Set([
+var ROOTS2 = new Set(["apps", "packages", "infra", "ai"]);
+var ROOT_FILES3 = new Set([
   "package.json",
   "bun.lock",
   "bunfig.toml",
@@ -258348,7 +258517,7 @@ async function collectWorkingSource(root, limits2 = {}) {
         return false;
       if (path === "packages/sdk" || path.startsWith("packages/sdk/"))
         return false;
-      return ROOTS.has(parts[0]) || !directory && ROOT_FILES2.has(path);
+      return ROOTS2.has(parts[0]) || !directory && ROOT_FILES3.has(path);
     }
   });
   return encodeSource(files, limits2.maxBytes ?? SOURCE_MAX_BYTES);
@@ -258372,44 +258541,110 @@ function encodeSource(entries, maxBytes) {
   return {
     files,
     bytes: bytes3,
-    hash: createHash10("sha256").update(bytes3).digest("hex"),
+    hash: createHash12("sha256").update(bytes3).digest("hex"),
     sizeBytes: bytes3.byteLength
   };
 }
 
+// frontend/packages/miniapp-kit/src/dev/schema-plan-cache.ts
+var CACHE_PATH = ".kit/cache/schema-plan.json";
+async function schemaPlanCacheKey(root, kitRoot, baseline) {
+  const hash4 = createHash13("sha256").update("schema-plan-v1\x00").update(await compilerFingerprint()).update(JSON.stringify(baseline)).update((await collectWorkingSource(root)).hash);
+  for (const path of ["platform/platform.zmodel", "package.json", "bun.lock"]) {
+    hash4.update(path).update("\x00").update(await optionalFile2(join37(kitRoot, path)) ?? "");
+  }
+  for (const path of [".kit/generated/schema.json", ".kit/generated/project.json"])
+    hash4.update(path).update("\x00").update(await optionalFile2(join37(root, path)) ?? "");
+  return hash4.digest("hex");
+}
+async function readSchemaPlanCache(root, key) {
+  const raw2 = await optionalFile2(join37(root, CACHE_PATH));
+  if (raw2 === null)
+    return null;
+  try {
+    const cached2 = JSON.parse(raw2.toString("utf8"));
+    if (!cached2 || typeof cached2 !== "object") {
+      console.warn("Cached schema preparation has invalid metadata; preparing again");
+      return null;
+    }
+    if (cached2.key !== key)
+      return null;
+    if (cached2.notification?.kind !== "schema" || cached2.checksum !== digest3(JSON.stringify(cached2.notification))) {
+      console.warn("Cached schema preparation failed its integrity check; preparing again");
+      return null;
+    }
+    console.info("kit: session schema preparation cache hit");
+    return cached2.notification;
+  } catch (error51) {
+    if (!(error51 instanceof SyntaxError))
+      throw error51;
+    console.warn("Cached schema preparation is invalid JSON; preparing again");
+    return null;
+  }
+}
+async function cacheSchemaPlan(root, key, notification) {
+  const path = join37(root, CACHE_PATH);
+  await mkdir15(join37(root, ".kit/cache"), { recursive: true });
+  const temporary = `${path}.${randomUUID4()}`;
+  await writeFile17(temporary, JSON.stringify({ key, checksum: digest3(JSON.stringify(notification)), notification }));
+  await rename5(temporary, path);
+}
+async function optionalFile2(path) {
+  try {
+    return await readFile28(path);
+  } catch (error51) {
+    if (error51.code === "ENOENT")
+      return null;
+    throw error51;
+  }
+}
+function digest3(bytes3) {
+  return createHash13("sha256").update(bytes3).digest("hex");
+}
+
 // frontend/packages/miniapp-kit/src/dev/watcher-build.ts
+init_session_runtime();
 async function prepareSessionChanges(options2, changes, signal, baseline = { revision: null, schemaSql: "" }) {
   const { root } = options2;
   const { manifest: manifest2 } = await prepareSessionRuntime(root);
   const events = [];
   signal.throwIfAborted();
   if (changes.schema) {
-    const plan = await prepareSchemaPlan(options2, baseline, signal);
-    const source = baseline.revision === null || plan.destructiveWithoutIntent ? await collectWorkingSource(root) : undefined;
-    const payload = {
-      ...plan,
-      ...source ? { source: { hash: source.hash, sizeBytes: source.sizeBytes } } : {}
-    };
-    const {
-      baseRevision: _baseRevision,
-      deltaSql: _deltaSql,
-      destructiveWithoutIntent: _destructive,
-      source: _source,
-      ...desired
-    } = payload;
-    events.push({
-      notification: {
-        kind: "schema",
-        payload: {
-          hash: digest3(JSON.stringify({
-            ...desired,
-            ...baseline.revision === null && source ? { sourceHash: source.hash } : {}
-          })),
-          ...payload
-        }
-      },
-      ...source ? { bundle: source.bytes } : {}
-    });
+    const cacheKey2 = baseline.revision ? await schemaPlanCacheKey(root, options2.kitRoot, baseline) : null;
+    const cached2 = cacheKey2 ? await readSchemaPlanCache(root, cacheKey2) : null;
+    if (cached2) {
+      events.push({ notification: cached2 });
+    } else {
+      const plan = await prepareSchemaPlan(options2, baseline, signal);
+      const source = baseline.revision === null || plan.destructiveWithoutIntent ? await collectWorkingSource(root) : undefined;
+      const payload = {
+        ...plan,
+        ...source ? { source: { hash: source.hash, sizeBytes: source.sizeBytes } } : {}
+      };
+      const {
+        baseRevision: _baseRevision,
+        deltaSql: _deltaSql,
+        destructiveWithoutIntent: _destructive,
+        source: _source,
+        ...desired
+      } = payload;
+      events.push({
+        notification: {
+          kind: "schema",
+          payload: {
+            hash: digest4(JSON.stringify({
+              ...desired,
+              ...baseline.revision === null && source ? { sourceHash: source.hash } : {}
+            })),
+            ...payload
+          }
+        },
+        ...source ? { bundle: source.bytes } : {}
+      });
+      const notification = events[events.length - 1].notification;
+      if (cacheKey2 && !source && notification.kind === "schema" && cacheKey2 === await schemaPlanCacheKey(root, options2.kitRoot, baseline))
+        await cacheSchemaPlan(root, cacheKey2, notification);
+    }
   }
   if (changes.samples && !changes.schema && baseline.revision) {
     const source = await collectWorkingSource(root);
@@ -258421,7 +258656,7 @@ async function prepareSessionChanges(options2, changes, signal, baseline = { rev
     events.push({
       notification: {
         kind: "sample",
-        payload: { hash: digest3(JSON.stringify(payload)), ...payload }
+        payload: { hash: digest4(JSON.stringify(payload)), ...payload }
       },
       bundle: source.bytes
     });
@@ -258446,34 +258681,34 @@ async function pythonEvent(root, appSlug, manifest2) {
   return {
     notification: {
       kind: "python",
-      payload: { hash: digest3(JSON.stringify(payload)), ...payload }
+      payload: { hash: digest4(JSON.stringify(payload)), ...payload }
     },
     bundle: source.bytes
   };
 }
 async function workerEvent(root, appSlug, kind, manifest2) {
-  const appDir = join36(root, "apps", appSlug);
-  const files = await collectFiles(join36(appDir, "src"));
+  const appDir = join38(root, "apps", appSlug);
+  const files = await collectFiles(join38(appDir, "src"));
   const sources = new Map(files.map((file2) => [`${appSlug}/src/${file2.path}`, new TextDecoder().decode(file2.bytes)]));
   const findings = checkAppNetwork(manifest2, sources);
   if (findings.length)
     throw new DevError(findings.map((finding2) => `${finding2.path}: ${finding2.code}: ${finding2.message}`).join(`
 `));
-  const output = join36(root, "dist", appSlug, "index.js");
+  const output = join38(root, "dist", appSlug, "index.js");
   const key = await workerCacheKey(root, appSlug, kind);
   let bundle = await readCachedWorker(root, appSlug, key);
   bundle ??= await readPrebuiltWorker(root, appSlug);
   if (bundle) {
-    await mkdir14(join36(root, "dist", appSlug), { recursive: true });
-    await writeFile16(output, bundle);
+    await mkdir16(join38(root, "dist", appSlug), { recursive: true });
+    await writeFile18(output, bundle);
     await cacheWorker(root, appSlug, key, bundle);
   } else {
     await buildWorkerBundle({ root, appDir, slug: appSlug, kind });
-    bundle = new Uint8Array(await readFile26(output));
+    bundle = new Uint8Array(await readFile29(output));
     await cacheWorker(root, appSlug, key, bundle);
   }
   const payload = {
-    bundleHash: digest3(bundle),
+    bundleHash: digest4(bundle),
     appSlug,
     kind,
     sizeBytes: bundle.byteLength,
@@ -258482,13 +258717,13 @@ async function workerEvent(root, appSlug, kind, manifest2) {
   return {
     notification: {
       kind: "worker",
-      payload: { hash: digest3(JSON.stringify(payload)), ...payload }
+      payload: { hash: digest4(JSON.stringify(payload)), ...payload }
     },
     bundle
   };
 }
-function digest3(bytes3) {
-  return createHash11("sha256").update(bytes3).digest("hex");
+function digest4(bytes3) {
+  return createHash14("sha256").update(bytes3).digest("hex");
 }
 
 // frontend/packages/miniapp-kit/src/dev/watcher-transport.ts
@@ -259010,7 +259245,7 @@ async function startDev(options2) {
   if (options2.live)
     return startLiveDev(options2, manifest2);
   const createLibsqlClient = options2.createLibsqlClient ?? await loadProjectLibsql(root, (m3) => new DevError(m3));
-  const projectName = String(JSON.parse(readFileSync4(join37(root, "package.json"), "utf8")).name ?? "");
+  const projectName = String(JSON.parse(readFileSync4(join39(root, "package.json"), "utf8")).name ?? "");
   const offset = process.env[KIT_LIVE_CONFIG_ENV] ? 100 : 0;
   const ports = options2.ports ?? {
     host: DEV_PORTS.host + offset,
@@ -259134,11 +259369,11 @@ async function startDev(options2) {
         if (!dist)
           await buildWorkerBundle({
             root,
-            appDir: join37(root, "apps", app.slug),
+            appDir: join39(root, "apps", app.slug),
             slug: app.slug,
             kind: app.kind
           });
-        const bytes3 = dist ? dist.files.get(`${app.slug}/index.js`) : readFileSync4(join37(root, "dist", app.slug, "index.js"));
+        const bytes3 = dist ? dist.files.get(`${app.slug}/index.js`) : readFileSync4(join39(root, "dist", app.slug, "index.js"));
         if (!bytes3)
           throw new DevError(`missing Worker bundle: ${app.slug}/index.js`);
         return {
@@ -259209,7 +259444,7 @@ async function startDev(options2) {
     for (const slug of dist ? [] : webApps) {
       const vite = await (options2.startVite ?? viteDev)({
         slug,
-        appDir: join37(root, "apps", slug),
+        appDir: join39(root, "apps", slug),
         port: appPorts[slug],
         env
       });
@@ -259366,7 +259601,7 @@ async function startLiveDev(options2, manifest2) {
         throw new DevError("live App configuration is incomplete");
       const vite = await (options2.startVite ?? viteDev)({
         slug,
-        appDir: join37(options2.root, "apps", slug),
+        appDir: join39(options2.root, "apps", slug),
         port,
         env: {
           [KIT_BUILD_ENV.projectId]: options2.projectId,
@@ -259655,7 +259890,7 @@ var execCommand = (command, args) => new Promise((resolve3, reject) => {
 init_src();
 import { randomBytes as randomBytes4 } from "node:crypto";
 import { existsSync as existsSync22 } from "node:fs";
-import { readFile as readFile27, realpath } from "node:fs/promises";
+import { readFile as readFile30, realpath } from "node:fs/promises";
 import { relative as relative4, resolve as resolve3, sep as sep3 } from "node:path";
 init_runtime2();
 init_session_runtime();
@@ -259663,7 +259898,7 @@ init_session_runtime();
 // frontend/packages/miniapp-kit/src/verify/browser.ts
 import { existsSync as existsSync21 } from "node:fs";
 import { createRequire as createRequire12 } from "node:module";
-import { join as join38 } from "node:path";
+import { join as join40 } from "node:path";
 import { pathToFileURL as pathToFileURL9 } from "node:url";
 
 class BrowserUnavailableError extends Error {
@@ -259673,7 +259908,7 @@ function resolvePlaywright() {
   const bases = [process.env.KIT_PLAYWRIGHT_DIR, process.cwd()].filter((base) => Boolean(base));
   for (const base of bases) {
     try {
-      return createRequire12(join38(base, "noop.js")).resolve("playwright-core");
+      return createRequire12(join40(base, "noop.js")).resolve("playwright-core");
     } catch {}
   }
   try {
@@ -259798,7 +260033,7 @@ async function runLiveE2E(options2) {
     grant: env.KIT_TEST_GRANT,
     identity: options2.identity
   });
-  const plan = await readFile27(resolve3(options2.root, "design/test-plan.md"), "utf8");
+  const plan = await readFile30(resolve3(options2.root, "design/test-plan.md"), "utf8");
   if (!plan.trim() || Buffer.byteLength(plan) > 128 * 1024 || plan.includes(input.grant))
     throw new LiveE2EError("Write a bounded, credential-free design/test-plan.md before live E2E");
   const { manifest: manifest2 } = await prepareSessionRuntime(options2.root);
@@ -259950,11 +260185,11 @@ async function checkKitUpdate(input) {
 }
 
 // frontend/packages/miniapp-kit/src/login.ts
-import { createHash as createHash12, randomBytes as randomBytes5 } from "node:crypto";
+import { createHash as createHash15, randomBytes as randomBytes5 } from "node:crypto";
 import { existsSync as existsSync23 } from "node:fs";
-import { chmod, mkdir as mkdir15, readFile as readFile28, rename as rename4, writeFile as writeFile17 } from "node:fs/promises";
+import { chmod, mkdir as mkdir17, readFile as readFile31, rename as rename6, writeFile as writeFile19 } from "node:fs/promises";
 import { createServer as createServer4 } from "node:http";
-import { join as join39 } from "node:path";
+import { join as join41 } from "node:path";
 var DEFAULT_MCP_URL = "https://fdpocket.dev/mcp/creator";
 var REDIRECT_URI = "http://127.0.0.1:43126/callback";
 var REFRESH_MARGIN_MS = 60000;
@@ -259968,10 +260203,10 @@ class LoginError extends Error {
 class LoginInProgress extends LoginError {
 }
 async function readLogins(configDir) {
-  const path = join39(configDir, CREDENTIALS_FILE);
+  const path = join41(configDir, CREDENTIALS_FILE);
   if (!existsSync23(path))
     return {};
-  const parsed = JSON.parse(await readFile28(path, "utf8"));
+  const parsed = JSON.parse(await readFile31(path, "utf8"));
   return parsed.logins ?? {};
 }
 async function writeLogin(configDir, mcpUrl, login) {
@@ -259980,13 +260215,13 @@ async function writeLogin(configDir, mcpUrl, login) {
     delete logins[mcpUrl];
   else
     logins[mcpUrl] = login;
-  await mkdir15(configDir, { recursive: true, mode: 448 });
-  const path = join39(configDir, CREDENTIALS_FILE);
+  await mkdir17(configDir, { recursive: true, mode: 448 });
+  const path = join41(configDir, CREDENTIALS_FILE);
   const temporary = `${path}.${process.pid}.tmp`;
-  await writeFile17(temporary, `${JSON.stringify({ logins }, null, 2)}
+  await writeFile19(temporary, `${JSON.stringify({ logins }, null, 2)}
 `, { mode: 384 });
   await chmod(temporary, 384);
-  await rename4(temporary, path);
+  await rename6(temporary, path);
 }
 async function getJson(fetch2, url2) {
   const response = await fetch2(url2);
@@ -260066,7 +260301,7 @@ async function login(mcpUrl, deps) {
     client_id: clientId,
     redirect_uri: REDIRECT_URI,
     state,
-    code_challenge: base64url3(createHash12("sha256").update(verifier).digest()),
+    code_challenge: base64url3(createHash15("sha256").update(verifier).digest()),
     code_challenge_method: "S256"
   }).toString();
   const code = await deps.authorize(url2.toString(), REDIRECT_URI, state);
@@ -260423,8 +260658,8 @@ init_src();
 init_dist();
 init_vendor();
 import { existsSync as existsSync24 } from "node:fs";
-import { mkdir as mkdir16, readdir as readdir14, readFile as readFile29, writeFile as writeFile18 } from "node:fs/promises";
-import { dirname as dirname11, join as join40, relative as relative5 } from "node:path";
+import { mkdir as mkdir18, readdir as readdir14, readFile as readFile32, writeFile as writeFile20 } from "node:fs/promises";
+import { dirname as dirname12, join as join42, relative as relative5 } from "node:path";
 var TEMPLATE_DIR = "templates/project";
 var DEFAULT_APP_SPECS = ["web", "admin"];
 var NAME_PATTERN = /^[a-z][a-z0-9-]{0,63}$/;
@@ -260459,19 +260694,19 @@ async function newProject(options2) {
   if (existsSync24(root) && (await readdir14(root)).some((entry2) => entry2 !== ".git")) {
     throw new NewProjectError(`${root} is not empty; kit new only fills an empty Project`);
   }
-  const template = join40(options2.kitRoot, TEMPLATE_DIR);
+  const template = join42(options2.kitRoot, TEMPLATE_DIR);
   const files = [];
   const sources = await listFiles(template);
   const put = async (target2, text2) => {
-    await mkdir16(dirname11(join40(root, target2)), { recursive: true });
-    await writeFile18(join40(root, target2), text2);
+    await mkdir18(dirname12(join42(root, target2)), { recursive: true });
+    await writeFile20(join42(root, target2), text2);
     files.push(target2);
   };
   for (const source of sources) {
     if (source.startsWith("apps/"))
       continue;
     const target2 = targetPath(source);
-    let text2 = fill(await readFile29(join40(template, source), "utf8"), { name: name3, title });
+    let text2 = fill(await readFile32(join42(template, source), "utf8"), { name: name3, title });
     if (target2 === PROJECT_PATHS.manifest) {
       const document2 = $parseDocument(text2);
       const original = document2.toJS().apps;
@@ -260521,7 +260756,7 @@ async function newProject(options2) {
     const prefix2 = `apps/${templateSlug}/`;
     for (const source of sources.filter((path) => path.startsWith(prefix2))) {
       const target2 = `apps/${slug}/${source.slice(prefix2.length)}`;
-      let text2 = fill(await readFile29(join40(template, source), "utf8"), { name: name3, title });
+      let text2 = fill(await readFile32(join42(template, source), "utf8"), { name: name3, title });
       if (target2.endsWith("/vite.config.ts"))
         text2 = text2.replace(`createAppConfig("${templateSlug}"`, `createAppConfig("${slug}"`);
       if (target2.endsWith("/package.json")) {
@@ -260616,7 +260851,7 @@ async function listFiles(root) {
   const files = [];
   const walk = async (dir) => {
     for (const entry2 of await readdir14(dir, { withFileTypes: true })) {
-      const path = join40(dir, entry2.name);
+      const path = join42(dir, entry2.name);
       if (entry2.isDirectory())
         await walk(path);
       else if (entry2.isFile())
@@ -260626,6 +260861,9 @@ async function listFiles(root) {
   await walk(root);
   return files.sort();
 }
+
+// frontend/packages/miniapp-kit/src/commands.ts
+init_pack();
 
 // frontend/packages/miniapp-kit/src/pulled.ts
 class PulledError extends Error {
@@ -260863,8 +261101,8 @@ function nextStep(error51) {
 
 // frontend/packages/miniapp-kit/src/read.ts
 import { execFile as execFile3 } from "node:child_process";
-import { mkdir as mkdir17, readdir as readdir15, readFile as readFile30, stat as stat3, writeFile as writeFile19 } from "node:fs/promises";
-import { extname, join as join41 } from "node:path";
+import { mkdir as mkdir19, readdir as readdir15, readFile as readFile33, stat as stat3, writeFile as writeFile21 } from "node:fs/promises";
+import { extname, join as join43 } from "node:path";
 var DOCUMENT_MAX_BYTES = 50 * 1024 * 1024;
 var TEXT_MAX_CHARS = 300000;
 var PAGES_MAX = 60;
@@ -261005,8 +261243,8 @@ ${page.trim()}`).join(`
   return { text: text2, pages: pages.length };
 }
 async function pdfImages(file2, out, range, deps) {
-  const directory = join41(out, "pages");
-  await mkdir17(directory, { recursive: true });
+  const directory = join43(out, "pages");
+  await mkdir19(directory, { recursive: true });
   try {
     await deps.run("pdftoppm", [
       "-png",
@@ -261017,7 +261255,7 @@ async function pdfImages(file2, out, range, deps) {
       "-l",
       String(range.last),
       file2,
-      join41(directory, "page")
+      join43(directory, "page")
     ], { timeoutMs: TOOL_TIMEOUT_MS });
   } catch (error51) {
     if (!(error51 instanceof ToolMissingError))
@@ -261025,7 +261263,7 @@ async function pdfImages(file2, out, range, deps) {
     return { images: [], note: "page images are unavailable: pdftoppm is not installed" };
   }
   const names = (await readdir15(directory)).filter((name3) => name3.endsWith(".png")).sort();
-  return { images: names.map((name3) => join41(directory, name3)), note: null };
+  return { images: names.map((name3) => join43(directory, name3)), note: null };
 }
 async function officeText(file2, deps) {
   return await deps.run("markitdown", [file2], { timeoutMs: TOOL_TIMEOUT_MS });
@@ -261036,8 +261274,8 @@ async function readDocument(options2, deps = realDeps) {
   if ((await stat3(options2.file)).size > maxBytes) {
     throw new ReadError(`${options2.file} is too large (limit ${maxBytes} bytes)`);
   }
-  checkContent(kind, await readFile30(options2.file), options2.file);
-  await mkdir17(options2.out, { recursive: true });
+  checkContent(kind, await readFile33(options2.file), options2.file);
+  await mkdir19(options2.out, { recursive: true });
   const notes = [];
   let pageCount = null;
   let images = [];
@@ -261056,13 +261294,13 @@ async function readDocument(options2, deps = realDeps) {
   } else if (kind === "docx" || kind === "pptx" || kind === "xlsx") {
     text2 = await officeText(options2.file, deps);
   } else {
-    text2 = (await readFile30(options2.file)).toString("utf8");
+    text2 = (await readFile33(options2.file)).toString("utf8");
   }
   const kept = cut(text2, options2.maxChars ?? TEXT_MAX_CHARS);
   if (kept.note)
     notes.push(kept.note);
-  const textPath = join41(options2.out, "text.md");
-  await writeFile19(textPath, kept.body);
+  const textPath = join43(options2.out, "text.md");
+  await writeFile21(textPath, kept.body);
   return {
     kind,
     textPath,
@@ -261076,8 +261314,8 @@ async function readDocument(options2, deps = realDeps) {
 
 // frontend/packages/miniapp-kit/src/repo.ts
 import { existsSync as existsSync25 } from "node:fs";
-import { appendFile, mkdir as mkdir18, readFile as readFile31, rm as rm15, writeFile as writeFile20 } from "node:fs/promises";
-import { join as join42 } from "node:path";
+import { appendFile, mkdir as mkdir20, readFile as readFile34, rm as rm16, writeFile as writeFile22 } from "node:fs/promises";
+import { join as join44 } from "node:path";
 class RepoError extends Error {
   name = "RepoError";
 }
@@ -261095,24 +261333,24 @@ async function configureRepo(git2, source, config3, author) {
   await set2(git2, source, `branch.${branch}.remote`, ".");
   await set2(git2, source, `branch.${branch}.merge`, trackingRef(config3.thread_ref));
   await set2(git2, source, `branch.${branch}.rebase`, "true");
-  const info = join42(source, ".git", "info");
-  await mkdir18(info, { recursive: true });
-  const excludePath = join42(info, "exclude");
-  const excluded = existsSync25(excludePath) ? (await readFile31(excludePath, "utf8")).split(`
+  const info = join44(source, ".git", "info");
+  await mkdir20(info, { recursive: true });
+  const excludePath = join44(info, "exclude");
+  const excluded = existsSync25(excludePath) ? (await readFile34(excludePath, "utf8")).split(`
 `) : [];
-  const missing = EXCLUDES.filter((line) => !excluded.includes(line));
-  if (missing.length > 0)
-    await appendFile(excludePath, `${missing.join(`
+  const missing2 = EXCLUDES.filter((line) => !excluded.includes(line));
+  if (missing2.length > 0)
+    await appendFile(excludePath, `${missing2.join(`
 `)}
 `);
 }
 function requireRepo(source) {
-  if (!existsSync25(join42(source, ".git"))) {
+  if (!existsSync25(join44(source, ".git"))) {
     throw new RepoError(`${source} is not a git repository; run kit.mjs clone in a new directory`);
   }
 }
 async function requireClean(git2, source, what) {
-  if (existsSync25(join42(source, ".git", "rebase-merge")) || existsSync25(join42(source, ".git", "rebase-apply"))) {
+  if (existsSync25(join44(source, ".git", "rebase-merge")) || existsSync25(join44(source, ".git", "rebase-apply"))) {
     throw new RepoError("a git rebase is in progress in source/; finish it (git rebase --continue) first");
   }
   if (await gitOk(git2, source, ["status", "--porcelain"]) !== "") {
@@ -261122,14 +261360,14 @@ async function requireClean(git2, source, what) {
 async function fetchBundles(git2, source, pulled, already, download2) {
   const listed = new Set(pulled.bundles.map((bundle2) => bundle2.sha256));
   const fetched = already.filter((sha) => listed.has(sha));
-  const dir = join42(source, ".git", "fdpocket-bundles");
-  await mkdir18(dir, { recursive: true });
+  const dir = join44(source, ".git", "fdpocket-bundles");
+  await mkdir20(dir, { recursive: true });
   for (const bundle2 of fetchOrder(pulled.bundles)) {
     if (fetched.includes(bundle2.sha256))
       continue;
     const bytes3 = await download2(`bundle ${bundle2.seq}`, bundle2.url, bundle2.sha256);
-    const file2 = join42(dir, `${bundle2.sha256}.bundle`);
-    await writeFile20(file2, bytes3);
+    const file2 = join44(dir, `${bundle2.sha256}.bundle`);
+    await writeFile22(file2, bytes3);
     try {
       await gitOk(git2, source, [
         "fetch",
@@ -261140,7 +261378,7 @@ async function fetchBundles(git2, source, pulled, already, download2) {
         `+refs/*:${REMOTE_REFS}/*`
       ]);
     } finally {
-      await rm15(file2, { force: true });
+      await rm16(file2, { force: true });
     }
     fetched.push(bundle2.sha256);
   }
@@ -261182,25 +261420,25 @@ async function integrate(git2, source, threadRef) {
 }
 
 // frontend/packages/miniapp-kit/src/sdk-fingerprint.ts
-import { createHash as createHash13 } from "node:crypto";
-import { readdir as readdir16, readFile as readFile32 } from "node:fs/promises";
-import { join as join43, relative as relative6, sep as sep4 } from "node:path";
+import { createHash as createHash16 } from "node:crypto";
+import { readdir as readdir16, readFile as readFile35 } from "node:fs/promises";
+import { join as join45, relative as relative6, sep as sep4 } from "node:path";
 async function sdkVendorHash(kitRoot) {
-  const root = join43(kitRoot, "vendor");
+  const root = join45(kitRoot, "vendor");
   const entries = await readdir16(root, { recursive: true, withFileTypes: true });
-  const files = entries.filter((entry2) => entry2.isFile()).map((entry2) => relative6(root, join43(entry2.parentPath, entry2.name)).split(sep4).join("/")).sort();
-  const digest4 = createHash13("sha256");
+  const files = entries.filter((entry2) => entry2.isFile()).map((entry2) => relative6(root, join45(entry2.parentPath, entry2.name)).split(sep4).join("/")).sort();
+  const digest5 = createHash16("sha256");
   for (const path of files) {
-    const content = await readFile32(join43(root, path));
-    digest4.update(`${path}\x00${createHash13("sha256").update(content).digest("hex")}
+    const content = await readFile35(join45(root, path));
+    digest5.update(`${path}\x00${createHash16("sha256").update(content).digest("hex")}
 `);
   }
-  return digest4.digest("hex");
+  return digest5.digest("hex");
 }
 
 // frontend/packages/miniapp-kit/src/shot.ts
-import { mkdir as mkdir19 } from "node:fs/promises";
-import { join as join44 } from "node:path";
+import { mkdir as mkdir21 } from "node:fs/promises";
+import { join as join46 } from "node:path";
 class ShotError extends Error {
   name = "ShotError";
 }
@@ -261307,7 +261545,7 @@ async function appFrame(page) {
 }
 async function takeShots(options2, launch = launchChromium) {
   const url3 = hostPageUrl(options2);
-  await mkdir19(options2.out, { recursive: true });
+  await mkdir21(options2.out, { recursive: true });
   const browser = await launch();
   const notes = [];
   const shots = [];
@@ -261336,7 +261574,7 @@ async function takeShots(options2, launch = launchChromium) {
         const inspected = await frame2.evaluate(inspectPage, limits2);
         const height = Math.min(MAX_HEIGHT, Math.max(MIN_HEIGHT, inspected.height));
         await page.setViewportSize({ width, height });
-        const file2 = join44(options2.out, `${options2.app}-${width}.png`);
+        const file2 = join46(options2.out, `${options2.app}-${width}.png`);
         await page.screenshot({ path: file2, type: "png" });
         shots.push({
           width,
@@ -261404,8 +261642,8 @@ function captureName(id) {
 // frontend/packages/miniapp-kit/src/verify/external-history.ts
 init_src();
 init_src2();
-import { readFile as readFile33 } from "node:fs/promises";
-import { join as join45 } from "node:path";
+import { readFile as readFile36 } from "node:fs/promises";
+import { join as join47 } from "node:path";
 function parseExternalHistoryContext(text2) {
   if (Buffer.byteLength(text2, "utf8") > 1024 * 1024)
     throw new Error("External history context is too large");
@@ -261464,7 +261702,7 @@ async function verifyExternalHistory(options2) {
         return migration;
       let meta3 = null;
       try {
-        meta3 = JSON.parse(await readFile33(join45(root, PROJECT_PATHS.migrations, migration.name, "meta.json"), "utf8"));
+        meta3 = JSON.parse(await readFile36(join47(root, PROJECT_PATHS.migrations, migration.name, "meta.json"), "utf8"));
       } catch {}
       return { ...migration, meta: meta3 };
     }));
@@ -261495,13 +261733,13 @@ class ValidationFailed extends Error {
 // frontend/packages/miniapp-kit/src/verify/validate.ts
 init_src();
 init_src2();
-import { mkdir as mkdir21, writeFile as writeFile22 } from "node:fs/promises";
-import { join as join48 } from "node:path";
+import { mkdir as mkdir23, writeFile as writeFile24 } from "node:fs/promises";
+import { join as join50 } from "node:path";
 
 // frontend/packages/miniapp-kit/src/verify/dynamic.ts
 init_src2();
-import { mkdir as mkdir20, writeFile as writeFile21 } from "node:fs/promises";
-import { join as join47 } from "node:path";
+import { mkdir as mkdir22, writeFile as writeFile23 } from "node:fs/promises";
+import { join as join49 } from "node:path";
 
 // frontend/packages/miniapp-kit/src/verify/erase.ts
 init_src3();
@@ -261510,9 +261748,9 @@ init_src2();
 init_runtime2();
 init_seed();
 import { existsSync as existsSync26 } from "node:fs";
-import { mkdtemp as mkdtemp5, rm as rm16 } from "node:fs/promises";
+import { mkdtemp as mkdtemp6, rm as rm17 } from "node:fs/promises";
 import { tmpdir as tmpdir2 } from "node:os";
-import { join as join46 } from "node:path";
+import { join as join48 } from "node:path";
 var failed3 = (message2) => ({
   code: "ERASE_TEST_FAILED",
   path: PROJECT_PATHS.eraseTest,
@@ -261521,7 +261759,7 @@ var failed3 = (message2) => ({
 var describe4 = (error51) => error51 instanceof Error ? error51.message : String(error51);
 async function runEraseTest(options2) {
   const { root } = options2;
-  if (!existsSync26(join46(root, PROJECT_PATHS.eraseTest))) {
+  if (!existsSync26(join48(root, PROJECT_PATHS.eraseTest))) {
     return {
       errors: [],
       warnings: [
@@ -261536,15 +261774,15 @@ async function runEraseTest(options2) {
   const manifest2 = JSON.parse(await readGenerated(root, "project.json"));
   const schema2 = JSON.parse(await readGenerated(root, "schema.json"));
   const importModule = options2.importModule ?? defaultImporter(root, manifest2);
-  const dir = await mkdtemp5(join46(tmpdir2(), "kit-erase-"));
-  const db = options2.createLibsqlClient({ url: `file:${join46(dir, "erase.db")}` });
+  const dir = await mkdtemp6(join48(tmpdir2(), "kit-erase-"));
+  const db = options2.createLibsqlClient({ url: `file:${join48(dir, "erase.db")}` });
   try {
     for (const part of await devDatabaseSql(root))
       await applySql(db, part.sql);
     await runSeed({ root, db, manifest: manifest2, importModule });
     let test;
     try {
-      test = (await importModule(join46(root, PROJECT_PATHS.eraseTest))).default;
+      test = (await importModule(join48(root, PROJECT_PATHS.eraseTest))).default;
     } catch (error51) {
       return { errors: [failed3(`could not be loaded: ${describe4(error51)}`)], warnings: [] };
     }
@@ -261587,7 +261825,7 @@ async function runEraseTest(options2) {
     return { errors: [], warnings: [] };
   } finally {
     db.close();
-    await rm16(dir, { recursive: true, force: true });
+    await rm17(dir, { recursive: true, force: true });
   }
 }
 
@@ -261784,7 +262022,7 @@ async function runDynamicChecks(options2) {
   });
   const browser = await (options2.launch ?? launchChromium)();
   try {
-    await mkdir20(join47(options2.outDir, "screenshots"), { recursive: true });
+    await mkdir22(join49(options2.outDir, "screenshots"), { recursive: true });
     const observations = [];
     const at = (app) => ({
       hostUrl: dev.hostUrl,
@@ -261820,7 +262058,7 @@ async function runDynamicChecks(options2) {
       gatewayUrl: dev.gatewayUrl,
       appOrigins: dev.appOrigins
     });
-    await writeFile21(join47(options2.outDir, "permission-matrix.json"), `${JSON.stringify(matrix, null, 1)}
+    await writeFile23(join49(options2.outDir, "permission-matrix.json"), `${JSON.stringify(matrix, null, 1)}
 `);
     const erase = await runEraseTest({
       root: options2.root,
@@ -261828,7 +262066,7 @@ async function runDynamicChecks(options2) {
     });
     const judged = judgeDynamic(options2.manifest, observations);
     const workerResults = await dev.checkWorkers();
-    await writeFile21(join47(options2.outDir, "worker-mocks.json"), `${JSON.stringify({ results: workerResults, events: dev.workerEvents() }, null, 1)}
+    await writeFile23(join49(options2.outDir, "worker-mocks.json"), `${JSON.stringify({ results: workerResults, events: dev.workerEvents() }, null, 1)}
 `);
     const workerErrors = workerResults.filter((result) => result.status >= (result.kind === "jobs" ? 400 : 500)).map((result) => ({
       code: "WORKER_RUNTIME_FAILED",
@@ -261906,7 +262144,7 @@ async function observe(context, visit2, at, shot) {
     if (shot)
       await page.waitForTimeout(shot.settleMs);
     const name3 = shot?.name ?? `screenshots/${visit2.app}-${visit2.principal}.png`;
-    await writeFile21(join47(at.outDir, name3), await page.locator("#frame").screenshot());
+    await writeFile23(join49(at.outDir, name3), await page.locator("#frame").screenshot());
     observation.screenshot = name3;
     return observation;
   } finally {
@@ -261993,19 +262231,19 @@ async function validateVersion(options2) {
     ...result.report,
     ...externalHistory ? { externalHistoryChecked: externalHistory.errors.length === 0 } : {}
   });
-  await mkdir21(options2.outDir, { recursive: true });
-  await writeFile22(join48(options2.outDir, "report.json"), `${JSON.stringify(report2, null, 2)}
+  await mkdir23(options2.outDir, { recursive: true });
+  await writeFile24(join50(options2.outDir, "report.json"), `${JSON.stringify(report2, null, 2)}
 `);
   if (result.schemaJson !== undefined) {
-    await writeFile22(join48(options2.outDir, "schema.json"), result.schemaJson);
+    await writeFile24(join50(options2.outDir, "schema.json"), result.schemaJson);
   }
   return report2;
 }
 
 // frontend/packages/miniapp-kit/src/workdir.ts
 import { existsSync as existsSync27 } from "node:fs";
-import { readFile as readFile34, unlink, writeFile as writeFile23 } from "node:fs/promises";
-import { dirname as dirname12, join as join49 } from "node:path";
+import { readFile as readFile37, unlink, writeFile as writeFile25 } from "node:fs/promises";
+import { dirname as dirname13, join as join51 } from "node:path";
 var CONFIG_FILE = ".fdpocket.json";
 var LEGACY_CONFIG_FILE = ".tokoyo.json";
 var WORKDIR_DIRS = {
@@ -262078,10 +262316,10 @@ function locateWorkdir(start) {
   return locateFile(start, CONFIG_FILE);
 }
 function locateFile(start, name3) {
-  for (let current = start;; current = dirname12(current)) {
-    if (existsSync27(join49(current, name3)))
+  for (let current = start;; current = dirname13(current)) {
+    if (existsSync27(join51(current, name3)))
       return current;
-    if (dirname12(current) === current)
+    if (dirname13(current) === current)
       return null;
   }
 }
@@ -262091,9 +262329,9 @@ async function migrateLegacyWorkdir(start) {
   const found = locateFile(start, LEGACY_CONFIG_FILE);
   if (found === null)
     return null;
-  const { app_id, ...rest } = JSON.parse(await readFile34(join49(found, LEGACY_CONFIG_FILE), "utf8"));
-  await writeFile23(join49(found, CONFIG_FILE), serializeConfig(parseConfig(JSON.stringify({ project_id: app_id, ...rest }))));
-  await unlink(join49(found, LEGACY_CONFIG_FILE));
+  const { app_id, ...rest } = JSON.parse(await readFile37(join51(found, LEGACY_CONFIG_FILE), "utf8"));
+  await writeFile25(join51(found, CONFIG_FILE), serializeConfig(parseConfig(JSON.stringify({ project_id: app_id, ...rest }))));
+  await unlink(join51(found, LEGACY_CONFIG_FILE));
   return found;
 }
 async function findWorkdir(start) {
@@ -262155,11 +262393,11 @@ class CommandError extends Error {
 }
 function defaultConfigDir() {
   const xdg = process.env.XDG_CONFIG_HOME;
-  return join50(xdg && xdg !== "" ? xdg : join50(homedir(), ".config"), "fdpocket");
+  return join52(xdg && xdg !== "" ? xdg : join52(homedir(), ".config"), "fdpocket");
 }
 function defaultCodexHome() {
   const home = process.env.CODEX_HOME;
-  return home && home !== "" ? home : join50(homedir(), ".codex");
+  return home && home !== "" ? home : join52(homedir(), ".codex");
 }
 async function readStdin() {
   const chunks = [];
@@ -262268,35 +262506,35 @@ async function runCommand(args, context) {
 var print = (context, value2) => context.stdout(JSON.stringify(value2, null, 2));
 var mcpUrlOf = (flag) => flag ?? process.env.CREATOR_MCP_URL ?? DEFAULT_MCP_URL;
 async function kitVersion(kitRoot) {
-  const manifest2 = join50(kitRoot, ".claude-plugin", "plugin.json");
+  const manifest2 = join52(kitRoot, ".claude-plugin", "plugin.json");
   if (!existsSync28(manifest2))
     throw new CommandError(`${manifest2} is missing; reinstall the Kit`);
-  const version3 = JSON.parse(await readFile35(manifest2, "utf8")).version;
+  const version3 = JSON.parse(await readFile38(manifest2, "utf8")).version;
   if (typeof version3 !== "string")
     throw new CommandError(`${manifest2} has no version`);
   return version3;
 }
 async function readConfig(workdir) {
-  return parseConfig(await readFile35(join50(workdir, CONFIG_FILE), "utf8"));
+  return parseConfig(await readFile38(join52(workdir, CONFIG_FILE), "utf8"));
 }
 async function saveConfig(workdir, config3) {
-  await writeFile24(join50(workdir, CONFIG_FILE), serializeConfig(config3));
+  await writeFile26(join52(workdir, CONFIG_FILE), serializeConfig(config3));
 }
-var sourceOf = (workdir) => join50(workdir, WORKDIR_DIRS.source);
+var sourceOf = (workdir) => join52(workdir, WORKDIR_DIRS.source);
 var AGENTS_TITLE = agentsMd("").split(`
 `)[0];
 async function writeAgentFiles(workdir, kitRoot) {
-  const agents = join50(workdir, "AGENTS.md");
-  if (!existsSync28(agents) || (await readFile35(agents, "utf8")).startsWith(AGENTS_TITLE)) {
-    await writeFile24(agents, agentsMd(kitRoot));
+  const agents = join52(workdir, "AGENTS.md");
+  if (!existsSync28(agents) || (await readFile38(agents, "utf8")).startsWith(AGENTS_TITLE)) {
+    await writeFile26(agents, agentsMd(kitRoot));
   }
-  const claude = join50(workdir, "CLAUDE.md");
+  const claude = join52(workdir, "CLAUDE.md");
   if (!existsSync28(claude))
-    await writeFile24(claude, CLAUDE_MD);
+    await writeFile26(claude, CLAUDE_MD);
 }
 async function fetchVerified(context, name3, url3, sha2562) {
   const bytes3 = await context.download(url3);
-  const actual = createHash14("sha256").update(bytes3).digest("hex");
+  const actual = createHash17("sha256").update(bytes3).digest("hex");
   if (sha2562 !== undefined && actual !== sha2562.toLowerCase()) {
     throw new CommandError(`${name3}: sha256 is ${actual}, expected ${sha2562}; nothing was changed`);
   }
@@ -262317,7 +262555,7 @@ async function clone4(context, flags) {
   }
   const pulled = parsePulled(bundles);
   const workdir = context.cwd;
-  const path = join50(workdir, CONFIG_FILE);
+  const path = join52(workdir, CONFIG_FILE);
   if (existsSync28(path)) {
     const existing = await readConfig(workdir);
     if (existing.project_id !== pulled.project_id) {
@@ -262330,7 +262568,7 @@ async function clone4(context, flags) {
     throw new CommandError(`${source} is not empty; clone into a new directory`);
   }
   for (const dir of Object.values(WORKDIR_DIRS))
-    await mkdir22(join50(workdir, dir), { recursive: true });
+    await mkdir24(join52(workdir, dir), { recursive: true });
   const branch = threadBranch(pulled.thread_ref);
   await gitOk(context.git, workdir, ["init", "-q", "-b", branch, source]);
   const config3 = {
@@ -262477,7 +262715,7 @@ async function push(context, flags) {
     },
     mcp: mcpFor(context, config3.mcp_url),
     sleep,
-    newRequestKey: randomUUID4
+    newRequestKey: randomUUID5
   }, {
     message: flags.message,
     ...revision === undefined ? {} : { policyRevision: Number(revision) },
@@ -262488,16 +262726,16 @@ async function push(context, flags) {
   print(context, { ...result, ...update.status === "outdated" ? { kit_update: update } : {} });
 }
 async function writeBuildReport(workdir, built, policyRevision) {
-  const path = join50(workdir, WORKDIR_DIRS.outputs, "build-report.json");
+  const path = join52(workdir, WORKDIR_DIRS.outputs, "build-report.json");
   const report2 = completeBuildReport({
-    existing: existsSync28(path) ? JSON.parse(await readFile35(path, "utf8")) : null,
-    projectYaml: await readFile35(join50(sourceOf(workdir), "infra", "project.yaml"), "utf8"),
+    existing: existsSync28(path) ? JSON.parse(await readFile38(path, "utf8")) : null,
+    projectYaml: await readFile38(join52(sourceOf(workdir), "infra", "project.yaml"), "utf8"),
     apps: built.apps,
     schemaVersion: built.schema_version,
     ...policyRevision === undefined ? {} : { policyRevision }
   });
-  await mkdir22(dirname13(path), { recursive: true });
-  await writeFile24(path, `${JSON.stringify(report2, null, 2)}
+  await mkdir24(dirname14(path), { recursive: true });
+  await writeFile26(path, `${JSON.stringify(report2, null, 2)}
 `);
 }
 async function mcpServe(context, flags) {
@@ -262535,7 +262773,7 @@ async function doctor(context) {
     throw new CommandError('some checks failed; follow each "fix" above');
 }
 async function kitUpdate(context) {
-  const manifest2 = JSON.parse(await readFile35(join50(context.kitRoot, ".claude-plugin", "plugin.json"), "utf8"));
+  const manifest2 = JSON.parse(await readFile38(join52(context.kitRoot, ".claude-plugin", "plugin.json"), "utf8"));
   const current = typeof manifest2.version === "string" ? manifest2.version : "unknown";
   if (process.env.KIT_TOOL_ROOT)
     return { status: "unknown", current };
@@ -262663,7 +262901,7 @@ async function validate(context, flags) {
     root,
     kitRoot: context.kitRoot,
     git: context.git,
-    archive: new Uint8Array(await readFile35(resolve4(context.cwd, flags.archive))),
+    archive: new Uint8Array(await readFile38(resolve4(context.cwd, flags.archive))),
     outDir: resolve4(context.cwd, flags.out),
     projectId: flags["project-id"],
     gatewayUrl: flags["gateway-url"],
@@ -262671,9 +262909,9 @@ async function validate(context, flags) {
     sdkUpdate: flags["sdk-update"] === "true",
     skipDynamic: flags["skip-dynamic"] === "true",
     ...flags["external-history"] ? {
-      externalHistory: parseExternalHistoryContext(await readFile35(resolve4(context.cwd, flags["external-history"]), "utf8"))
+      externalHistory: parseExternalHistoryContext(await readFile38(resolve4(context.cwd, flags["external-history"]), "utf8"))
     } : {},
-    ...flags.captures ? { captures: parseCaptures(await readFile35(resolve4(context.cwd, flags.captures), "utf8")) } : {}
+    ...flags.captures ? { captures: parseCaptures(await readFile38(resolve4(context.cwd, flags.captures), "utf8")) } : {}
   });
   print(context, {
     passed: report2.passed,
@@ -262742,7 +262980,7 @@ async function connectedDev(context, workdir, config3, as) {
     throw new CommandError("--connect needs at least one web App");
   const appPorts = allocateAppPorts(webSlugs);
   await assertConnectedPorts([4320, ...Object.values(appPorts)]);
-  const projectPackage = JSON.parse(await readFile35(join50(root, "package.json"), "utf8"));
+  const projectPackage = JSON.parse(await readFile38(join52(root, "package.json"), "utf8"));
   const name3 = projectPackage && typeof projectPackage === "object" && "name" in projectPackage && typeof projectPackage.name === "string" ? projectPackage.name : "project";
   const scope = {
     projectId: config3.project_id,
@@ -262871,16 +263109,16 @@ async function pack(context) {
   if (tip === base) {
     throw new CommandError("no new commits since the head kit.mjs pull took (base_commit_oid); git commit first");
   }
-  const outputs = join50(workdir, WORKDIR_DIRS.outputs);
-  const reportPath = join50(outputs, "build-report.json");
+  const outputs = join52(workdir, WORKDIR_DIRS.outputs);
+  const reportPath = join52(outputs, "build-report.json");
   if (!existsSync28(reportPath)) {
     throw new CommandError("outputs/build-report.json is missing; write it first (instructions.md §2)");
   }
-  const dist = join50(source, "dist");
+  const dist = join52(source, "dist");
   if (!existsSync28(dist))
     throw new CommandError("source/dist is missing; kit.mjs build first");
-  await mkdir22(outputs, { recursive: true });
-  const bundlePath = join50(outputs, "source.bundle");
+  await mkdir24(outputs, { recursive: true });
+  const bundlePath = join52(outputs, "source.bundle");
   await gitOk(context.git, source, [
     "bundle",
     "create",
@@ -262890,12 +263128,12 @@ async function pack(context) {
     ...base === null ? [] : [`^${base}`]
   ]);
   const distArchive = buildDistArchive(await collectFiles(dist));
-  await writeFile24(join50(outputs, "dist.tar.gz"), distArchive);
+  await writeFile26(join52(outputs, "dist.tar.gz"), distArchive);
   print(context, {
     files: {
-      "source.bundle": describeFile(new Uint8Array(await readFile35(bundlePath))),
+      "source.bundle": describeFile(new Uint8Array(await readFile38(bundlePath))),
       "dist.tar.gz": describeFile(distArchive),
-      "build-report.json": describeFile(new Uint8Array(await readFile35(reportPath)))
+      "build-report.json": describeFile(new Uint8Array(await readFile38(reportPath)))
     },
     project_id: config3.project_id,
     session_id: config3.session_id,
@@ -262919,7 +263157,7 @@ async function uploadOutputs(context, flags) {
       throw new CommandError(`--urls has no URL for ${name3}`);
   }
   for (const [name3, contentType2] of Object.entries(OUTPUT_FILES)) {
-    const bytes3 = new Uint8Array(await readFile35(join50(workdir, WORKDIR_DIRS.outputs, name3)));
+    const bytes3 = new Uint8Array(await readFile38(join52(workdir, WORKDIR_DIRS.outputs, name3)));
     await upload(name3, urls[name3], bytes3, contentType2, context.fetch);
   }
   print(context, { uploaded: Object.keys(OUTPUT_FILES) });
@@ -262980,9 +263218,9 @@ async function addAsset(context, flags) {
   }
   const workdir = await findWorkdir(context.cwd);
   const bytes3 = await fetchVerified(context, path, flags.url, flags.sha256);
-  const target2 = join50(sourceOf(workdir), ...segments);
-  await mkdir22(dirname13(target2), { recursive: true });
-  await writeFile24(target2, bytes3);
+  const target2 = join52(sourceOf(workdir), ...segments);
+  await mkdir24(dirname14(target2), { recursive: true });
+  await writeFile26(target2, bytes3);
   print(context, {
     path,
     ...describeFile(bytes3),
@@ -263015,8 +263253,8 @@ async function codexConfig(context, flags) {
     context.stdout(codexApprovalToml(pluginId, MCP_SERVER_NAME));
     return;
   }
-  const path = join50(context.codexHome, "config.toml");
-  const existing = existsSync28(path) ? await readFile35(path, "utf8") : "";
+  const path = join52(context.codexHome, "config.toml");
+  const existing = existsSync28(path) ? await readFile38(path, "utf8") : "";
   let merged;
   try {
     merged = mergeCodexApproval(existing, pluginId, MCP_SERVER_NAME);
@@ -263027,8 +263265,8 @@ async function codexConfig(context, flags) {
   }
   const changed = merged !== existing;
   if (changed) {
-    await mkdir22(context.codexHome, { recursive: true });
-    await writeFile24(path, merged);
+    await mkdir24(context.codexHome, { recursive: true });
+    await writeFile26(path, merged);
   }
   print(context, {
     written: path,
@@ -263089,7 +263327,7 @@ async function e2eCommand(context, flags) {
 
 // frontend/packages/miniapp-kit/src/cli.ts
 function kitRootOf(scriptUrl) {
-  return resolve5(dirname14(fileURLToPath(scriptUrl)), "..");
+  return resolve5(dirname15(fileURLToPath2(scriptUrl)), "..");
 }
 async function main(argv, scriptUrl) {
   let args;
