@@ -1,6 +1,6 @@
 ---
 name: fdpocket-release
-description: 自分のチャットのブランチを main へ取り込み（adopt_branch）、公開を依頼する（publish_project → get_publication）。オーナーとアプリの管理者だけ。呼ぶ前の必須チェック（check・push の ready・kit dev で全画面 App と権限の違い・DB と権限の変更・main の確認用環境・掲載情報・公開範囲）を省略せずに行い、利用者の明示的な了承を得てから呼ぶ。「main に取り込んで」「マージして」「公開して」「リリースして」のときに使う。adopt, merge into main, publish, release.
+description: 自分のチャットのブランチを main へ取り込み（adopt_branch）、公開を依頼する（publish_project → get_publication）。取り込みは編集者（write 以上）、公開はオーナーとアプリの管理者だけ。呼ぶ前の必須チェック（check・push の ready・kit dev で全画面 App と権限の違い・DB と権限の変更・main の確認用環境・掲載情報・公開範囲）を省略せずに行い、利用者の明示的な了承を得てから呼ぶ。「main に取り込んで」「マージして」「公開して」「リリースして」のときに使う。adopt, merge into main, publish, release.
 user-invocable: false
 ---
 
@@ -9,7 +9,8 @@ user-invocable: false
 作業ディレクトリ（`.fdpocket.json` のあるところ）で行う。`<kit>` は `.fdpocket.json` の `kit_root`。
 手順・エラーの正本は **`<kit>/profile/instructions.md` §8.7**。
 
-- できるのは**オーナーとアプリの管理者だけ**。write のコラボレーター・外部の参加者は `FORBIDDEN`（`not_project_admin`）。
+- 取り込み（A）は**アプリの編集者**（write のコラボレーター・管理者・オーナー）。DB・権限の変更を含むときは、取り込む人とチャットを書いた人の両方が管理者でないと `FORBIDDEN`（`policy_change_requires_admin`）。
+- 公開（B）は**オーナーとアプリの管理者だけ**。write は `FORBIDDEN`（`not_project_admin`）。
   外部参加のブランチ（`requires_proposal`）は `$fdpocket-propose` で提案する。
 - `adopt_branch` も `publish_project` も、**クライアントが利用者に確認を求める**。断られたらそれ以上押さない。
 - **下の必須チェックは 1 つも省略しない。** 結果を利用者に報告し、会話で「取り込んでよい」「公開してよい」と明示的な了承を得てから呼ぶ。

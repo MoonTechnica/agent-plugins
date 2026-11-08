@@ -301,7 +301,7 @@ main の参照権限がある場合は、同じ `session_id` の `get_git_bundle
 | `FORBIDDEN` | この App を編集できない。利用者に確認する |
 | `INVALID_ACTION` | マージ中・生成中など、今は送れない。`get_project` の `running_job` / `merge_in_progress` を見て待つ |
 
-main への取り込みと公開は §8.7（オーナーと管理者だけ）。**投稿・削除・クレジット・チーム・通報は制作画面で利用者が行う**（MCP には無い）。
+main への取り込み（編集者）と公開（オーナーと管理者）は §8.7。**投稿・削除・クレジット・チーム・通報は制作画面で利用者が行う**（MCP には無い）。
 
 ### 8.6 リミックスと提案（`$fdpocket-remix` / `$fdpocket-propose` / `$fdpocket-proposals`）
 
@@ -322,10 +322,11 @@ main への取り込みと公開は §8.7（オーナーと管理者だけ）。
 | `INVALID_ACTION`（`proposal_already_open`） | `update_proposal` で版を差し替える |
 | `RATE_LIMITED` | 提案は 1 日 20 件、コメントは 1 日 200 件まで。待つ |
 
-### 8.7 main への取り込みと公開（`$fdpocket-release`。オーナーと管理者だけ）
+### 8.7 main への取り込みと公開（`$fdpocket-release`）
 
-オーナーとアプリの管理者は、自分のチャットのブランチを main へ取り込み（`adopt_branch`。制作画面の「変更を取り込む」と同じ）、
-公開を依頼できる（`publish_project`。制作画面の「公開する」と同じ。進めるのはサーバー）。write のコラボレーターや外部の参加者には断られる（`FORBIDDEN` / `not_project_admin`）。
+アプリの編集者（write のコラボレーター・管理者・オーナー）は、自分のチャットのブランチを main へ取り込める（`adopt_branch`。制作画面の「変更を取り込む」と同じ）。
+DB（`packages/db-schema`）・権限（`project.yaml` の権限に関わるキー）の変更を含むときは、取り込む人とチャットを書いた人の両方が管理者でないと断られる（`FORBIDDEN` / `policy_change_requires_admin`）。
+公開の依頼（`publish_project`。制作画面の「公開する」と同じ。進めるのはサーバー）はオーナーと管理者だけ（write には `FORBIDDEN` / `not_project_admin`）。外部の参加者のブランチは取り込めない（提案する）。
 どちらも**クライアントが利用者に確認を求める**。断られたらそれ以上押さない。
 
 **どちらも、呼ぶ前に下の必須チェックをすべて行い、結果を利用者に報告し、会話で明示的に了承を得る。省略しない。**
@@ -358,7 +359,9 @@ main への取り込みと公開は §8.7（オーナーと管理者だけ）。
 
 | エラー | すること |
 |---|---|
-| `FORBIDDEN`（`not_project_admin`） | オーナーと管理者だけの操作。制作画面で権限のある人に頼むよう伝えて止まる |
+| `FORBIDDEN`（`not_project_admin`） | 公開はオーナーと管理者だけ。権限のある人に頼むよう伝えて止まる |
+| `FORBIDDEN`（`policy_change_requires_admin`） | DB・権限の変更は管理者だけが取り込める。管理者に頼むか、その変更を外して push し直す |
+| `FORBIDDEN`（`not_project_editor`） | 取り込めるのは編集者（write 以上）だけ。`open_proposal` で提案する |
 | `FORBIDDEN`（`requires_proposal`） | 外部参加のブランチは直接取り込めない。`open_proposal` で提案する（§8.6） |
 | `NOT_PUBLISHABLE` | `reasons` を利用者に伝えて直す（`ARTIFACT_UNAVAILABLE` は main の配備を待つ） |
 | `INVALID_ACTION`（`publication_in_progress`） | 別の公開が進んでいる。`get_publication` で見る |
