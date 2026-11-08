@@ -21779,6 +21779,16 @@ var bootMessageSchema = strictObject({
   type: literal("boot"),
   ok: boolean2()
 });
+var BOOT_STAGES = [
+  "engine_script_loaded",
+  "engine_initialized",
+  "pack_loaded",
+  "engine_started"
+];
+var bootProgressMessageSchema = strictObject({
+  type: literal("boot_progress"),
+  stage: _enum(BOOT_STAGES)
+});
 var avatarKeySchema = string2().min(1).max(512).regex(/^(?!\/)(?!.*(?:^|\/)\.\.(?:\/|$))[A-Za-z0-9._\-/]+$/, "must be a storage key");
 var avatarRequestMessageSchema = strictObject({
   type: literal("avatar_request"),
