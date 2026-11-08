@@ -119,6 +119,7 @@ Project は利用者向けの `web` と、必要なら管理用の `admin` の A
 2. **データ**（`$fdpocket-app-data-model`）: `packages/db-schema/schema.zmodel` に業務モデルとポリシーを書き、
    `node <kit>/scripts/kit.mjs generate` → `node <kit>/scripts/kit.mjs db migrate --slug <slug>` で `migrations/` に新しい migration を作り、commit する
    （commit 済みの migration は書き換えない。次の変更は新しい migration）。破壊的な変更（`kit db diff` の `destructive` が true）なら、`migrate` の前に `pending/intent.yaml`（と `pending/data.sql`）を書く。
+   `pending/data.sql` は既存の値を移すためだけに使い、新しい行の `INSERT … VALUES` を書かない（main と本番にそのまま入る）。固定の行は `masters.ts`、見本の行は `seed.ts`（`$fdpocket-app-data-model`「行をどこに書くか」）。
    試用データを `packages/db-schema/seed.ts` に。
 3. **project.yaml**: 各 App が使うモデル × 操作・バケット × 操作だけを capability に宣言し、Role と Permission を決める（spec §2。`$fdpocket-app-admin`）。
 4. **画面**（`$fdpocket-app-ui`）: `apps/<slug>` の各web Appを `@workspace/sdk` の `client` と `@workspace/miniapp-sdk/react` のフックで作る。
