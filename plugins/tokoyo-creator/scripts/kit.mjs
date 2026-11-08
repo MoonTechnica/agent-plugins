@@ -21707,6 +21707,9 @@ var DEBUG_RESULT_CODES = new Set([
   "REQUEST_REUSED",
   "EXPIRED"
 ]);
+var GRAPHICS_MODES = new Set(["auto", "low", "medium", "high"]);
+var GRAPHICS_TIERS = new Set(["low", "medium", "high"]);
+var GRAPHICS_FPS = new Set(["auto", 24, 30, 60]);
 // frontend/packages/app-protocol/src/godot-runtime.ts
 var GODOT_WEB_GLUE_SHA256 = "8a7c7d57f7da69bb71da9de302480b87e4c7ecb467ce643665b4a288683cd18f";
 var GODOT_WEB_WASM_SHA256 = "6498359ba889796a0d95a2f71113ac184badc0f2d84cf28f4103c7e399d2d547";
@@ -21746,13 +21749,24 @@ var safeAreaInsetsSchema = strictObject({
   bottom: number2().min(0),
   left: number2().min(0)
 });
+var GRAPHICS_MODES2 = ["auto", "low", "medium", "high"];
+var GRAPHICS_TIERS2 = ["low", "medium", "high"];
+var graphicsPreferenceSchema = strictObject({
+  mode: _enum(GRAPHICS_MODES2),
+  fps: union([literal("auto"), literal(24), literal(30), literal(60)]),
+  learned: strictObject({
+    tier: _enum(GRAPHICS_TIERS2),
+    scale: number2().min(0.5).max(1)
+  }).optional()
+});
 var contextPayloadSchema = strictObject({
   identity: identitySchema,
   capabilities: array(capabilitySchema),
   api: apiContextSchema,
   space: spaceConnectionSchema.optional(),
   paused: boolean2().optional(),
-  documentId: uuid2().optional()
+  documentId: uuid2().optional(),
+  graphics: graphicsPreferenceSchema.optional()
 });
 var contextMessageSchema = contextPayloadSchema.extend({
   type: literal("context"),
@@ -21916,7 +21930,8 @@ var OP_NAMES = [
   "ai.action.update",
   "ai.action.unmount",
   "device.start",
-  "device.stop"
+  "device.stop",
+  "graphics.save"
 ];
 var opNameSchema = _enum(OP_NAMES);
 var openInviteDocumentPayloadSchema = strictObject({
@@ -21937,7 +21952,8 @@ var OP_PAYLOAD_SCHEMAS = {
   "ai.action.update": aiActionMountSchema,
   "ai.action.unmount": aiActionUnmountSchema,
   "device.start": deviceStartPayloadSchema,
-  "device.stop": deviceStopPayloadSchema
+  "device.stop": deviceStopPayloadSchema,
+  "graphics.save": graphicsPreferenceSchema
 };
 var opMessageSchema = strictObject({
   type: literal("op"),
