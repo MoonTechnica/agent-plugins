@@ -259759,8 +259759,38 @@ async function forwardApp(request2, port) {
     });
   }
 }
+var VITE_DEV_RUNNER = `
+import { createRequire } from 'node:module';
+import { join } from 'node:path';
+import { pathToFileURL } from 'node:url';
+const root = process.cwd();
+const entry = createRequire(join(root, 'package.json')).resolve('vite');
+let server;
+let closing;
+function stop(code = 0) {
+  return closing ??= (async () => {
+    try { await server?.close(); }
+    catch (error) { console.error(error); code = 1; }
+    finally { process.exit(code); }
+  })();
+}
+try {
+  const { createServer } = await import(pathToFileURL(entry).href);
+  server = await createServer({
+    root,
+    logLevel: 'warn',
+    server: { port: Number(process.argv[1]), strictPort: true, warmup: { clientFiles: ['./index.html'] } },
+  });
+  // Vite owns SIGTERM and closes the server in its built-in finally handler.
+  process.once('SIGINT', () => { void stop(); });
+  await server.listen();
+} catch (error) {
+  console.error(error);
+  await stop(1);
+}
+`;
 var viteDev = async ({ slug, appDir, port, env }) => {
-  const child = spawn6(process.execPath, [resolveViteBin(appDir), "--logLevel", "warn", "--port", String(port), "--strictPort"], {
+  const child = spawn6(process.execPath, ["--input-type=module", "--eval", VITE_DEV_RUNNER, "--", String(port)], {
     cwd: appDir,
     env: { ...process.env, ...env },
     stdio: ["ignore", "pipe", "pipe"]
