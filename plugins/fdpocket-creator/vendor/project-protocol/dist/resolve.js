@@ -30,6 +30,8 @@ const capabilitiesSchema = z.strictObject({
     ai: z.strictObject({ chat: z.boolean() }).optional(),
     users: z.strictObject({ invite: z.boolean() }).optional(),
     connections: connectionCapabilitiesSchema.optional(),
+    /** 画面から依頼できる python の App のタスク（manifest の `capabilities.python` と同じ形） */
+    python: z.record(z.string(), z.array(z.string())).optional(),
 });
 const resolvedBucketSchema = z.strictObject({
     public: z.boolean(),

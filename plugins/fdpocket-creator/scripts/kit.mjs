@@ -18056,7 +18056,8 @@ var init_resolve = __esm(() => {
     realtime: exports_external.record(exports_external.string(), exports_external.array(exports_external.enum(["broadcastReceive", "broadcastSend", "presenceRead", "presenceTrack"]))).optional(),
     ai: exports_external.strictObject({ chat: exports_external.boolean() }).optional(),
     users: exports_external.strictObject({ invite: exports_external.boolean() }).optional(),
-    connections: connectionCapabilitiesSchema.optional()
+    connections: connectionCapabilitiesSchema.optional(),
+    python: exports_external.record(exports_external.string(), exports_external.array(exports_external.string())).optional()
   });
   resolvedBucketSchema = exports_external.strictObject({
     public: exports_external.boolean(),

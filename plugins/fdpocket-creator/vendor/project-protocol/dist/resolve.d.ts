@@ -122,6 +122,7 @@ declare const activeSchema: z.ZodObject<{
                 salesforce: "salesforce";
                 hubspot: "hubspot";
             }> & z.core.$partial, z.ZodArray<z.ZodLiteral<"fdpocket-read">>>>;
+            python: z.ZodOptional<z.ZodRecord<z.ZodString, z.ZodArray<z.ZodString>>>;
         }, z.core.$strict>;
         anonymous: z.ZodObject<{
             allowed: z.ZodBoolean;
@@ -311,6 +312,7 @@ export declare const gatewayResolveResultSchema: z.ZodDiscriminatedUnion<[z.ZodO
                 salesforce: "salesforce";
                 hubspot: "hubspot";
             }> & z.core.$partial, z.ZodArray<z.ZodLiteral<"fdpocket-read">>>>;
+            python: z.ZodOptional<z.ZodRecord<z.ZodString, z.ZodArray<z.ZodString>>>;
         }, z.core.$strict>;
         anonymous: z.ZodObject<{
             allowed: z.ZodBoolean;
