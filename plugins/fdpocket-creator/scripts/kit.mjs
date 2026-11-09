@@ -256996,6 +256996,276 @@ var hostMessages = {
   }
 };
 
+// frontend/packages/miniapp-kit/src/dev/preview-trace.ts
+function readNavigationTiming(clock, headScript, moduleStart) {
+  let entry2;
+  try {
+    entry2 = clock.getEntriesByType?.("navigation")[0];
+  } catch {
+    console.warn("kit: navigation timing unavailable");
+  }
+  const legacy = clock.timing;
+  const legacyStart = legacy?.navigationStart;
+  const modern = entry2 && typeof entry2 === "object";
+  const offset = !modern && typeof legacyStart === "number" && Number.isFinite(legacyStart) && legacyStart > 0 ? legacyStart : 0;
+  const result = {
+    source: modern ? "navigation" : offset ? "legacy" : "unavailable"
+  };
+  const values = modern ? entry2 : offset ? legacy : {};
+  const fields = {
+    fetchStartMs: "fetchStart",
+    dnsStartMs: "domainLookupStart",
+    dnsEndMs: "domainLookupEnd",
+    connectStartMs: "connectStart",
+    secureConnectionStartMs: "secureConnectionStart",
+    connectEndMs: "connectEnd",
+    requestStartMs: "requestStart",
+    responseStartMs: "responseStart",
+    responseEndMs: "responseEnd",
+    domInteractiveMs: "domInteractive"
+  };
+  for (const [key, field3] of Object.entries(fields)) {
+    const raw2 = values[field3];
+    if (typeof raw2 !== "number" || !Number.isFinite(raw2) || raw2 <= 0)
+      continue;
+    const relative3 = raw2 - offset;
+    if (relative3 >= 0 && relative3 <= 600000)
+      result[key] = Math.round(relative3);
+  }
+  for (const [key, value2] of [
+    ["headScriptMs", headScript],
+    ["moduleStartMs", moduleStart]
+  ])
+    if (typeof value2 === "number" && Number.isFinite(value2) && value2 >= 0 && value2 <= 600000)
+      result[key] = Math.round(value2);
+  return result;
+}
+function parseBrowserTraceBatch(value2) {
+  if (!value2 || typeof value2 !== "object" || Object.keys(value2).length !== 1 || !("events" in value2) || !Array.isArray(value2.events) || value2.events.length < 1 || value2.events.length > 64)
+    return null;
+  const events = value2.events;
+  const kinds = {
+    host: [
+      "host_loaded",
+      "native_init",
+      "native_init_rejected",
+      "exchange_request",
+      "exchange_reply",
+      "exchange_failed",
+      "app_src_set",
+      "app_load",
+      "sdk_ready",
+      "failure"
+    ],
+    app: ["app_fcp", "app_fcp_unsupported"]
+  };
+  for (const event of events) {
+    if (!event || typeof event !== "object" || Object.keys(event).some((key) => ![
+      "version",
+      "source",
+      "attemptId",
+      "sequence",
+      "event",
+      "elapsedMs",
+      "reason",
+      "httpStatus",
+      "navigation"
+    ].includes(key)))
+      return null;
+    if (event.navigation !== undefined) {
+      const navigation = event.navigation;
+      if (event.source !== "host" || event.event !== "host_loaded" || !navigation || typeof navigation !== "object" || !["navigation", "legacy", "unavailable"].includes(String(navigation.source)) || typeof navigation.source !== "string" || Object.keys(navigation).some((key) => key !== "source" && (![
+        "fetchStartMs",
+        "dnsStartMs",
+        "dnsEndMs",
+        "connectStartMs",
+        "secureConnectionStartMs",
+        "connectEndMs",
+        "requestStartMs",
+        "responseStartMs",
+        "responseEndMs",
+        "domInteractiveMs",
+        "headScriptMs",
+        "moduleStartMs"
+      ].includes(key) || !Number.isInteger(navigation[key]) || Number(navigation[key]) < 0 || Number(navigation[key]) > 600000)))
+        return null;
+    }
+    if (event.version !== 1 || event.source !== "host" && event.source !== "app" || typeof event.attemptId !== "string" || !/^[a-f0-9]{8}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{12}$/i.test(event.attemptId) || typeof event.event !== "string" || !kinds[event.source].includes(event.event))
+      return null;
+    if (!Number.isInteger(event.sequence) || Number(event.sequence) < 1 || Number(event.sequence) > 64 || !Number.isInteger(event.elapsedMs) || Number(event.elapsedMs) < 0 || Number(event.elapsedMs) > 600000)
+      return null;
+    if (event.reason !== undefined && (typeof event.reason !== "string" || !["network", "timeout", "protocol", "http", "unknown"].includes(event.reason)))
+      return null;
+    if (event.httpStatus !== undefined && (!Number.isInteger(event.httpStatus) || Number(event.httpStatus) < 100 || Number(event.httpStatus) > 599))
+      return null;
+  }
+  return events;
+}
+async function forwardBrowserTrace(events, options2) {
+  if (!options2.notifyUrl || !options2.notifyKey)
+    return false;
+  try {
+    const url2 = new URL(options2.notifyUrl);
+    if (!/\/events\/?$/.test(url2.pathname))
+      return false;
+    url2.pathname = url2.pathname.replace(/\/events\/?$/, "/preview-traces");
+    const response = await (options2.request ?? fetch)(url2.toString(), {
+      method: "POST",
+      headers: { Authorization: `Bearer ${options2.notifyKey}`, "Content-Type": "application/json" },
+      body: JSON.stringify({ events }),
+      redirect: "error",
+      credentials: "omit",
+      signal: AbortSignal.timeout(5000)
+    });
+    await response.body?.cancel();
+    if (!response.ok)
+      console.warn("kit: preview trace delivery failed", { reason: "http" });
+    return response.ok;
+  } catch {
+    console.warn("kit: preview trace delivery failed", { reason: "network" });
+    return false;
+  }
+}
+function createPreviewTraceHandler(options2, parse9, forward) {
+  const seen = new Map;
+  let windowStart = Date.now(), count = 0;
+  return async (request) => {
+    try {
+      if (request.method !== "POST")
+        return new Response(null, { status: 404 });
+      let text2 = "";
+      const reader = request.body?.getReader();
+      if (!reader)
+        return new Response(null, { status: 400 });
+      const decoder2 = new TextDecoder;
+      let bytes3 = 0;
+      while (true) {
+        const item = await reader.read();
+        if (item.done)
+          break;
+        bytes3 += item.value.byteLength;
+        if (bytes3 > 16384) {
+          await reader.cancel();
+          return new Response(null, { status: 413 });
+        }
+        text2 += decoder2.decode(item.value, { stream: true });
+      }
+      let value2;
+      try {
+        value2 = JSON.parse(text2);
+      } catch {
+        return new Response(null, { status: 400 });
+      }
+      const events = parse9(value2);
+      if (!events)
+        return new Response(null, { status: 400 });
+      if (Date.now() - windowStart >= 60000) {
+        windowStart = Date.now();
+        count = 0;
+      }
+      const fresh = events.filter((event) => {
+        const key = event.source + ":" + event.attemptId;
+        if (!seen.has(key)) {
+          if (seen.size >= 32)
+            seen.delete(seen.keys().next().value);
+          seen.set(key, new Set);
+        }
+        const sequences = seen.get(key);
+        if (sequences.has(event.sequence) || count >= 256)
+          return false;
+        sequences.add(event.sequence);
+        count += 1;
+        return true;
+      });
+      if (fresh.length)
+        await forward(fresh, options2);
+      return new Response(null, { status: 204 });
+    } catch {
+      console.warn("kit: preview trace collection failed", { reason: "network" });
+      return new Response(null, { status: 204 });
+    }
+  };
+}
+function appPaintScript(endpoint) {
+  return `(() => {
+let attemptId=null, parentOrigin=null, firstPaint=null, unsupported=false, sent=false;
+function report(){
+  if(sent||!attemptId||(!firstPaint&&!unsupported))return;
+  sent=true;
+  const event=unsupported?'app_fcp_unsupported':'app_fcp';
+  const mark={version:1,source:'app',attemptId,sequence:1,event,elapsedMs:Math.min(600000,Math.max(0,Math.round(firstPaint?.startTime??performance.now())))};
+  try{void fetch(${JSON.stringify(endpoint)},{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({events:[mark]}),credentials:'omit',keepalive:true}).catch(()=>console.warn('kit: preview trace delivery failed'))}catch{console.warn('kit: preview trace delivery failed')}
+  window.parent.postMessage({type:'kit-preview-timing',version:1,attemptId,event},parentOrigin);
+}
+window.addEventListener('message',message=>{
+  const data=message.data;
+  if(message.source!==window.parent||message.origin==='null'||data?.type!=='kit-preview-trace-init'||data.version!==1||typeof data.attemptId!=='string'||!/^[a-f0-9]{8}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{12}$/i.test(data.attemptId))return;
+  if(attemptId&&attemptId!==data.attemptId)return;
+  attemptId=data.attemptId;parentOrigin=message.origin;report();
+});
+window.parent.postMessage({type:'kit-preview-trace-request',version:1},'*');
+if(typeof PerformanceObserver==='undefined'||!PerformanceObserver.supportedEntryTypes?.includes('paint')){unsupported=true;report();return}
+try {
+const observer=new PerformanceObserver(list=>{
+  const paint=list.getEntries().find(entry=>entry.name==='first-contentful-paint');
+  if(paint){firstPaint=paint;observer.disconnect();report()}
+});
+observer.observe({type:'paint',buffered:true});
+} catch { unsupported=true;report() }
+})();`;
+}
+function createViteTracePlugin(options2, handlerFactory, parser2, forwarder, paint) {
+  const handle = handlerFactory(options2, parser2, forwarder);
+  let base = "/";
+  return {
+    name: "kit-preview-timing",
+    configResolved(config3) {
+      base = config3.base;
+    },
+    configureServer(server2) {
+      if (!options2.enabled)
+        return;
+      server2.middlewares.use(async (request, response, next) => {
+        if (request.url?.split("?")[0] !== base + "__kit/timing")
+          return next();
+        try {
+          let body = "";
+          for await (const chunk of request) {
+            body += chunk.toString();
+            if (Buffer.byteLength(body) > 16384) {
+              response.statusCode = 413;
+              response.end();
+              return;
+            }
+          }
+          const result = await handle(new Request("http://kit.invalid/kit-dev/timing", {
+            method: request.method,
+            ...request.method === "POST" ? { body } : {}
+          }));
+          response.statusCode = result.status;
+          response.end();
+        } catch {
+          console.warn("kit: preview trace collection failed", { reason: "network" });
+          response.statusCode = 204;
+          response.end();
+        }
+      });
+    },
+    transformIndexHtml() {
+      if (!options2.enabled)
+        return;
+      return [
+        {
+          tag: "script",
+          attrs: { type: "module" },
+          injectTo: "head-prepend",
+          children: paint(base + "__kit/timing")
+        }
+      ];
+    }
+  };
+}
+
 // frontend/packages/miniapp-kit/src/dev/host-page.ts
 init_runtime2();
 function scriptJson(value2) {
@@ -257008,6 +257278,7 @@ function renderHostPage(config3) {
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
+<script>try{window.__kitPreviewHeadScriptMs=performance.now()}catch{console.warn('kit: navigation timing unavailable')}</script>
 <title>kit dev</title>
 <style>
   :root { color-scheme: light dark; font-family: system-ui, sans-serif; --bg: #fff; --fg: #202020; --muted: #6b6b6b; --surface: #f5f5f5; --line: #e5e5e5; }
@@ -257071,7 +257342,10 @@ function renderHostPage(config3) {
 <iframe id="frame" title="app" sandbox="allow-scripts allow-same-origin allow-forms allow-popups" allow="camera; microphone; clipboard-write"></iframe>
 <script type="application/json" id="kit-dev-config">${scriptJson(config3)}</script>
 <script type="module">
+const traceModuleStart=performance.now()
 const config = JSON.parse(document.getElementById('kit-dev-config').textContent)
+const readNavigationTiming=${readNavigationTiming.toString()}
+const traceNavigation=readNavigationTiming(performance,window.__kitPreviewHeadScriptMs,traceModuleStart)
 const traceUuid=value=>typeof value==='string'&&/^[a-f0-9]{8}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{12}$/i.test(value)
 let traceAttempt=traceUuid(window.__kitPreviewTraceAttempt)?window.__kitPreviewTraceAttempt:null
 let traceFallback=null
@@ -257093,6 +257367,7 @@ function traceMark(event,reason){
   if(traceSequence>=64||(!traceAttempt&&!traceFallback))return
   const mark={version:1,source:'host',attemptId:traceAttempt||traceFallback,sequence:++traceSequence,event,elapsedMs:Math.min(600000,Math.max(0,Math.round(performance.now())))}
   if(reason)mark.reason=reason
+  if(event==='host_loaded')mark.navigation=traceNavigation
   traceQueue.push(mark)
   if(traceAttempt||!config.bridge)scheduleTrace()
 }
@@ -257801,214 +258076,6 @@ function createLiveHostHandler(options2) {
           "referrer-policy": "no-referrer"
         }
       });
-    }
-  };
-}
-
-// frontend/packages/miniapp-kit/src/dev/preview-trace.ts
-function parseBrowserTraceBatch(value2) {
-  if (!value2 || typeof value2 !== "object" || Object.keys(value2).length !== 1 || !("events" in value2) || !Array.isArray(value2.events) || value2.events.length < 1 || value2.events.length > 64)
-    return null;
-  const events = value2.events;
-  const kinds = {
-    host: [
-      "host_loaded",
-      "native_init",
-      "native_init_rejected",
-      "exchange_request",
-      "exchange_reply",
-      "exchange_failed",
-      "app_src_set",
-      "app_load",
-      "sdk_ready",
-      "failure"
-    ],
-    app: ["app_fcp", "app_fcp_unsupported"]
-  };
-  for (const event of events) {
-    if (!event || typeof event !== "object" || Object.keys(event).some((key) => ![
-      "version",
-      "source",
-      "attemptId",
-      "sequence",
-      "event",
-      "elapsedMs",
-      "reason",
-      "httpStatus"
-    ].includes(key)))
-      return null;
-    if (event.version !== 1 || event.source !== "host" && event.source !== "app" || typeof event.attemptId !== "string" || !/^[a-f0-9]{8}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{12}$/i.test(event.attemptId) || typeof event.event !== "string" || !kinds[event.source].includes(event.event))
-      return null;
-    if (!Number.isInteger(event.sequence) || Number(event.sequence) < 1 || Number(event.sequence) > 64 || !Number.isInteger(event.elapsedMs) || Number(event.elapsedMs) < 0 || Number(event.elapsedMs) > 600000)
-      return null;
-    if (event.reason !== undefined && (typeof event.reason !== "string" || !["network", "timeout", "protocol", "http", "unknown"].includes(event.reason)))
-      return null;
-    if (event.httpStatus !== undefined && (!Number.isInteger(event.httpStatus) || Number(event.httpStatus) < 100 || Number(event.httpStatus) > 599))
-      return null;
-  }
-  return events;
-}
-async function forwardBrowserTrace(events, options2) {
-  if (!options2.notifyUrl || !options2.notifyKey)
-    return false;
-  try {
-    const url2 = new URL(options2.notifyUrl);
-    if (!/\/events\/?$/.test(url2.pathname))
-      return false;
-    url2.pathname = url2.pathname.replace(/\/events\/?$/, "/preview-traces");
-    const response = await (options2.request ?? fetch)(url2.toString(), {
-      method: "POST",
-      headers: { Authorization: `Bearer ${options2.notifyKey}`, "Content-Type": "application/json" },
-      body: JSON.stringify({ events }),
-      redirect: "error",
-      credentials: "omit",
-      signal: AbortSignal.timeout(5000)
-    });
-    await response.body?.cancel();
-    if (!response.ok)
-      console.warn("kit: preview trace delivery failed", { reason: "http" });
-    return response.ok;
-  } catch {
-    console.warn("kit: preview trace delivery failed", { reason: "network" });
-    return false;
-  }
-}
-function createPreviewTraceHandler(options2, parse9, forward) {
-  const seen = new Map;
-  let windowStart = Date.now(), count = 0;
-  return async (request) => {
-    try {
-      if (request.method !== "POST")
-        return new Response(null, { status: 404 });
-      let text2 = "";
-      const reader = request.body?.getReader();
-      if (!reader)
-        return new Response(null, { status: 400 });
-      const decoder2 = new TextDecoder;
-      let bytes3 = 0;
-      while (true) {
-        const item = await reader.read();
-        if (item.done)
-          break;
-        bytes3 += item.value.byteLength;
-        if (bytes3 > 16384) {
-          await reader.cancel();
-          return new Response(null, { status: 413 });
-        }
-        text2 += decoder2.decode(item.value, { stream: true });
-      }
-      let value2;
-      try {
-        value2 = JSON.parse(text2);
-      } catch {
-        return new Response(null, { status: 400 });
-      }
-      const events = parse9(value2);
-      if (!events)
-        return new Response(null, { status: 400 });
-      if (Date.now() - windowStart >= 60000) {
-        windowStart = Date.now();
-        count = 0;
-      }
-      const fresh = events.filter((event) => {
-        const key = event.source + ":" + event.attemptId;
-        if (!seen.has(key)) {
-          if (seen.size >= 32)
-            seen.delete(seen.keys().next().value);
-          seen.set(key, new Set);
-        }
-        const sequences = seen.get(key);
-        if (sequences.has(event.sequence) || count >= 256)
-          return false;
-        sequences.add(event.sequence);
-        count += 1;
-        return true;
-      });
-      if (fresh.length)
-        await forward(fresh, options2);
-      return new Response(null, { status: 204 });
-    } catch {
-      console.warn("kit: preview trace collection failed", { reason: "network" });
-      return new Response(null, { status: 204 });
-    }
-  };
-}
-function appPaintScript(endpoint) {
-  return `(() => {
-let attemptId=null, parentOrigin=null, firstPaint=null, unsupported=false, sent=false;
-function report(){
-  if(sent||!attemptId||(!firstPaint&&!unsupported))return;
-  sent=true;
-  const event=unsupported?'app_fcp_unsupported':'app_fcp';
-  const mark={version:1,source:'app',attemptId,sequence:1,event,elapsedMs:Math.min(600000,Math.max(0,Math.round(firstPaint?.startTime??performance.now())))};
-  try{void fetch(${JSON.stringify(endpoint)},{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({events:[mark]}),credentials:'omit',keepalive:true}).catch(()=>console.warn('kit: preview trace delivery failed'))}catch{console.warn('kit: preview trace delivery failed')}
-  window.parent.postMessage({type:'kit-preview-timing',version:1,attemptId,event},parentOrigin);
-}
-window.addEventListener('message',message=>{
-  const data=message.data;
-  if(message.source!==window.parent||message.origin==='null'||data?.type!=='kit-preview-trace-init'||data.version!==1||typeof data.attemptId!=='string'||!/^[a-f0-9]{8}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{12}$/i.test(data.attemptId))return;
-  if(attemptId&&attemptId!==data.attemptId)return;
-  attemptId=data.attemptId;parentOrigin=message.origin;report();
-});
-window.parent.postMessage({type:'kit-preview-trace-request',version:1},'*');
-if(typeof PerformanceObserver==='undefined'||!PerformanceObserver.supportedEntryTypes?.includes('paint')){unsupported=true;report();return}
-try {
-const observer=new PerformanceObserver(list=>{
-  const paint=list.getEntries().find(entry=>entry.name==='first-contentful-paint');
-  if(paint){firstPaint=paint;observer.disconnect();report()}
-});
-observer.observe({type:'paint',buffered:true});
-} catch { unsupported=true;report() }
-})();`;
-}
-function createViteTracePlugin(options2, handlerFactory, parser2, forwarder, paint) {
-  const handle = handlerFactory(options2, parser2, forwarder);
-  let base = "/";
-  return {
-    name: "kit-preview-timing",
-    configResolved(config3) {
-      base = config3.base;
-    },
-    configureServer(server2) {
-      if (!options2.enabled)
-        return;
-      server2.middlewares.use(async (request, response, next) => {
-        if (request.url?.split("?")[0] !== base + "__kit/timing")
-          return next();
-        try {
-          let body2 = "";
-          for await (const chunk of request) {
-            body2 += chunk.toString();
-            if (Buffer.byteLength(body2) > 16384) {
-              response.statusCode = 413;
-              response.end();
-              return;
-            }
-          }
-          const result = await handle(new Request("http://kit.invalid/kit-dev/timing", {
-            method: request.method,
-            ...request.method === "POST" ? { body: body2 } : {}
-          }));
-          response.statusCode = result.status;
-          response.end();
-        } catch {
-          console.warn("kit: preview trace collection failed", { reason: "network" });
-          response.statusCode = 204;
-          response.end();
-        }
-      });
-    },
-    transformIndexHtml() {
-      if (!options2.enabled)
-        return;
-      return [
-        {
-          tag: "script",
-          attrs: { type: "module" },
-          injectTo: "head-prepend",
-          children: paint(base + "__kit/timing")
-        }
-      ];
     }
   };
 }
