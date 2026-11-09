@@ -256234,12 +256234,14 @@ async function prepareProject(options2) {
   await placeVendoredPackages(root, kitRoot);
   await (options2.install ?? ((directory) => bunInstall(directory, kitRoot)))(root);
   const generate = await generateProject({ root, kitRoot });
-  const seedFindings = await checkSeedContract(root, kitRoot);
-  if (seedFindings.length && options2.seedContract !== "report")
-    throw new BuildError(seedFindings.map((finding2) => finding2.message).join(`
+  if (options2.checkSeedContract !== false) {
+    const findings = await checkSeedContract(root, kitRoot);
+    if (findings.length)
+      throw new BuildError(findings.map((finding2) => finding2.message).join(`
 `));
+  }
   const manifest2 = JSON.parse(await readFile22(join31(root, PROJECT_PATHS.generated, "project.json"), "utf8"));
-  return { generate, manifest: manifest2, seedFindings };
+  return { generate, manifest: manifest2 };
 }
 async function checkLockfile2(root) {
   const path = join31(root, "bun.lock");
@@ -257040,6 +257042,72 @@ function readNavigationTiming(clock, headScript, moduleStart) {
       result[key] = Math.round(value2);
   return result;
 }
+function summarizeResources(clock, origin2, bufferFull) {
+  let entries;
+  try {
+    entries = clock.getEntriesByType?.("resource");
+  } catch {
+    console.warn("kit: resource timing unavailable");
+  }
+  const result = {
+    source: Array.isArray(entries) ? "resource" : "unavailable",
+    sampledCount: 0,
+    counts: { script: 0, css: 0, img: 0, font: 0, fetch: 0, other: 0 }
+  };
+  if (bufferFull !== undefined)
+    result.bufferFull = bufferFull;
+  if (!Array.isArray(entries))
+    return result;
+  if (entries.length >= 1024)
+    result.bufferFull = true;
+  let slowest = -1, transfer = 0, hasTransfer = false;
+  for (const item of entries.slice(0, 1024)) {
+    if (!item || typeof item !== "object")
+      continue;
+    const entry2 = item;
+    let url2 = null;
+    try {
+      if (typeof entry2.name === "string")
+        url2 = new URL(entry2.name, origin2);
+    } catch {
+      url2 = null;
+    }
+    const path = url2?.pathname.toLowerCase() ?? "";
+    let kind = "other";
+    if (/\.(woff2?|ttf|otf|eot)$/.test(path))
+      kind = "font";
+    else if (/\.css$/.test(path))
+      kind = "css";
+    else if (entry2.initiatorType === "img" || /\.(png|jpe?g|webp|gif|svg|avif|ico)$/.test(path))
+      kind = "img";
+    else if (entry2.initiatorType === "script" || /\.(mjs|cjs|js)$/.test(path))
+      kind = "script";
+    else if (entry2.initiatorType === "fetch" || entry2.initiatorType === "xmlhttprequest")
+      kind = "fetch";
+    result.sampledCount++;
+    result.counts[kind]++;
+    const duration3 = entry2.duration;
+    if (typeof duration3 === "number" && Number.isFinite(duration3) && duration3 >= 0 && duration3 > slowest) {
+      slowest = duration3;
+      result.slowestDurationMs = Math.min(600000, Math.round(duration3));
+      result.slowestType = kind;
+      delete result.slowestSameOrigin;
+      if (url2)
+        result.slowestSameOrigin = url2.origin === origin2;
+    }
+    const end = entry2.responseEnd;
+    if (typeof end === "number" && Number.isFinite(end) && end >= 0)
+      result.lastResponseEndMs = Math.max(result.lastResponseEndMs ?? 0, Math.min(600000, Math.round(end)));
+    const size = entry2.transferSize;
+    if (typeof size === "number" && Number.isFinite(size) && size >= 0) {
+      hasTransfer = true;
+      transfer = Math.min(1073741824, transfer + Math.round(size));
+    }
+  }
+  if (hasTransfer)
+    result.transferBytes = transfer;
+  return result;
+}
 function parseBrowserTraceBatch(value2) {
   if (!value2 || typeof value2 !== "object" || Object.keys(value2).length !== 1 || !("events" in value2) || !Array.isArray(value2.events) || value2.events.length < 1 || value2.events.length > 64)
     return null;
@@ -257057,7 +257125,7 @@ function parseBrowserTraceBatch(value2) {
       "sdk_ready",
       "failure"
     ],
-    app: ["app_fcp", "app_fcp_unsupported"]
+    app: ["app_fcp", "app_fcp_unsupported", "app_load"]
   };
   for (const event of events) {
     if (!event || typeof event !== "object" || Object.keys(event).some((key) => ![
@@ -257069,12 +257137,14 @@ function parseBrowserTraceBatch(value2) {
       "elapsedMs",
       "reason",
       "httpStatus",
-      "navigation"
+      "navigation",
+      "resources",
+      "nativeTraceContext"
     ].includes(key)))
       return null;
     if (event.navigation !== undefined) {
       const navigation = event.navigation;
-      if (event.source !== "host" || event.event !== "host_loaded" || !navigation || typeof navigation !== "object" || !["navigation", "legacy", "unavailable"].includes(String(navigation.source)) || typeof navigation.source !== "string" || Object.keys(navigation).some((key) => key !== "source" && (![
+      if (!(event.source === "host" && event.event === "host_loaded" || event.source === "app" && event.event === "app_load") || !navigation || typeof navigation !== "object" || !["navigation", "legacy", "unavailable"].includes(String(navigation.source)) || typeof navigation.source !== "string" || Object.keys(navigation).some((key) => key !== "source" && (![
         "fetchStartMs",
         "dnsStartMs",
         "dnsEndMs",
@@ -257090,6 +257160,35 @@ function parseBrowserTraceBatch(value2) {
       ].includes(key) || !Number.isInteger(navigation[key]) || Number(navigation[key]) < 0 || Number(navigation[key]) > 600000)))
         return null;
     }
+    if (event.nativeTraceContext !== undefined && (event.source !== "host" || !["host_loaded", "native_init"].includes(String(event.event)) || typeof event.nativeTraceContext !== "boolean"))
+      return null;
+    if (event.resources !== undefined) {
+      const summary = event.resources;
+      const kinds2 = ["script", "css", "img", "font", "fetch", "other"];
+      if (event.source !== "app" || event.event !== "app_load" || !summary || typeof summary !== "object" || !["resource", "unavailable"].includes(String(summary.source)) || typeof summary.source !== "string" || !Number.isInteger(summary.sampledCount) || Number(summary.sampledCount) < 0 || Number(summary.sampledCount) > 1024 || !summary.counts || typeof summary.counts !== "object" || Object.keys(summary.counts).length !== 6)
+        return null;
+      const counts2 = summary.counts;
+      if (Object.keys(counts2).some((key) => !kinds2.includes(key) || !Number.isInteger(counts2[key]) || Number(counts2[key]) < 0 || Number(counts2[key]) > 1024) || Object.values(counts2).reduce((sum2, count) => sum2 + Number(count), 0) !== summary.sampledCount)
+        return null;
+      if (Object.keys(summary).some((key) => {
+        if (["source", "sampledCount", "counts"].includes(key))
+          return false;
+        if (key === "slowestType")
+          return !kinds2.includes(String(summary[key])) || typeof summary[key] !== "string";
+        if (["bufferFull", "slowestSameOrigin", "hiddenAtStart", "hiddenAtLoad"].includes(key))
+          return typeof summary[key] !== "boolean";
+        if (![
+          "slowestDurationMs",
+          "lastResponseEndMs",
+          "transferBytes",
+          "documentHiddenMs",
+          "visibilityTransitions"
+        ].includes(key))
+          return true;
+        return !Number.isInteger(summary[key]) || Number(summary[key]) < 0 || Number(summary[key]) > (key === "transferBytes" ? 1073741824 : key === "visibilityTransitions" ? 1024 : 600000);
+      }))
+        return null;
+    }
     if (event.version !== 1 || event.source !== "host" && event.source !== "app" || typeof event.attemptId !== "string" || !/^[a-f0-9]{8}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{12}$/i.test(event.attemptId) || typeof event.event !== "string" || !kinds[event.source].includes(event.event))
       return null;
     if (!Number.isInteger(event.sequence) || Number(event.sequence) < 1 || Number(event.sequence) > 64 || !Number.isInteger(event.elapsedMs) || Number(event.elapsedMs) < 0 || Number(event.elapsedMs) > 600000)
@@ -257101,30 +257200,67 @@ function parseBrowserTraceBatch(value2) {
   }
   return events;
 }
-async function forwardBrowserTrace(events, options2) {
+async function forwardBrowserTrace(events, options2, parse9) {
   if (!options2.notifyUrl || !options2.notifyKey)
     return false;
+  const validated = parse9({ events });
+  if (!validated)
+    return false;
+  let url2;
   try {
-    const url2 = new URL(options2.notifyUrl);
+    url2 = new URL(options2.notifyUrl);
     if (!/\/events\/?$/.test(url2.pathname))
       return false;
     url2.pathname = url2.pathname.replace(/\/events\/?$/, "/preview-traces");
-    const response = await (options2.request ?? fetch)(url2.toString(), {
-      method: "POST",
-      headers: { Authorization: `Bearer ${options2.notifyKey}`, "Content-Type": "application/json" },
-      body: JSON.stringify({ events }),
-      redirect: "error",
-      credentials: "omit",
-      signal: AbortSignal.timeout(5000)
-    });
-    await response.body?.cancel();
-    if (!response.ok)
-      console.warn("kit: preview trace delivery failed", { reason: "http" });
-    return response.ok;
   } catch {
-    console.warn("kit: preview trace delivery failed", { reason: "network" });
+    console.warn("kit: preview trace delivery failed", { reason: "configuration" });
     return false;
   }
+  let reason = "network";
+  let httpStatus;
+  for (let attempt = 0;attempt < 3; attempt++) {
+    const controller = new AbortController;
+    const deadline = setTimeout(() => controller.abort(), 5000);
+    let retry = true;
+    httpStatus = undefined;
+    try {
+      const response = await (options2.request ?? fetch)(url2.toString(), {
+        method: "POST",
+        headers: {
+          Authorization: `Bearer ${options2.notifyKey}`,
+          "Content-Type": "application/json"
+        },
+        body: JSON.stringify({ events: validated }),
+        redirect: "error",
+        credentials: "omit",
+        signal: controller.signal
+      });
+      httpStatus = response.status;
+      retry = httpStatus === 408 || httpStatus === 429 || httpStatus >= 500;
+      await response.body?.cancel();
+      if (response.ok)
+        return true;
+      reason = "http";
+    } catch {
+      reason = controller.signal.aborted ? "timeout" : "network";
+    } finally {
+      clearTimeout(deadline);
+    }
+    console.warn("kit: preview trace delivery failed", {
+      reason,
+      ...httpStatus !== undefined ? { httpStatus } : {}
+    });
+    if (!retry)
+      break;
+    if (attempt < 2)
+      await new Promise((resolve3) => setTimeout(resolve3, (attempt + 1) * 1000));
+  }
+  console.warn("kit: preview trace delivery exhausted", JSON.stringify({
+    reason,
+    ...httpStatus !== undefined ? { httpStatus } : {},
+    events: validated
+  }));
+  return false;
 }
 function createPreviewTraceHandler(options2, parse9, forward) {
   const seen = new Map;
@@ -257178,7 +257314,7 @@ function createPreviewTraceHandler(options2, parse9, forward) {
         return true;
       });
       if (fresh.length)
-        await forward(fresh, options2);
+        await forward(fresh, options2, parse9);
       return new Response(null, { status: 204 });
     } catch {
       console.warn("kit: preview trace collection failed", { reason: "network" });
@@ -257186,22 +257322,56 @@ function createPreviewTraceHandler(options2, parse9, forward) {
     }
   };
 }
-function appPaintScript(endpoint) {
+function appPaintScript(endpoint, navigationReader, resourceReader) {
   return `(() => {
 let attemptId=null, parentOrigin=null, firstPaint=null, unsupported=false, sent=false;
+let loadTiming=null, loadSent=false, bufferFull;
+const moduleStart=performance.now();
+const visibility=typeof document.hidden==='boolean'?{hiddenAtStart:document.hidden,hidden:document.hidden,last:moduleStart,total:0,transitions:0}:null;
+if(visibility)document.addEventListener('visibilitychange',()=>{
+  const now=performance.now();
+  if(visibility.hidden)visibility.total+=Math.max(0,now-visibility.last);
+  visibility.hidden=document.hidden;visibility.last=now;visibility.transitions=Math.min(1024,visibility.transitions+1);
+});
+const navigationReader=${navigationReader.toString()};
+const resourceReader=${resourceReader.toString()};
+function send(mark){
+  try{void fetch(${JSON.stringify(endpoint)},{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({events:[mark]}),credentials:'omit',keepalive:true}).catch(()=>console.warn('kit: preview trace delivery failed'))}catch{console.warn('kit: preview trace delivery failed')}
+}
+function reportLoad(){
+  if(loadSent||!attemptId||!loadTiming)return;
+  loadSent=true;
+  send({version:1,source:'app',attemptId,sequence:2,event:'app_load',...loadTiming});
+}
+try{
+  performance.setResourceTimingBufferSize?.(1024);
+  if(typeof performance.addEventListener==='function'){
+    bufferFull=false;
+    performance.addEventListener('resourcetimingbufferfull',()=>{bufferFull=true});
+  }
+}catch{console.warn('kit: resource timing unavailable')}
+window.addEventListener('load',()=>{
+  const now=performance.now(),resources=resourceReader(performance,location.origin,bufferFull);
+  if(visibility){
+    resources.documentHiddenMs=Math.min(600000,Math.max(0,Math.round(visibility.total+(visibility.hidden?now-visibility.last:0))));
+    resources.visibilityTransitions=visibility.transitions;resources.hiddenAtStart=visibility.hiddenAtStart;resources.hiddenAtLoad=document.hidden;
+  }
+  loadTiming={elapsedMs:Math.min(600000,Math.max(0,Math.round(now))),navigation:navigationReader(performance,undefined,moduleStart),resources};
+  reportLoad();
+},{once:true});
 function report(){
   if(sent||!attemptId||(!firstPaint&&!unsupported))return;
   sent=true;
   const event=unsupported?'app_fcp_unsupported':'app_fcp';
   const mark={version:1,source:'app',attemptId,sequence:1,event,elapsedMs:Math.min(600000,Math.max(0,Math.round(firstPaint?.startTime??performance.now())))};
-  try{void fetch(${JSON.stringify(endpoint)},{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({events:[mark]}),credentials:'omit',keepalive:true}).catch(()=>console.warn('kit: preview trace delivery failed'))}catch{console.warn('kit: preview trace delivery failed')}
+  send(mark);
   window.parent.postMessage({type:'kit-preview-timing',version:1,attemptId,event},parentOrigin);
 }
 window.addEventListener('message',message=>{
   const data=message.data;
   if(message.source!==window.parent||message.origin==='null'||data?.type!=='kit-preview-trace-init'||data.version!==1||typeof data.attemptId!=='string'||!/^[a-f0-9]{8}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{12}$/i.test(data.attemptId))return;
   if(attemptId&&attemptId!==data.attemptId)return;
-  attemptId=data.attemptId;parentOrigin=message.origin;report();
+  attemptId=data.attemptId;parentOrigin=message.origin;report();reportLoad();
 });
 window.parent.postMessage({type:'kit-preview-trace-request',version:1},'*');
 if(typeof PerformanceObserver==='undefined'||!PerformanceObserver.supportedEntryTypes?.includes('paint')){unsupported=true;report();return}
@@ -257214,7 +257384,7 @@ observer.observe({type:'paint',buffered:true});
 } catch { unsupported=true;report() }
 })();`;
 }
-function createViteTracePlugin(options2, handlerFactory, parser2, forwarder, paint) {
+function createViteTracePlugin(options2, handlerFactory, parser2, forwarder, paint, navigationReader, resourceReader) {
   const handle = handlerFactory(options2, parser2, forwarder);
   let base = "/";
   return {
@@ -257259,7 +257429,7 @@ function createViteTracePlugin(options2, handlerFactory, parser2, forwarder, pai
           tag: "script",
           attrs: { type: "module" },
           injectTo: "head-prepend",
-          children: paint(base + "__kit/timing")
+          children: paint(base + "__kit/timing", navigationReader, resourceReader)
         }
       ];
     }
@@ -257347,7 +257517,8 @@ const config = JSON.parse(document.getElementById('kit-dev-config').textContent)
 const readNavigationTiming=${readNavigationTiming.toString()}
 const traceNavigation=readNavigationTiming(performance,window.__kitPreviewHeadScriptMs,traceModuleStart)
 const traceUuid=value=>typeof value==='string'&&/^[a-f0-9]{8}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{12}$/i.test(value)
-let traceAttempt=traceUuid(window.__kitPreviewTraceAttempt)?window.__kitPreviewTraceAttempt:null
+const traceEarlyContext=traceUuid(window.__kitPreviewTraceAttempt)
+let traceAttempt=traceEarlyContext?window.__kitPreviewTraceAttempt:null
 let traceFallback=null
 try{traceFallback=crypto.randomUUID()}catch{console.warn('kit: preview trace unavailable')}
 let traceSequence=0,traceQueue=[],traceFlushTimer=null
@@ -257363,11 +257534,13 @@ function adoptTrace(value){
   for(const item of traceQueue)item.attemptId=traceAttempt
   scheduleTrace()
 }
-function traceMark(event,reason){
+function traceMark(event,reason,nativeTraceContext){
   if(traceSequence>=64||(!traceAttempt&&!traceFallback))return
   const mark={version:1,source:'host',attemptId:traceAttempt||traceFallback,sequence:++traceSequence,event,elapsedMs:Math.min(600000,Math.max(0,Math.round(performance.now())))}
   if(reason)mark.reason=reason
   if(event==='host_loaded')mark.navigation=traceNavigation
+  if(event==='host_loaded')mark.nativeTraceContext=traceEarlyContext
+  if(event==='native_init')mark.nativeTraceContext=nativeTraceContext===true
   traceQueue.push(mark)
   if(traceAttempt||!config.bridge)scheduleTrace()
 }
@@ -257431,7 +257604,7 @@ function attachStudio(data, send, origin) {
   if(data.selectedIdentity!==null&&!data.identities.some(item=>item.slot===data.selectedIdentity))return false
   if(data.trace!==undefined&&(!data.trace||Object.keys(data.trace).length!==1||!traceUuid(data.trace.attemptId))){traceMark('native_init_rejected','protocol');return false}
   adoptTrace(data.trace)
-  traceMark('native_init')
+  traceMark('native_init',undefined,traceUuid(data.trace?.attemptId))
   studioIdentity=data.selectedIdentity
   asSelect.replaceChildren(new Option(roleLabel('self'), 'self'))
   for(const identity of data.identities)asSelect.add(new Option(identity.displayName,identity.slot))
@@ -259590,7 +259763,7 @@ async function startDev(options2) {
     ...options2.install ? { install: options2.install } : options2.live ? { install: async () => {
       return;
     } } : {},
-    seedContract: "report"
+    checkSeedContract: false
   });
   if (options2.live)
     return startLiveDev(options2, manifest2);
@@ -260132,7 +260305,7 @@ function stop(code = 0) {
 }
 try {
   const { createServer } = await import(pathToFileURL(entry).href);
-  const timing = (${createViteTracePlugin.toString()})({ enabled: Boolean(process.env.MINIAPP_SESSION_LIVE_TOKEN), notifyUrl: process.env.KIT_LIVE_NOTIFY_URL, notifyKey: process.env.KIT_LIVE_NOTIFY }, ${createPreviewTraceHandler.toString()}, ${parseBrowserTraceBatch.toString()}, ${forwardBrowserTrace.toString()}, ${appPaintScript.toString()});
+  const timing = (${createViteTracePlugin.toString()})({ enabled: Boolean(process.env.MINIAPP_SESSION_LIVE_TOKEN), notifyUrl: process.env.KIT_LIVE_NOTIFY_URL, notifyKey: process.env.KIT_LIVE_NOTIFY }, ${createPreviewTraceHandler.toString()}, ${parseBrowserTraceBatch.toString()}, ${forwardBrowserTrace.toString()}, ${appPaintScript.toString()}, ${readNavigationTiming.toString()}, ${summarizeResources.toString()});
   server = await createServer({
     root,
     plugins: [timing],
