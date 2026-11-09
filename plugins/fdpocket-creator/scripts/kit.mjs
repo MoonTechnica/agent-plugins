@@ -260067,7 +260067,8 @@ async function startSessionWatcher(options2) {
     }, delay);
   };
   watcher = (options2.watch ?? watchRoot)(options2.root, changed, watchAgain);
-  changed(null);
+  requested = true;
+  launch();
   return {
     close: async () => {
       stop();
