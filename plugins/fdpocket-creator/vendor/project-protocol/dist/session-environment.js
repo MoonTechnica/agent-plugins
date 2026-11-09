@@ -90,6 +90,9 @@ export const sessionEnvironmentViewSchema = z.object({
     jobs: liveSessionInspectionSchema.shape.jobs.optional().default([]),
     jobRuns: liveJobRunsSchema.optional().default([]),
     live: z.object({
+        /** Owner-only read model; an unknown or older response never authorizes early preparation. */
+        authenticationReady: z.boolean().optional().catch(false),
+        resourceGeneration: z.uuid().nullish().catch(null),
         kind: z.enum(['sandbox', 'connect']).nullable(),
         status: z.enum(['starting', 'running', 'stopped', 'failed']).nullable(),
         url: z.string().url().nullable(),

@@ -18260,6 +18260,8 @@ var init_session_environment = __esm(() => {
     jobs: liveSessionInspectionSchema.shape.jobs.optional().default([]),
     jobRuns: liveJobRunsSchema.optional().default([]),
     live: exports_external.object({
+      authenticationReady: exports_external.boolean().optional().catch(false),
+      resourceGeneration: exports_external.uuid().nullish().catch(null),
       kind: exports_external.enum(["sandbox", "connect"]).nullable(),
       status: exports_external.enum(["starting", "running", "stopped", "failed"]).nullable(),
       url: exports_external.string().url().nullable(),
@@ -29949,8 +29951,8 @@ var TEXT_PLAIN = "text/plain; charset=UTF-8", setDefaultContentType = (contentTy
     const res = (html2) => this.#newResponse(html2, arg, setDefaultContentType("text/html; charset=UTF-8", headers));
     return typeof html === "object" ? resolveCallback(html, HtmlEscapedCallbackPhase.Stringify, false, {}).then(res) : res(html);
   };
-  redirect = (location, status) => {
-    const locationString = String(location);
+  redirect = (location2, status) => {
+    const locationString = String(location2);
     this.header("Location", !/[^\x00-\xFF]/.test(locationString) ? locationString : encodeURI(locationString));
     return this.newResponse(null, status ?? 302);
   };
@@ -47037,8 +47039,8 @@ function fileRefsOf(message2) {
   if (!Array.isArray(message2.content))
     return [];
   return message2.content.flatMap((part) => {
-    const location = locationOf(part);
-    const match2 = location ? FILE_REF.exec(location) : null;
+    const location2 = locationOf(part);
+    const match2 = location2 ? FILE_REF.exec(location2) : null;
     return match2?.[1] ? [match2[1].toLowerCase()] : [];
   });
 }
@@ -47046,8 +47048,8 @@ function locationOf(part) {
   const value = part[part.type];
   if (!value || typeof value !== "object")
     return;
-  const location = value.url ?? value.file_data ?? value.data;
-  return typeof location === "string" ? location : undefined;
+  const location2 = value.url ?? value.file_data ?? value.data;
+  return typeof location2 === "string" ? location2 : undefined;
 }
 function partKindsOf(message2) {
   if (!Array.isArray(message2.content))
@@ -47063,8 +47065,8 @@ function inlineFiles(message2, files) {
   return {
     ...message2,
     content: message2.content.map((part) => {
-      const location = locationOf(part);
-      const match2 = location ? FILE_REF.exec(location) : null;
+      const location2 = locationOf(part);
+      const match2 = location2 ? FILE_REF.exec(location2) : null;
       const file2 = match2?.[1] ? files.get(match2[1].toLowerCase()) : undefined;
       if (!file2)
         return part;
@@ -78471,10 +78473,10 @@ function registerStorageRoutes(app, adapters, config3, runtime) {
     if (request.data.partNumbers.some((n2) => n2 > count)) {
       throw new GatewayError("VALIDATION_FAILED", "part number out of range");
     }
-    const location = { tier: tierOf(claims.env), area: "private", key: file2.row.objectKey };
+    const location2 = { tier: tierOf(claims.env), area: "private", key: file2.row.objectKey };
     const parts = await Promise.all(request.data.partNumbers.map(async (partNumber) => {
       const contentLength = multipartPartLength(file2.size, partNumber);
-      const url2 = await adapters.storage.signUploadPart(location, {
+      const url2 = await adapters.storage.signUploadPart(location2, {
         uploadId: request.data.r2UploadId,
         partNumber,
         contentLength,
@@ -78583,12 +78585,12 @@ function registerStorageRoutes(app, adapters, config3, runtime) {
     const bucket = file2 ? resolved.storage.buckets[file2.bucket] : undefined;
     if (!file2 || !inAppScope(file2, claims) || !hasCapability(resolved, claims, file2.bucket, "read") || bucket?.delivery !== "proxy" || bucket.public)
       throw new GatewayError("NOT_FOUND", "file not found");
-    const location = {
+    const location2 = {
       tier: tierOf(claims.env),
       area: "private",
       key: file2.objectKey
     };
-    const head = c2.req.method === "HEAD" || file2.sizeBytes === null ? await adapters.storage.head(location) : null;
+    const head = c2.req.method === "HEAD" || file2.sizeBytes === null ? await adapters.storage.head(location2) : null;
     if ((c2.req.method === "HEAD" || file2.sizeBytes === null) && !head)
       throw new GatewayError("NOT_FOUND", "file not found");
     const size = head?.contentLength ?? file2.sizeBytes;
@@ -78617,7 +78619,7 @@ function registerStorageRoutes(app, adapters, config3, runtime) {
       headers.set("Content-Length", "0");
       return c2.newResponse(null, { status: 416, headers });
     }
-    const upstream = await adapters.storage.get(location, {
+    const upstream = await adapters.storage.get(location2, {
       ...range ? { range } : {},
       signal: c2.req.raw.signal
     });
@@ -80883,10 +80885,10 @@ function createLocalObjectStore(options2) {
   const root = resolve2(options2.root);
   const base = options2.baseUrl.replace(/\/$/, "");
   const keyPromise = crypto.subtle.importKey("raw", encoder5.encode(options2.secret), { name: "HMAC", hash: "SHA-256" }, false, ["sign"]);
-  const areaDir = (location) => `${location.area}-${location.tier}`;
-  function pathOf2(location) {
-    const path = resolve2(root, areaDir(location), location.key);
-    if (!path.startsWith(`${resolve2(root, areaDir(location))}${sep}`)) {
+  const areaDir = (location2) => `${location2.area}-${location2.tier}`;
+  function pathOf2(location2) {
+    const path = resolve2(root, areaDir(location2), location2.key);
+    if (!path.startsWith(`${resolve2(root, areaDir(location2))}${sep}`)) {
       throw new Error("object key escapes the storage root");
     }
     return path;
@@ -80896,10 +80898,10 @@ function createLocalObjectStore(options2) {
 `)));
     return [...new Uint8Array(mac3)].map((b3) => b3.toString(16).padStart(2, "0")).join("");
   }
-  async function signedUrl(method, location, expiresIn, extra) {
-    pathOf2(location);
+  async function signedUrl(method, location2, expiresIn, extra) {
+    pathOf2(location2);
     const exp2 = String(Math.floor(clock().getTime() / 1000) + expiresIn);
-    const url2 = new URL(`${base}/signed/${areaDir(location)}/${location.key}`);
+    const url2 = new URL(`${base}/signed/${areaDir(location2)}/${location2.key}`);
     url2.searchParams.set("exp", exp2);
     for (const [name3, value2] of Object.entries(extra))
       url2.searchParams.set(name3, value2);
@@ -80914,7 +80916,7 @@ function createLocalObjectStore(options2) {
     }
     return dir;
   }
-  async function readUpload(location, uploadId) {
+  async function readUpload(location2, uploadId) {
     let dir;
     try {
       dir = uploadDir(uploadId);
@@ -80929,7 +80931,7 @@ function createLocalObjectStore(options2) {
         return null;
       throw error51;
     }
-    const same2 = meta3.area === location.area && meta3.tier === location.tier && meta3.key === location.key;
+    const same2 = meta3.area === location2.area && meta3.tier === location2.tier && meta3.key === location2.key;
     return same2 ? { dir, meta: meta3 } : null;
   }
   async function partsOf(dir) {
@@ -80940,8 +80942,8 @@ function createLocalObjectStore(options2) {
     }));
     return parts.sort((a2, b3) => a2.partNumber - b3.partNumber);
   }
-  async function writeObject(location, body, contentType2) {
-    const path = pathOf2(location);
+  async function writeObject(location2, body, contentType2) {
+    const path = pathOf2(location2);
     await mkdir3(dirname4(path), { recursive: true });
     await writeFile3(path, body);
     await writeFile3(`${path}.meta.json`, JSON.stringify({ contentType: contentType2 }));
@@ -80966,8 +80968,8 @@ function createLocalObjectStore(options2) {
       key: match2[3]
     };
   }
-  async function serveFile(location, disposition, range, signal) {
-    const path = pathOf2(location);
+  async function serveFile(location2, disposition, range, signal) {
+    const path = pathOf2(location2);
     const meta3 = await readMeta(path);
     if (!meta3)
       return new Response(null, { status: 404 });
@@ -80981,18 +80983,18 @@ function createLocalObjectStore(options2) {
     return new Response(Readable2.toWeb(createReadStream(path, { ...range, signal })), { status: range ? 206 : 200, headers });
   }
   return {
-    async get(location, { range, signal } = {}) {
-      const response = await serveFile(location, undefined, range, signal);
+    async get(location2, { range, signal } = {}) {
+      const response = await serveFile(location2, undefined, range, signal);
       return response.status === 404 ? null : response;
     },
-    signPut(location, { contentType: contentType2, contentLength, expiresIn }) {
-      return signedUrl("PUT", location, expiresIn, { ct: contentType2, cl: String(contentLength) });
+    signPut(location2, { contentType: contentType2, contentLength, expiresIn }) {
+      return signedUrl("PUT", location2, expiresIn, { ct: contentType2, cl: String(contentLength) });
     },
-    signGet(location, { expiresIn, downloadName }) {
-      return signedUrl("GET", location, expiresIn, downloadName === undefined ? {} : { dn: downloadName });
+    signGet(location2, { expiresIn, downloadName }) {
+      return signedUrl("GET", location2, expiresIn, downloadName === undefined ? {} : { dn: downloadName });
     },
-    async head(location) {
-      const path = pathOf2(location);
+    async head(location2) {
+      const path = pathOf2(location2);
       const meta3 = await readMeta(path);
       if (!meta3)
         return null;
@@ -81008,8 +81010,8 @@ function createLocalObjectStore(options2) {
       await copyFile(source, target);
       await writeFile3(`${target}.meta.json`, JSON.stringify(meta3));
     },
-    async remove(location) {
-      const path = pathOf2(location);
+    async remove(location2) {
+      const path = pathOf2(location2);
       await rm3(path, { force: true });
       await rm3(`${path}.meta.json`, { force: true });
     },
@@ -81031,46 +81033,46 @@ function createLocalObjectStore(options2) {
       })));
       return { objects, truncated: keys.length > limit3 };
     },
-    publicUrl(location) {
-      if (location.area !== "public")
+    publicUrl(location2) {
+      if (location2.area !== "public")
         return null;
-      return `${base}/public/${location.tier}/${location.key}`;
+      return `${base}/public/${location2.tier}/${location2.key}`;
     },
-    async createMultipart(location, { contentType: contentType2 }) {
-      pathOf2(location);
+    async createMultipart(location2, { contentType: contentType2 }) {
+      pathOf2(location2);
       const uploadId = crypto.randomUUID();
       const dir = uploadDir(uploadId);
       await mkdir3(dir, { recursive: true });
-      const meta3 = { ...location, contentType: contentType2 };
+      const meta3 = { ...location2, contentType: contentType2 };
       await writeFile3(join12(dir, "meta.json"), JSON.stringify(meta3));
       return uploadId;
     },
-    signUploadPart(location, { uploadId, partNumber, contentLength, expiresIn }) {
-      return signedUrl("PUT", location, expiresIn, {
+    signUploadPart(location2, { uploadId, partNumber, contentLength, expiresIn }) {
+      return signedUrl("PUT", location2, expiresIn, {
         uploadId,
         partNumber: String(partNumber),
         cl: String(contentLength)
       });
     },
-    async listParts(location, uploadId) {
-      const upload = await readUpload(location, uploadId);
+    async listParts(location2, uploadId) {
+      const upload = await readUpload(location2, uploadId);
       return upload ? partsOf(upload.dir) : null;
     },
-    async completeMultipart(location, uploadId, parts) {
-      const upload = await readUpload(location, uploadId);
+    async completeMultipart(location2, uploadId, parts) {
+      const upload = await readUpload(location2, uploadId);
       if (!upload)
         throw new Error("multipart upload not found");
       const ordered = [...parts].sort((a2, b3) => a2.partNumber - b3.partNumber);
       const chunks = await Promise.all(ordered.map((part) => readFile8(join12(upload.dir, String(part.partNumber)))));
-      await writeObject(location, Buffer.concat(chunks), upload.meta.contentType);
+      await writeObject(location2, Buffer.concat(chunks), upload.meta.contentType);
       await rm3(upload.dir, { recursive: true, force: true });
     },
-    async abortMultipart(location, uploadId) {
-      const upload = await readUpload(location, uploadId);
+    async abortMultipart(location2, uploadId) {
+      const upload = await readUpload(location2, uploadId);
       if (upload)
         await rm3(upload.dir, { recursive: true, force: true });
     },
-    async listMultipartUploads(location) {
+    async listMultipartUploads(location2) {
       let ids;
       try {
         ids = await readdir7(multipartRoot);
@@ -81079,7 +81081,7 @@ function createLocalObjectStore(options2) {
           return [];
         throw error51;
       }
-      const found = await Promise.all(ids.map(async (id) => await readUpload(location, id) ? id : null));
+      const found = await Promise.all(ids.map(async (id) => await readUpload(location2, id) ? id : null));
       return found.filter((id) => id !== null);
     },
     async copyPart(from, to, { uploadId, partNumber, range }) {
@@ -81117,9 +81119,9 @@ function createLocalObjectStore(options2) {
           response.headers.set(name3, value2);
         return response;
       }
-      const location = url2.pathname.startsWith("/signed/") ? locationFromPath(url2.pathname, "/signed/") : null;
+      const location2 = url2.pathname.startsWith("/signed/") ? locationFromPath(url2.pathname, "/signed/") : null;
       const method = request.method === "PUT" ? "PUT" : request.method === "GET" ? "GET" : null;
-      if (!location || !method)
+      if (!location2 || !method)
         return new Response(null, { status: 404, headers: cors });
       const exp2 = url2.searchParams.get("exp") ?? "";
       const isPart = method === "PUT" && url2.searchParams.has("uploadId");
@@ -81135,13 +81137,13 @@ function createLocalObjectStore(options2) {
       }
       if (method === "GET") {
         const dn = url2.searchParams.get("dn");
-        const response = await serveFile(location, dn === null ? undefined : `attachment; filename*=UTF-8''${encodeURIComponent(dn)}`);
+        const response = await serveFile(location2, dn === null ? undefined : `attachment; filename*=UTF-8''${encodeURIComponent(dn)}`);
         for (const [name3, value2] of Object.entries(cors))
           response.headers.set(name3, value2);
         return response;
       }
       if (isPart) {
-        const upload = await readUpload(location, url2.searchParams.get("uploadId") ?? "");
+        const upload = await readUpload(location2, url2.searchParams.get("uploadId") ?? "");
         if (!upload)
           return new Response(null, { status: 404, headers: cors });
         const part = new Uint8Array(await request.arrayBuffer());
@@ -81156,7 +81158,7 @@ function createLocalObjectStore(options2) {
       if (contentType2 !== url2.searchParams.get("ct") || String(body.byteLength) !== url2.searchParams.get("cl")) {
         return new Response(null, { status: 403, headers: cors });
       }
-      await writeObject(location, body, contentType2);
+      await writeObject(location2, body, contentType2);
       return new Response(null, { status: 200, headers: cors });
     }
   };
@@ -81457,21 +81459,29 @@ var init_jobs3 = __esm(() => {
 
 // frontend/packages/miniapp-kit/src/vendor.ts
 import { existsSync as existsSync10 } from "node:fs";
-import { cp, mkdir as mkdir4, readdir as readdir8, readFile as readFile10, rm as rm4, writeFile as writeFile4 } from "node:fs/promises";
-import { join as join14 } from "node:path";
+import { cp, lstat, mkdir as mkdir4, readdir as readdir8, readFile as readFile10, rm as rm4, writeFile as writeFile4 } from "node:fs/promises";
+import { dirname as dirname5, join as join14, relative } from "node:path";
 async function readTree3(root) {
   const files = new Map;
-  if (!existsSync10(root))
-    return files;
-  const walk = async (relative) => {
-    for (const entry of await readdir8(join14(root, relative), { withFileTypes: true })) {
-      if (relative === "" && entry.name === "node_modules")
+  let rootStat;
+  try {
+    rootStat = await lstat(root);
+  } catch (error51) {
+    if (error51.code === "ENOENT")
+      return files;
+    throw error51;
+  }
+  if (!rootStat.isDirectory())
+    return new Map([["", "!not-directory"]]);
+  const walk = async (relative2) => {
+    for (const entry of await readdir8(join14(root, relative2), { withFileTypes: true })) {
+      if (relative2 === "" && entry.name === "node_modules")
         continue;
-      const path = relative === "" ? entry.name : `${relative}/${entry.name}`;
+      const path = relative2 === "" ? entry.name : `${relative2}/${entry.name}`;
       if (entry.isDirectory())
         await walk(path);
       else
-        files.set(path, await readFile10(join14(root, path), "base64"));
+        files.set(path, entry.isSymbolicLink() ? "!symlink" : await readFile10(join14(root, path), "base64"));
     }
   };
   await walk("");
@@ -81504,16 +81514,54 @@ async function placePythonSdk(root, kitRoot) {
   return placeTree(source, join14(root, "packages", PYTHON_SDK_DIR));
 }
 async function placeTree(source, target) {
-  if (sameTree2(await readTree3(source), await readTree3(target)))
+  try {
+    if ((await lstat(dirname5(target))).isSymbolicLink())
+      throw new VendorError("Vendored package parent is a symlink");
+  } catch (error51) {
+    if (error51.code !== "ENOENT")
+      throw error51;
+  }
+  const expected = await readTree3(source);
+  const actual = await readTree3(target);
+  if (sameTree2(expected, actual))
     return "unchanged";
-  const existed = existsSync10(target);
-  if (existed) {
-    for (const entry of await readdir8(target)) {
-      if (entry !== "node_modules")
-        await rm4(join14(target, entry), { recursive: true, force: true });
+  const existed = actual.size > 0 || existsSync10(target);
+  const directories = new Set([""]);
+  for (const path of expected.keys()) {
+    let parent = dirname5(path);
+    while (parent !== ".") {
+      directories.add(parent);
+      parent = dirname5(parent);
     }
   }
-  await cp(source, target, { recursive: true });
+  const prune = async (path) => {
+    const destination = join14(target, path);
+    let info;
+    try {
+      info = await lstat(destination);
+    } catch (error51) {
+      if (error51.code === "ENOENT")
+        return;
+      throw error51;
+    }
+    if (directories.has(path) && info.isDirectory()) {
+      for (const name3 of await readdir8(destination)) {
+        if (path === "" && name3 === "node_modules")
+          continue;
+        await prune(path ? `${path}/${name3}` : name3);
+      }
+    } else if (!expected.has(path) || !info.isFile()) {
+      await rm4(destination, { recursive: true, force: true });
+    }
+  };
+  await prune("");
+  await cp(source, target, {
+    recursive: true,
+    filter: (path) => {
+      const name3 = relative(source, path);
+      return directories.has(name3) || expected.get(name3) !== actual.get(name3);
+    }
+  });
   return existed ? "restored" : "created";
 }
 var VENDORED_PACKAGES, KIT_VENDOR_DIR = "vendor", PYTHON_SDK_DIR = "fdpocket-py", VendorError;
@@ -81883,18 +81931,18 @@ var init_tar2 = __esm(() => {
 
 // frontend/packages/miniapp-kit/src/pack.ts
 import { createHash as createHash5 } from "node:crypto";
-import { lstat, readdir as readdir9, readFile as readFile11 } from "node:fs/promises";
+import { lstat as lstat2, readdir as readdir9, readFile as readFile11 } from "node:fs/promises";
 import { join as join16 } from "node:path";
 async function collectFiles(root, options2 = {}) {
   let size = 0;
   const files = [];
-  const walk = async (relative) => {
-    const entries = await readdir9(join16(root, relative), { withFileTypes: true });
+  const walk = async (relative2) => {
+    const entries = await readdir9(join16(root, relative2), { withFileTypes: true });
     for (const entry of entries) {
-      const path = relative === "" ? entry.name : `${relative}/${entry.name}`;
+      const path = relative2 === "" ? entry.name : `${relative2}/${entry.name}`;
       if (options2.include && !options2.include(path, entry.isDirectory()))
         continue;
-      const info = await lstat(join16(root, path));
+      const info = await lstat2(join16(root, path));
       if (info.isSymbolicLink()) {
         throw new PackError(`${path} is a symbolic link; Platform rejects links, copy the file instead`);
       }
@@ -81998,7 +82046,7 @@ var GENERATION_INPUT_POLICY = "generation-v2-ui-only";
 // frontend/packages/miniapp-kit/src/generate-cache.ts
 import { createHash as createHash7 } from "node:crypto";
 import { mkdir as mkdir5, mkdtemp as mkdtemp2, readFile as readFile13, rename, rm as rm5, writeFile as writeFile5 } from "node:fs/promises";
-import { dirname as dirname5, join as join17 } from "node:path";
+import { dirname as dirname6, join as join17 } from "node:path";
 function included(path) {
   return !path.split("/").some((part) => SKIP.has(part)) && !path.split("/").some((part) => part.startsWith(".env") || part.endsWith(".pyc")) && path !== "packages/sdk" && !path.startsWith("packages/sdk/") && (ROOTS.has(path.split("/")[0]) || ROOT_FILES.has(path));
 }
@@ -82070,8 +82118,8 @@ async function cachedGeneration(root, key) {
 }
 async function cacheGeneration(root, key, files) {
   const target = join17(root, CACHE);
-  await mkdir5(dirname5(target), { recursive: true });
-  const temporary = await mkdtemp2(join17(dirname5(target), ".generation-"));
+  await mkdir5(dirname6(target), { recursive: true });
+  const temporary = await mkdtemp2(join17(dirname6(target), ".generation-"));
   try {
     const path = join17(temporary, "cache.json");
     await writeFile5(path, JSON.stringify({ key, output: await outputHash(root), files }));
@@ -82111,15 +82159,15 @@ var init_generate_cache = __esm(() => {
 });
 
 // frontend/packages/miniapp-kit/src/sdk-scaffold.ts
-import { lstat as lstat2, mkdir as mkdir6, mkdtemp as mkdtemp3, readFile as readFile14, rename as rename2, rm as rm6, writeFile as writeFile6 } from "node:fs/promises";
-import { dirname as dirname6, join as join18 } from "node:path";
+import { lstat as lstat3, mkdir as mkdir6, mkdtemp as mkdtemp3, readFile as readFile14, rename as rename2, rm as rm6, writeFile as writeFile6 } from "node:fs/promises";
+import { dirname as dirname7, join as join18 } from "node:path";
 async function assertSdkScaffoldPaths(root) {
   for (const file2 of SDK_SCAFFOLD) {
     let path = root;
     for (const part of ["packages", "sdk", ...file2.split("/")]) {
       path = join18(path, part);
       try {
-        if ((await lstat2(path)).isSymbolicLink())
+        if ((await lstat3(path)).isSymbolicLink())
           throw new Error("SDK scaffold path is a symlink");
       } catch (error51) {
         if (!(error51 instanceof Error && ("code" in error51) && error51.code === "ENOENT"))
@@ -82149,8 +82197,8 @@ async function restoreFiles(root, kitRoot, files) {
       if (!(error51 instanceof Error && ("code" in error51) && error51.code === "ENOENT"))
         throw error51;
     }
-    await mkdir6(dirname6(target), { recursive: true });
-    const temporary = await mkdtemp3(join18(dirname6(target), ".sdk-scaffold-"));
+    await mkdir6(dirname7(target), { recursive: true });
+    const temporary = await mkdtemp3(join18(dirname7(target), ".sdk-scaffold-"));
     try {
       const staged = join18(temporary, "replacement");
       await writeFile6(staged, bytes3);
@@ -82168,7 +82216,7 @@ var init_sdk_scaffold = __esm(() => {
 // frontend/packages/miniapp-kit/src/generate.ts
 import { existsSync as existsSync11 } from "node:fs";
 import { mkdir as mkdir7, mkdtemp as mkdtemp4, readdir as readdir10, readFile as readFile15, rename as rename3, rm as rm7, writeFile as writeFile7 } from "node:fs/promises";
-import { dirname as dirname7, join as join19, relative } from "node:path";
+import { dirname as dirname8, join as join19, relative as relative2 } from "node:path";
 async function generateProject(options2) {
   const started = performance.now();
   const { root } = options2;
@@ -82192,8 +82240,8 @@ async function generateProject(options2) {
   const sdk = join19(root, PROJECT_PATHS.sdk);
   const generated = join19(root, PROJECT_PATHS.generated);
   await mkdir7(generated, { recursive: true });
-  await mkdir7(dirname7(sdk), { recursive: true });
-  const staging = await mkdtemp4(join19(dirname7(sdk), ".zenstack-"));
+  await mkdir7(dirname8(sdk), { recursive: true });
+  const staging = await mkdtemp4(join19(dirname8(sdk), ".zenstack-"));
   let sdkFiles;
   try {
     await runZen(cli, root, [
@@ -82201,7 +82249,7 @@ async function generateProject(options2) {
       "--schema",
       PROJECT_PATHS.schema,
       "--output",
-      relative(root, staging),
+      relative2(root, staging),
       "--no-version-check",
       "--no-tips",
       "--silent"
@@ -82258,7 +82306,7 @@ async function publishGeneratedFile(staged, target) {
     if (error51.code !== "ENOENT")
       throw error51;
   }
-  await mkdir7(dirname7(target), { recursive: true });
+  await mkdir7(dirname8(target), { recursive: true });
   await rename3(staged, target);
 }
 async function readManifestSource(root) {
@@ -82288,7 +82336,7 @@ async function placePlatform(root, kitRoot) {
   const current = existsSync11(path) ? await readFile15(path, "utf8") : null;
   if (current === kitCopy)
     return "unchanged";
-  await mkdir7(dirname7(path), { recursive: true });
+  await mkdir7(dirname8(path), { recursive: true });
   await writeFile7(path, kitCopy);
   return current === null ? "created" : "restored";
 }
@@ -82334,7 +82382,7 @@ import { randomUUID as randomUUID2 } from "node:crypto";
 import { existsSync as existsSync12, readFileSync as readFileSync2 } from "node:fs";
 import { readFile as readFile16, writeFile as writeFile8 } from "node:fs/promises";
 import { createRequire as createRequire6 } from "node:module";
-import { dirname as dirname8, join as join20 } from "node:path";
+import { dirname as dirname9, join as join20 } from "node:path";
 import { pathToFileURL as pathToFileURL5 } from "node:url";
 function viteImporter(viteEntry, root) {
   return async (path) => {
@@ -82353,7 +82401,7 @@ function resolveViteEntry(appDir) {
   const file2 = typeof entry === "string" ? entry : entry?.import?.default ?? entry?.import;
   if (typeof file2 !== "string")
     throw new Error("vite has no ESM entry");
-  return join20(dirname8(manifestPath), file2);
+  return join20(dirname9(manifestPath), file2);
 }
 async function recoverLegacySamplePlan(seed, context) {
   if (typeof seed !== "function")
@@ -82888,7 +82936,7 @@ var init_schema_plan = __esm(() => {
 import { createHash as createHash9, randomBytes as randomBytes2 } from "node:crypto";
 import { existsSync as existsSync13 } from "node:fs";
 import { mkdir as mkdir8, readFile as readFile18, rm as rm8, writeFile as writeFile10 } from "node:fs/promises";
-import { dirname as dirname9, join as join22 } from "node:path";
+import { dirname as dirname10, join as join22 } from "node:path";
 function devOriginHost(projectName, projectId) {
   const slug = projectName.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-+|-+$/g, "") || "project";
   try {
@@ -83203,7 +83251,7 @@ async function openDevDatabase(options2) {
   if (recreated) {
     for (const file2 of [stampPath, path, `${path}-wal`, `${path}-shm`, `${path}-journal`])
       await rm8(file2, { force: true });
-    await mkdir8(dirname9(path), { recursive: true });
+    await mkdir8(dirname10(path), { recursive: true });
   }
   const db = options2.createLibsqlClient({ url: `file:${path}` });
   if (!recreated)
@@ -83746,7 +83794,7 @@ var require_util = __commonJS((exports) => {
   exports.isAbsolute = function(aPath) {
     return aPath.charAt(0) === "/" || urlRegexp.test(aPath);
   };
-  function relative2(aRoot, aPath) {
+  function relative3(aRoot, aPath) {
     if (aRoot === "") {
       aRoot = ".";
     }
@@ -83765,7 +83813,7 @@ var require_util = __commonJS((exports) => {
     }
     return Array(level + 1).join("../") + aPath.substr(aRoot.length + 1);
   }
-  exports.relative = relative2;
+  exports.relative = relative3;
   var supportsNullProto = function() {
     var obj = Object.create(null);
     return !("__proto__" in obj);
@@ -94583,11 +94631,11 @@ ${lanes.join(`
         return toComponents;
       }
       const components = toComponents.slice(start);
-      const relative2 = [];
+      const relative3 = [];
       for (;start < fromComponents.length; start++) {
-        relative2.push("..");
+        relative3.push("..");
       }
-      return ["", ...relative2, ...components];
+      return ["", ...relative3, ...components];
     }
     function getRelativePathFromDirectory(fromDirectory, to, getCanonicalFileNameOrIgnoreCase) {
       Debug.assert(getRootLength(fromDirectory) > 0 === getRootLength(to) > 0, "Paths must either both be absolute or both be relative");
@@ -108307,14 +108355,14 @@ ${lanes.join(`
       return { value: value2, isSyntacticallyString, resolvedOtherFiles, hasExternalReferences };
     }
     function createEvaluator({ evaluateElementAccessExpression, evaluateEntityNameExpression }) {
-      function evaluate(expr2, location) {
+      function evaluate(expr2, location2) {
         let isSyntacticallyString = false;
         let resolvedOtherFiles = false;
         let hasExternalReferences = false;
         expr2 = skipParentheses(expr2);
         switch (expr2.kind) {
           case 225:
-            const result = evaluate(expr2.operand, location);
+            const result = evaluate(expr2.operand, location2);
             resolvedOtherFiles = result.resolvedOtherFiles;
             hasExternalReferences = result.hasExternalReferences;
             if (typeof result.value === "number") {
@@ -108329,8 +108377,8 @@ ${lanes.join(`
             }
             break;
           case 227: {
-            const left = evaluate(expr2.left, location);
-            const right = evaluate(expr2.right, location);
+            const left = evaluate(expr2.left, location2);
+            const right = evaluate(expr2.right, location2);
             isSyntacticallyString = (left.isSyntacticallyString || right.isSyntacticallyString) && expr2.operatorToken.kind === 40;
             resolvedOtherFiles = left.resolvedOtherFiles || right.resolvedOtherFiles;
             hasExternalReferences = left.hasExternalReferences || right.hasExternalReferences;
@@ -108370,27 +108418,27 @@ ${lanes.join(`
           case 15:
             return evaluatorResult(expr2.text, true);
           case 229:
-            return evaluateTemplateExpression(expr2, location);
+            return evaluateTemplateExpression(expr2, location2);
           case 9:
             return evaluatorResult(+expr2.text);
           case 80:
-            return evaluateEntityNameExpression(expr2, location);
+            return evaluateEntityNameExpression(expr2, location2);
           case 212:
             if (isEntityNameExpression(expr2)) {
-              return evaluateEntityNameExpression(expr2, location);
+              return evaluateEntityNameExpression(expr2, location2);
             }
             break;
           case 213:
-            return evaluateElementAccessExpression(expr2, location);
+            return evaluateElementAccessExpression(expr2, location2);
         }
         return evaluatorResult(undefined, isSyntacticallyString, resolvedOtherFiles, hasExternalReferences);
       }
-      function evaluateTemplateExpression(expr2, location) {
+      function evaluateTemplateExpression(expr2, location2) {
         let result = expr2.head.text;
         let resolvedOtherFiles = false;
         let hasExternalReferences = false;
         for (const span of expr2.templateSpans) {
-          const spanResult = evaluate(span.expression, location);
+          const spanResult = evaluate(span.expression, location2);
           if (spanResult.value === undefined) {
             return evaluatorResult(undefined, true);
           }
@@ -108403,8 +108451,8 @@ ${lanes.join(`
       }
       return evaluate;
     }
-    function isConstAssertion(location) {
-      return isAssertionExpression(location) && isConstTypeReference(location.type) || isJSDocTypeTag(location) && isConstTypeReference(location.typeExpression);
+    function isConstAssertion(location2) {
+      return isAssertionExpression(location2) && isConstTypeReference(location2.type) || isJSDocTypeTag(location2) && isConstTypeReference(location2.typeExpression);
     }
     function findConstructorDeclaration(node) {
       const members = node.members;
@@ -108432,9 +108480,9 @@ ${lanes.join(`
       var emitStandardClassFields = getEmitStandardClassFields(compilerOptions);
       var emptySymbols = createSymbolTable();
       return resolveNameHelper;
-      function resolveNameHelper(location, nameArg, meaning, nameNotFoundMessage, isUse, excludeGlobals) {
+      function resolveNameHelper(location2, nameArg, meaning, nameNotFoundMessage, isUse, excludeGlobals) {
         var _a7, _b, _c;
-        const originalLocation = location;
+        const originalLocation = location2;
         let result;
         let lastLocation;
         let lastSelfReferenceLocation;
@@ -108444,30 +108492,30 @@ ${lanes.join(`
         let grandparent;
         const name3 = isString3(nameArg) ? nameArg : nameArg.escapedText;
         loop:
-          while (location) {
-            if (name3 === "const" && isConstAssertion(location)) {
+          while (location2) {
+            if (name3 === "const" && isConstAssertion(location2)) {
               return;
             }
-            if (isModuleOrEnumDeclaration(location) && lastLocation && location.name === lastLocation) {
-              lastLocation = location;
-              location = location.parent;
+            if (isModuleOrEnumDeclaration(location2) && lastLocation && location2.name === lastLocation) {
+              lastLocation = location2;
+              location2 = location2.parent;
             }
-            if (canHaveLocals(location) && location.locals && !isGlobalSourceFile(location)) {
-              if (result = lookup(location.locals, name3, meaning)) {
+            if (canHaveLocals(location2) && location2.locals && !isGlobalSourceFile(location2)) {
+              if (result = lookup(location2.locals, name3, meaning)) {
                 let useResult = true;
-                if (isFunctionLike(location) && lastLocation && lastLocation !== location.body) {
+                if (isFunctionLike(location2) && lastLocation && lastLocation !== location2.body) {
                   if (meaning & result.flags & 788968 && lastLocation.kind !== 321) {
-                    useResult = result.flags & 262144 ? !!(lastLocation.flags & 16) || lastLocation === location.type || lastLocation.kind === 170 || lastLocation.kind === 342 || lastLocation.kind === 343 || lastLocation.kind === 169 : false;
+                    useResult = result.flags & 262144 ? !!(lastLocation.flags & 16) || lastLocation === location2.type || lastLocation.kind === 170 || lastLocation.kind === 342 || lastLocation.kind === 343 || lastLocation.kind === 169 : false;
                   }
                   if (meaning & result.flags & 3) {
-                    if (useOuterVariableScopeInParameter(result, location, lastLocation)) {
+                    if (useOuterVariableScopeInParameter(result, location2, lastLocation)) {
                       useResult = false;
                     } else if (result.flags & 1) {
-                      useResult = lastLocation.kind === 170 || !!(lastLocation.flags & 16) || lastLocation === location.type && !!findAncestor(result.valueDeclaration, isParameter);
+                      useResult = lastLocation.kind === 170 || !!(lastLocation.flags & 16) || lastLocation === location2.type && !!findAncestor(result.valueDeclaration, isParameter);
                     }
                   }
-                } else if (location.kind === 195) {
-                  useResult = lastLocation === location.trueType;
+                } else if (location2.kind === 195) {
+                  useResult = lastLocation === location2.trueType;
                 }
                 if (useResult) {
                   break loop;
@@ -108476,14 +108524,14 @@ ${lanes.join(`
                 }
               }
             }
-            withinDeferredContext = withinDeferredContext || getIsDeferredContext(location, lastLocation);
-            switch (location.kind) {
+            withinDeferredContext = withinDeferredContext || getIsDeferredContext(location2, lastLocation);
+            switch (location2.kind) {
               case 308:
-                if (!isExternalOrCommonJsModule(location))
+                if (!isExternalOrCommonJsModule(location2))
                   break;
               case 268:
-                const moduleExports = ((_a7 = getSymbolOfDeclaration(location)) == null ? undefined : _a7.exports) || emptySymbols;
-                if (location.kind === 308 || isModuleDeclaration(location) && location.flags & 33554432 && !isGlobalScopeAugmentation(location)) {
+                const moduleExports = ((_a7 = getSymbolOfDeclaration(location2)) == null ? undefined : _a7.exports) || emptySymbols;
+                if (location2.kind === 308 || isModuleDeclaration(location2) && location2.flags & 33554432 && !isGlobalScopeAugmentation(location2)) {
                   if (result = moduleExports.get("default")) {
                     const localSymbol = getLocalSymbolForExportDefault(result);
                     if (localSymbol && result.flags & meaning && localSymbol.escapedName === name3) {
@@ -108497,7 +108545,7 @@ ${lanes.join(`
                   }
                 }
                 if (name3 !== "default" && (result = lookup(moduleExports, name3, meaning & 2623475))) {
-                  if (isSourceFile(location) && location.commonJsModuleIndicator && !((_b = result.declarations) == null ? undefined : _b.some(isJSDocTypeAlias))) {
+                  if (isSourceFile(location2) && location2.commonJsModuleIndicator && !((_b = result.declarations) == null ? undefined : _b.some(isJSDocTypeAlias))) {
                     result = undefined;
                   } else {
                     break loop;
@@ -108505,20 +108553,20 @@ ${lanes.join(`
                 }
                 break;
               case 267:
-                if (result = lookup(((_c = getSymbolOfDeclaration(location)) == null ? undefined : _c.exports) || emptySymbols, name3, meaning & 8)) {
-                  if (nameNotFoundMessage && getIsolatedModules(compilerOptions) && !(location.flags & 33554432) && getSourceFileOfNode(location) !== getSourceFileOfNode(result.valueDeclaration)) {
-                    error210(originalLocation, Diagnostics.Cannot_access_0_from_another_file_without_qualification_when_1_is_enabled_Use_2_instead, unescapeLeadingUnderscores(name3), isolatedModulesLikeFlagName, `${unescapeLeadingUnderscores(getSymbolOfDeclaration(location).escapedName)}.${unescapeLeadingUnderscores(name3)}`);
+                if (result = lookup(((_c = getSymbolOfDeclaration(location2)) == null ? undefined : _c.exports) || emptySymbols, name3, meaning & 8)) {
+                  if (nameNotFoundMessage && getIsolatedModules(compilerOptions) && !(location2.flags & 33554432) && getSourceFileOfNode(location2) !== getSourceFileOfNode(result.valueDeclaration)) {
+                    error210(originalLocation, Diagnostics.Cannot_access_0_from_another_file_without_qualification_when_1_is_enabled_Use_2_instead, unescapeLeadingUnderscores(name3), isolatedModulesLikeFlagName, `${unescapeLeadingUnderscores(getSymbolOfDeclaration(location2).escapedName)}.${unescapeLeadingUnderscores(name3)}`);
                   }
                   break loop;
                 }
                 break;
               case 173:
-                if (!isStatic(location)) {
-                  const ctor = findConstructorDeclaration(location.parent);
+                if (!isStatic(location2)) {
+                  const ctor = findConstructorDeclaration(location2.parent);
                   if (ctor && ctor.locals) {
                     if (lookup(ctor.locals, name3, meaning & 111551)) {
-                      Debug.assertNode(location, isPropertyDeclaration);
-                      propertyWithInvalidInitializer = location;
+                      Debug.assertNode(location2, isPropertyDeclaration);
+                      propertyWithInvalidInitializer = location2;
                     }
                   }
                 }
@@ -108526,8 +108574,8 @@ ${lanes.join(`
               case 264:
               case 232:
               case 265:
-                if (result = lookup(getSymbolOfDeclaration(location).members || emptySymbols, name3, meaning & 788968)) {
-                  if (!isTypeParameterSymbolDeclaredInContainer(result, location)) {
+                if (result = lookup(getSymbolOfDeclaration(location2).members || emptySymbols, name3, meaning & 788968)) {
+                  if (!isTypeParameterSymbolDeclaredInContainer(result, location2)) {
                     result = undefined;
                     break;
                   }
@@ -108539,17 +108587,17 @@ ${lanes.join(`
                   }
                   break loop;
                 }
-                if (isClassExpression(location) && meaning & 32) {
-                  const className = location.name;
+                if (isClassExpression(location2) && meaning & 32) {
+                  const className = location2.name;
                   if (className && name3 === className.escapedText) {
-                    result = location.symbol;
+                    result = location2.symbol;
                     break loop;
                   }
                 }
                 break;
               case 234:
-                if (lastLocation === location.expression && location.parent.token === 96) {
-                  const container = location.parent.parent;
+                if (lastLocation === location2.expression && location2.parent.token === 96) {
+                  const container = location2.parent.parent;
                   if (isClassLike(container) && (result = lookup(getSymbolOfDeclaration(container).members, name3, meaning & 788968))) {
                     if (nameNotFoundMessage) {
                       error210(originalLocation, Diagnostics.Base_class_expressions_cannot_reference_class_type_parameters);
@@ -108559,7 +108607,7 @@ ${lanes.join(`
                 }
                 break;
               case 168:
-                grandparent = location.parent.parent;
+                grandparent = location2.parent.parent;
                 if (isClassLike(grandparent) || grandparent.kind === 265) {
                   if (result = lookup(getSymbolOfDeclaration(grandparent).members, name3, meaning & 788968)) {
                     if (nameNotFoundMessage) {
@@ -108589,64 +108637,64 @@ ${lanes.join(`
                   break loop;
                 }
                 if (meaning & 16) {
-                  const functionName = location.name;
+                  const functionName = location2.name;
                   if (functionName && name3 === functionName.escapedText) {
-                    result = location.symbol;
+                    result = location2.symbol;
                     break loop;
                   }
                 }
                 break;
               case 171:
-                if (location.parent && location.parent.kind === 170) {
-                  location = location.parent;
+                if (location2.parent && location2.parent.kind === 170) {
+                  location2 = location2.parent;
                 }
-                if (location.parent && (isClassElement(location.parent) || location.parent.kind === 264)) {
-                  location = location.parent;
+                if (location2.parent && (isClassElement(location2.parent) || location2.parent.kind === 264)) {
+                  location2 = location2.parent;
                 }
                 break;
               case 347:
               case 339:
               case 341:
               case 352:
-                const root = getJSDocRoot(location);
+                const root = getJSDocRoot(location2);
                 if (root) {
-                  location = root.parent;
+                  location2 = root.parent;
                 }
                 break;
               case 170:
-                if (lastLocation && (lastLocation === location.initializer || lastLocation === location.name && isBindingPattern(lastLocation))) {
+                if (lastLocation && (lastLocation === location2.initializer || lastLocation === location2.name && isBindingPattern(lastLocation))) {
                   if (!associatedDeclarationForContainingInitializerOrBindingName) {
-                    associatedDeclarationForContainingInitializerOrBindingName = location;
+                    associatedDeclarationForContainingInitializerOrBindingName = location2;
                   }
                 }
                 break;
               case 209:
-                if (lastLocation && (lastLocation === location.initializer || lastLocation === location.name && isBindingPattern(lastLocation))) {
-                  if (isPartOfParameterDeclaration(location) && !associatedDeclarationForContainingInitializerOrBindingName) {
-                    associatedDeclarationForContainingInitializerOrBindingName = location;
+                if (lastLocation && (lastLocation === location2.initializer || lastLocation === location2.name && isBindingPattern(lastLocation))) {
+                  if (isPartOfParameterDeclaration(location2) && !associatedDeclarationForContainingInitializerOrBindingName) {
+                    associatedDeclarationForContainingInitializerOrBindingName = location2;
                   }
                 }
                 break;
               case 196:
                 if (meaning & 262144) {
-                  const parameterName = location.typeParameter.name;
+                  const parameterName = location2.typeParameter.name;
                   if (parameterName && name3 === parameterName.escapedText) {
-                    result = location.typeParameter.symbol;
+                    result = location2.typeParameter.symbol;
                     break loop;
                   }
                 }
                 break;
               case 282:
-                if (lastLocation && lastLocation === location.propertyName && location.parent.parent.moduleSpecifier) {
-                  location = location.parent.parent.parent;
+                if (lastLocation && lastLocation === location2.propertyName && location2.parent.parent.moduleSpecifier) {
+                  location2 = location2.parent.parent.parent;
                 }
                 break;
             }
-            if (isSelfReferenceLocation(location, lastLocation)) {
-              lastSelfReferenceLocation = location;
+            if (isSelfReferenceLocation(location2, lastLocation)) {
+              lastSelfReferenceLocation = location2;
             }
-            lastLocation = location;
-            location = isJSDocTemplateTag(location) ? getEffectiveContainerForJSDocTemplateTag(location) || location.parent : isJSDocParameterTag(location) || isJSDocReturnTag(location) ? getHostSignatureFromJSDoc(location) || location.parent : location.parent;
+            lastLocation = location2;
+            location2 = isJSDocTemplateTag(location2) ? getEffectiveContainerForJSDocTemplateTag(location2) || location2.parent : isJSDocParameterTag(location2) || isJSDocReturnTag(location2) ? getHostSignatureFromJSDoc(location2) || location2.parent : location2.parent;
           }
         if (isUse && result && (!lastSelfReferenceLocation || result !== lastSelfReferenceLocation.symbol)) {
           result.isReferenced |= meaning;
@@ -108681,9 +108729,9 @@ ${lanes.join(`
         }
         return result;
       }
-      function useOuterVariableScopeInParameter(result, location, lastLocation) {
+      function useOuterVariableScopeInParameter(result, location2, lastLocation) {
         const target = getEmitScriptTarget(compilerOptions);
-        const functionLocation = location;
+        const functionLocation = location2;
         if (isParameter(lastLocation) && functionLocation.body && result.valueDeclaration && result.valueDeclaration.pos >= functionLocation.body.pos && result.valueDeclaration.end <= functionLocation.body.end) {
           if (target >= 2) {
             let declarationRequiresScopeChange = getRequiresScopeChangeCache(functionLocation);
@@ -108728,17 +108776,17 @@ ${lanes.join(`
           }
         }
       }
-      function getIsDeferredContext(location, lastLocation) {
-        if (location.kind !== 220 && location.kind !== 219) {
-          return isTypeQueryNode(location) || (isFunctionLikeDeclaration(location) || location.kind === 173 && !isStatic(location)) && (!lastLocation || lastLocation !== location.name);
+      function getIsDeferredContext(location2, lastLocation) {
+        if (location2.kind !== 220 && location2.kind !== 219) {
+          return isTypeQueryNode(location2) || (isFunctionLikeDeclaration(location2) || location2.kind === 173 && !isStatic(location2)) && (!lastLocation || lastLocation !== location2.name);
         }
-        if (lastLocation && lastLocation === location.name) {
+        if (lastLocation && lastLocation === location2.name) {
           return false;
         }
-        if (location.asteriskToken || hasSyntacticModifier(location, 1024)) {
+        if (location2.asteriskToken || hasSyntacticModifier(location2, 1024)) {
           return true;
         }
-        return !getImmediatelyInvokedFunctionExpression(location);
+        return !getImmediatelyInvokedFunctionExpression(location2);
       }
       function isSelfReferenceLocation(node, lastLocation) {
         switch (node.kind) {
@@ -114048,12 +114096,12 @@ ${lanes.join(`
           metadataValue
         ]);
       }
-      function createParamHelper(expression2, parameterOffset, location) {
+      function createParamHelper(expression2, parameterOffset, location2) {
         context.requestEmitHelper(paramHelper);
         return setTextRange(factory2.createCallExpression(getUnscopedHelperName("__param"), undefined, [
           factory2.createNumericLiteral(parameterOffset + ""),
           expression2
-        ]), location);
+        ]), location2);
       }
       function createESDecorateClassContextObject(contextIn) {
         const properties = [
@@ -114148,7 +114196,7 @@ ${lanes.join(`
         context.requestEmitHelper(asyncValues);
         return factory2.createCallExpression(getUnscopedHelperName("__asyncValues"), undefined, [expression2]);
       }
-      function createRestHelper(value2, elements, computedTempVariables, location) {
+      function createRestHelper(value2, elements, computedTempVariables, location2) {
         context.requestEmitHelper(restHelper);
         const propertyNames = [];
         let computedTempVariableOffset = 0;
@@ -114167,7 +114215,7 @@ ${lanes.join(`
         }
         return factory2.createCallExpression(getUnscopedHelperName("__rest"), undefined, [
           value2,
-          setTextRange(factory2.createArrayLiteralExpression(propertyNames), location)
+          setTextRange(factory2.createArrayLiteralExpression(propertyNames), location2)
         ]);
       }
       function createAwaiterHelper(hasLexicalThis, argumentsExpression, promiseConstructor, parameters, body) {
@@ -115539,9 +115587,9 @@ ${lanes.join(`
     function createEmptyExports(factory2) {
       return factory2.createExportDeclaration(undefined, false, factory2.createNamedExports([]), undefined);
     }
-    function createMemberAccessForPropertyName(factory2, target, memberName, location) {
+    function createMemberAccessForPropertyName(factory2, target, memberName, location2) {
       if (isComputedPropertyName(memberName)) {
-        return setTextRange(factory2.createElementAccessExpression(target, memberName.expression), location);
+        return setTextRange(factory2.createElementAccessExpression(target, memberName.expression), location2);
       } else {
         const expression2 = setTextRange(isMemberName(memberName) ? factory2.createPropertyAccessExpression(target, memberName) : factory2.createElementAccessExpression(target, memberName), memberName);
         addEmitFlags(expression2, 128);
@@ -115569,7 +115617,7 @@ ${lanes.join(`
     function createJsxFragmentFactoryExpression(factory2, jsxFragmentFactoryEntity, reactNamespace, parent2) {
       return jsxFragmentFactoryEntity ? createJsxFactoryExpressionFromEntityName(factory2, jsxFragmentFactoryEntity, parent2) : factory2.createPropertyAccessExpression(createReactNamespace(reactNamespace, parent2), "Fragment");
     }
-    function createExpressionForJsxElement(factory2, callee, tagName, props, children, location) {
+    function createExpressionForJsxElement(factory2, callee, tagName, props, children, location2) {
       const argumentsList = [tagName];
       if (props) {
         argumentsList.push(props);
@@ -115587,9 +115635,9 @@ ${lanes.join(`
           argumentsList.push(children[0]);
         }
       }
-      return setTextRange(factory2.createCallExpression(callee, undefined, argumentsList), location);
+      return setTextRange(factory2.createCallExpression(callee, undefined, argumentsList), location2);
     }
-    function createExpressionForJsxFragment(factory2, jsxFactoryEntity, jsxFragmentFactoryEntity, reactNamespace, children, parentElement, location) {
+    function createExpressionForJsxFragment(factory2, jsxFactoryEntity, jsxFragmentFactoryEntity, reactNamespace, children, parentElement, location2) {
       const tagName = createJsxFragmentFactoryExpression(factory2, jsxFragmentFactoryEntity, reactNamespace, parentElement);
       const argumentsList = [tagName, factory2.createNull()];
       if (children && children.length > 0) {
@@ -115602,7 +115650,7 @@ ${lanes.join(`
           argumentsList.push(children[0]);
         }
       }
-      return setTextRange(factory2.createCallExpression(createJsxFactoryExpression(factory2, jsxFactoryEntity, reactNamespace, parentElement), undefined, argumentsList), location);
+      return setTextRange(factory2.createCallExpression(createJsxFactoryExpression(factory2, jsxFactoryEntity, reactNamespace, parentElement), undefined, argumentsList), location2);
     }
     function createForOfBindingStatement(factory2, node, boundValue) {
       if (isVariableDeclarationList(node)) {
@@ -116317,8 +116365,8 @@ ${lanes.join(`
       }
       return false;
     }
-    function setTextRange(range, location) {
-      return location ? setTextRangePosEnd(range, location.pos, location.end) : range;
+    function setTextRange(range, location2) {
+      return location2 ? setTextRangePosEnd(range, location2.pos, location2.end) : range;
     }
     function canHaveModifiers(node) {
       const kind = node.kind;
@@ -131962,9 +132010,9 @@ ${lanes.join(`
           if (!startsWithDirectory(target, realPathDirectory, getCanonicalFileName)) {
             return;
           }
-          const relative2 = getRelativePathFromDirectory(realPathDirectory, target, getCanonicalFileName);
+          const relative3 = getRelativePathFromDirectory(realPathDirectory, target, getCanonicalFileName);
           for (const symlinkDirectory of symlinkDirectories) {
-            const option = resolvePath(symlinkDirectory, relative2);
+            const option = resolvePath(symlinkDirectory, relative3);
             const result2 = cb(option, target === referenceRedirect);
             shouldFilterIgnoredPaths = true;
             if (result2)
@@ -132717,8 +132765,8 @@ ${lanes.join(`
         getRecursionIdentity,
         getUnmatchedProperties,
         getTypeOfSymbolAtLocation: (symbol2, locationIn) => {
-          const location = getParseTreeNode(locationIn);
-          return location ? getTypeOfSymbolAtLocation(symbol2, location) : errorType;
+          const location2 = getParseTreeNode(locationIn);
+          return location2 ? getTypeOfSymbolAtLocation(symbol2, location2) : errorType;
         },
         getTypeOfSymbol,
         getSymbolsOfParameterPropertyDeclaration: (parameterIn, parameterName) => {
@@ -132731,8 +132779,8 @@ ${lanes.join(`
         getDeclaredTypeOfSymbol,
         getPropertiesOfType,
         getPropertyOfType: (type, name3) => getPropertyOfType(type, escapeLeadingUnderscores(name3)),
-        getPrivateIdentifierPropertyOfType: (leftType, name3, location) => {
-          const node = getParseTreeNode(location);
+        getPrivateIdentifierPropertyOfType: (leftType, name3, location2) => {
+          const node = getParseTreeNode(location2);
           if (!node) {
             return;
           }
@@ -132777,8 +132825,8 @@ ${lanes.join(`
         symbolToParameterDeclaration: nodeBuilder.symbolToParameterDeclaration,
         typeParameterToDeclaration: nodeBuilder.typeParameterToDeclaration,
         getSymbolsInScope: (locationIn, meaning) => {
-          const location = getParseTreeNode(locationIn);
-          return location ? getSymbolsInScope(location, meaning) : [];
+          const location2 = getParseTreeNode(locationIn);
+          return location2 ? getSymbolsInScope(location2, meaning) : [];
         },
         getSymbolAtLocation: (nodeIn) => {
           const node = getParseTreeNode(nodeIn);
@@ -132808,8 +132856,8 @@ ${lanes.join(`
           return node && getTypeOfAssignmentPattern(node) || errorType;
         },
         getPropertySymbolOfDestructuringAssignment: (locationIn) => {
-          const location = getParseTreeNode(locationIn, isIdentifier);
-          return location ? getPropertySymbolOfDestructuringAssignment(location) : undefined;
+          const location2 = getParseTreeNode(locationIn, isIdentifier);
+          return location2 ? getPropertySymbolOfDestructuringAssignment(location2) : undefined;
         },
         signatureToString: (signature, enclosingDeclaration, flags, kind) => {
           return signatureToString(signature, getParseTreeNode(enclosingDeclaration), flags, kind);
@@ -132952,13 +133000,13 @@ ${lanes.join(`
         getAllPossiblePropertiesOfTypes,
         getSuggestedSymbolForNonexistentProperty,
         getSuggestedSymbolForNonexistentJSXAttribute,
-        getSuggestedSymbolForNonexistentSymbol: (location, name3, meaning) => getSuggestedSymbolForNonexistentSymbol(location, escapeLeadingUnderscores(name3), meaning),
+        getSuggestedSymbolForNonexistentSymbol: (location2, name3, meaning) => getSuggestedSymbolForNonexistentSymbol(location2, escapeLeadingUnderscores(name3), meaning),
         getSuggestedSymbolForNonexistentModule,
         getSuggestedSymbolForNonexistentClassMember,
         getBaseConstraintOfType,
         getDefaultFromTypeParameter: (type) => type && type.flags & 524288 ? getDefaultFromTypeParameter(type) : undefined,
-        resolveName(name3, location, meaning, excludeGlobals) {
-          return resolveName(location, escapeLeadingUnderscores(name3), meaning, undefined, false, excludeGlobals);
+        resolveName(name3, location2, meaning, excludeGlobals) {
+          return resolveName(location2, escapeLeadingUnderscores(name3), meaning, undefined, false, excludeGlobals);
         },
         getJsxNamespace: (n2) => unescapeLeadingUnderscores(getJsxNamespace(n2)),
         getJsxFragmentFactory: (n2) => {
@@ -133413,11 +133461,11 @@ ${lanes.join(`
           cachedTypes.set(key, type);
         return type;
       }
-      function getJsxNamespace(location) {
-        if (location) {
-          const file2 = getSourceFileOfNode(location);
+      function getJsxNamespace(location2) {
+        if (location2) {
+          const file2 = getSourceFileOfNode(location2);
           if (file2) {
-            if (isJsxOpeningFragment(location)) {
+            if (isJsxOpeningFragment(location2)) {
               if (file2.localJsxFragmentNamespace) {
                 return file2.localJsxFragmentNamespace;
               }
@@ -133430,7 +133478,7 @@ ${lanes.join(`
                   return file2.localJsxFragmentNamespace = getFirstIdentifier(file2.localJsxFragmentFactory).escapedText;
                 }
               }
-              const entity = getJsxFragmentFactoryEntity(location);
+              const entity = getJsxFragmentFactoryEntity(location2);
               if (entity) {
                 file2.localJsxFragmentFactory = entity;
                 return file2.localJsxFragmentNamespace = getFirstIdentifier(entity).escapedText;
@@ -133483,8 +133531,8 @@ ${lanes.join(`
           getDiagnostics2(sourceFile, cancellationToken2);
         return emitResolver;
       }
-      function lookupOrIssueError(location, message2, ...args) {
-        const diagnostic = location ? createDiagnosticForNode(location, message2, ...args) : createCompilerDiagnostic(message2, ...args);
+      function lookupOrIssueError(location2, message2, ...args) {
+        const diagnostic = location2 ? createDiagnosticForNode(location2, message2, ...args) : createCompilerDiagnostic(message2, ...args);
         const existing = diagnostics.lookup(diagnostic);
         if (existing) {
           return existing;
@@ -133493,16 +133541,16 @@ ${lanes.join(`
           return diagnostic;
         }
       }
-      function errorSkippedOn(key, location, message2, ...args) {
-        const diagnostic = error210(location, message2, ...args);
+      function errorSkippedOn(key, location2, message2, ...args) {
+        const diagnostic = error210(location2, message2, ...args);
         diagnostic.skippedOn = key;
         return diagnostic;
       }
-      function createError(location, message2, ...args) {
-        return location ? createDiagnosticForNode(location, message2, ...args) : createCompilerDiagnostic(message2, ...args);
+      function createError(location2, message2, ...args) {
+        return location2 ? createDiagnosticForNode(location2, message2, ...args) : createCompilerDiagnostic(message2, ...args);
       }
-      function error210(location, message2, ...args) {
-        const diagnostic = createError(location, message2, ...args);
+      function error210(location2, message2, ...args) {
+        const diagnostic = createError(location2, message2, ...args);
         diagnostics.add(diagnostic);
         return diagnostic;
       }
@@ -133522,21 +133570,21 @@ ${lanes.join(`
           suggestionDiagnostics.add({ ...diagnostic, category: 2 });
         }
       }
-      function errorOrSuggestion(isError2, location, message2, ...args) {
-        if (location.pos < 0 || location.end < 0) {
+      function errorOrSuggestion(isError2, location2, message2, ...args) {
+        if (location2.pos < 0 || location2.end < 0) {
           if (!isError2) {
             return;
           }
-          const file2 = getSourceFileOfNode(location);
+          const file2 = getSourceFileOfNode(location2);
           addErrorOrSuggestion(isError2, "message" in message2 ? createFileDiagnostic(file2, 0, 0, message2, ...args) : createDiagnosticForFileFromMessageChain(file2, message2));
           return;
         }
-        addErrorOrSuggestion(isError2, "message" in message2 ? createDiagnosticForNode(location, message2, ...args) : createDiagnosticForNodeFromMessageChain(getSourceFileOfNode(location), location, message2));
+        addErrorOrSuggestion(isError2, "message" in message2 ? createDiagnosticForNode(location2, message2, ...args) : createDiagnosticForNodeFromMessageChain(getSourceFileOfNode(location2), location2, message2));
       }
-      function errorAndMaybeSuggestAwait(location, maybeMissingAwait, message2, ...args) {
-        const diagnostic = error210(location, message2, ...args);
+      function errorAndMaybeSuggestAwait(location2, maybeMissingAwait, message2, ...args) {
+        const diagnostic = error210(location2, message2, ...args);
         if (maybeMissingAwait) {
-          const related = createDiagnosticForNode(location, Diagnostics.Did_you_forget_to_use_await);
+          const related = createDiagnosticForNode(location2, Diagnostics.Did_you_forget_to_use_await);
           addRelatedInfo(diagnostic, related);
         }
         return diagnostic;
@@ -133559,12 +133607,12 @@ ${lanes.join(`
       function isDeprecatedDeclaration2(declaration) {
         return !!(getCombinedNodeFlagsCached(declaration) & 536870912);
       }
-      function addDeprecatedSuggestion(location, declarations, deprecatedEntity) {
-        const diagnostic = createDiagnosticForNode(location, Diagnostics._0_is_deprecated, deprecatedEntity);
+      function addDeprecatedSuggestion(location2, declarations, deprecatedEntity) {
+        const diagnostic = createDiagnosticForNode(location2, Diagnostics._0_is_deprecated, deprecatedEntity);
         return addDeprecatedSuggestionWorker(declarations, diagnostic);
       }
-      function addDeprecatedSuggestionWithSignature(location, declaration, deprecatedEntity, signatureString) {
-        const diagnostic = deprecatedEntity ? createDiagnosticForNode(location, Diagnostics.The_signature_0_of_1_is_deprecated, signatureString, deprecatedEntity) : createDiagnosticForNode(location, Diagnostics._0_is_deprecated, signatureString);
+      function addDeprecatedSuggestionWithSignature(location2, declaration, deprecatedEntity, signatureString) {
+        const diagnostic = deprecatedEntity ? createDiagnosticForNode(location2, Diagnostics.The_signature_0_of_1_is_deprecated, signatureString, deprecatedEntity) : createDiagnosticForNode(location2, Diagnostics._0_is_deprecated, signatureString);
         return addDeprecatedSuggestionWorker(declaration, diagnostic);
       }
       function createSymbol(flags, name3, checkFlags) {
@@ -134113,10 +134161,10 @@ ${lanes.join(`
           return false;
         }
         const container = getThisContainer(errorLocation, false, false);
-        let location = container;
-        while (location) {
-          if (isClassLike(location.parent)) {
-            const classSymbol = getSymbolOfDeclaration(location.parent);
+        let location2 = container;
+        while (location2) {
+          if (isClassLike(location2.parent)) {
+            const classSymbol = getSymbolOfDeclaration(location2.parent);
             if (!classSymbol) {
               break;
             }
@@ -134125,7 +134173,7 @@ ${lanes.join(`
               error210(errorLocation, Diagnostics.Cannot_find_name_0_Did_you_mean_the_static_member_1_0, diagnosticName(nameArg), symbolToString(classSymbol));
               return true;
             }
-            if (location === container && !isStatic(location)) {
+            if (location2 === container && !isStatic(location2)) {
               const instanceType = getDeclaredTypeOfSymbol(classSymbol).thisType;
               if (getPropertyOfType(instanceType, name3)) {
                 error210(errorLocation, Diagnostics.Cannot_find_name_0_Did_you_mean_the_instance_member_this_0, diagnosticName(nameArg));
@@ -134133,7 +134181,7 @@ ${lanes.join(`
               }
             }
           }
-          location = location.parent;
+          location2 = location2.parent;
         }
         return false;
       }
@@ -134900,7 +134948,7 @@ ${lanes.join(`
         }
         return symbol2;
       }
-      function resolveEntityName(name3, meaning, ignoreErrors, dontResolveAlias, location) {
+      function resolveEntityName(name3, meaning, ignoreErrors, dontResolveAlias, location2) {
         if (nodeIsMissing(name3)) {
           return;
         }
@@ -134909,14 +134957,14 @@ ${lanes.join(`
         if (name3.kind === 80) {
           const message2 = meaning === namespaceMeaning || nodeIsSynthesized(name3) ? Diagnostics.Cannot_find_namespace_0 : getCannotFindNameDiagnosticForName(getFirstIdentifier(name3));
           const symbolFromJSPrototype = isInJSFile(name3) && !nodeIsSynthesized(name3) ? resolveEntityNameFromAssignmentDeclaration(name3, meaning) : undefined;
-          symbol2 = getMergedSymbol(resolveName(location || name3, name3, meaning, ignoreErrors || symbolFromJSPrototype ? undefined : message2, true, false));
+          symbol2 = getMergedSymbol(resolveName(location2 || name3, name3, meaning, ignoreErrors || symbolFromJSPrototype ? undefined : message2, true, false));
           if (!symbol2) {
             return getMergedSymbol(symbolFromJSPrototype);
           }
         } else if (name3.kind === 167 || name3.kind === 212) {
           const left = name3.kind === 167 ? name3.left : name3.expression;
           const right = name3.kind === 167 ? name3.right : name3.name;
-          let namespace = resolveEntityName(left, namespaceMeaning, ignoreErrors, false, location);
+          let namespace = resolveEntityName(left, namespaceMeaning, ignoreErrors, false, location2);
           if (!namespace || nodeIsMissing(right)) {
             return;
           } else if (namespace === unknownSymbol) {
@@ -135029,15 +135077,15 @@ ${lanes.join(`
           }
         }
       }
-      function resolveExternalModuleName(location, moduleReferenceExpression, ignoreErrors, errorMessage) {
+      function resolveExternalModuleName(location2, moduleReferenceExpression, ignoreErrors, errorMessage) {
         const isClassic = getEmitModuleResolutionKind(compilerOptions) === 1;
         errorMessage ?? (errorMessage = getCannotResolveModuleNameErrorForSpecificModule(moduleReferenceExpression) ?? (isClassic ? Diagnostics.Cannot_find_module_0_Did_you_mean_to_set_the_moduleResolution_option_to_nodenext_or_to_add_aliases_to_the_paths_option : Diagnostics.Cannot_find_module_0_or_its_corresponding_type_declarations));
-        return resolveExternalModuleNameWorker(location, moduleReferenceExpression, ignoreErrors ? undefined : errorMessage, ignoreErrors);
+        return resolveExternalModuleNameWorker(location2, moduleReferenceExpression, ignoreErrors ? undefined : errorMessage, ignoreErrors);
       }
-      function resolveExternalModuleNameWorker(location, moduleReferenceExpression, moduleNotFoundError, ignoreErrors = false, isForAugmentation = false) {
-        return isStringLiteralLike(moduleReferenceExpression) ? resolveExternalModule(location, moduleReferenceExpression.text, moduleNotFoundError, !ignoreErrors ? moduleReferenceExpression : undefined, isForAugmentation) : undefined;
+      function resolveExternalModuleNameWorker(location2, moduleReferenceExpression, moduleNotFoundError, ignoreErrors = false, isForAugmentation = false) {
+        return isStringLiteralLike(moduleReferenceExpression) ? resolveExternalModule(location2, moduleReferenceExpression.text, moduleNotFoundError, !ignoreErrors ? moduleReferenceExpression : undefined, isForAugmentation) : undefined;
       }
-      function resolveExternalModule(location, moduleReference, moduleNotFoundError, errorNode, isForAugmentation = false) {
+      function resolveExternalModule(location2, moduleReference, moduleNotFoundError, errorNode, isForAugmentation = false) {
         var _a7, _b, _c, _d, _e, _f, _g, _h, _i, _j, _k, _l;
         if (errorNode && startsWith2(moduleReference, "@types/")) {
           const diag2 = Diagnostics.Cannot_import_type_declaration_files_Consider_importing_0_instead_of_1;
@@ -135048,8 +135096,8 @@ ${lanes.join(`
         if (ambientModule) {
           return ambientModule;
         }
-        const currentSourceFile = getSourceFileOfNode(location);
-        const contextSpecifier = isStringLiteralLike(location) ? location : ((_a7 = isModuleDeclaration(location) ? location : location.parent && isModuleDeclaration(location.parent) && location.parent.name === location ? location.parent : undefined) == null ? undefined : _a7.name) || ((_b = isLiteralImportTypeNode(location) ? location : undefined) == null ? undefined : _b.argument.literal) || isVariableDeclarationInitializedToBareOrAccessedRequire(location) && getModuleSpecifierOfBareOrAccessedRequire(location) || ((_c = findAncestor(location, isImportCall)) == null ? undefined : _c.arguments[0]) || ((_d = findAncestor(location, or(isImportDeclaration, isJSDocImportTag, isExportDeclaration))) == null ? undefined : _d.moduleSpecifier) || ((_e = findAncestor(location, isExternalModuleImportEqualsDeclaration)) == null ? undefined : _e.moduleReference.expression);
+        const currentSourceFile = getSourceFileOfNode(location2);
+        const contextSpecifier = isStringLiteralLike(location2) ? location2 : ((_a7 = isModuleDeclaration(location2) ? location2 : location2.parent && isModuleDeclaration(location2.parent) && location2.parent.name === location2 ? location2.parent : undefined) == null ? undefined : _a7.name) || ((_b = isLiteralImportTypeNode(location2) ? location2 : undefined) == null ? undefined : _b.argument.literal) || isVariableDeclarationInitializedToBareOrAccessedRequire(location2) && getModuleSpecifierOfBareOrAccessedRequire(location2) || ((_c = findAncestor(location2, isImportCall)) == null ? undefined : _c.arguments[0]) || ((_d = findAncestor(location2, or(isImportDeclaration, isJSDocImportTag, isExportDeclaration))) == null ? undefined : _d.moduleSpecifier) || ((_e = findAncestor(location2, isExternalModuleImportEqualsDeclaration)) == null ? undefined : _e.moduleReference.expression);
         const mode = contextSpecifier && isStringLiteralLike(contextSpecifier) ? host.getModeForUsageLocation(currentSourceFile, contextSpecifier) : host.getDefaultResolutionModeForFile(currentSourceFile);
         const moduleResolutionKind = getEmitModuleResolutionKind(compilerOptions);
         const resolvedModule = (_f = host.getResolvedModule(currentSourceFile, moduleReference, mode)) == null ? undefined : _f.resolvedModule;
@@ -135060,17 +135108,17 @@ ${lanes.join(`
             error210(errorNode, resolutionDiagnostic, moduleReference, resolvedModule.resolvedFileName);
           }
           if (resolvedModule.resolvedUsingTsExtension && isDeclarationFileName(moduleReference)) {
-            const importOrExport = ((_g = findAncestor(location, isImportDeclaration)) == null ? undefined : _g.importClause) || findAncestor(location, or(isImportEqualsDeclaration, isExportDeclaration));
-            if (errorNode && importOrExport && !importOrExport.isTypeOnly || findAncestor(location, isImportCall)) {
+            const importOrExport = ((_g = findAncestor(location2, isImportDeclaration)) == null ? undefined : _g.importClause) || findAncestor(location2, or(isImportEqualsDeclaration, isExportDeclaration));
+            if (errorNode && importOrExport && !importOrExport.isTypeOnly || findAncestor(location2, isImportCall)) {
               error210(errorNode, Diagnostics.A_declaration_file_cannot_be_imported_without_import_type_Did_you_mean_to_import_an_implementation_file_0_instead, getSuggestedImportSource(Debug.checkDefined(tryExtractTSExtension(moduleReference))));
             }
           } else if (resolvedModule.resolvedUsingTsExtension && !shouldAllowImportingTsExtension(compilerOptions, currentSourceFile.fileName)) {
-            const importOrExport = ((_h = findAncestor(location, isImportDeclaration)) == null ? undefined : _h.importClause) || findAncestor(location, or(isImportEqualsDeclaration, isExportDeclaration));
-            if (errorNode && !((importOrExport == null ? undefined : importOrExport.isTypeOnly) || findAncestor(location, isImportTypeNode))) {
+            const importOrExport = ((_h = findAncestor(location2, isImportDeclaration)) == null ? undefined : _h.importClause) || findAncestor(location2, or(isImportEqualsDeclaration, isExportDeclaration));
+            if (errorNode && !((importOrExport == null ? undefined : importOrExport.isTypeOnly) || findAncestor(location2, isImportTypeNode))) {
               const tsExtension = Debug.checkDefined(tryExtractTSExtension(moduleReference));
               error210(errorNode, Diagnostics.An_import_path_can_only_end_with_a_0_extension_when_allowImportingTsExtensions_is_enabled, tsExtension);
             }
-          } else if (compilerOptions.rewriteRelativeImportExtensions && !(location.flags & 33554432) && !isDeclarationFileName(moduleReference) && !isLiteralImportTypeNode(location) && !isPartOfTypeOnlyImportOrExportDeclaration(location)) {
+          } else if (compilerOptions.rewriteRelativeImportExtensions && !(location2.flags & 33554432) && !isDeclarationFileName(moduleReference) && !isLiteralImportTypeNode(location2) && !isPartOfTypeOnlyImportOrExportDeclaration(location2)) {
             const shouldRewrite = shouldRewriteModuleSpecifier(moduleReference, compilerOptions);
             if (!resolvedModule.resolvedUsingTsExtension && shouldRewrite) {
               error210(errorNode, Diagnostics.This_relative_import_path_is_unsafe_to_rewrite_because_it_looks_like_a_file_name_but_actually_resolves_to_0, getRelativePathFromFile(getNormalizedAbsolutePath(currentSourceFile.fileName, host.getCurrentDirectory()), resolvedModule.resolvedFileName, hostGetCanonicalFileName(host)));
@@ -135095,10 +135143,10 @@ ${lanes.join(`
               errorOnImplicitAnyModule(false, errorNode, currentSourceFile, mode, resolvedModule, moduleReference);
             }
             if (errorNode && (moduleKind === 100 || moduleKind === 101)) {
-              const isSyncImport = currentSourceFile.impliedNodeFormat === 1 && !findAncestor(location, isImportCall) || !!findAncestor(location, isImportEqualsDeclaration);
-              const overrideHost = findAncestor(location, (l2) => isImportTypeNode(l2) || isExportDeclaration(l2) || isImportDeclaration(l2) || isJSDocImportTag(l2));
+              const isSyncImport = currentSourceFile.impliedNodeFormat === 1 && !findAncestor(location2, isImportCall) || !!findAncestor(location2, isImportEqualsDeclaration);
+              const overrideHost = findAncestor(location2, (l2) => isImportTypeNode(l2) || isExportDeclaration(l2) || isImportDeclaration(l2) || isJSDocImportTag(l2));
               if (isSyncImport && sourceFile.impliedNodeFormat === 99 && !hasResolutionModeOverride(overrideHost)) {
-                if (findAncestor(location, isImportEqualsDeclaration)) {
+                if (findAncestor(location2, isImportEqualsDeclaration)) {
                   error210(errorNode, Diagnostics.Module_0_cannot_be_imported_using_this_construct_The_specifier_only_resolves_to_an_ES_module_which_cannot_be_imported_with_require_Use_an_ECMAScript_import_instead, moduleReference);
                 } else {
                   let diagnosticDetails;
@@ -135718,20 +135766,20 @@ ${lanes.join(`
       }
       function forEachSymbolTableInScope(enclosingDeclaration, callback) {
         let result;
-        for (let location = enclosingDeclaration;location; location = location.parent) {
-          if (canHaveLocals(location) && location.locals && !isGlobalSourceFile(location)) {
-            if (result = callback(location.locals, undefined, true, location)) {
+        for (let location2 = enclosingDeclaration;location2; location2 = location2.parent) {
+          if (canHaveLocals(location2) && location2.locals && !isGlobalSourceFile(location2)) {
+            if (result = callback(location2.locals, undefined, true, location2)) {
               return result;
             }
           }
-          switch (location.kind) {
+          switch (location2.kind) {
             case 308:
-              if (!isExternalOrCommonJsModule(location)) {
+              if (!isExternalOrCommonJsModule(location2)) {
                 break;
               }
             case 268:
-              const sym = getSymbolOfDeclaration(location);
-              if (result = callback((sym == null ? undefined : sym.exports) || emptySymbols, undefined, true, location)) {
+              const sym = getSymbolOfDeclaration(location2);
+              if (result = callback((sym == null ? undefined : sym.exports) || emptySymbols, undefined, true, location2)) {
                 return result;
               }
               break;
@@ -135739,12 +135787,12 @@ ${lanes.join(`
             case 232:
             case 265:
               let table;
-              (getSymbolOfDeclaration(location).members || emptySymbols).forEach((memberSymbol, key) => {
+              (getSymbolOfDeclaration(location2).members || emptySymbols).forEach((memberSymbol, key) => {
                 if (memberSymbol.flags & (788968 & ~67108864)) {
                   (table || (table = createSymbolTable())).set(key, memberSymbol);
                 }
               });
-              if (table && (result = callback(table, undefined, false, location))) {
+              if (table && (result = callback(table, undefined, false, location2))) {
                 return result;
               }
               break;
@@ -136213,8 +136261,8 @@ ${lanes.join(`
               return enterNewScope(context, node, undefined, typeParameters);
             }
           },
-          markNodeReuse(context, range, location) {
-            return setTextRange2(context, range, location);
+          markNodeReuse(context, range, location2) {
+            return setTextRange2(context, range, location2);
           },
           trackExistingEntityName(context, node) {
             return trackExistingEntityName(node, context);
@@ -136303,24 +136351,24 @@ ${lanes.join(`
           const mappedType = instantiateType(type, context.mapper);
           return noMappedTypes && mappedType !== type ? undefined : mappedType;
         }
-        function setTextRange2(context, range, location) {
+        function setTextRange2(context, range, location2) {
           if (!nodeIsSynthesized(range) || !(range.flags & 16) || !context.enclosingFile || context.enclosingFile !== getSourceFileOfNode(getOriginalNode(range))) {
             range = factory.cloneNode(range);
           }
-          if (range === location)
+          if (range === location2)
             return range;
-          if (!location) {
+          if (!location2) {
             return range;
           }
           let original = range.original;
-          while (original && original !== location) {
+          while (original && original !== location2) {
             original = original.original;
           }
           if (!original) {
-            setOriginalNode(range, location);
+            setOriginalNode(range, location2);
           }
-          if (context.enclosingFile && context.enclosingFile === getSourceFileOfNode(getOriginalNode(location))) {
-            return setTextRange(range, location);
+          if (context.enclosingFile && context.enclosingFile === getSourceFileOfNode(getOriginalNode(location2))) {
+            return setTextRange(range, location2);
           }
           return range;
         }
@@ -139298,8 +139346,8 @@ ${lanes.join(`
                     questionToken: p3.flags & 16777216 ? factory.createToken(58) : undefined,
                     modifiers: flag ? factory.createModifiersFromModifierFlags(flag) : undefined
                   });
-                  const location = sig.declaration && isPrototypePropertyAssignment(sig.declaration.parent) ? sig.declaration.parent : sig.declaration;
-                  results2.push(setTextRange2(context, decl, location));
+                  const location2 = sig.declaration && isPrototypePropertyAssignment(sig.declaration.parent) ? sig.declaration.parent : sig.declaration;
+                  results2.push(setTextRange2(context, decl, location2));
                 }
                 return results2;
               }
@@ -139560,8 +139608,8 @@ ${lanes.join(`
       function isTopLevelInExternalModuleAugmentation(node) {
         return node && node.parent && node.parent.kind === 269 && isExternalModuleAugmentation(node.parent.parent);
       }
-      function isDefaultBindingContext(location) {
-        return location.kind === 308 || isAmbientModule(location);
+      function isDefaultBindingContext(location2) {
+        return location2.kind === 308 || isAmbientModule(location2);
       }
       function getNameOfSymbolFromNameType(symbol2, context) {
         const nameType = getSymbolLinks(symbol2).nameType;
@@ -141002,15 +141050,15 @@ ${lanes.join(`
         const decl = getClassLikeDeclarationOfSymbol(type.symbol);
         return decl && getEffectiveBaseTypeNode(decl);
       }
-      function getConstructorsForTypeArguments(type, typeArgumentNodes, location) {
+      function getConstructorsForTypeArguments(type, typeArgumentNodes, location2) {
         const typeArgCount = length(typeArgumentNodes);
-        const isJavascript = isInJSFile(location);
+        const isJavascript = isInJSFile(location2);
         return filter(getSignaturesOfType(type, 1), (sig) => (isJavascript || typeArgCount >= getMinTypeArgumentCount(sig.typeParameters)) && typeArgCount <= length(sig.typeParameters));
       }
-      function getInstantiatedConstructorsForTypeArguments(type, typeArgumentNodes, location) {
-        const signatures = getConstructorsForTypeArguments(type, typeArgumentNodes, location);
+      function getInstantiatedConstructorsForTypeArguments(type, typeArgumentNodes, location2) {
+        const signatures = getConstructorsForTypeArguments(type, typeArgumentNodes, location2);
         const typeArguments = map2(typeArgumentNodes, getTypeFromTypeNode);
-        return sameMap(signatures, (sig) => some(sig.typeParameters) ? getSignatureInstantiation(sig, typeArguments, isInJSFile(location)) : sig);
+        return sameMap(signatures, (sig) => some(sig.typeParameters) ? getSignatureInstantiation(sig, typeArguments, isInJSFile(location2)) : sig);
       }
       function getBaseConstructorTypeOfClass(type) {
         if (!type.resolvedBaseConstructorType) {
@@ -153512,23 +153560,23 @@ ${lanes.join(`
           return type;
         }
       }
-      function getTypeOfSymbolAtLocation(symbol2, location) {
+      function getTypeOfSymbolAtLocation(symbol2, location2) {
         symbol2 = getExportSymbolOfValueSymbolIfExported(symbol2);
-        if (location.kind === 80 || location.kind === 81) {
-          if (isRightSideOfQualifiedNameOrPropertyAccess(location)) {
-            location = location.parent;
+        if (location2.kind === 80 || location2.kind === 81) {
+          if (isRightSideOfQualifiedNameOrPropertyAccess(location2)) {
+            location2 = location2.parent;
           }
-          if (isExpressionNode(location) && (!isAssignmentTarget(location) || isWriteAccess(location))) {
-            const type = removeOptionalTypeMarker(isWriteAccess(location) && location.kind === 212 ? checkPropertyAccessExpression(location, undefined, true) : getTypeOfExpression(location));
-            if (getExportSymbolOfValueSymbolIfExported(getNodeLinks(location).resolvedSymbol) === symbol2) {
+          if (isExpressionNode(location2) && (!isAssignmentTarget(location2) || isWriteAccess(location2))) {
+            const type = removeOptionalTypeMarker(isWriteAccess(location2) && location2.kind === 212 ? checkPropertyAccessExpression(location2, undefined, true) : getTypeOfExpression(location2));
+            if (getExportSymbolOfValueSymbolIfExported(getNodeLinks(location2).resolvedSymbol) === symbol2) {
               return type;
             }
           }
         }
-        if (isDeclarationName(location) && isSetAccessor(location.parent) && getAnnotatedAccessorTypeNode(location.parent)) {
-          return getWriteTypeOfAccessors(location.parent.symbol);
+        if (isDeclarationName(location2) && isSetAccessor(location2.parent) && getAnnotatedAccessorTypeNode(location2.parent)) {
+          return getWriteTypeOfAccessors(location2.parent.symbol);
         }
-        return isRightSideOfAccessExpression(location) && isWriteAccess(location.parent) ? getWriteTypeOfSymbol(symbol2) : getNonMissingTypeOfSymbol(symbol2);
+        return isRightSideOfAccessExpression(location2) && isWriteAccess(location2.parent) ? getWriteTypeOfSymbol(symbol2) : getNonMissingTypeOfSymbol(symbol2);
       }
       function getControlFlowContainer(node) {
         return findAncestor(node.parent, (node2) => isFunctionLike(node2) && !getImmediatelyInvokedFunctionExpression(node2) || node2.kind === 269 || node2.kind === 308 || node2.kind === 173);
@@ -153542,7 +153590,7 @@ ${lanes.join(`
       function isSymbolAssigned(symbol2) {
         return !isPastLastAssignment(symbol2, undefined);
       }
-      function isPastLastAssignment(symbol2, location) {
+      function isPastLastAssignment(symbol2, location2) {
         const parent2 = findAncestor(symbol2.valueDeclaration, isFunctionOrSourceFile);
         if (!parent2) {
           return false;
@@ -153554,7 +153602,7 @@ ${lanes.join(`
             markNodeAssignments(parent2);
           }
         }
-        return !symbol2.lastAssignmentPos || location && Math.abs(symbol2.lastAssignmentPos) < location.pos;
+        return !symbol2.lastAssignmentPos || location2 && Math.abs(symbol2.lastAssignmentPos) < location2.pos;
       }
       function isSomeSymbolAssigned(rootDeclaration) {
         Debug.assert(isVariableDeclaration(rootDeclaration) || isParameter(rootDeclaration));
@@ -153685,8 +153733,8 @@ ${lanes.join(`
         const substituteConstraints = !(checkMode && checkMode & 2) && someType(type, isGenericTypeWithUnionConstraint) && (isConstraintPosition(type, reference) || hasContextualTypeWithNoGenericTypes(reference, checkMode));
         return substituteConstraints ? mapType2(type, getBaseConstraintOrType) : type;
       }
-      function isExportOrExportExpression(location) {
-        return !!findAncestor(location, (n2) => {
+      function isExportOrExportExpression(location2) {
+        return !!findAncestor(location2, (n2) => {
           const parent2 = n2.parent;
           if (parent2 === undefined) {
             return "quit";
@@ -153700,87 +153748,87 @@ ${lanes.join(`
           return false;
         });
       }
-      function markLinkedReferences(location, hint, propSymbol, parentType) {
+      function markLinkedReferences(location2, hint, propSymbol, parentType) {
         if (!canCollectSymbolAliasAccessabilityData) {
           return;
         }
-        if (location.flags & 33554432 && !isPropertySignature(location) && !isPropertyDeclaration(location)) {
+        if (location2.flags & 33554432 && !isPropertySignature(location2) && !isPropertyDeclaration(location2)) {
           return;
         }
         switch (hint) {
           case 1:
-            return markIdentifierAliasReferenced(location);
+            return markIdentifierAliasReferenced(location2);
           case 2:
-            return markPropertyAliasReferenced(location, propSymbol, parentType);
+            return markPropertyAliasReferenced(location2, propSymbol, parentType);
           case 3:
-            return markExportAssignmentAliasReferenced(location);
+            return markExportAssignmentAliasReferenced(location2);
           case 4:
-            return markJsxAliasReferenced(location);
+            return markJsxAliasReferenced(location2);
           case 5:
-            return markAsyncFunctionAliasReferenced(location);
+            return markAsyncFunctionAliasReferenced(location2);
           case 6:
-            return markImportEqualsAliasReferenced(location);
+            return markImportEqualsAliasReferenced(location2);
           case 7:
-            return markExportSpecifierAliasReferenced(location);
+            return markExportSpecifierAliasReferenced(location2);
           case 8:
-            return markDecoratorAliasReferenced(location);
+            return markDecoratorAliasReferenced(location2);
           case 0: {
-            if (isIdentifier(location) && (isExpressionNode(location) || isShorthandPropertyAssignment(location.parent) || isImportEqualsDeclaration(location.parent) && location.parent.moduleReference === location) && shouldMarkIdentifierAliasReferenced(location)) {
-              if (isPropertyAccessOrQualifiedName(location.parent)) {
-                const left = isPropertyAccessExpression(location.parent) ? location.parent.expression : location.parent.left;
-                if (left !== location)
+            if (isIdentifier(location2) && (isExpressionNode(location2) || isShorthandPropertyAssignment(location2.parent) || isImportEqualsDeclaration(location2.parent) && location2.parent.moduleReference === location2) && shouldMarkIdentifierAliasReferenced(location2)) {
+              if (isPropertyAccessOrQualifiedName(location2.parent)) {
+                const left = isPropertyAccessExpression(location2.parent) ? location2.parent.expression : location2.parent.left;
+                if (left !== location2)
                   return;
               }
-              markIdentifierAliasReferenced(location);
+              markIdentifierAliasReferenced(location2);
               return;
             }
-            if (isPropertyAccessOrQualifiedName(location)) {
-              let topProp = location;
+            if (isPropertyAccessOrQualifiedName(location2)) {
+              let topProp = location2;
               while (isPropertyAccessOrQualifiedName(topProp)) {
                 if (isPartOfTypeNode(topProp))
                   return;
                 topProp = topProp.parent;
               }
-              return markPropertyAliasReferenced(location);
+              return markPropertyAliasReferenced(location2);
             }
-            if (isExportAssignment(location)) {
-              return markExportAssignmentAliasReferenced(location);
+            if (isExportAssignment(location2)) {
+              return markExportAssignmentAliasReferenced(location2);
             }
-            if (isJsxOpeningLikeElement(location) || isJsxOpeningFragment(location)) {
-              return markJsxAliasReferenced(location);
+            if (isJsxOpeningLikeElement(location2) || isJsxOpeningFragment(location2)) {
+              return markJsxAliasReferenced(location2);
             }
-            if (isImportEqualsDeclaration(location)) {
-              if (isInternalModuleImportEqualsDeclaration(location) || checkExternalImportOrExportDeclaration(location)) {
-                return markImportEqualsAliasReferenced(location);
+            if (isImportEqualsDeclaration(location2)) {
+              if (isInternalModuleImportEqualsDeclaration(location2) || checkExternalImportOrExportDeclaration(location2)) {
+                return markImportEqualsAliasReferenced(location2);
               }
               return;
             }
-            if (isExportSpecifier(location)) {
-              return markExportSpecifierAliasReferenced(location);
+            if (isExportSpecifier(location2)) {
+              return markExportSpecifierAliasReferenced(location2);
             }
-            if (isFunctionLikeDeclaration(location) || isMethodSignature(location)) {
-              markAsyncFunctionAliasReferenced(location);
+            if (isFunctionLikeDeclaration(location2) || isMethodSignature(location2)) {
+              markAsyncFunctionAliasReferenced(location2);
             }
             if (!compilerOptions.emitDecoratorMetadata) {
               return;
             }
-            if (!canHaveDecorators(location) || !hasDecorators(location) || !location.modifiers || !nodeCanBeDecorated(legacyDecorators, location, location.parent, location.parent.parent)) {
+            if (!canHaveDecorators(location2) || !hasDecorators(location2) || !location2.modifiers || !nodeCanBeDecorated(legacyDecorators, location2, location2.parent, location2.parent.parent)) {
               return;
             }
-            return markDecoratorAliasReferenced(location);
+            return markDecoratorAliasReferenced(location2);
           }
           default:
             Debug.assertNever(hint, `Unhandled reference hint: ${hint}`);
         }
       }
-      function markIdentifierAliasReferenced(location) {
-        const symbol2 = getResolvedSymbol(location);
-        if (symbol2 && symbol2 !== argumentsSymbol && symbol2 !== unknownSymbol && !isThisInTypeQuery(location)) {
-          markAliasReferenced(symbol2, location);
+      function markIdentifierAliasReferenced(location2) {
+        const symbol2 = getResolvedSymbol(location2);
+        if (symbol2 && symbol2 !== argumentsSymbol && symbol2 !== unknownSymbol && !isThisInTypeQuery(location2)) {
+          markAliasReferenced(symbol2, location2);
         }
       }
-      function markPropertyAliasReferenced(location, propSymbol, parentType) {
-        const left = isPropertyAccessExpression(location) ? location.expression : location.left;
+      function markPropertyAliasReferenced(location2, propSymbol, parentType) {
+        const left = isPropertyAccessExpression(location2) ? location2.expression : location2.left;
         if (isThisIdentifier(left) || !isIdentifier(left)) {
           return;
         }
@@ -153788,32 +153836,32 @@ ${lanes.join(`
         if (!parentSymbol || parentSymbol === unknownSymbol) {
           return;
         }
-        if (getIsolatedModules(compilerOptions) || shouldPreserveConstEnums(compilerOptions) && isExportOrExportExpression(location)) {
-          markAliasReferenced(parentSymbol, location);
+        if (getIsolatedModules(compilerOptions) || shouldPreserveConstEnums(compilerOptions) && isExportOrExportExpression(location2)) {
+          markAliasReferenced(parentSymbol, location2);
           return;
         }
         const leftType = parentType || checkExpressionCached(left);
         if (isTypeAny(leftType) || leftType === silentNeverType) {
-          markAliasReferenced(parentSymbol, location);
+          markAliasReferenced(parentSymbol, location2);
           return;
         }
         let prop = propSymbol;
         if (!prop && !parentType) {
-          const right = isPropertyAccessExpression(location) ? location.name : location.right;
+          const right = isPropertyAccessExpression(location2) ? location2.name : location2.right;
           const lexicallyScopedSymbol = isPrivateIdentifier(right) && lookupSymbolForPrivateIdentifierDeclaration(right.escapedText, right);
-          const assignmentKind = getAssignmentTargetKind(location);
-          const apparentType = getApparentType(assignmentKind !== 0 || isMethodAccessForCall(location) ? getWidenedType(leftType) : leftType);
+          const assignmentKind = getAssignmentTargetKind(location2);
+          const apparentType = getApparentType(assignmentKind !== 0 || isMethodAccessForCall(location2) ? getWidenedType(leftType) : leftType);
           prop = isPrivateIdentifier(right) ? lexicallyScopedSymbol && getPrivateIdentifierPropertyOfType(apparentType, lexicallyScopedSymbol) || undefined : getPropertyOfType(apparentType, right.escapedText);
         }
-        if (!(prop && (isConstEnumOrConstEnumOnlyModule(prop) || prop.flags & 8 && location.parent.kind === 307))) {
-          markAliasReferenced(parentSymbol, location);
+        if (!(prop && (isConstEnumOrConstEnumOnlyModule(prop) || prop.flags & 8 && location2.parent.kind === 307))) {
+          markAliasReferenced(parentSymbol, location2);
         }
         return;
       }
-      function markExportAssignmentAliasReferenced(location) {
-        if (isIdentifier(location.expression)) {
-          const id = location.expression;
-          const sym = getExportSymbolOfValueSymbolIfExported(resolveEntityName(id, -1, true, true, location));
+      function markExportAssignmentAliasReferenced(location2) {
+        if (isIdentifier(location2.expression)) {
+          const id = location2.expression;
+          const sym = getExportSymbolOfValueSymbolIfExported(resolveEntityName(id, -1, true, true, location2));
           if (sym) {
             markAliasReferenced(sym, id);
           }
@@ -153846,22 +153894,22 @@ ${lanes.join(`
         }
         return;
       }
-      function markAsyncFunctionAliasReferenced(location) {
+      function markAsyncFunctionAliasReferenced(location2) {
         if (languageVersion < 2) {
-          if (getFunctionFlags(location) & 2) {
-            const returnTypeNode = getEffectiveReturnTypeNode(location);
+          if (getFunctionFlags(location2) & 2) {
+            const returnTypeNode = getEffectiveReturnTypeNode(location2);
             markTypeNodeAsReferenced(returnTypeNode);
           }
         }
       }
-      function markImportEqualsAliasReferenced(location) {
-        if (hasSyntacticModifier(location, 32)) {
-          markExportAsReferenced(location);
+      function markImportEqualsAliasReferenced(location2) {
+        if (hasSyntacticModifier(location2, 32)) {
+          markExportAsReferenced(location2);
         }
       }
-      function markExportSpecifierAliasReferenced(location) {
-        if (!location.parent.parent.moduleSpecifier && !location.isTypeOnly && !location.parent.parent.isTypeOnly) {
-          const exportedName = location.propertyName || location.name;
+      function markExportSpecifierAliasReferenced(location2) {
+        if (!location2.parent.parent.moduleSpecifier && !location2.isTypeOnly && !location2.parent.parent.isTypeOnly) {
+          const exportedName = location2.propertyName || location2.name;
           if (exportedName.kind === 11) {
             return;
           }
@@ -153869,7 +153917,7 @@ ${lanes.join(`
           if (symbol2 && (symbol2 === undefinedSymbol || symbol2 === globalThisSymbol || symbol2.declarations && isGlobalSourceFile(getDeclarationContainer(symbol2.declarations[0])))) {} else {
             const target = symbol2 && (symbol2.flags & 2097152 ? resolveAlias(symbol2) : symbol2);
             if (!target || getSymbolFlags(target) & 111551) {
-              markExportAsReferenced(location);
+              markExportAsReferenced(location2);
               markIdentifierAliasReferenced(exportedName);
             }
           }
@@ -153918,14 +153966,14 @@ ${lanes.join(`
           }
         }
       }
-      function markAliasReferenced(symbol2, location) {
+      function markAliasReferenced(symbol2, location2) {
         if (!canCollectSymbolAliasAccessabilityData) {
           return;
         }
-        if (isNonLocalAlias(symbol2, 111551) && !isInTypeQuery(location)) {
+        if (isNonLocalAlias(symbol2, 111551) && !isInTypeQuery(location2)) {
           const target = resolveAlias(symbol2);
           if (getSymbolFlags(symbol2, true) & (111551 | 1048576)) {
-            if (getIsolatedModules(compilerOptions) || shouldPreserveConstEnums(compilerOptions) && isExportOrExportExpression(location) || !isConstEnumOrConstEnumOnlyModule(getExportSymbolOfValueSymbolIfExported(target))) {
+            if (getIsolatedModules(compilerOptions) || shouldPreserveConstEnums(compilerOptions) && isExportOrExportExpression(location2) || !isConstEnumOrConstEnumOnlyModule(getExportSymbolOfValueSymbolIfExported(target))) {
               markAliasSymbolAsReferenced(symbol2);
             }
           }
@@ -153984,7 +154032,7 @@ ${lanes.join(`
           markEntityNameOrEntityExpressionAsReference(entityName, true);
         }
       }
-      function getNarrowedTypeOfSymbol(symbol2, location) {
+      function getNarrowedTypeOfSymbol(symbol2, location2) {
         var _a7;
         const type = getTypeOfSymbol(symbol2);
         const declaration = symbol2.valueDeclaration;
@@ -154001,7 +154049,7 @@ ${lanes.join(`
                 links.flags &= ~4194304;
                 if (parentTypeConstraint && parentTypeConstraint.flags & 134217728 && !(rootDeclaration.kind === 170 && isSomeSymbolAssigned(rootDeclaration))) {
                   const pattern = declaration.parent;
-                  const narrowedType = getFlowTypeOfReference(pattern, parentTypeConstraint, parentTypeConstraint, undefined, location.flowNode);
+                  const narrowedType = getFlowTypeOfReference(pattern, parentTypeConstraint, parentTypeConstraint, undefined, location2.flowNode);
                   if (narrowedType.flags & 262144) {
                     return neverType2;
                   }
@@ -154017,7 +154065,7 @@ ${lanes.join(`
               if (contextualSignature && contextualSignature.parameters.length === 1 && signatureHasRestParameter(contextualSignature)) {
                 const restType = getReducedApparentType(instantiateType(getTypeOfSymbol(contextualSignature.parameters[0]), (_a7 = getInferenceContext(func)) == null ? undefined : _a7.nonFixingMapper));
                 if (restType.flags & 134217728 && everyType(restType, isTupleType) && !some(func.parameters, isSomeSymbolAssigned)) {
-                  const narrowedType = getFlowTypeOfReference(func, restType, restType, undefined, location.flowNode);
+                  const narrowedType = getFlowTypeOfReference(func, restType, restType, undefined, location2.flowNode);
                   const index2 = func.parameters.indexOf(declaration) - (getThisParameter(func) ? 1 : 0);
                   return getIndexedAccessType(narrowedType, getNumberLiteralType(index2));
                 }
@@ -156132,8 +156180,8 @@ ${lanes.join(`
       function checkJsxAttributes(node, checkMode) {
         return createJsxAttributesTypeFromAttributesProperty(node.parent, checkMode);
       }
-      function getJsxType(name3, location) {
-        const namespace = getJsxNamespaceAt(location);
+      function getJsxType(name3, location2) {
+        const namespace = getJsxNamespaceAt(location2);
         const exports2 = namespace && getExportsOfSymbol(namespace);
         const typeSymbol = exports2 && getSymbol2(exports2, name3, 788968);
         return typeSymbol ? getDeclaredTypeOfSymbol(typeSymbol) : errorType;
@@ -156171,8 +156219,8 @@ ${lanes.join(`
         }
         return links.resolvedSymbol;
       }
-      function getJsxNamespaceContainerForImplicitImport(location) {
-        const file2 = location && getSourceFileOfNode(location);
+      function getJsxNamespaceContainerForImplicitImport(location2) {
+        const file2 = location2 && getSourceFileOfNode(location2);
         const links = file2 && getNodeLinks(file2);
         if (links && links.jsxImplicitImportContainer === false) {
           return;
@@ -156187,23 +156235,23 @@ ${lanes.join(`
         const isClassic = getEmitModuleResolutionKind(compilerOptions) === 1;
         const errorMessage = isClassic ? Diagnostics.Cannot_find_module_0_Did_you_mean_to_set_the_moduleResolution_option_to_nodenext_or_to_add_aliases_to_the_paths_option : Diagnostics.This_JSX_tag_requires_the_module_path_0_to_exist_but_none_could_be_found_Make_sure_you_have_types_for_the_appropriate_package_installed;
         const specifier = getJSXRuntimeImportSpecifier(file2, runtimeImportSpecifier);
-        const mod2 = resolveExternalModule(specifier || location, runtimeImportSpecifier, errorMessage, location);
+        const mod2 = resolveExternalModule(specifier || location2, runtimeImportSpecifier, errorMessage, location2);
         const result = mod2 && mod2 !== unknownSymbol ? getMergedSymbol(resolveSymbol(mod2)) : undefined;
         if (links) {
           links.jsxImplicitImportContainer = result || false;
         }
         return result;
       }
-      function getJsxNamespaceAt(location) {
-        const links = location && getNodeLinks(location);
+      function getJsxNamespaceAt(location2) {
+        const links = location2 && getNodeLinks(location2);
         if (links && links.jsxNamespace) {
           return links.jsxNamespace;
         }
         if (!links || links.jsxNamespace !== false) {
-          let resolvedNamespace = getJsxNamespaceContainerForImplicitImport(location);
+          let resolvedNamespace = getJsxNamespaceContainerForImplicitImport(location2);
           if (!resolvedNamespace || resolvedNamespace === unknownSymbol) {
-            const namespaceName = getJsxNamespace(location);
-            resolvedNamespace = resolveName(location, namespaceName, 1920, undefined, false);
+            const namespaceName = getJsxNamespace(location2);
+            resolvedNamespace = resolveName(location2, namespaceName, 1920, undefined, false);
           }
           if (resolvedNamespace) {
             const candidate = resolveSymbol(getSymbol2(getExportsOfSymbol(resolveSymbol(resolvedNamespace)), JsxNames.JSX, 1920));
@@ -156277,8 +156325,8 @@ ${lanes.join(`
         }
         return signatures;
       }
-      function getIntrinsicAttributesTypeFromStringLiteralType(type, location) {
-        const intrinsicElementsType = getJsxType(JsxNames.IntrinsicElements, location);
+      function getIntrinsicAttributesTypeFromStringLiteralType(type, location2) {
+        const intrinsicElementsType = getJsxType(JsxNames.IntrinsicElements, location2);
         if (!isErrorType(intrinsicElementsType)) {
           const stringLiteralTypeName = type.value;
           const intrinsicProp = getPropertyOfType(intrinsicElementsType, escapeLeadingUnderscores(stringLiteralTypeName));
@@ -156335,29 +156383,29 @@ ${lanes.join(`
         }
         return links.resolvedJsxElementAttributesType;
       }
-      function getJsxElementClassTypeAt(location) {
-        const type = getJsxType(JsxNames.ElementClass, location);
+      function getJsxElementClassTypeAt(location2) {
+        const type = getJsxType(JsxNames.ElementClass, location2);
         if (isErrorType(type))
           return;
         return type;
       }
-      function getJsxElementTypeAt(location) {
-        return getJsxType(JsxNames.Element, location);
+      function getJsxElementTypeAt(location2) {
+        return getJsxType(JsxNames.Element, location2);
       }
-      function getJsxStatelessElementTypeAt(location) {
-        const jsxElementType = getJsxElementTypeAt(location);
+      function getJsxStatelessElementTypeAt(location2) {
+        const jsxElementType = getJsxElementTypeAt(location2);
         if (jsxElementType) {
           return getUnionType([jsxElementType, nullType2]);
         }
       }
-      function getJsxElementTypeTypeAt(location) {
-        const ns = getJsxNamespaceAt(location);
+      function getJsxElementTypeTypeAt(location2) {
+        const ns = getJsxNamespaceAt(location2);
         if (!ns)
           return;
         const sym = getJsxElementTypeSymbol(ns);
         if (!sym)
           return;
-        const type = instantiateAliasOrInterfaceWithDefaults(sym, isInJSFile(location));
+        const type = instantiateAliasOrInterfaceWithDefaults(sym, isInJSFile(location2));
         if (!type || isErrorType(type))
           return;
         return type;
@@ -156377,8 +156425,8 @@ ${lanes.join(`
         }
         return;
       }
-      function getJsxIntrinsicTagNamesAt(location) {
-        const intrinsics = getJsxType(JsxNames.IntrinsicElements, location);
+      function getJsxIntrinsicTagNamesAt(location2) {
+        const intrinsics = getJsxType(JsxNames.IntrinsicElements, location2);
         return intrinsics ? getPropertiesOfType(intrinsics) : emptyArray;
       }
       function checkJsxPreconditions(errorNode) {
@@ -156464,7 +156512,7 @@ ${lanes.join(`
         const errorNode = !reportError ? undefined : node.kind === 167 ? node.right : node.kind === 206 ? node : node.kind === 209 && node.propertyName ? node.propertyName : node.name;
         return checkPropertyAccessibilityAtLocation(node, isSuper, writing, type, prop, errorNode);
       }
-      function checkPropertyAccessibilityAtLocation(location, isSuper, writing, containingType, prop, errorNode) {
+      function checkPropertyAccessibilityAtLocation(location2, isSuper, writing, containingType, prop, errorNode) {
         var _a7;
         const flags = getDeclarationModifierFlagsFromSymbol(prop, writing);
         if (isSuper) {
@@ -156489,9 +156537,9 @@ ${lanes.join(`
             return false;
           }
         }
-        if (flags & 64 && symbolHasNonMethodDeclaration(prop) && (isThisProperty(location) || isThisInitializedObjectBindingExpression(location) || isObjectBindingPattern(location.parent) && isThisInitializedDeclaration(location.parent.parent))) {
+        if (flags & 64 && symbolHasNonMethodDeclaration(prop) && (isThisProperty(location2) || isThisInitializedObjectBindingExpression(location2) || isObjectBindingPattern(location2.parent) && isThisInitializedDeclaration(location2.parent.parent))) {
           const parentSymbol = getParentOfSymbol(prop);
-          if (parentSymbol && parentSymbol.flags & 32 && isNodeUsedDuringClassInitialization(location)) {
+          if (parentSymbol && parentSymbol.flags & 32 && isNodeUsedDuringClassInitialization(location2)) {
             if (errorNode) {
               error210(errorNode, Diagnostics.Abstract_property_0_in_class_1_cannot_be_accessed_in_the_constructor, symbolToString(prop), symbolToString(parentSymbol));
             }
@@ -156503,7 +156551,7 @@ ${lanes.join(`
         }
         if (flags & 2) {
           const declaringClassDeclaration = getClassLikeDeclarationOfSymbol(getParentOfSymbol(prop));
-          if (!isNodeWithinClass(location, declaringClassDeclaration)) {
+          if (!isNodeWithinClass(location2, declaringClassDeclaration)) {
             if (errorNode) {
               error210(errorNode, Diagnostics.Property_0_is_private_and_only_accessible_within_class_1, symbolToString(prop), typeToString(getDeclaringClass(prop)));
             }
@@ -156514,12 +156562,12 @@ ${lanes.join(`
         if (isSuper) {
           return true;
         }
-        let enclosingClass = forEachEnclosingClass(location, (enclosingDeclaration) => {
+        let enclosingClass = forEachEnclosingClass(location2, (enclosingDeclaration) => {
           const enclosingClass2 = getDeclaredTypeOfSymbol(getSymbolOfDeclaration(enclosingDeclaration));
           return isClassDerivedFromDeclaringClasses(enclosingClass2, prop, writing);
         });
         if (!enclosingClass) {
-          enclosingClass = getEnclosingClassFromThisParameter(location);
+          enclosingClass = getEnclosingClassFromThisParameter(location2);
           enclosingClass = enclosingClass && isClassDerivedFromDeclaringClasses(enclosingClass, prop, writing);
           if (flags & 256 || !enclosingClass) {
             if (errorNode) {
@@ -156654,8 +156702,8 @@ ${lanes.join(`
         }
         return isCallOrNewExpression(node.parent) && node.parent.expression === node;
       }
-      function lookupSymbolForPrivateIdentifierDeclaration(propName, location) {
-        for (let containingClass = getContainingClassExcludingClassDecorators(location);containingClass; containingClass = getContainingClass(containingClass)) {
+      function lookupSymbolForPrivateIdentifierDeclaration(propName, location2) {
+        for (let containingClass = getContainingClassExcludingClassDecorators(location2);containingClass; containingClass = getContainingClass(containingClass)) {
           const { symbol: symbol2 } = containingClass;
           const name3 = getSymbolNameForPrivateIdentifier(symbol2, propName);
           const prop = symbol2.members && symbol2.members.get(name3) || symbol2.exports && symbol2.exports.get(name3);
@@ -157045,9 +157093,9 @@ ${lanes.join(`
         sortSymbolsIfTSGoCompat(candidates);
         return getSpellingSuggestionForName(unescapeLeadingUnderscores(name3), candidates, meaning);
       }
-      function getSuggestedSymbolForNonexistentSymbol(location, outerName, meaning) {
+      function getSuggestedSymbolForNonexistentSymbol(location2, outerName, meaning) {
         Debug.assert(outerName !== undefined, "outername should always be defined");
-        const result = resolveNameForSymbolSuggestion(location, outerName, meaning, undefined, false, false);
+        const result = resolveNameForSymbolSuggestion(location2, outerName, meaning, undefined, false, false);
         return result;
       }
       function getSuggestedSymbolForNonexistentModule(name3, targetModule) {
@@ -161183,9 +161231,9 @@ ${lanes.join(`
             if (isLeftNaN && isRightNaN)
               return;
             const operatorString = operator2 === 38 || operator2 === 36 ? tokenToString(54) : "";
-            const location = isLeftNaN ? right2 : left2;
-            const expression2 = skipParentheses(location);
-            addRelatedInfo(err, createDiagnosticForNode(location, Diagnostics.Did_you_mean_0, `${operatorString}Number.isNaN(${isEntityNameExpression(expression2) ? entityNameToString(expression2) : "..."})`));
+            const location2 = isLeftNaN ? right2 : left2;
+            const expression2 = skipParentheses(location2);
+            addRelatedInfo(err, createDiagnosticForNode(location2, Diagnostics.Did_you_mean_0, `${operatorString}Number.isNaN(${isEntityNameExpression(expression2) ? entityNameToString(expression2) : "..."})`));
           }
         }
         function isGlobalNaN(expr2) {
@@ -162048,20 +162096,20 @@ ${lanes.join(`
             }
           }
         }
-        function addName(names, location, name3, meaning) {
+        function addName(names, location2, name3, meaning) {
           const prev = names.get(name3);
           if (prev) {
             if ((prev & 16) !== (meaning & 16)) {
-              error210(location, Diagnostics.Duplicate_identifier_0_Static_and_instance_elements_cannot_share_the_same_private_name, getTextOfNode(location));
+              error210(location2, Diagnostics.Duplicate_identifier_0_Static_and_instance_elements_cannot_share_the_same_private_name, getTextOfNode(location2));
             } else {
               const prevIsMethod = !!(prev & 8);
               const isMethod = !!(meaning & 8);
               if (prevIsMethod || isMethod) {
                 if (prevIsMethod !== isMethod) {
-                  error210(location, Diagnostics.Duplicate_identifier_0, getTextOfNode(location));
+                  error210(location2, Diagnostics.Duplicate_identifier_0, getTextOfNode(location2));
                 }
               } else if (prev & meaning & ~16) {
-                error210(location, Diagnostics.Duplicate_identifier_0, getTextOfNode(location));
+                error210(location2, Diagnostics.Duplicate_identifier_0, getTextOfNode(location2));
               } else {
                 names.set(name3, prev | meaning);
               }
@@ -164128,20 +164176,20 @@ ${lanes.join(`
           }
         }
         function helper(condExpr2, body2) {
-          const location = isLogicalOrCoalescingBinaryExpression(condExpr2) ? skipParentheses(condExpr2.right) : condExpr2;
-          if (isModuleExportsAccessExpression(location)) {
+          const location2 = isLogicalOrCoalescingBinaryExpression(condExpr2) ? skipParentheses(condExpr2.right) : condExpr2;
+          if (isModuleExportsAccessExpression(location2)) {
             return;
           }
-          if (isLogicalOrCoalescingBinaryExpression(location)) {
-            bothHelper(location, body2);
+          if (isLogicalOrCoalescingBinaryExpression(location2)) {
+            bothHelper(location2, body2);
             return;
           }
-          const type = location === condExpr2 ? condType : checkExpression(location);
-          if (type.flags & 32768 && isPropertyAccessExpression(location) && (getNodeLinks(location.expression).resolvedSymbol ?? unknownSymbol).flags & 384) {
-            error210(location, Diagnostics.This_condition_will_always_return_0, type.value ? "true" : "false");
+          const type = location2 === condExpr2 ? condType : checkExpression(location2);
+          if (type.flags & 32768 && isPropertyAccessExpression(location2) && (getNodeLinks(location2.expression).resolvedSymbol ?? unknownSymbol).flags & 384) {
+            error210(location2, Diagnostics.This_condition_will_always_return_0, type.value ? "true" : "false");
             return;
           }
-          const isPropertyExpressionCast = isPropertyAccessExpression(location) && isTypeAssertion(location.expression);
+          const isPropertyExpressionCast = isPropertyAccessExpression(location2) && isTypeAssertion(location2.expression);
           if (!hasTypeFacts(type, 4194304) || isPropertyExpressionCast)
             return;
           const callSignatures = getSignaturesOfType(type, 0);
@@ -164149,7 +164197,7 @@ ${lanes.join(`
           if (callSignatures.length === 0 && !isPromise) {
             return;
           }
-          const testedNode = isIdentifier(location) ? location : isPropertyAccessExpression(location) ? location.name : undefined;
+          const testedNode = isIdentifier(location2) ? location2 : isPropertyAccessExpression(location2) ? location2.name : undefined;
           const testedSymbol = testedNode && getSymbolAtLocation(testedNode);
           if (!testedSymbol && !isPromise) {
             return;
@@ -164157,9 +164205,9 @@ ${lanes.join(`
           const isUsed = testedSymbol && isBinaryExpression(condExpr2.parent) && isSymbolUsedInBinaryExpressionChain(condExpr2.parent, testedSymbol) || testedSymbol && body2 && isSymbolUsedInConditionBody(condExpr2, body2, testedNode, testedSymbol);
           if (!isUsed) {
             if (isPromise) {
-              errorAndMaybeSuggestAwait(location, true, Diagnostics.This_condition_will_always_return_true_since_this_0_is_always_defined, getTypeNameForErrorDisplay(type));
+              errorAndMaybeSuggestAwait(location2, true, Diagnostics.This_condition_will_always_return_true_since_this_0_is_always_defined, getTypeNameForErrorDisplay(type));
             } else {
-              error210(location, Diagnostics.This_condition_will_always_return_true_since_this_function_is_always_defined_Did_you_mean_to_call_it_instead);
+              error210(location2, Diagnostics.This_condition_will_always_return_true_since_this_function_is_always_defined_Did_you_mean_to_call_it_instead);
             }
           }
         }
@@ -165239,16 +165287,16 @@ ${lanes.join(`
         if (!isNamedEvaluationSource(parent2))
           return;
         const willTransformESDecorators = !legacyDecorators && languageVersion < LanguageFeatureMinimumTarget.ClassAndClassElementDecorators;
-        let location;
+        let location2;
         if (willTransformESDecorators && classOrConstructorParameterIsDecorated(false, node)) {
-          location = firstOrUndefined(getDecorators(node)) ?? node;
+          location2 = firstOrUndefined(getDecorators(node)) ?? node;
         } else {
-          location = getFirstTransformableStaticClassElement(node);
+          location2 = getFirstTransformableStaticClassElement(node);
         }
-        if (location) {
-          checkExternalEmitHelpers(location, 4194304);
+        if (location2) {
+          checkExternalEmitHelpers(location2, 4194304);
           if ((isPropertyAssignment(parent2) || isPropertyDeclaration(parent2) || isBindingElement(parent2)) && isComputedPropertyName(parent2.name)) {
-            checkExternalEmitHelpers(location, 8388608);
+            checkExternalEmitHelpers(location2, 8388608);
           }
         }
       }
@@ -165827,7 +165875,7 @@ ${lanes.join(`
         }
         return result;
       }
-      function evaluateEntityNameExpression(expr2, location) {
+      function evaluateEntityNameExpression(expr2, location2) {
         const symbol2 = resolveEntityName(expr2, 111551, true);
         if (!symbol2)
           return evaluatorResult(undefined);
@@ -165838,13 +165886,13 @@ ${lanes.join(`
           }
         }
         if (symbol2.flags & 8) {
-          return location ? evaluateEnumMember(expr2, symbol2, location) : getEnumMemberValue(symbol2.valueDeclaration);
+          return location2 ? evaluateEnumMember(expr2, symbol2, location2) : getEnumMemberValue(symbol2.valueDeclaration);
         }
         if (isConstantVariable(symbol2)) {
           const declaration = symbol2.valueDeclaration;
-          if (declaration && isVariableDeclaration(declaration) && !declaration.type && declaration.initializer && (!location || declaration !== location && isBlockScopedNameDeclaredBeforeUse(declaration, location))) {
+          if (declaration && isVariableDeclaration(declaration) && !declaration.type && declaration.initializer && (!location2 || declaration !== location2 && isBlockScopedNameDeclaredBeforeUse(declaration, location2))) {
             const result = evaluate(declaration.initializer, declaration);
-            if (location && getSourceFileOfNode(location) !== getSourceFileOfNode(declaration)) {
+            if (location2 && getSourceFileOfNode(location2) !== getSourceFileOfNode(declaration)) {
               return evaluatorResult(result.value, false, true, true);
             }
             return evaluatorResult(result.value, result.isSyntacticallyString, result.resolvedOtherFiles, true);
@@ -165852,7 +165900,7 @@ ${lanes.join(`
         }
         return evaluatorResult(undefined);
       }
-      function evaluateElementAccessExpression(expr2, location) {
+      function evaluateElementAccessExpression(expr2, location2) {
         const root = expr2.expression;
         if (isEntityNameExpression(root) && isStringLiteralLike(expr2.argumentExpression)) {
           const rootSymbol = resolveEntityName(root, 111551, true);
@@ -165861,24 +165909,24 @@ ${lanes.join(`
             const member = rootSymbol.exports.get(name3);
             if (member) {
               Debug.assert(getSourceFileOfNode(member.valueDeclaration) === getSourceFileOfNode(rootSymbol.valueDeclaration));
-              return location ? evaluateEnumMember(expr2, member, location) : getEnumMemberValue(member.valueDeclaration);
+              return location2 ? evaluateEnumMember(expr2, member, location2) : getEnumMemberValue(member.valueDeclaration);
             }
           }
         }
         return evaluatorResult(undefined);
       }
-      function evaluateEnumMember(expr2, symbol2, location) {
+      function evaluateEnumMember(expr2, symbol2, location2) {
         const declaration = symbol2.valueDeclaration;
-        if (!declaration || declaration === location) {
+        if (!declaration || declaration === location2) {
           error210(expr2, Diagnostics.Property_0_is_used_before_being_assigned, symbolToString(symbol2));
           return evaluatorResult(undefined);
         }
-        if (!isBlockScopedNameDeclaredBeforeUse(declaration, location)) {
+        if (!isBlockScopedNameDeclaredBeforeUse(declaration, location2)) {
           error210(expr2, Diagnostics.A_member_initializer_in_a_enum_declaration_cannot_reference_members_declared_after_it_including_members_defined_in_other_enums);
           return evaluatorResult(0);
         }
         const value2 = getEnumMemberValue(declaration);
-        if (location.parent !== declaration.parent) {
+        if (location2.parent !== declaration.parent) {
           return evaluatorResult(value2.value, value2.isSyntacticallyString, value2.resolvedOtherFiles, true);
         }
         return value2;
@@ -166229,7 +166277,7 @@ ${lanes.join(`
           }
         }
       }
-      function resolveAliasWithDeprecationCheck(symbol2, location) {
+      function resolveAliasWithDeprecationCheck(symbol2, location2) {
         if (!(symbol2.flags & 2097152) || isDeprecatedSymbol(symbol2) || !getDeclarationOfAliasSymbol(symbol2)) {
           return symbol2;
         }
@@ -166243,7 +166291,7 @@ ${lanes.join(`
               break;
             if (target.declarations && length(target.declarations)) {
               if (isDeprecatedSymbol(target)) {
-                addDeprecatedSuggestion(location, target.declarations, target.escapedName);
+                addDeprecatedSuggestion(location2, target.declarations, target.escapedName);
                 break;
               } else {
                 if (symbol2 === targetSymbol)
@@ -167148,8 +167196,8 @@ ${lanes.join(`
         ensurePendingDiagnosticWorkComplete();
         return diagnostics.getGlobalDiagnostics();
       }
-      function getSymbolsInScope(location, meaning) {
-        if (location.flags & 67108864) {
+      function getSymbolsInScope(location2, meaning) {
+        if (location2.flags & 67108864) {
           return [];
         }
         const symbols = createSymbolTable();
@@ -167158,43 +167206,43 @@ ${lanes.join(`
         symbols.delete("this");
         return symbolsToArray(symbols);
         function populateSymbols() {
-          while (location) {
-            if (canHaveLocals(location) && location.locals && !isGlobalSourceFile(location)) {
-              copySymbols(location.locals, meaning);
+          while (location2) {
+            if (canHaveLocals(location2) && location2.locals && !isGlobalSourceFile(location2)) {
+              copySymbols(location2.locals, meaning);
             }
-            switch (location.kind) {
+            switch (location2.kind) {
               case 308:
-                if (!isExternalModule(location))
+                if (!isExternalModule(location2))
                   break;
               case 268:
-                copyLocallyVisibleExportSymbols(getSymbolOfDeclaration(location).exports, meaning & 2623475);
+                copyLocallyVisibleExportSymbols(getSymbolOfDeclaration(location2).exports, meaning & 2623475);
                 break;
               case 267:
-                copySymbols(getSymbolOfDeclaration(location).exports, meaning & 8);
+                copySymbols(getSymbolOfDeclaration(location2).exports, meaning & 8);
                 break;
               case 232:
-                const className = location.name;
+                const className = location2.name;
                 if (className) {
-                  copySymbol(location.symbol, meaning);
+                  copySymbol(location2.symbol, meaning);
                 }
               case 264:
               case 265:
                 if (!isStaticSymbol) {
-                  copySymbols(getMembersOfSymbol(getSymbolOfDeclaration(location)), meaning & 788968);
+                  copySymbols(getMembersOfSymbol(getSymbolOfDeclaration(location2)), meaning & 788968);
                 }
                 break;
               case 219:
-                const funcName = location.name;
+                const funcName = location2.name;
                 if (funcName) {
-                  copySymbol(location.symbol, meaning);
+                  copySymbol(location2.symbol, meaning);
                 }
                 break;
             }
-            if (introducesArgumentsExoticObject(location)) {
+            if (introducesArgumentsExoticObject(location2)) {
               copySymbol(argumentsSymbol, meaning);
             }
-            isStaticSymbol = isStatic(location);
-            location = location.parent;
+            isStaticSymbol = isStatic(location2);
+            location2 = location2.parent;
           }
           copySymbols(globals, meaning);
         }
@@ -167589,9 +167637,9 @@ ${lanes.join(`
         }
         return;
       }
-      function getShorthandAssignmentValueSymbol(location) {
-        if (location && location.kind === 305) {
-          return resolveEntityName(location.name, 111551 | 2097152, true);
+      function getShorthandAssignmentValueSymbol(location2) {
+        if (location2 && location2.kind === 305) {
+          return resolveEntityName(location2.name, 111551 | 2097152, true);
         }
         return;
       }
@@ -167684,9 +167732,9 @@ ${lanes.join(`
         const elementType = checkIteratedTypeOrElementType(65, typeOfArrayLiteral, undefinedType2, expr2.parent) || errorType;
         return checkArrayLiteralDestructuringElementAssignment(node, typeOfArrayLiteral, node.elements.indexOf(expr2), elementType);
       }
-      function getPropertySymbolOfDestructuringAssignment(location) {
-        const typeOfObjectLiteral = getTypeOfAssignmentPattern(cast(location.parent.parent, isAssignmentPattern));
-        return typeOfObjectLiteral && getPropertyOfType(typeOfObjectLiteral, location.escapedText);
+      function getPropertySymbolOfDestructuringAssignment(location2) {
+        const typeOfObjectLiteral = getTypeOfAssignmentPattern(cast(location2.parent.parent, isAssignmentPattern));
+        return typeOfObjectLiteral && getPropertyOfType(typeOfObjectLiteral, location2.escapedText);
       }
       function getRegularTypeOfExpression(expr2) {
         if (isRightSideOfQualifiedNameOrPropertyAccess(expr2)) {
@@ -168124,25 +168172,25 @@ ${lanes.join(`
       function isFunctionType(type) {
         return !!(type.flags & 1048576) && getSignaturesOfType(type, 0).length > 0;
       }
-      function getTypeReferenceSerializationKind(typeNameIn, location) {
+      function getTypeReferenceSerializationKind(typeNameIn, location2) {
         var _a7;
         const typeName = getParseTreeNode(typeNameIn, isEntityName);
         if (!typeName)
           return 0;
-        if (location) {
-          location = getParseTreeNode(location);
-          if (!location)
+        if (location2) {
+          location2 = getParseTreeNode(location2);
+          if (!location2)
             return 0;
         }
         let isTypeOnly = false;
         if (isQualifiedName(typeName)) {
-          const rootValueSymbol = resolveEntityName(getFirstIdentifier(typeName), 111551, true, true, location);
+          const rootValueSymbol = resolveEntityName(getFirstIdentifier(typeName), 111551, true, true, location2);
           isTypeOnly = !!((_a7 = rootValueSymbol == null ? undefined : rootValueSymbol.declarations) == null ? undefined : _a7.every(isTypeOnlyImportOrExportDeclaration));
         }
-        const valueSymbol = resolveEntityName(typeName, 111551, true, true, location);
+        const valueSymbol = resolveEntityName(typeName, 111551, true, true, location2);
         const resolvedValueSymbol = valueSymbol && valueSymbol.flags & 2097152 ? resolveAlias(valueSymbol) : valueSymbol;
         isTypeOnly || (isTypeOnly = !!(valueSymbol && getTypeOnlyAliasDeclaration(valueSymbol, 111551)));
-        const typeSymbol = resolveEntityName(typeName, 788968, true, true, location);
+        const typeSymbol = resolveEntityName(typeName, 788968, true, true, location2);
         const resolvedTypeSymbol = typeSymbol && typeSymbol.flags & 2097152 ? resolveAlias(typeSymbol) : typeSymbol;
         if (!valueSymbol) {
           isTypeOnly || (isTypeOnly = !!(typeSymbol && getTypeOnlyAliasDeclaration(typeSymbol, 788968)));
@@ -168232,14 +168280,14 @@ ${lanes.join(`
         if (resolvedSymbol) {
           return resolvedSymbol;
         }
-        let location = reference;
+        let location2 = reference;
         if (startInDeclarationContainer) {
           const parent2 = reference.parent;
           if (isDeclaration(parent2) && reference === parent2.name) {
-            location = getDeclarationContainer(parent2);
+            location2 = getDeclarationContainer(parent2);
           }
         }
-        return resolveName(location, reference.escapedText, 111551 | 1048576 | 2097152, undefined, true);
+        return resolveName(location2, reference.escapedText, 111551 | 1048576 | 2097152, undefined, true);
       }
       function getReferencedValueOrAliasSymbol(reference) {
         const resolvedSymbol = getNodeLinks(reference).resolvedSymbol;
@@ -168312,12 +168360,12 @@ ${lanes.join(`
         const type = getTypeOfSymbol(getSymbolOfDeclaration(node));
         return literalTypeToNode(type, node, tracker);
       }
-      function getJsxFactoryEntity(location) {
-        return location ? (getJsxNamespace(location), getSourceFileOfNode(location).localJsxFactory || _jsxFactoryEntity) : _jsxFactoryEntity;
+      function getJsxFactoryEntity(location2) {
+        return location2 ? (getJsxNamespace(location2), getSourceFileOfNode(location2).localJsxFactory || _jsxFactoryEntity) : _jsxFactoryEntity;
       }
-      function getJsxFragmentFactoryEntity(location) {
-        if (location) {
-          const file2 = getSourceFileOfNode(location);
+      function getJsxFragmentFactoryEntity(location2) {
+        if (location2) {
+          const file2 = getSourceFileOfNode(location2);
           if (file2) {
             if (file2.localJsxFragmentFactory) {
               return file2.localJsxFragmentFactory;
@@ -168613,11 +168661,11 @@ ${lanes.join(`
         });
         amalgamatedDuplicates = undefined;
       }
-      function checkExternalEmitHelpers(location, helpers) {
+      function checkExternalEmitHelpers(location2, helpers) {
         if (compilerOptions.importHelpers) {
-          const sourceFile = getSourceFileOfNode(location);
-          if (isEffectiveExternalModule(sourceFile, compilerOptions) && !(location.flags & 33554432)) {
-            const helpersModule = resolveHelpersModule(sourceFile, location);
+          const sourceFile = getSourceFileOfNode(location2);
+          if (isEffectiveExternalModule(sourceFile, compilerOptions) && !(location2.flags & 33554432)) {
+            const helpersModule = resolveHelpersModule(sourceFile, location2);
             if (helpersModule !== unknownSymbol) {
               const links = getSymbolLinks(helpersModule);
               links.requestedExternalEmitHelpers ?? (links.requestedExternalEmitHelpers = 0);
@@ -168628,18 +168676,18 @@ ${lanes.join(`
                     for (const name3 of getHelperNames(helper)) {
                       const symbol2 = resolveSymbol(getSymbol2(getExportsOfModule(helpersModule), escapeLeadingUnderscores(name3), 111551));
                       if (!symbol2) {
-                        error210(location, Diagnostics.This_syntax_requires_an_imported_helper_named_1_which_does_not_exist_in_0_Consider_upgrading_your_version_of_0, externalHelpersModuleNameText, name3);
+                        error210(location2, Diagnostics.This_syntax_requires_an_imported_helper_named_1_which_does_not_exist_in_0_Consider_upgrading_your_version_of_0, externalHelpersModuleNameText, name3);
                       } else if (helper & 524288) {
                         if (!some(getSignaturesOfSymbol(symbol2), (signature) => getParameterCount(signature) > 3)) {
-                          error210(location, Diagnostics.This_syntax_requires_an_imported_helper_named_1_with_2_parameters_which_is_not_compatible_with_the_one_in_0_Consider_upgrading_your_version_of_0, externalHelpersModuleNameText, name3, 4);
+                          error210(location2, Diagnostics.This_syntax_requires_an_imported_helper_named_1_with_2_parameters_which_is_not_compatible_with_the_one_in_0_Consider_upgrading_your_version_of_0, externalHelpersModuleNameText, name3, 4);
                         }
                       } else if (helper & 1048576) {
                         if (!some(getSignaturesOfSymbol(symbol2), (signature) => getParameterCount(signature) > 4)) {
-                          error210(location, Diagnostics.This_syntax_requires_an_imported_helper_named_1_with_2_parameters_which_is_not_compatible_with_the_one_in_0_Consider_upgrading_your_version_of_0, externalHelpersModuleNameText, name3, 5);
+                          error210(location2, Diagnostics.This_syntax_requires_an_imported_helper_named_1_with_2_parameters_which_is_not_compatible_with_the_one_in_0_Consider_upgrading_your_version_of_0, externalHelpersModuleNameText, name3, 5);
                         }
                       } else if (helper & 1024) {
                         if (!some(getSignaturesOfSymbol(symbol2), (signature) => getParameterCount(signature) > 2)) {
-                          error210(location, Diagnostics.This_syntax_requires_an_imported_helper_named_1_with_2_parameters_which_is_not_compatible_with_the_one_in_0_Consider_upgrading_your_version_of_0, externalHelpersModuleNameText, name3, 3);
+                          error210(location2, Diagnostics.This_syntax_requires_an_imported_helper_named_1_with_2_parameters_which_is_not_compatible_with_the_one_in_0_Consider_upgrading_your_version_of_0, externalHelpersModuleNameText, name3, 3);
                         }
                       }
                     }
@@ -172378,13 +172426,13 @@ ${lanes.join(`
       return FlattenLevel2;
     })(FlattenLevel || {});
     function flattenDestructuringAssignment(node, visitor, context, level, needsValue, createAssignmentCallback) {
-      let location = node;
+      let location2 = node;
       let value2;
       if (isDestructuringAssignment(node)) {
         value2 = node.right;
         while (isEmptyArrayLiteral(node.left) || isEmptyObjectLiteral(node.left)) {
           if (isDestructuringAssignment(value2)) {
-            location = node = value2;
+            location2 = node = value2;
             value2 = node.right;
           } else {
             return Debug.checkDefined(visitNode(value2, visitor, isExpression2));
@@ -172408,14 +172456,14 @@ ${lanes.join(`
         value2 = visitNode(value2, visitor, isExpression2);
         Debug.assert(value2);
         if (isIdentifier(value2) && bindingOrAssignmentElementAssignsToName(node, value2.escapedText) || bindingOrAssignmentElementContainsNonLiteralComputedName(node)) {
-          value2 = ensureIdentifier(flattenContext, value2, false, location);
+          value2 = ensureIdentifier(flattenContext, value2, false, location2);
         } else if (needsValue) {
-          value2 = ensureIdentifier(flattenContext, value2, true, location);
+          value2 = ensureIdentifier(flattenContext, value2, true, location2);
         } else if (nodeIsSynthesized(node)) {
-          location = value2;
+          location2 = value2;
         }
       }
-      flattenBindingOrAssignmentElement(flattenContext, node, value2, location, isDestructuringAssignment(node));
+      flattenBindingOrAssignmentElement(flattenContext, node, value2, location2, isDestructuringAssignment(node));
       if (value2 && needsValue) {
         if (!some(expressions)) {
           return value2;
@@ -172426,9 +172474,9 @@ ${lanes.join(`
       function emitExpression(expression2) {
         expressions = append(expressions, expression2);
       }
-      function emitBindingOrAssignment(target, value22, location2, original) {
+      function emitBindingOrAssignment(target, value22, location22, original) {
         Debug.assertNode(target, createAssignmentCallback ? isIdentifier : isExpression2);
-        const expression2 = createAssignmentCallback ? createAssignmentCallback(target, value22, location2) : setTextRange(context.factory.createAssignment(Debug.checkDefined(visitNode(target, visitor, isExpression2)), value22), location2);
+        const expression2 = createAssignmentCallback ? createAssignmentCallback(target, value22, location22) : setTextRange(context.factory.createAssignment(Debug.checkDefined(visitNode(target, visitor, isExpression2)), value22), location22);
         expression2.original = original;
         emitExpression(expression2);
       }
@@ -172500,34 +172548,34 @@ ${lanes.join(`
           pendingDeclaration.value = temp;
         }
       }
-      for (const { pendingExpressions: pendingExpressions2, name: name3, value: value2, location, original } of pendingDeclarations) {
+      for (const { pendingExpressions: pendingExpressions2, name: name3, value: value2, location: location2, original } of pendingDeclarations) {
         const variable = context.factory.createVariableDeclaration(name3, undefined, undefined, pendingExpressions2 ? context.factory.inlineExpressions(append(pendingExpressions2, value2)) : value2);
         variable.original = original;
-        setTextRange(variable, location);
+        setTextRange(variable, location2);
         declarations.push(variable);
       }
       return declarations;
       function emitExpression(value2) {
         pendingExpressions = append(pendingExpressions, value2);
       }
-      function emitBindingOrAssignment(target, value2, location, original) {
+      function emitBindingOrAssignment(target, value2, location2, original) {
         Debug.assertNode(target, isBindingName);
         if (pendingExpressions) {
           value2 = context.factory.inlineExpressions(append(pendingExpressions, value2));
           pendingExpressions = undefined;
         }
-        pendingDeclarations.push({ pendingExpressions, name: target, value: value2, location, original });
+        pendingDeclarations.push({ pendingExpressions, name: target, value: value2, location: location2, original });
       }
     }
-    function flattenBindingOrAssignmentElement(flattenContext, element, value2, location, skipInitializer) {
+    function flattenBindingOrAssignmentElement(flattenContext, element, value2, location2, skipInitializer) {
       const bindingTarget = getTargetOfBindingOrAssignmentElement(element);
       if (!skipInitializer) {
         const initializer3 = visitNode(getInitializerOfBindingOrAssignmentElement(element), flattenContext.visitor, isExpression2);
         if (initializer3) {
           if (value2) {
-            value2 = createDefaultValueCheck(flattenContext, value2, initializer3, location);
+            value2 = createDefaultValueCheck(flattenContext, value2, initializer3, location2);
             if (!isSimpleInlineableExpression(initializer3) && isBindingOrAssignmentPattern(bindingTarget)) {
-              value2 = ensureIdentifier(flattenContext, value2, true, location);
+              value2 = ensureIdentifier(flattenContext, value2, true, location2);
             }
           } else {
             value2 = initializer3;
@@ -172537,19 +172585,19 @@ ${lanes.join(`
         }
       }
       if (isObjectBindingOrAssignmentPattern(bindingTarget)) {
-        flattenObjectBindingOrAssignmentPattern(flattenContext, element, bindingTarget, value2, location);
+        flattenObjectBindingOrAssignmentPattern(flattenContext, element, bindingTarget, value2, location2);
       } else if (isArrayBindingOrAssignmentPattern(bindingTarget)) {
-        flattenArrayBindingOrAssignmentPattern(flattenContext, element, bindingTarget, value2, location);
+        flattenArrayBindingOrAssignmentPattern(flattenContext, element, bindingTarget, value2, location2);
       } else {
-        flattenContext.emitBindingOrAssignment(bindingTarget, value2, location, element);
+        flattenContext.emitBindingOrAssignment(bindingTarget, value2, location2, element);
       }
     }
-    function flattenObjectBindingOrAssignmentPattern(flattenContext, parent2, pattern, value2, location) {
+    function flattenObjectBindingOrAssignmentPattern(flattenContext, parent2, pattern, value2, location2) {
       const elements = getElementsOfBindingOrAssignmentPattern(pattern);
       const numElements = elements.length;
       if (numElements !== 1) {
         const reuseIdentifierExpressions = !isDeclarationBindingElement(parent2) || numElements !== 0;
-        value2 = ensureIdentifier(flattenContext, value2, reuseIdentifierExpressions, location);
+        value2 = ensureIdentifier(flattenContext, value2, reuseIdentifierExpressions, location2);
       }
       let bindingElements;
       let computedTempVariables;
@@ -172561,7 +172609,7 @@ ${lanes.join(`
             bindingElements = append(bindingElements, visitNode(element, flattenContext.visitor, isBindingOrAssignmentElement));
           } else {
             if (bindingElements) {
-              flattenContext.emitBindingOrAssignment(flattenContext.createObjectBindingOrAssignmentPattern(bindingElements), value2, location, pattern);
+              flattenContext.emitBindingOrAssignment(flattenContext.createObjectBindingOrAssignmentPattern(bindingElements), value2, location2, pattern);
               bindingElements = undefined;
             }
             const rhsValue = createDestructuringPropertyAccess(flattenContext, value2, propertyName);
@@ -172572,7 +172620,7 @@ ${lanes.join(`
           }
         } else if (i2 === numElements - 1) {
           if (bindingElements) {
-            flattenContext.emitBindingOrAssignment(flattenContext.createObjectBindingOrAssignmentPattern(bindingElements), value2, location, pattern);
+            flattenContext.emitBindingOrAssignment(flattenContext.createObjectBindingOrAssignmentPattern(bindingElements), value2, location2, pattern);
             bindingElements = undefined;
           }
           const rhsValue = flattenContext.context.getEmitHelperFactory().createRestHelper(value2, elements, computedTempVariables, pattern);
@@ -172580,17 +172628,17 @@ ${lanes.join(`
         }
       }
       if (bindingElements) {
-        flattenContext.emitBindingOrAssignment(flattenContext.createObjectBindingOrAssignmentPattern(bindingElements), value2, location, pattern);
+        flattenContext.emitBindingOrAssignment(flattenContext.createObjectBindingOrAssignmentPattern(bindingElements), value2, location2, pattern);
       }
     }
-    function flattenArrayBindingOrAssignmentPattern(flattenContext, parent2, pattern, value2, location) {
+    function flattenArrayBindingOrAssignmentPattern(flattenContext, parent2, pattern, value2, location2) {
       const elements = getElementsOfBindingOrAssignmentPattern(pattern);
       const numElements = elements.length;
       if (flattenContext.level < 1 && flattenContext.downlevelIteration) {
-        value2 = ensureIdentifier(flattenContext, setTextRange(flattenContext.context.getEmitHelperFactory().createReadHelper(value2, numElements > 0 && getRestIndicatorOfBindingOrAssignmentElement(elements[numElements - 1]) ? undefined : numElements), location), false, location);
+        value2 = ensureIdentifier(flattenContext, setTextRange(flattenContext.context.getEmitHelperFactory().createReadHelper(value2, numElements > 0 && getRestIndicatorOfBindingOrAssignmentElement(elements[numElements - 1]) ? undefined : numElements), location2), false, location2);
       } else if (numElements !== 1 && (flattenContext.level < 1 || numElements === 0) || every(elements, isOmittedExpression)) {
         const reuseIdentifierExpressions = !isDeclarationBindingElement(parent2) || numElements !== 0;
-        value2 = ensureIdentifier(flattenContext, value2, reuseIdentifierExpressions, location);
+        value2 = ensureIdentifier(flattenContext, value2, reuseIdentifierExpressions, location2);
       }
       let bindingElements;
       let restContainingElements;
@@ -172619,7 +172667,7 @@ ${lanes.join(`
         }
       }
       if (bindingElements) {
-        flattenContext.emitBindingOrAssignment(flattenContext.createArrayBindingOrAssignmentPattern(bindingElements), value2, location, pattern);
+        flattenContext.emitBindingOrAssignment(flattenContext.createArrayBindingOrAssignmentPattern(bindingElements), value2, location2, pattern);
       }
       if (restContainingElements) {
         for (const [id, element] of restContainingElements) {
@@ -172641,8 +172689,8 @@ ${lanes.join(`
         return every(getElementsOfBindingOrAssignmentPattern(target), isSimpleBindingOrAssignmentElement);
       return isIdentifier(target);
     }
-    function createDefaultValueCheck(flattenContext, value2, defaultValue, location) {
-      value2 = ensureIdentifier(flattenContext, value2, true, location);
+    function createDefaultValueCheck(flattenContext, value2, defaultValue, location2) {
+      value2 = ensureIdentifier(flattenContext, value2, true, location2);
       return flattenContext.context.factory.createConditionalExpression(flattenContext.context.factory.createTypeCheck(value2, "undefined"), undefined, defaultValue, undefined, value2);
     }
     function createDestructuringPropertyAccess(flattenContext, value2, propertyName) {
@@ -172658,16 +172706,16 @@ ${lanes.join(`
         return flattenContext.context.factory.createPropertyAccessExpression(value2, name3);
       }
     }
-    function ensureIdentifier(flattenContext, value2, reuseIdentifierExpressions, location) {
+    function ensureIdentifier(flattenContext, value2, reuseIdentifierExpressions, location2) {
       if (isIdentifier(value2) && reuseIdentifierExpressions) {
         return value2;
       } else {
         const temp = flattenContext.context.factory.createTempVariable(undefined);
         if (flattenContext.hoistTempVariables) {
           flattenContext.context.hoistVariableDeclaration(temp);
-          flattenContext.emitExpression(setTextRange(flattenContext.context.factory.createAssignment(temp, value2), location));
+          flattenContext.emitExpression(setTextRange(flattenContext.context.factory.createAssignment(temp, value2), location2));
         } else {
-          flattenContext.emitBindingOrAssignment(temp, value2, location, undefined);
+          flattenContext.emitBindingOrAssignment(temp, value2, location2, undefined);
         }
         return temp;
       }
@@ -174034,11 +174082,11 @@ ${lanes.join(`
       function addExportMemberAssignment(statements, node) {
         statements.push(createExportMemberAssignmentStatement(node));
       }
-      function createNamespaceExport(exportName, exportValue, location) {
-        return setTextRange(factory2.createExpressionStatement(factory2.createAssignment(factory2.getNamespaceMemberName(currentNamespaceContainerName, exportName, false, true), exportValue)), location);
+      function createNamespaceExport(exportName, exportValue, location2) {
+        return setTextRange(factory2.createExpressionStatement(factory2.createAssignment(factory2.getNamespaceMemberName(currentNamespaceContainerName, exportName, false, true), exportValue)), location2);
       }
-      function createNamespaceExportExpression(exportName, exportValue, location) {
-        return setTextRange(factory2.createAssignment(getNamespaceMemberNameWithSourceMapsAndWithoutComments(exportName), exportValue), location);
+      function createNamespaceExportExpression(exportName, exportValue, location2) {
+        return setTextRange(factory2.createAssignment(getNamespaceMemberNameWithSourceMapsAndWithoutComments(exportName), exportValue), location2);
       }
       function getNamespaceMemberNameWithSourceMapsAndWithoutComments(name3) {
         return factory2.getNamespaceMemberName(currentNamespaceContainerName, name3, false, true);
@@ -176256,7 +176304,7 @@ ${lanes.join(`
         const isExport = hasSyntacticModifier(node, 32);
         const isDefault = hasSyntacticModifier(node, 2048);
         const modifiers = visitNodes2(node.modifiers, (node2) => isExportOrDefaultModifier(node2) || isDecorator(node2) ? undefined : node2, isModifierLike);
-        const location = moveRangePastModifiers(node);
+        const location2 = moveRangePastModifiers(node);
         const classAlias = getClassAliasIfNeeded(node);
         const declName = languageVersion < 2 ? factory2.getInternalName(node, false, true) : factory2.getLocalName(node, false, true);
         const heritageClauses = visitNodes2(node.heritageClauses, visitor, isHeritageClause);
@@ -176274,14 +176322,14 @@ ${lanes.join(`
         }
         const classExpression = factory2.createClassExpression(modifiers, name3 && isGeneratedIdentifier(name3) ? undefined : name3, undefined, heritageClauses, members);
         setOriginalNode(classExpression, node);
-        setTextRange(classExpression, location);
+        setTextRange(classExpression, location2);
         const varInitializer = classAlias && !assignClassAliasInStaticBlock ? factory2.createAssignment(classAlias, classExpression) : classExpression;
         const varDecl = factory2.createVariableDeclaration(declName, undefined, undefined, varInitializer);
         setOriginalNode(varDecl, node);
         const varDeclList = factory2.createVariableDeclarationList([varDecl], 1);
         const varStatement = factory2.createVariableStatement(undefined, varDeclList);
         setOriginalNode(varStatement, node);
-        setTextRange(varStatement, location);
+        setTextRange(varStatement, location2);
         setCommentRange(varStatement, node);
         const statements = [varStatement];
         addRange(statements, decorationStatements);
@@ -178359,11 +178407,11 @@ ${lanes.join(`
         const kind = node.kind;
         return kind === 264 || kind === 177 || kind === 175 || kind === 178 || kind === 179;
       }
-      function createSuperElementAccessInAsyncMethod(argumentExpression, location) {
+      function createSuperElementAccessInAsyncMethod(argumentExpression, location2) {
         if (enclosingSuperContainerFlags & 256) {
-          return setTextRange(factory2.createPropertyAccessExpression(factory2.createCallExpression(factory2.createUniqueName("_superIndex", 16 | 32), undefined, [argumentExpression]), "value"), location);
+          return setTextRange(factory2.createPropertyAccessExpression(factory2.createCallExpression(factory2.createUniqueName("_superIndex", 16 | 32), undefined, [argumentExpression]), "value"), location2);
         } else {
-          return setTextRange(factory2.createCallExpression(factory2.createUniqueName("_superIndex", 16 | 32), undefined, [argumentExpression]), location);
+          return setTextRange(factory2.createCallExpression(factory2.createUniqueName("_superIndex", 16 | 32), undefined, [argumentExpression]), location2);
         }
       }
     }
@@ -179089,11 +179137,11 @@ ${lanes.join(`
         const kind = node.kind;
         return kind === 264 || kind === 177 || kind === 175 || kind === 178 || kind === 179;
       }
-      function createSuperElementAccessInAsyncMethod(argumentExpression, location) {
+      function createSuperElementAccessInAsyncMethod(argumentExpression, location2) {
         if (enclosingSuperContainerFlags & 256) {
-          return setTextRange(factory2.createPropertyAccessExpression(factory2.createCallExpression(factory2.createIdentifier("_superIndex"), undefined, [argumentExpression]), "value"), location);
+          return setTextRange(factory2.createPropertyAccessExpression(factory2.createCallExpression(factory2.createIdentifier("_superIndex"), undefined, [argumentExpression]), "value"), location2);
         } else {
-          return setTextRange(factory2.createCallExpression(factory2.createIdentifier("_superIndex"), undefined, [argumentExpression]), location);
+          return setTextRange(factory2.createCallExpression(factory2.createIdentifier("_superIndex"), undefined, [argumentExpression]), location2);
         }
       }
     }
@@ -179866,15 +179914,15 @@ ${lanes.join(`
         const result = mapDefined(children, transformJsxChildToExpression);
         return length(result) ? factory2.createPropertyAssignment("children", factory2.createArrayLiteralExpression(result)) : undefined;
       }
-      function visitJsxOpeningLikeElementJSX(node, children, isChild, location) {
+      function visitJsxOpeningLikeElementJSX(node, children, isChild, location2) {
         const tagName = getTagName(node);
         const childrenProp = children && children.length ? convertJsxChildrenToChildrenPropAssignment(children) : undefined;
         const keyAttr = find2(node.attributes.properties, (p3) => !!p3.name && isIdentifier(p3.name) && p3.name.escapedText === "key");
         const attrs2 = keyAttr ? filter(node.attributes.properties, (p3) => p3 !== keyAttr) : node.attributes.properties;
         const objectProperties = length(attrs2) ? transformJsxAttributesToObjectProps(attrs2, childrenProp) : factory2.createObjectLiteralExpression(childrenProp ? [childrenProp] : emptyArray);
-        return visitJsxOpeningLikeElementOrFragmentJSX(tagName, objectProperties, keyAttr, children || emptyArray, isChild, location);
+        return visitJsxOpeningLikeElementOrFragmentJSX(tagName, objectProperties, keyAttr, children || emptyArray, isChild, location2);
       }
-      function visitJsxOpeningLikeElementOrFragmentJSX(tagName, objectProperties, keyAttr, children, isChild, location) {
+      function visitJsxOpeningLikeElementOrFragmentJSX(tagName, objectProperties, keyAttr, children, isChild, location2) {
         var _a7;
         const nonWhitespaceChildren = getSemanticJsxChildren(children);
         const isStaticChildren = length(nonWhitespaceChildren) > 1 || !!((_a7 = nonWhitespaceChildren[0]) == null ? undefined : _a7.dotDotDotToken);
@@ -179889,7 +179937,7 @@ ${lanes.join(`
               args.push(factory2.createVoidZero());
             }
             args.push(isStaticChildren ? factory2.createTrue() : factory2.createFalse());
-            const lineCol = getLineAndCharacterOfPosition(originalFile, location.pos);
+            const lineCol = getLineAndCharacterOfPosition(originalFile, location2.pos);
             args.push(factory2.createObjectLiteralExpression([
               factory2.createPropertyAssignment("fileName", getCurrentFileNameExpression()),
               factory2.createPropertyAssignment("lineNumber", factory2.createNumericLiteral(lineCol.line + 1)),
@@ -179898,24 +179946,24 @@ ${lanes.join(`
             args.push(factory2.createThis());
           }
         }
-        const element = setTextRange(factory2.createCallExpression(getJsxFactoryCallee(isStaticChildren), undefined, args), location);
+        const element = setTextRange(factory2.createCallExpression(getJsxFactoryCallee(isStaticChildren), undefined, args), location2);
         if (isChild) {
           startOnNewLine(element);
         }
         return element;
       }
-      function visitJsxOpeningLikeElementCreateElement(node, children, isChild, location) {
+      function visitJsxOpeningLikeElementCreateElement(node, children, isChild, location2) {
         const tagName = getTagName(node);
         const attrs2 = node.attributes.properties;
         const objectProperties = length(attrs2) ? transformJsxAttributesToObjectProps(attrs2) : factory2.createNull();
         const callee = currentFileState.importSpecifier === undefined ? createJsxFactoryExpression(factory2, context.getEmitResolver().getJsxFactoryEntity(currentSourceFile), compilerOptions.reactNamespace, node) : getImplicitImportForName("createElement");
-        const element = createExpressionForJsxElement(factory2, callee, tagName, objectProperties, mapDefined(children, transformJsxChildToExpression), location);
+        const element = createExpressionForJsxElement(factory2, callee, tagName, objectProperties, mapDefined(children, transformJsxChildToExpression), location2);
         if (isChild) {
           startOnNewLine(element);
         }
         return element;
       }
-      function visitJsxOpeningFragmentJSX(_node, children, isChild, location) {
+      function visitJsxOpeningFragmentJSX(_node, children, isChild, location2) {
         let childrenProps;
         if (children && children.length) {
           const result = convertJsxChildrenToChildrenPropObject(children);
@@ -179923,10 +179971,10 @@ ${lanes.join(`
             childrenProps = result;
           }
         }
-        return visitJsxOpeningLikeElementOrFragmentJSX(getImplicitJsxFragmentReference(), childrenProps || factory2.createObjectLiteralExpression([]), undefined, children, isChild, location);
+        return visitJsxOpeningLikeElementOrFragmentJSX(getImplicitJsxFragmentReference(), childrenProps || factory2.createObjectLiteralExpression([]), undefined, children, isChild, location2);
       }
-      function visitJsxOpeningFragmentCreateElement(node, children, isChild, location) {
-        const element = createExpressionForJsxFragment(factory2, context.getEmitResolver().getJsxFactoryEntity(currentSourceFile), context.getEmitResolver().getJsxFragmentFactoryEntity(currentSourceFile), compilerOptions.reactNamespace, mapDefined(children, transformJsxChildToExpression), node, location);
+      function visitJsxOpeningFragmentCreateElement(node, children, isChild, location2) {
+        const element = createExpressionForJsxFragment(factory2, context.getEmitResolver().getJsxFactoryEntity(currentSourceFile), context.getEmitResolver().getJsxFragmentFactoryEntity(currentSourceFile), compilerOptions.reactNamespace, mapDefined(children, transformJsxChildToExpression), node, location2);
         if (isChild) {
           startOnNewLine(element);
         }
@@ -181348,7 +181396,7 @@ ${lanes.join(`
         convertedLoopState = savedConvertedLoopState;
         return factory2.updateFunctionDeclaration(node, visitNodes2(node.modifiers, visitor, isModifier), node.asteriskToken, name3, undefined, parameters, undefined, body);
       }
-      function transformFunctionLikeToExpression(node, location, name3, container) {
+      function transformFunctionLikeToExpression(node, location2, name3, container) {
         const savedConvertedLoopState = convertedLoopState;
         convertedLoopState = undefined;
         const ancestorFacts = container && isClassLike(container) && !isStatic(node) ? enterSubtree(32670, 65 | 8) : enterSubtree(32670, 65);
@@ -181359,7 +181407,7 @@ ${lanes.join(`
         }
         exitSubtree(ancestorFacts, 229376, 0);
         convertedLoopState = savedConvertedLoopState;
-        return setOriginalNode(setTextRange(factory2.createFunctionExpression(undefined, node.asteriskToken, name3, undefined, parameters, undefined, body), location), node);
+        return setOriginalNode(setTextRange(factory2.createFunctionExpression(undefined, node.asteriskToken, name3, undefined, parameters, undefined, body), location2), node);
       }
       function transformFunctionBody2(node) {
         let multiLine = false;
@@ -182881,7 +182929,7 @@ ${lanes.join(`
       function visitArrayLiteralExpression(node) {
         return visitElements(node.elements, undefined, undefined, node.multiLine);
       }
-      function visitElements(elements, leadingElement, location, multiLine) {
+      function visitElements(elements, leadingElement, location2, multiLine) {
         const numInitialElements = countInitialNodesWithoutYield(elements);
         let temp;
         if (numInitialElements > 0) {
@@ -182891,7 +182939,7 @@ ${lanes.join(`
           leadingElement = undefined;
         }
         const expressions = reduceLeft(elements, reduceElement, [], numInitialElements);
-        return temp ? factory2.createArrayConcatCall(temp, [factory2.createArrayLiteralExpression(expressions, multiLine)]) : setTextRange(factory2.createArrayLiteralExpression(leadingElement ? [leadingElement, ...expressions] : expressions, multiLine), location);
+        return temp ? factory2.createArrayConcatCall(temp, [factory2.createArrayLiteralExpression(expressions, multiLine)]) : setTextRange(factory2.createArrayLiteralExpression(leadingElement ? [leadingElement, ...expressions] : expressions, multiLine), location2);
         function reduceElement(expressions2, element) {
           if (containsYield(element) && expressions2.length > 0) {
             const hasAssignedTemp = temp !== undefined;
@@ -183713,18 +183761,18 @@ ${lanes.join(`
         addSyntheticTrailingComment(literal4, 3, getInstructionName(instruction));
         return literal4;
       }
-      function createInlineBreak(label, location) {
+      function createInlineBreak(label, location2) {
         Debug.assertLessThan(0, label, "Invalid label");
         return setTextRange(factory2.createReturnStatement(factory2.createArrayLiteralExpression([
           createInstruction(3),
           createLabel(label)
-        ])), location);
+        ])), location2);
       }
-      function createInlineReturn(expression2, location) {
-        return setTextRange(factory2.createReturnStatement(factory2.createArrayLiteralExpression(expression2 ? [createInstruction(2), expression2] : [createInstruction(2)])), location);
+      function createInlineReturn(expression2, location2) {
+        return setTextRange(factory2.createReturnStatement(factory2.createArrayLiteralExpression(expression2 ? [createInstruction(2), expression2] : [createInstruction(2)])), location2);
       }
-      function createGeneratorResume(location) {
-        return setTextRange(factory2.createCallExpression(factory2.createPropertyAccessExpression(state, "sent"), undefined, []), location);
+      function createGeneratorResume(location2) {
+        return setTextRange(factory2.createCallExpression(factory2.createPropertyAccessExpression(state, "sent"), undefined, []), location2);
       }
       function emitNop() {
         emitWorker(0);
@@ -183736,34 +183784,34 @@ ${lanes.join(`
           emitNop();
         }
       }
-      function emitAssignment(left, right, location) {
-        emitWorker(2, [left, right], location);
+      function emitAssignment(left, right, location2) {
+        emitWorker(2, [left, right], location2);
       }
-      function emitBreak(label, location) {
-        emitWorker(3, [label], location);
+      function emitBreak(label, location2) {
+        emitWorker(3, [label], location2);
       }
-      function emitBreakWhenTrue(label, condition, location) {
-        emitWorker(4, [label, condition], location);
+      function emitBreakWhenTrue(label, condition, location2) {
+        emitWorker(4, [label, condition], location2);
       }
-      function emitBreakWhenFalse(label, condition, location) {
-        emitWorker(5, [label, condition], location);
+      function emitBreakWhenFalse(label, condition, location2) {
+        emitWorker(5, [label, condition], location2);
       }
-      function emitYieldStar(expression2, location) {
-        emitWorker(7, [expression2], location);
+      function emitYieldStar(expression2, location2) {
+        emitWorker(7, [expression2], location2);
       }
-      function emitYield(expression2, location) {
-        emitWorker(6, [expression2], location);
+      function emitYield(expression2, location2) {
+        emitWorker(6, [expression2], location2);
       }
-      function emitReturn(expression2, location) {
-        emitWorker(8, [expression2], location);
+      function emitReturn(expression2, location2) {
+        emitWorker(8, [expression2], location2);
       }
-      function emitThrow(expression2, location) {
-        emitWorker(9, [expression2], location);
+      function emitThrow(expression2, location2) {
+        emitWorker(9, [expression2], location2);
       }
       function emitEndfinally() {
         emitWorker(10);
       }
-      function emitWorker(code, args, location) {
+      function emitWorker(code, args, location2) {
         if (operations === undefined) {
           operations = [];
           operationArguments = [];
@@ -183775,7 +183823,7 @@ ${lanes.join(`
         const operationIndex = operations.length;
         operations[operationIndex] = code;
         operationArguments[operationIndex] = args;
-        operationLocations[operationIndex] = location;
+        operationLocations[operationIndex] = location2;
       }
       function build2() {
         blockIndex = 0;
@@ -183961,24 +184009,24 @@ ${lanes.join(`
         if (opcode === 1) {
           return writeStatement(args[0]);
         }
-        const location = operationLocations[operationIndex];
+        const location2 = operationLocations[operationIndex];
         switch (opcode) {
           case 2:
-            return writeAssign(args[0], args[1], location);
+            return writeAssign(args[0], args[1], location2);
           case 3:
-            return writeBreak(args[0], location);
+            return writeBreak(args[0], location2);
           case 4:
-            return writeBreakWhenTrue(args[0], args[1], location);
+            return writeBreakWhenTrue(args[0], args[1], location2);
           case 5:
-            return writeBreakWhenFalse(args[0], args[1], location);
+            return writeBreakWhenFalse(args[0], args[1], location2);
           case 6:
-            return writeYield(args[0], location);
+            return writeYield(args[0], location2);
           case 7:
-            return writeYieldStar(args[0], location);
+            return writeYieldStar(args[0], location2);
           case 8:
-            return writeReturn(args[0], location);
+            return writeReturn(args[0], location2);
           case 9:
-            return writeThrow(args[0], location);
+            return writeThrow(args[0], location2);
         }
       }
       function writeStatement(statement) {
@@ -184805,13 +184853,13 @@ ${lanes.join(`
         statements = appendExportsOfVariableStatement(statements, node);
         return singleOrMany(statements);
       }
-      function createAllExportExpressions(name3, value2, location) {
+      function createAllExportExpressions(name3, value2, location2) {
         const exportedNames = getExports(name3);
         if (exportedNames) {
           let expression2 = isExportName(name3) ? value2 : factory2.createAssignment(name3, value2);
           for (const exportName of exportedNames) {
             setEmitFlags(expression2, 8);
-            expression2 = createExportExpression(exportName, expression2, location);
+            expression2 = createExportExpression(exportName, expression2, location2);
           }
           return expression2;
         }
@@ -184908,14 +184956,14 @@ ${lanes.join(`
         }
         return statements;
       }
-      function appendExportStatement(statements, seen, exportName, expression2, location, allowComments, liveBinding) {
+      function appendExportStatement(statements, seen, exportName, expression2, location2, allowComments, liveBinding) {
         if (exportName.kind !== 11) {
           if (seen.has(exportName)) {
             return statements;
           }
           seen.set(exportName, true);
         }
-        statements = append(statements, createExportStatement(exportName, expression2, location, allowComments, liveBinding));
+        statements = append(statements, createExportStatement(exportName, expression2, location2, allowComments, liveBinding));
         return statements;
       }
       function createUnderscoreUnderscoreESModule() {
@@ -184929,15 +184977,15 @@ ${lanes.join(`
         setEmitFlags(statement, 2097152);
         return statement;
       }
-      function createExportStatement(name3, value2, location, allowComments, liveBinding) {
-        const statement = setTextRange(factory2.createExpressionStatement(createExportExpression(name3, value2, undefined, liveBinding)), location);
+      function createExportStatement(name3, value2, location2, allowComments, liveBinding) {
+        const statement = setTextRange(factory2.createExpressionStatement(createExportExpression(name3, value2, undefined, liveBinding)), location2);
         startOnNewLine(statement);
         if (!allowComments) {
           setEmitFlags(statement, 3072);
         }
         return statement;
       }
-      function createExportExpression(name3, value2, location, liveBinding) {
+      function createExportExpression(name3, value2, location2, liveBinding) {
         return setTextRange(liveBinding ? factory2.createCallExpression(factory2.createPropertyAccessExpression(factory2.createIdentifier("Object"), "defineProperty"), undefined, [
           factory2.createIdentifier("exports"),
           factory2.createStringLiteralFromNode(name3),
@@ -184945,7 +184993,7 @@ ${lanes.join(`
             factory2.createPropertyAssignment("enumerable", factory2.createTrue()),
             factory2.createPropertyAssignment("get", factory2.createFunctionExpression(undefined, undefined, undefined, undefined, [], undefined, factory2.createBlock([factory2.createReturnStatement(value2)])))
           ])
-        ]) : factory2.createAssignment(name3.kind === 11 ? factory2.createElementAccessExpression(factory2.createIdentifier("exports"), factory2.cloneNode(name3)) : factory2.createPropertyAccessExpression(factory2.createIdentifier("exports"), factory2.cloneNode(name3)), value2), location);
+        ]) : factory2.createAssignment(name3.kind === 11 ? factory2.createElementAccessExpression(factory2.createIdentifier("exports"), factory2.cloneNode(name3)) : factory2.createPropertyAccessExpression(factory2.createIdentifier("exports"), factory2.cloneNode(name3)), value2), location2);
       }
       function modifierVisitor(node) {
         switch (node.kind) {
@@ -185426,15 +185474,15 @@ ${lanes.join(`
         const createAssignment = isExportedDeclaration ? createExportedVariableAssignment : createNonExportedVariableAssignment;
         return isBindingPattern(node.name) ? flattenDestructuringAssignment(node, visitor, context, 0, false, createAssignment) : node.initializer ? createAssignment(node.name, visitNode(node.initializer, visitor, isExpression2)) : node.name;
       }
-      function createExportedVariableAssignment(name3, value2, location) {
-        return createVariableAssignment(name3, value2, location, true);
+      function createExportedVariableAssignment(name3, value2, location2) {
+        return createVariableAssignment(name3, value2, location2, true);
       }
-      function createNonExportedVariableAssignment(name3, value2, location) {
-        return createVariableAssignment(name3, value2, location, false);
+      function createNonExportedVariableAssignment(name3, value2, location2) {
+        return createVariableAssignment(name3, value2, location2, false);
       }
-      function createVariableAssignment(name3, value2, location, isExportedDeclaration) {
+      function createVariableAssignment(name3, value2, location2, isExportedDeclaration) {
         hoistVariableDeclaration(factory2.cloneNode(name3));
-        return isExportedDeclaration ? createExportExpression(name3, preventSubstitution(setTextRange(factory2.createAssignment(name3, value2), location))) : preventSubstitution(setTextRange(factory2.createAssignment(name3, value2), location));
+        return isExportedDeclaration ? createExportExpression(name3, preventSubstitution(setTextRange(factory2.createAssignment(name3, value2), location2))) : preventSubstitution(setTextRange(factory2.createAssignment(name3, value2), location2));
       }
       function appendExportsOfImportDeclaration(statements, decl) {
         if (moduleInfo.exportEquals) {
@@ -193660,8 +193708,8 @@ ${lanes.join(`
           return false;
       }
     }
-    function isReferenceFileLocation(location) {
-      return location.pos !== undefined;
+    function isReferenceFileLocation(location2) {
+      return location2.pos !== undefined;
     }
     function getReferencedFileLocation(program, ref) {
       var _a7, _b, _c, _d;
@@ -196597,8 +196645,8 @@ ${lanes.join(`
           if (!cachedChain.details && !processedExtraReason)
             cachedChain.details = chain.next;
         }
-        const location = locationReason && getReferencedFileLocation(program, locationReason);
-        return location && isReferenceFileLocation(location) ? createFileDiagnosticFromMessageChain(location.file, location.pos, location.end - location.pos, chain, relatedInfo) : createCompilerDiagnosticFromMessageChain(chain, relatedInfo);
+        const location2 = locationReason && getReferencedFileLocation(program, locationReason);
+        return location2 && isReferenceFileLocation(location2) ? createFileDiagnosticFromMessageChain(location2.file, location2.pos, location2.end - location2.pos, chain, relatedInfo) : createCompilerDiagnosticFromMessageChain(chain, relatedInfo);
         function processReason(reason) {
           if (seenReasons == null ? undefined : seenReasons.has(reason))
             return;
@@ -198740,7 +198788,7 @@ ${lanes.join(`
           impliedFormatPackageJsons.forEach((existing, path) => {
             const newFile = newProgram == null ? undefined : newProgram.getSourceFileByPath(path);
             if (!newFile || newFile.resolvedPath !== path) {
-              existing.forEach((location) => fileWatchesOfAffectingLocations.get(location).files--);
+              existing.forEach((location2) => fileWatchesOfAffectingLocations.get(location2).files--);
               impliedFormatPackageJsons.delete(path);
             }
           });
@@ -199300,7 +199348,7 @@ ${lanes.join(`
         let invalidated = false;
         if (affectingPathChecksForFile) {
           (_a7 = resolutionHost.getCurrentProgram()) == null || _a7.getSourceFiles().forEach((f3) => {
-            if (some(f3.packageJsonLocations, (location) => affectingPathChecksForFile.has(location))) {
+            if (some(f3.packageJsonLocations, (location2) => affectingPathChecksForFile.has(location2))) {
               (filesWithInvalidatedResolutions ?? (filesWithInvalidatedResolutions = /* @__PURE__ */ new Set)).add(f3.path);
               invalidated = true;
             }
@@ -199325,14 +199373,14 @@ ${lanes.join(`
           return true;
         if (!failedLookupChecks && !startsWithPathChecks && !isInDirectoryChecks)
           return false;
-        return ((_a7 = resolution.failedLookupLocations) == null ? undefined : _a7.some((location) => isInvalidatedFailedLookup(resolutionHost.toPath(location)))) || !!resolution.alternateResult && isInvalidatedFailedLookup(resolutionHost.toPath(resolution.alternateResult));
+        return ((_a7 = resolution.failedLookupLocations) == null ? undefined : _a7.some((location2) => isInvalidatedFailedLookup(resolutionHost.toPath(location2)))) || !!resolution.alternateResult && isInvalidatedFailedLookup(resolutionHost.toPath(resolution.alternateResult));
       }
       function isInvalidatedFailedLookup(locationPath) {
         return (failedLookupChecks == null ? undefined : failedLookupChecks.has(locationPath)) || firstDefinedIterator((startsWithPathChecks == null ? undefined : startsWithPathChecks.keys()) || [], (fileOrDirectoryPath) => startsWith2(locationPath, fileOrDirectoryPath) ? true : undefined) || firstDefinedIterator((isInDirectoryChecks == null ? undefined : isInDirectoryChecks.keys()) || [], (dirPath) => locationPath.length > dirPath.length && startsWith2(locationPath, dirPath) && (isDiskPathRoot(dirPath) || locationPath[dirPath.length] === directorySeparator) ? true : undefined);
       }
       function canInvalidatedFailedLookupResolutionWithAffectingLocation(resolution) {
         var _a7;
-        return !!affectingPathChecks && ((_a7 = resolution.affectingLocations) == null ? undefined : _a7.some((location) => affectingPathChecks.has(location)));
+        return !!affectingPathChecks && ((_a7 = resolution.affectingLocations) == null ? undefined : _a7.some((location2) => affectingPathChecks.has(location2)));
       }
       function closeTypeRootsWatch() {
         clearMap(typeRootsWatches, closeFileWatcher);
@@ -205028,9 +205076,9 @@ ${lanes.join(`
     function getAdjustedLocation(node, forRename) {
       const { parent: parent2 } = node;
       if (isModifier(node) && (forRename || node.kind !== 90) ? canHaveModifiers(parent2) && contains2(parent2.modifiers, node) : node.kind === 86 ? isClassDeclaration(parent2) || isClassExpression(node) : node.kind === 100 ? isFunctionDeclaration(parent2) || isFunctionExpression(node) : node.kind === 120 ? isInterfaceDeclaration(parent2) : node.kind === 94 ? isEnumDeclaration(parent2) : node.kind === 156 ? isTypeAliasDeclaration(parent2) : node.kind === 145 || node.kind === 144 ? isModuleDeclaration(parent2) : node.kind === 102 ? isImportEqualsDeclaration(parent2) : node.kind === 139 ? isGetAccessorDeclaration(parent2) : node.kind === 153 && isSetAccessorDeclaration(parent2)) {
-        const location = getAdjustedLocationForDeclaration(parent2, forRename);
-        if (location) {
-          return location;
+        const location2 = getAdjustedLocationForDeclaration(parent2, forRename);
+        if (location2) {
+          return location2;
         }
       }
       if ((node.kind === 115 || node.kind === 87 || node.kind === 121) && isVariableDeclarationList(parent2) && parent2.declarations.length === 1) {
@@ -205041,15 +205089,15 @@ ${lanes.join(`
       }
       if (node.kind === 156) {
         if (isImportClause(parent2) && parent2.isTypeOnly) {
-          const location = getAdjustedLocationForImportDeclaration(parent2.parent, forRename);
-          if (location) {
-            return location;
+          const location2 = getAdjustedLocationForImportDeclaration(parent2.parent, forRename);
+          if (location2) {
+            return location2;
           }
         }
         if (isExportDeclaration(parent2) && parent2.isTypeOnly) {
-          const location = getAdjustedLocationForExportDeclaration(parent2, forRename);
-          if (location) {
-            return location;
+          const location2 = getAdjustedLocationForExportDeclaration(parent2, forRename);
+          if (location2) {
+            return location2;
           }
         }
       }
@@ -205062,16 +205110,16 @@ ${lanes.join(`
         }
       }
       if (node.kind === 102 && isImportDeclaration(parent2)) {
-        const location = getAdjustedLocationForImportDeclaration(parent2, forRename);
-        if (location) {
-          return location;
+        const location2 = getAdjustedLocationForImportDeclaration(parent2, forRename);
+        if (location2) {
+          return location2;
         }
       }
       if (node.kind === 95) {
         if (isExportDeclaration(parent2)) {
-          const location = getAdjustedLocationForExportDeclaration(parent2, forRename);
-          if (location) {
-            return location;
+          const location2 = getAdjustedLocationForExportDeclaration(parent2, forRename);
+          if (location2) {
+            return location2;
           }
         }
         if (isExportAssignment(parent2)) {
@@ -205085,9 +205133,9 @@ ${lanes.join(`
         return parent2.moduleSpecifier;
       }
       if ((node.kind === 96 || node.kind === 119) && isHeritageClause(parent2) && parent2.token === node.kind) {
-        const location = getAdjustedLocationForHeritageClause(parent2);
-        if (location) {
-          return location;
+        const location2 = getAdjustedLocationForHeritageClause(parent2);
+        if (location2) {
+          return location2;
         }
       }
       if (node.kind === 96) {
@@ -205868,8 +205916,8 @@ ${lanes.join(`
       }
       return true;
     }
-    function getMappedLocation(location, sourceMapper, fileExists) {
-      const mapsTo = sourceMapper.tryGetSourcePosition(location);
+    function getMappedLocation(location2, sourceMapper, fileExists) {
+      const mapsTo = sourceMapper.tryGetSourcePosition(location2);
       return mapsTo && (!fileExists || fileExists(normalizePath(mapsTo.fileName)) ? mapsTo : undefined);
     }
     function getMappedDocumentSpan(documentSpan, sourceMapper, fileExists) {
@@ -206178,8 +206226,8 @@ ${lanes.join(`
         typechecker.writeSignature(signature, enclosingDeclaration, flags, undefined, writer, maximumLength, verbosityLevel, out);
       }, maximumLength);
     }
-    function isImportOrExportSpecifierName(location) {
-      return !!location.parent && isImportOrExportSpecifier(location.parent) && location.parent.propertyName === location;
+    function isImportOrExportSpecifierName(location2) {
+      return !!location2.parent && isImportOrExportSpecifier(location2.parent) && location2.parent.propertyName === location2;
     }
     function getScriptKind(fileName, host) {
       return ensureScriptKind(fileName, host.getScriptKind && host.getScriptKind(fileName));
@@ -209692,8 +209740,8 @@ ${lanes.join(`
       }
       possibleMapLocations.push(generatedFileName + ".map");
       const originalMapFileName = mapFileName && getNormalizedAbsolutePath(mapFileName, getDirectoryPath(generatedFileName));
-      for (const location of possibleMapLocations) {
-        const mapFileName2 = getNormalizedAbsolutePath(location, getDirectoryPath(generatedFileName));
+      for (const location2 of possibleMapLocations) {
+        const mapFileName2 = getNormalizedAbsolutePath(location2, getDirectoryPath(generatedFileName));
         const mapFileContents = readMapFile(mapFileName2, originalMapFileName);
         if (isString3(mapFileContents)) {
           return convertDocumentToSourceMapper(host, mapFileContents, mapFileName2);
@@ -218314,8 +218362,8 @@ ${newComment.split(`
       return node.kind === 90;
     }
     function getSymbolOfCallHierarchyDeclaration(typeChecker, node) {
-      const location = getCallHierarchyDeclarationReferenceNode(node);
-      return location && typeChecker.getSymbolAtLocation(location);
+      const location2 = getCallHierarchyDeclarationReferenceNode(node);
+      return location2 && typeChecker.getSymbolAtLocation(location2);
     }
     function getCallHierarchyItemName(program, node) {
       if (isSourceFile(node)) {
@@ -218423,52 +218471,52 @@ ${newComment.split(`
       }
       return findAllInitialDeclarations(typeChecker, node) ?? node;
     }
-    function resolveCallHierarchyDeclaration(program, location) {
+    function resolveCallHierarchyDeclaration(program, location2) {
       const typeChecker = program.getTypeChecker();
       let followingSymbol = false;
       while (true) {
-        if (isValidCallHierarchyDeclaration(location)) {
-          return findImplementationOrAllInitialDeclarations(typeChecker, location);
+        if (isValidCallHierarchyDeclaration(location2)) {
+          return findImplementationOrAllInitialDeclarations(typeChecker, location2);
         }
-        if (isPossibleCallHierarchyDeclaration(location)) {
-          const ancestor = findAncestor(location, isValidCallHierarchyDeclaration);
+        if (isPossibleCallHierarchyDeclaration(location2)) {
+          const ancestor = findAncestor(location2, isValidCallHierarchyDeclaration);
           return ancestor && findImplementationOrAllInitialDeclarations(typeChecker, ancestor);
         }
-        if (isDeclarationName(location)) {
-          if (isValidCallHierarchyDeclaration(location.parent)) {
-            return findImplementationOrAllInitialDeclarations(typeChecker, location.parent);
+        if (isDeclarationName(location2)) {
+          if (isValidCallHierarchyDeclaration(location2.parent)) {
+            return findImplementationOrAllInitialDeclarations(typeChecker, location2.parent);
           }
-          if (isPossibleCallHierarchyDeclaration(location.parent)) {
-            const ancestor = findAncestor(location.parent, isValidCallHierarchyDeclaration);
+          if (isPossibleCallHierarchyDeclaration(location2.parent)) {
+            const ancestor = findAncestor(location2.parent, isValidCallHierarchyDeclaration);
             return ancestor && findImplementationOrAllInitialDeclarations(typeChecker, ancestor);
           }
-          if (isVariableLike2(location.parent) && location.parent.initializer && isAssignedExpression(location.parent.initializer)) {
-            return location.parent.initializer;
+          if (isVariableLike2(location2.parent) && location2.parent.initializer && isAssignedExpression(location2.parent.initializer)) {
+            return location2.parent.initializer;
           }
           return;
         }
-        if (isConstructorDeclaration(location)) {
-          if (isValidCallHierarchyDeclaration(location.parent)) {
-            return location.parent;
+        if (isConstructorDeclaration(location2)) {
+          if (isValidCallHierarchyDeclaration(location2.parent)) {
+            return location2.parent;
           }
           return;
         }
-        if (location.kind === 126 && isClassStaticBlockDeclaration(location.parent)) {
-          location = location.parent;
+        if (location2.kind === 126 && isClassStaticBlockDeclaration(location2.parent)) {
+          location2 = location2.parent;
           continue;
         }
-        if (isVariableDeclaration(location) && location.initializer && isAssignedExpression(location.initializer)) {
-          return location.initializer;
+        if (isVariableDeclaration(location2) && location2.initializer && isAssignedExpression(location2.initializer)) {
+          return location2.initializer;
         }
         if (!followingSymbol) {
-          let symbol2 = typeChecker.getSymbolAtLocation(location);
+          let symbol2 = typeChecker.getSymbolAtLocation(location2);
           if (symbol2) {
             if (symbol2.flags & 2097152) {
               symbol2 = typeChecker.getAliasedSymbol(symbol2);
             }
             if (symbol2.valueDeclaration) {
               followingSymbol = true;
-              location = symbol2.valueDeclaration;
+              location2 = symbol2.valueDeclaration;
               continue;
             }
           }
@@ -218512,8 +218560,8 @@ ${newComment.split(`
       if (isSourceFile(declaration) || isModuleDeclaration(declaration) || isClassStaticBlockDeclaration(declaration)) {
         return [];
       }
-      const location = getCallHierarchyDeclarationReferenceNode(declaration);
-      const calls = filter(ts_FindAllReferences_exports.findReferenceOrRenameEntries(program, cancellationToken, program.getSourceFiles(), location, 0, { use: ts_FindAllReferences_exports.FindReferencesUse.References }, convertEntryToCallSite), isDefined);
+      const location2 = getCallHierarchyDeclarationReferenceNode(declaration);
+      const calls = filter(ts_FindAllReferences_exports.findReferenceOrRenameEntries(program, cancellationToken, program.getSourceFiles(), location2, 0, { use: ts_FindAllReferences_exports.FindReferencesUse.References }, convertEntryToCallSite), isDefined);
       return calls ? group(calls, getCallSiteGroupKey, (entries) => convertCallSiteGroupToIncomingCall(program, entries)) : [];
     }
     function createCallSiteCollector(program, callSites) {
@@ -225342,8 +225390,8 @@ ${newComment.split(`
           }
         }
       }
-      function isConstAssertion2(location) {
-        return isAssertionExpression(location) && isConstTypeReference(location.type);
+      function isConstAssertion2(location2) {
+        return isAssertionExpression(location2) && isConstTypeReference(location2.type);
       }
       function relativeType(node) {
         if (isParameter(node)) {
@@ -228133,14 +228181,14 @@ ${newComment.split(`
     function completionEntryDataIsResolved(data) {
       return !!(data == null ? undefined : data.moduleSpecifier);
     }
-    function continuePreviousIncompleteResponse(cache2, file2, location, program, host, preferences, cancellationToken, position) {
+    function continuePreviousIncompleteResponse(cache2, file2, location2, program, host, preferences, cancellationToken, position) {
       const previousResponse = cache2.get();
       if (!previousResponse)
         return;
       const touchNode = getTouchingPropertyName(file2, position);
-      const lowerCaseTokenText = location.text.toLowerCase();
+      const lowerCaseTokenText = location2.text.toLowerCase();
       const exportMap = getExportInfoMap(file2, host, program, preferences, cancellationToken);
-      const newEntries = resolvingModuleSpecifiers("continuePreviousIncompleteResponse", host, ts_codefix_exports.createImportSpecifierResolver(file2, program, host, preferences), program, location.getStart(), preferences, false, isValidTypeOnlyAliasUseSite(location), (context) => {
+      const newEntries = resolvingModuleSpecifiers("continuePreviousIncompleteResponse", host, ts_codefix_exports.createImportSpecifierResolver(file2, program, host, preferences), program, location2.getStart(), preferences, false, isValidTypeOnlyAliasUseSite(location2), (context) => {
         const entries = mapDefined(previousResponse.entries, (entry2) => {
           var _a7;
           if (!entry2.hasAction || !entry2.source || !entry2.data || completionEntryDataIsResolved(entry2.data)) {
@@ -228385,8 +228433,8 @@ ${newComment.split(`
           Debug.fail("Unknown mapping from SyntaxKind to KeywordCompletionFilters");
       }
     }
-    function getOptionalReplacementSpan(location) {
-      return (location == null ? undefined : location.kind) === 80 ? createTextSpanFromNode(location) : undefined;
+    function getOptionalReplacementSpan(location2) {
+      return (location2 == null ? undefined : location2.kind) === 80 ? createTextSpanFromNode(location2) : undefined;
     }
     function completionInfoFromData(sourceFile, host, program, compilerOptions, log4, completionData, preferences, formatContext, position, includeSymbol) {
       const {
@@ -228395,7 +228443,7 @@ ${newComment.split(`
         completionKind,
         isInSnippetScope,
         isNewIdentifierLocation,
-        location,
+        location: location2,
         propertyAccessToConvert,
         keywordFilters,
         symbolToOriginInfoMap,
@@ -228414,7 +228462,7 @@ ${newComment.split(`
       let literals = completionData.literals;
       const checker = program.getTypeChecker();
       if (getLanguageVariant(sourceFile.scriptKind) === 1) {
-        const completionInfo = getJsxClosingTagCompletion(location, sourceFile);
+        const completionInfo = getJsxClosingTagCompletion(location2, sourceFile);
         if (completionInfo) {
           return completionInfo;
         }
@@ -228437,7 +228485,7 @@ ${newComment.split(`
       if (isChecked && !isNewIdentifierLocation && (!symbols || symbols.length === 0) && keywordFilters === 0) {
         return;
       }
-      const uniqueNames = getCompletionEntriesFromSymbols(symbols, entries, undefined, contextToken, location, position, sourceFile, host, program, getEmitScriptTarget(compilerOptions), log4, completionKind, preferences, compilerOptions, formatContext, isTypeOnlyLocation, propertyAccessToConvert, isJsxIdentifierExpected, isJsxInitializer, importStatementCompletion, recommendedCompletion, symbolToOriginInfoMap, symbolToSortTextMap, isJsxIdentifierExpected, isRightOfOpenTag, includeSymbol);
+      const uniqueNames = getCompletionEntriesFromSymbols(symbols, entries, undefined, contextToken, location2, position, sourceFile, host, program, getEmitScriptTarget(compilerOptions), log4, completionKind, preferences, compilerOptions, formatContext, isTypeOnlyLocation, propertyAccessToConvert, isJsxIdentifierExpected, isJsxInitializer, importStatementCompletion, recommendedCompletion, symbolToOriginInfoMap, symbolToSortTextMap, isJsxIdentifierExpected, isRightOfOpenTag, includeSymbol);
       if (keywordFilters !== 0) {
         for (const keywordEntry of getKeywordCompletions(keywordFilters, !insideJsDocTagTypeExpression && isSourceFileJS(sourceFile))) {
           if (isTypeOnlyLocation && isTypeKeyword(stringToToken(keywordEntry.name)) || !isTypeOnlyLocation && isContextualKeywordInAutoImportableExpressionSpace(keywordEntry.name) || !uniqueNames.has(keywordEntry.name)) {
@@ -228458,7 +228506,7 @@ ${newComment.split(`
         insertSorted(entries, literalEntry, compareCompletionEntries, undefined, true);
       }
       if (!isChecked) {
-        getJSCompletionEntries(sourceFile, location.pos, uniqueNames, getEmitScriptTarget(compilerOptions), entries);
+        getJSCompletionEntries(sourceFile, location2.pos, uniqueNames, getEmitScriptTarget(compilerOptions), entries);
       }
       let caseBlock;
       if (preferences.includeCompletionsWithInsertText && contextToken && !isRightOfOpenTag && !isRightOfDotOrQuestionDot && (caseBlock = findAncestor(contextToken, isCaseBlock))) {
@@ -228473,7 +228521,7 @@ ${newComment.split(`
         isIncomplete: preferences.allowIncompleteCompletions && hasUnresolvedAutoImports ? true : undefined,
         isMemberCompletion: isMemberCompletionKind(completionKind),
         isNewIdentifierLocation,
-        optionalReplacementSpan: getOptionalReplacementSpan(location),
+        optionalReplacementSpan: getOptionalReplacementSpan(location2),
         entries,
         defaultCommitCharacters: defaultCommitCharacters ?? getDefaultCommitCharacters(isNewIdentifierLocation)
       };
@@ -228609,8 +228657,8 @@ ${newComment.split(`
           return false;
       }
     }
-    function getJsxClosingTagCompletion(location, sourceFile) {
-      const jsxClosingElement = findAncestor(location, (node) => {
+    function getJsxClosingTagCompletion(location2, sourceFile) {
+      const jsxClosingElement = findAncestor(location2, (node) => {
         switch (node.kind) {
           case 288:
             return true;
@@ -228677,7 +228725,7 @@ ${newComment.split(`
         commitCharacters: []
       };
     }
-    function createCompletionEntry(symbol2, sortText, replacementToken, contextToken, location, position, sourceFile, host, program, name3, needsConvertPropertyAccess, origin2, recommendedCompletion, propertyAccessToConvert, isJsxInitializer, importStatementCompletion, useSemicolons, options2, preferences, completionKind, formatContext, isJsxIdentifierExpected, isRightOfOpenTag, includeSymbol) {
+    function createCompletionEntry(symbol2, sortText, replacementToken, contextToken, location2, position, sourceFile, host, program, name3, needsConvertPropertyAccess, origin2, recommendedCompletion, propertyAccessToConvert, isJsxInitializer, importStatementCompletion, useSemicolons, options2, preferences, completionKind, formatContext, isJsxIdentifierExpected, isRightOfOpenTag, includeSymbol) {
       var _a7, _b;
       let insertText;
       let filterText;
@@ -228743,9 +228791,9 @@ ${newComment.split(`
           hasAction = true;
         }
       }
-      if (preferences.includeCompletionsWithClassMemberSnippets && preferences.includeCompletionsWithInsertText && completionKind === 3 && isClassLikeMemberCompletion(symbol2, location, sourceFile)) {
+      if (preferences.includeCompletionsWithClassMemberSnippets && preferences.includeCompletionsWithInsertText && completionKind === 3 && isClassLikeMemberCompletion(symbol2, location2, sourceFile)) {
         let importAdder;
-        const memberCompletionEntry = getEntryForMemberCompletion(host, program, options2, preferences, name3, symbol2, location, position, contextToken, formatContext);
+        const memberCompletionEntry = getEntryForMemberCompletion(host, program, options2, preferences, name3, symbol2, location2, position, contextToken, formatContext);
         if (memberCompletionEntry) {
           ({ insertText, filterText, isSnippet, importAdder } = memberCompletionEntry);
           if ((importAdder == null ? undefined : importAdder.hasFixes()) || memberCompletionEntry.eraseRange) {
@@ -228765,9 +228813,9 @@ ${newComment.split(`
         source = "ObjectLiteralMethodSnippet/";
         sortText = SortText.SortBelow(sortText);
       }
-      if (isJsxIdentifierExpected && !isRightOfOpenTag && preferences.includeCompletionsWithSnippetText && preferences.jsxAttributeCompletionStyle && preferences.jsxAttributeCompletionStyle !== "none" && !(isJsxAttribute(location.parent) && location.parent.initializer)) {
+      if (isJsxIdentifierExpected && !isRightOfOpenTag && preferences.includeCompletionsWithSnippetText && preferences.jsxAttributeCompletionStyle && preferences.jsxAttributeCompletionStyle !== "none" && !(isJsxAttribute(location2.parent) && location2.parent.initializer)) {
         let useBraces2 = preferences.jsxAttributeCompletionStyle === "braces";
-        const type = typeChecker.getTypeOfSymbolAtLocation(symbol2, location);
+        const type = typeChecker.getTypeOfSymbolAtLocation(symbol2, location2);
         if (preferences.jsxAttributeCompletionStyle === "auto" && !(type.flags & 8448) && !(type.flags & 134217728 && find2(type.types, (type2) => !!(type2.flags & 8448)))) {
           if (type.flags & 12583968 || type.flags & 134217728 && every(type.types, (type2) => !!(type2.flags & (12583968 | 4) || isStringAndEmptyAnonymousObjectIntersection(type2)))) {
             insertText = `${escapeSnippetText(name3)}=${quote5(sourceFile, preferences, "$1")}`;
@@ -228788,7 +228836,7 @@ ${newComment.split(`
         data = originToCompletionEntryData(origin2);
         hasAction = !importStatementCompletion;
       }
-      const parentNamedImportOrExport = findAncestor(location, isNamedImportsOrExports);
+      const parentNamedImportOrExport = findAncestor(location2, isNamedImportsOrExports);
       if (parentNamedImportOrExport) {
         const languageVersion = getEmitScriptTarget(host.getCompilationSettings());
         if (!isIdentifierText(name3, languageVersion)) {
@@ -228807,7 +228855,7 @@ ${newComment.split(`
           }
         }
       }
-      const kind = ts_SymbolDisplay_exports.getSymbolKind(typeChecker, symbol2, location);
+      const kind = ts_SymbolDisplay_exports.getSymbolKind(typeChecker, symbol2, location2);
       const commitCharacters = kind === "warning" || kind === "string" ? [] : undefined;
       return {
         name: name3,
@@ -228849,15 +228897,15 @@ ${newComment.split(`
         identifier += "_";
       return identifier || "_";
     }
-    function isClassLikeMemberCompletion(symbol2, location, sourceFile) {
-      if (isInJSFile(location)) {
+    function isClassLikeMemberCompletion(symbol2, location2, sourceFile) {
+      if (isInJSFile(location2)) {
         return false;
       }
       const memberFlags = 106500 & 900095;
-      return !!(symbol2.flags & memberFlags) && (isClassLike(location) || location.parent && location.parent.parent && isClassElement(location.parent) && location === location.parent.name && location.parent.getLastToken(sourceFile) === location.parent.name && isClassLike(location.parent.parent) || location.parent && isSyntaxList(location) && isClassLike(location.parent));
+      return !!(symbol2.flags & memberFlags) && (isClassLike(location2) || location2.parent && location2.parent.parent && isClassElement(location2.parent) && location2 === location2.parent.name && location2.parent.getLastToken(sourceFile) === location2.parent.name && isClassLike(location2.parent.parent) || location2.parent && isSyntaxList(location2) && isClassLike(location2.parent));
     }
-    function getEntryForMemberCompletion(host, program, options2, preferences, name3, symbol2, location, position, contextToken, formatContext) {
-      const classLikeDeclaration = findAncestor(location, isClassLike);
+    function getEntryForMemberCompletion(host, program, options2, preferences, name3, symbol2, location2, position, contextToken, formatContext) {
+      const classLikeDeclaration = findAncestor(location2, isClassLike);
       if (!classLikeDeclaration) {
         return;
       }
@@ -228865,7 +228913,7 @@ ${newComment.split(`
       let insertText = name3;
       const filterText = name3;
       const checker = program.getTypeChecker();
-      const sourceFile = location.getSourceFile();
+      const sourceFile = location2.getSourceFile();
       const printer = createSnippetPrinter({
         removeComments: true,
         module: options2.module,
@@ -229231,9 +229279,9 @@ ${newComment.split(`
         return "TypeOnlyAlias/";
       }
     }
-    function getCompletionEntriesFromSymbols(symbols, entries, replacementToken, contextToken, location, position, sourceFile, host, program, target, log4, kind, preferences, compilerOptions, formatContext, isTypeOnlyLocation, propertyAccessToConvert, jsxIdentifierExpected, isJsxInitializer, importStatementCompletion, recommendedCompletion, symbolToOriginInfoMap, symbolToSortTextMap, isJsxIdentifierExpected, isRightOfOpenTag, includeSymbol = false) {
+    function getCompletionEntriesFromSymbols(symbols, entries, replacementToken, contextToken, location2, position, sourceFile, host, program, target, log4, kind, preferences, compilerOptions, formatContext, isTypeOnlyLocation, propertyAccessToConvert, jsxIdentifierExpected, isJsxInitializer, importStatementCompletion, recommendedCompletion, symbolToOriginInfoMap, symbolToSortTextMap, isJsxIdentifierExpected, isRightOfOpenTag, includeSymbol = false) {
       const start = timestamp();
-      const closestSymbolDeclaration = getClosestSymbolDeclaration(contextToken, location);
+      const closestSymbolDeclaration = getClosestSymbolDeclaration(contextToken, location2);
       const useSemicolons = probablyUsesSemicolons(sourceFile);
       const typeChecker = program.getTypeChecker();
       const uniques = /* @__PURE__ */ new Map;
@@ -229250,11 +229298,11 @@ ${newComment.split(`
         const { name: name3, needsConvertPropertyAccess } = info;
         const originalSortText = (symbolToSortTextMap == null ? undefined : symbolToSortTextMap[getSymbolId(symbol2)]) ?? SortText.LocationPriority;
         const sortText = isDeprecated(symbol2, typeChecker) ? SortText.Deprecated(originalSortText) : originalSortText;
-        const entry2 = createCompletionEntry(symbol2, sortText, replacementToken, contextToken, location, position, sourceFile, host, program, name3, needsConvertPropertyAccess, origin2, recommendedCompletion, propertyAccessToConvert, isJsxInitializer, importStatementCompletion, useSemicolons, compilerOptions, preferences, kind, formatContext, isJsxIdentifierExpected, isRightOfOpenTag, includeSymbol);
+        const entry2 = createCompletionEntry(symbol2, sortText, replacementToken, contextToken, location2, position, sourceFile, host, program, name3, needsConvertPropertyAccess, origin2, recommendedCompletion, propertyAccessToConvert, isJsxInitializer, importStatementCompletion, useSemicolons, compilerOptions, preferences, kind, formatContext, isJsxIdentifierExpected, isRightOfOpenTag, includeSymbol);
         if (!entry2) {
           continue;
         }
-        const shouldShadowLaterSymbols = (!origin2 || originIsTypeOnlyAlias(origin2)) && !(symbol2.parent === undefined && !some(symbol2.declarations, (d2) => d2.getSourceFile() === location.getSourceFile()));
+        const shouldShadowLaterSymbols = (!origin2 || originIsTypeOnlyAlias(origin2)) && !(symbol2.parent === undefined && !some(symbol2.declarations, (d2) => d2.getSourceFile() === location2.getSourceFile()));
         uniques.set(name3, shouldShadowLaterSymbols);
         insertSorted(entries, entry2, compareCompletionEntries, undefined, true);
       }
@@ -229266,7 +229314,7 @@ ${newComment.split(`
       function shouldIncludeSymbol(symbol2, symbolToSortTextMap2) {
         var _a7;
         let allFlags = symbol2.flags;
-        if (location.parent && isExportAssignment(location.parent)) {
+        if (location2.parent && isExportAssignment(location2.parent)) {
           return true;
         }
         if (closestSymbolDeclaration && tryCast(closestSymbolDeclaration, isVariableDeclaration)) {
@@ -229301,7 +229349,7 @@ ${newComment.split(`
           return false;
         }
         allFlags |= getCombinedLocalAndExportSymbolFlags(symbolOrigin);
-        if (isInRightSideOfInternalImportEqualsDeclaration(location)) {
+        if (isInRightSideOfInternalImportEqualsDeclaration(location2)) {
           return !!(allFlags & 1920);
         }
         if (isTypeOnlyLocation) {
@@ -229379,14 +229427,14 @@ ${newComment.split(`
       if (completionData.kind !== 0) {
         return { type: "request", request: completionData };
       }
-      const { symbols, literals, location, completionKind, symbolToOriginInfoMap, contextToken, previousToken, isJsxInitializer, isTypeOnlyLocation } = completionData;
+      const { symbols, literals, location: location2, completionKind, symbolToOriginInfoMap, contextToken, previousToken, isJsxInitializer, isTypeOnlyLocation } = completionData;
       const literal4 = find2(literals, (l2) => completionNameForLiteral(sourceFile, preferences, l2) === entryId.name);
       if (literal4 !== undefined)
         return { type: "literal", literal: literal4 };
       return firstDefined(symbols, (symbol2, index2) => {
         const origin2 = symbolToOriginInfoMap[index2];
         const info = getCompletionEntryDisplayNameForSymbol(symbol2, getEmitScriptTarget(compilerOptions), origin2, completionKind, completionData.isJsxIdentifierExpected);
-        return info && info.name === entryId.name && (entryId.source === "ClassMemberSnippet/" && symbol2.flags & 106500 || entryId.source === "ObjectLiteralMethodSnippet/" && symbol2.flags & (4 | 8192) || getSourceFromOrigin(origin2) === entryId.source || entryId.source === "ObjectLiteralMemberWithComma/") ? { type: "symbol", symbol: symbol2, location, origin: origin2, contextToken, previousToken, isJsxInitializer, isTypeOnlyLocation } : undefined;
+        return info && info.name === entryId.name && (entryId.source === "ClassMemberSnippet/" && symbol2.flags & 106500 || entryId.source === "ObjectLiteralMethodSnippet/" && symbol2.flags & (4 | 8192) || getSourceFromOrigin(origin2) === entryId.source || entryId.source === "ObjectLiteralMemberWithComma/") ? { type: "symbol", symbol: symbol2, location: location2, origin: origin2, contextToken, previousToken, isJsxInitializer, isTypeOnlyLocation } : undefined;
       }) || { type: "none" };
     }
     function getCompletionEntryDetails(program, log4, sourceFile, position, entryId, host, formatContext, preferences, cancellationToken) {
@@ -229415,10 +229463,10 @@ ${newComment.split(`
           }
         }
         case "symbol": {
-          const { symbol: symbol2, location, contextToken: contextToken2, origin: origin2, previousToken: previousToken2 } = symbolCompletion;
-          const { codeActions, sourceDisplay } = getCompletionEntryCodeActionsAndSourceDisplay(name3, location, contextToken2, origin2, symbol2, program, host, compilerOptions, sourceFile, position, previousToken2, formatContext, preferences, data, source, cancellationToken);
+          const { symbol: symbol2, location: location2, contextToken: contextToken2, origin: origin2, previousToken: previousToken2 } = symbolCompletion;
+          const { codeActions, sourceDisplay } = getCompletionEntryCodeActionsAndSourceDisplay(name3, location2, contextToken2, origin2, symbol2, program, host, compilerOptions, sourceFile, position, previousToken2, formatContext, preferences, data, source, cancellationToken);
           const symbolName2 = originIsComputedPropertyName(origin2) ? origin2.symbolName : symbol2.name;
-          return createCompletionDetailsForSymbol(symbol2, symbolName2, typeChecker, sourceFile, location, cancellationToken, codeActions, sourceDisplay);
+          return createCompletionDetailsForSymbol(symbol2, symbolName2, typeChecker, sourceFile, location2, cancellationToken, codeActions, sourceDisplay);
         }
         case "literal": {
           const { literal: literal4 } = symbolCompletion;
@@ -229458,21 +229506,21 @@ ${newComment.split(`
     function createSimpleDetails(name3, kind, kind2) {
       return createCompletionDetails(name3, "", kind, [displayPart(name3, kind2)]);
     }
-    function createCompletionDetailsForSymbol(symbol2, name3, checker, sourceFile, location, cancellationToken, codeActions, sourceDisplay) {
-      const { displayParts, documentation, symbolKind, tags } = checker.runWithCancellationToken(cancellationToken, (checker2) => ts_SymbolDisplay_exports.getSymbolDisplayPartsDocumentationAndSymbolKind(checker2, symbol2, sourceFile, location, location, 7));
+    function createCompletionDetailsForSymbol(symbol2, name3, checker, sourceFile, location2, cancellationToken, codeActions, sourceDisplay) {
+      const { displayParts, documentation, symbolKind, tags } = checker.runWithCancellationToken(cancellationToken, (checker2) => ts_SymbolDisplay_exports.getSymbolDisplayPartsDocumentationAndSymbolKind(checker2, symbol2, sourceFile, location2, location2, 7));
       return createCompletionDetails(name3, ts_SymbolDisplay_exports.getSymbolModifiers(checker, symbol2), symbolKind, displayParts, documentation, tags, codeActions, sourceDisplay);
     }
     function createCompletionDetails(name3, kindModifiers, kind, displayParts, documentation, tags, codeActions, source) {
       return { name: name3, kindModifiers, kind, displayParts, documentation, tags, codeActions, source, sourceDisplay: source };
     }
-    function getCompletionEntryCodeActionsAndSourceDisplay(name3, location, contextToken, origin2, symbol2, program, host, compilerOptions, sourceFile, position, previousToken, formatContext, preferences, data, source, cancellationToken) {
+    function getCompletionEntryCodeActionsAndSourceDisplay(name3, location2, contextToken, origin2, symbol2, program, host, compilerOptions, sourceFile, position, previousToken, formatContext, preferences, data, source, cancellationToken) {
       if (data == null ? undefined : data.moduleSpecifier) {
         if (previousToken && getImportStatementCompletionInfo(contextToken || previousToken, sourceFile).replacementSpan) {
           return { codeActions: undefined, sourceDisplay: [textPart(data.moduleSpecifier)] };
         }
       }
       if (source === "ClassMemberSnippet/") {
-        const { importAdder, eraseRange } = getEntryForMemberCompletion(host, program, compilerOptions, preferences, name3, symbol2, location, position, contextToken, formatContext);
+        const { importAdder, eraseRange } = getEntryForMemberCompletion(host, program, compilerOptions, preferences, name3, symbol2, location2, position, contextToken, formatContext);
         if ((importAdder == null ? undefined : importAdder.hasFixes()) || eraseRange) {
           const changes = ts_textChanges_exports.ChangeTracker.with({ host, formatContext, preferences }, (tracker) => {
             if (importAdder) {
@@ -229639,7 +229687,7 @@ ${newComment.split(`
       let isJsxInitializer = false;
       let isJsxIdentifierExpected = false;
       let importStatementCompletion;
-      let location = getTouchingPropertyName(sourceFile, position);
+      let location2 = getTouchingPropertyName(sourceFile, position);
       let keywordFilters = 0;
       let isNewIdentifierLocation = false;
       let flags = 0;
@@ -229699,16 +229747,16 @@ ${newComment.split(`
             contextToken = parent2;
             parent2 = parent2.parent;
           }
-          if (currentToken.parent === location) {
+          if (currentToken.parent === location2) {
             switch (currentToken.kind) {
               case 32:
                 if (currentToken.parent.kind === 285 || currentToken.parent.kind === 287) {
-                  location = currentToken;
+                  location2 = currentToken;
                 }
                 break;
               case 44:
                 if (currentToken.parent.kind === 286) {
-                  location = currentToken;
+                  location2 = currentToken;
                 }
                 break;
             }
@@ -229717,7 +229765,7 @@ ${newComment.split(`
             case 288:
               if (contextToken.kind === 44) {
                 isStartingCloseTag = true;
-                location = contextToken;
+                location2 = contextToken;
               }
               break;
             case 227:
@@ -229730,7 +229778,7 @@ ${newComment.split(`
               isJsxIdentifierExpected = true;
               if (contextToken.kind === 30) {
                 isRightOfOpenTag = true;
-                location = contextToken;
+                location2 = contextToken;
               }
               break;
             case 295:
@@ -229773,7 +229821,7 @@ ${newComment.split(`
       if (isRightOfDot || isRightOfQuestionDot) {
         getTypeScriptMemberSymbols();
       } else if (isRightOfOpenTag) {
-        symbols = typeChecker.getJsxIntrinsicTagNamesAt(location);
+        symbols = typeChecker.getJsxIntrinsicTagNamesAt(location2);
         Debug.assertEachIsDefined(symbols, "getJsxIntrinsicTagNames() should all be defined");
         tryGetGlobalSymbols();
         completionKind = 1;
@@ -229803,7 +229851,7 @@ ${newComment.split(`
         isInSnippetScope,
         propertyAccessToConvert,
         isNewIdentifierLocation,
-        location,
+        location: location2,
         keywordFilters,
         literals,
         symbolToOriginInfoMap,
@@ -229968,7 +230016,7 @@ ${newComment.split(`
                 moduleSymbol,
                 symbol: firstAccessibleSymbol,
                 targetFlags: skipAlias(firstAccessibleSymbol, typeChecker).flags
-              }], position, isValidTypeOnlyAliasUseSite(location)) || {};
+              }], position, isValidTypeOnlyAliasUseSite(location2)) || {};
               if (moduleSpecifier) {
                 const origin2 = {
                   kind: getNullableSymbolOriginInfoKind(34),
@@ -230113,7 +230161,7 @@ ${newComment.split(`
         }
       }
       function isTypeOnlyCompletion() {
-        return insideJsDocTagTypeExpression || insideJsDocImportTag || !!importStatementCompletion && isTypeOnlyImportOrExportDeclaration(location.parent) || !isContextTokenValueLocation(contextToken) && (isPossiblyTypeArgumentPosition(contextToken, sourceFile, typeChecker) || isPartOfTypeNode(location) || isContextTokenTypeLocation(contextToken));
+        return insideJsDocTagTypeExpression || insideJsDocImportTag || !!importStatementCompletion && isTypeOnlyImportOrExportDeclaration(location2.parent) || !isContextTokenValueLocation(contextToken) && (isPossiblyTypeArgumentPosition(contextToken, sourceFile, typeChecker) || isPartOfTypeNode(location2) || isContextTokenTypeLocation(contextToken));
       }
       function isContextTokenValueLocation(contextToken2) {
         return contextToken2 && (contextToken2.kind === 114 && (contextToken2.parent.kind === 187 || isTypeOfExpression(contextToken2.parent)) || contextToken2.kind === 131 && contextToken2.parent.kind === 183);
@@ -230153,7 +230201,7 @@ ${newComment.split(`
         const exportInfo = getExportInfoMap(sourceFile, host, program, preferences, cancellationToken);
         const packageJsonAutoImportProvider = (_b = host.getPackageJsonAutoImportProvider) == null ? undefined : _b.call(host);
         const packageJsonFilter = detailsEntryId ? undefined : createPackageJsonImportFilter(sourceFile, preferences, host);
-        resolvingModuleSpecifiers("collectAutoImports", host, importSpecifierResolver || (importSpecifierResolver = ts_codefix_exports.createImportSpecifierResolver(sourceFile, program, host, preferences)), program, position, preferences, !!importStatementCompletion, isValidTypeOnlyAliasUseSite(location), (context) => {
+        resolvingModuleSpecifiers("collectAutoImports", host, importSpecifierResolver || (importSpecifierResolver = ts_codefix_exports.createImportSpecifierResolver(sourceFile, program, host, preferences)), program, position, preferences, !!importStatementCompletion, isValidTypeOnlyAliasUseSite(location2), (context) => {
           exportInfo.search(sourceFile.path, isRightOfOpenTag, (symbolName2, targetFlags) => {
             if (!isIdentifierText(symbolName2, getEmitScriptTarget(host.getCompilationSettings())))
               return false;
@@ -230216,7 +230264,7 @@ ${newComment.split(`
         symbols.push(symbol2);
       }
       function collectObjectLiteralMethodSymbols(members, enclosingDeclaration) {
-        if (isInJSFile(location)) {
+        if (isInJSFile(location2)) {
           return;
         }
         members.forEach((member) => {
@@ -230262,11 +230310,11 @@ ${newComment.split(`
           return true;
         }
         if (contextToken2.kind === 32 && contextToken2.parent) {
-          if (location === contextToken2.parent && (location.kind === 287 || location.kind === 286)) {
+          if (location2 === contextToken2.parent && (location2.kind === 287 || location2.kind === 286)) {
             return false;
           }
           if (contextToken2.parent.kind === 287) {
-            return location.parent.kind !== 287;
+            return location2.parent.kind !== 287;
           }
           if (contextToken2.parent.kind === 288 || contextToken2.parent.kind === 286) {
             return !!contextToken2.parent.parent && contextToken2.parent.parent.kind === 285;
@@ -230521,7 +230569,7 @@ ${newComment.split(`
         return 1;
       }
       function tryGetClassLikeCompletionSymbols() {
-        const decl = tryGetObjectTypeDeclarationCompletionContainer(sourceFile, contextToken, location, position);
+        const decl = tryGetObjectTypeDeclarationCompletionContainer(sourceFile, contextToken, location2, position);
         if (!decl)
           return 0;
         completionKind = 3;
@@ -231116,37 +231164,37 @@ ${newComment.split(`
     function getPropertiesForCompletion(type, checker) {
       return type.isUnion() ? Debug.checkEachDefined(checker.getAllPossiblePropertiesOfTypes(type.types), "getAllPossiblePropertiesOfTypes() should all be defined") : Debug.checkEachDefined(type.getApparentProperties(), "getApparentProperties() should all be defined");
     }
-    function tryGetObjectTypeDeclarationCompletionContainer(sourceFile, contextToken, location, position) {
-      switch (location.kind) {
+    function tryGetObjectTypeDeclarationCompletionContainer(sourceFile, contextToken, location2, position) {
+      switch (location2.kind) {
         case 353:
-          return tryCast(location.parent, isObjectTypeDeclaration);
+          return tryCast(location2.parent, isObjectTypeDeclaration);
         case 1:
-          const cls = tryCast(lastOrUndefined(cast(location.parent, isSourceFile).statements), isObjectTypeDeclaration);
+          const cls = tryCast(lastOrUndefined(cast(location2.parent, isSourceFile).statements), isObjectTypeDeclaration);
           if (cls && !findChildOfKind(cls, 20, sourceFile)) {
             return cls;
           }
           break;
         case 81:
-          if (tryCast(location.parent, isPropertyDeclaration)) {
-            return findAncestor(location, isClassLike);
+          if (tryCast(location2.parent, isPropertyDeclaration)) {
+            return findAncestor(location2, isClassLike);
           }
           break;
         case 80: {
-          const originalKeywordKind = identifierToKeywordKind(location);
+          const originalKeywordKind = identifierToKeywordKind(location2);
           if (originalKeywordKind) {
             return;
           }
-          if (isPropertyDeclaration(location.parent) && location.parent.initializer === location) {
+          if (isPropertyDeclaration(location2.parent) && location2.parent.initializer === location2) {
             return;
           }
-          if (isFromObjectTypeDeclaration(location)) {
-            return findAncestor(location, isObjectTypeDeclaration);
+          if (isFromObjectTypeDeclaration(location2)) {
+            return findAncestor(location2, isObjectTypeDeclaration);
           }
         }
       }
       if (!contextToken)
         return;
-      if (location.kind === 137 || isIdentifier(contextToken) && isPropertyDeclaration(contextToken.parent) && isClassLike(location)) {
+      if (location2.kind === 137 || isIdentifier(contextToken) && isPropertyDeclaration(contextToken.parent) && isClassLike(location2)) {
         return findAncestor(contextToken, isClassLike);
       }
       switch (contextToken.kind) {
@@ -231154,14 +231202,14 @@ ${newComment.split(`
           return;
         case 27:
         case 20:
-          return isFromObjectTypeDeclaration(location) && location.parent.name === location ? location.parent.parent : tryCast(location, isObjectTypeDeclaration);
+          return isFromObjectTypeDeclaration(location2) && location2.parent.name === location2 ? location2.parent.parent : tryCast(location2, isObjectTypeDeclaration);
         case 19:
         case 28:
           return tryCast(contextToken.parent, isObjectTypeDeclaration);
         default:
-          if (isObjectTypeDeclaration(location)) {
+          if (isObjectTypeDeclaration(location2)) {
             if (getLineAndCharacterOfPosition(sourceFile, contextToken.getEnd()).line !== getLineAndCharacterOfPosition(sourceFile, position).line) {
-              return location;
+              return location2;
             }
             const isValidKeyword = isClassLike(contextToken.parent.parent) ? isClassMemberCompletionKeyword : isInterfaceOrTypeLiteralCompletionKeyword;
             return isValidKeyword(contextToken.kind) || contextToken.kind === 42 || isIdentifier(contextToken) && isValidKeyword(identifierToKeywordKind(contextToken) ?? 0) ? contextToken.parent.parent : undefined;
@@ -231379,12 +231427,12 @@ ${newComment.split(`
         return true;
       return !((_a7 = tryCast(isExternalModuleReference(specifier) ? specifier.expression : specifier, isStringLiteralLike)) == null ? undefined : _a7.text);
     }
-    function getClosestSymbolDeclaration(contextToken, location) {
+    function getClosestSymbolDeclaration(contextToken, location2) {
       if (!contextToken)
         return;
       let closestDeclaration = findAncestor(contextToken, (node) => isFunctionBlock(node) || isArrowFunctionBody(node) || isBindingPattern(node) ? "quit" : (isParameter(node) || isTypeParameterDeclaration(node)) && !isIndexSignatureDeclaration(node.parent));
       if (!closestDeclaration) {
-        closestDeclaration = findAncestor(location, (node) => isFunctionBlock(node) || isArrowFunctionBody(node) || isBindingPattern(node) ? "quit" : isVariableDeclaration(node));
+        closestDeclaration = findAncestor(location2, (node) => isFunctionBlock(node) || isArrowFunctionBody(node) || isBindingPattern(node) ? "quit" : isVariableDeclaration(node));
       }
       return closestDeclaration;
     }
@@ -231534,7 +231582,7 @@ ${newComment.split(`
       const completions = getStringLiteralCompletionEntries(sourceFile, contextToken, position, program, host, preferences);
       return completions && stringLiteralCompletionDetails(name3, contextToken, completions, sourceFile, program.getTypeChecker(), cancellationToken);
     }
-    function stringLiteralCompletionDetails(name3, location, completion, sourceFile, checker, cancellationToken) {
+    function stringLiteralCompletionDetails(name3, location2, completion, sourceFile, checker, cancellationToken) {
       switch (completion.kind) {
         case 0: {
           const match2 = find2(completion.paths, (p3) => p3.name === name3);
@@ -231542,7 +231590,7 @@ ${newComment.split(`
         }
         case 1: {
           const match2 = find2(completion.symbols, (s3) => s3.name === name3);
-          return match2 && createCompletionDetailsForSymbol(match2, match2.name, checker, sourceFile, location, cancellationToken);
+          return match2 && createCompletionDetailsForSymbol(match2, match2.name, checker, sourceFile, location2, cancellationToken);
         }
         case 2:
           return find2(completion.types, (t2) => t2.value === name3) ? createCompletionDetails(name3, "", "string", [textPart(name3)]) : undefined;
@@ -232461,8 +232509,8 @@ ${newComment.split(`
     function getSearchesFromDirectImports(directImports, exportSymbol, exportKind, checker, isForRename) {
       const importSearches = [];
       const singleReferences = [];
-      function addSearch(location, symbol2) {
-        importSearches.push([location, symbol2]);
+      function addSearch(location2, symbol2) {
+        importSearches.push([location2, symbol2]);
       }
       if (directImports) {
         for (const decl of directImports) {
@@ -233338,12 +233386,12 @@ ${newComment.split(`
         for (const ref of references) {
           if (isReferencedFile(ref)) {
             const referencingFile = program.getSourceFileByPath(ref.file);
-            const location = getReferencedFileLocation(program, ref);
-            if (isReferenceFileLocation(location)) {
+            const location2 = getReferencedFileLocation(program, ref);
+            if (isReferenceFileLocation(location2)) {
               entries = append(entries, {
                 kind: 0,
                 fileName: referencingFile.fileName,
-                textSpan: createTextSpanFromRange(location)
+                textSpan: createTextSpanFromRange(location2)
               });
             }
           }
@@ -233590,13 +233638,13 @@ ${newComment.split(`
             this.importTracker = createImportTracker(this.sourceFiles, this.sourceFilesSet, this.checker, this.cancellationToken);
           return this.importTracker(exportSymbol, exportInfo, this.options.use === 2);
         }
-        createSearch(location, symbol2, comingFrom, searchOptions = {}) {
+        createSearch(location2, symbol2, comingFrom, searchOptions = {}) {
           const {
             text: text2 = stripQuotes(symbolName(getLocalSymbolForExportDefault(symbol2) || getNonModuleSymbolOfMergedModuleSymbol(symbol2) || symbol2)),
             allSearchSymbols = [symbol2]
           } = searchOptions;
           const escapedText = escapeLeadingUnderscores(text2);
-          const parents = this.options.implementations && location ? getParentSymbolsOfPropertyAccess(location, symbol2, this.checker) : undefined;
+          const parents = this.options.implementations && location2 ? getParentSymbolsOfPropertyAccess(location2, symbol2, this.checker) : undefined;
           return { symbol: symbol2, comingFrom, text: text2, escapedText, parents, allSearchSymbols, includes: (sym) => contains2(allSearchSymbols, sym) };
         }
         referenceAdder(searchSymbol) {
@@ -233699,8 +233747,8 @@ ${newComment.split(`
           getReferencesInSourceFile(sourceFile, search2, state);
         }
       }
-      function getPropertySymbolOfDestructuringAssignment(location, checker) {
-        return isArrayLiteralOrObjectLiteralDestructuringPattern(location.parent.parent) ? checker.getPropertySymbolOfDestructuringAssignment(location) : undefined;
+      function getPropertySymbolOfDestructuringAssignment(location2, checker) {
+        return isArrayLiteralOrObjectLiteralDestructuringPattern(location2.parent.parent) ? checker.getPropertySymbolOfDestructuringAssignment(location2) : undefined;
       }
       function getSymbolScope(symbol2) {
         const { declarations, flags, parent: parent2, valueDeclaration } = symbol2;
@@ -234334,9 +234382,9 @@ ${newComment.split(`
           return checker.getPropertyOfType(checker.getTypeAtLocation(node.parent.parent), node.text);
         }
       }
-      function populateSearchSymbolSet(symbol2, location, checker, isForRename, providePrefixAndSuffixText, implementations) {
+      function populateSearchSymbolSet(symbol2, location2, checker, isForRename, providePrefixAndSuffixText, implementations) {
         const result = [];
-        forEachRelatedSymbol(symbol2, location, checker, isForRename, !(isForRename && providePrefixAndSuffixText), (sym, root, base) => {
+        forEachRelatedSymbol(symbol2, location2, checker, isForRename, !(isForRename && providePrefixAndSuffixText), (sym, root, base) => {
           if (base) {
             if (isStaticSymbol(symbol2) !== isStaticSymbol(base)) {
               base = undefined;
@@ -234346,10 +234394,10 @@ ${newComment.split(`
         }, () => !implementations);
         return result;
       }
-      function forEachRelatedSymbol(symbol2, location, checker, isForRenamePopulateSearchSymbolSet, onlyIncludeBindingElementAtReferenceLocation, cbSymbol, allowBaseTypes) {
-        const containingObjectLiteralElement = getContainingObjectLiteralElement(location);
+      function forEachRelatedSymbol(symbol2, location2, checker, isForRenamePopulateSearchSymbolSet, onlyIncludeBindingElementAtReferenceLocation, cbSymbol, allowBaseTypes) {
+        const containingObjectLiteralElement = getContainingObjectLiteralElement(location2);
         if (containingObjectLiteralElement) {
-          const shorthandValueSymbol = checker.getShorthandAssignmentValueSymbol(location.parent);
+          const shorthandValueSymbol = checker.getShorthandAssignmentValueSymbol(location2.parent);
           if (shorthandValueSymbol && isForRenamePopulateSearchSymbolSet) {
             return cbSymbol(shorthandValueSymbol, undefined, undefined, 3);
           }
@@ -234357,7 +234405,7 @@ ${newComment.split(`
           const res2 = contextualType && firstDefined(getPropertySymbolsFromContextualType(containingObjectLiteralElement, checker, contextualType, true), (sym) => fromRoot(sym, 4));
           if (res2)
             return res2;
-          const propertySymbol = getPropertySymbolOfDestructuringAssignment(location, checker);
+          const propertySymbol = getPropertySymbolOfDestructuringAssignment(location2, checker);
           const res1 = propertySymbol && cbSymbol(propertySymbol, undefined, undefined, 4);
           if (res1)
             return res1;
@@ -234365,7 +234413,7 @@ ${newComment.split(`
           if (res22)
             return res22;
         }
-        const aliasedSymbol = getMergedAliasedSymbolOfNamespaceExportDeclaration(location, symbol2, checker);
+        const aliasedSymbol = getMergedAliasedSymbolOfNamespaceExportDeclaration(location2, symbol2, checker);
         if (aliasedSymbol) {
           const res2 = cbSymbol(aliasedSymbol, undefined, undefined, 1);
           if (res2)
@@ -234391,7 +234439,7 @@ ${newComment.split(`
         if (!isForRenamePopulateSearchSymbolSet) {
           let bindingElementPropertySymbol;
           if (onlyIncludeBindingElementAtReferenceLocation) {
-            bindingElementPropertySymbol = isObjectBindingElementWithoutPropertyName(location.parent) ? getPropertySymbolFromBindingElement(checker, location.parent) : undefined;
+            bindingElementPropertySymbol = isObjectBindingElementWithoutPropertyName(location2.parent) ? getPropertySymbolFromBindingElement(checker, location2.parent) : undefined;
           } else {
             bindingElementPropertySymbol = getPropertySymbolOfObjectBindingPatternWithoutPropertyName(symbol2, checker);
           }
@@ -234487,8 +234535,8 @@ ${newComment.split(`
       function tryGetClassByExtendingIdentifier(node) {
         return tryGetClassExtendingExpressionWithTypeArguments(climbPastPropertyAccess(node).parent);
       }
-      function getParentSymbolsOfPropertyAccess(location, symbol2, checker) {
-        const propertyAccessExpression = isRightSideOfPropertyAccess(location) ? location.parent : undefined;
+      function getParentSymbolsOfPropertyAccess(location2, symbol2, checker) {
+        const propertyAccessExpression = isRightSideOfPropertyAccess(location2) ? location2.parent : undefined;
         const lhsType = propertyAccessExpression && checker.getTypeAtLocation(propertyAccessExpression.expression);
         const res = mapDefined(lhsType && (lhsType.isUnionOrIntersection() ? lhsType.types : lhsType.symbol === symbol2.parent ? undefined : [lhsType]), (t2) => t2.symbol && t2.symbol.flags & (32 | 64) ? t2.symbol : undefined);
         return res.length === 0 ? undefined : res;
@@ -236227,7 +236275,7 @@ ${content}
       if (!focusLocations || !focusLocations.length) {
         classOrInterface = find2(originalFile.statements, or(isClassLike, isInterfaceDeclaration));
       } else {
-        classOrInterface = forEach2(focusLocations, (location) => findAncestor(getTokenAtPosition(originalFile, location.start), or(isClassLike, isInterfaceDeclaration)));
+        classOrInterface = forEach2(focusLocations, (location2) => findAncestor(getTokenAtPosition(originalFile, location2.start), or(isClassLike, isInterfaceDeclaration)));
       }
       if (!classOrInterface) {
         return;
@@ -236247,8 +236295,8 @@ ${content}
         changeTracker.insertNodesAtEndOfFile(originalFile, changes, false);
         return;
       }
-      for (const location of focusLocations) {
-        const scope = findAncestor(getTokenAtPosition(originalFile, location.start), (block) => or(isBlock, isSourceFile)(block) && some(block.statements, (origStmt) => changes.some((newStmt) => matchNode(newStmt, origStmt))));
+      for (const location2 of focusLocations) {
+        const scope = findAncestor(getTokenAtPosition(originalFile, location2.start), (block) => or(isBlock, isSourceFile)(block) && some(block.statements, (origStmt) => changes.some((newStmt) => matchNode(newStmt, origStmt))));
         if (scope) {
           const start = scope.statements.find((stmt) => changes.some((node) => matchNode(node, stmt)));
           if (start) {
@@ -236260,8 +236308,8 @@ ${content}
         }
       }
       let scopeStatements = originalFile.statements;
-      for (const location of focusLocations) {
-        const block = findAncestor(getTokenAtPosition(originalFile, location.start), isBlock);
+      for (const location2 of focusLocations) {
+        const block = findAncestor(getTokenAtPosition(originalFile, location2.start), isBlock);
         if (block) {
           scopeStatements = block.statements;
           break;
@@ -238038,8 +238086,8 @@ ${content}
       getSymbolModifiers: () => getSymbolModifiers
     });
     var symbolDisplayNodeBuilderFlags = 8192 | 70221824 | 16384;
-    function getSymbolKind(typeChecker, symbol2, location) {
-      const result = getSymbolKindOfConstructorPropertyMethodAccessorFunctionOrVar(typeChecker, symbol2, location);
+    function getSymbolKind(typeChecker, symbol2, location2) {
+      const result = getSymbolKindOfConstructorPropertyMethodAccessorFunctionOrVar(typeChecker, symbol2, location2);
       if (result !== "") {
         return result;
       }
@@ -238063,9 +238111,9 @@ ${content}
         return "module";
       return result;
     }
-    function getSymbolKindOfConstructorPropertyMethodAccessorFunctionOrVar(typeChecker, symbol2, location) {
+    function getSymbolKindOfConstructorPropertyMethodAccessorFunctionOrVar(typeChecker, symbol2, location2) {
       const roots = typeChecker.getRootSymbols(symbol2);
-      if (roots.length === 1 && first(roots).flags & 8192 && typeChecker.getTypeOfSymbolAtLocation(symbol2, location).getNonNullableType().getCallSignatures().length !== 0) {
+      if (roots.length === 1 && first(roots).flags & 8192 && typeChecker.getTypeOfSymbolAtLocation(symbol2, location2).getNonNullableType().getCallSignatures().length !== 0) {
         return "method";
       }
       if (typeChecker.isUndefinedSymbol(symbol2)) {
@@ -238074,7 +238122,7 @@ ${content}
       if (typeChecker.isArgumentsSymbol(symbol2)) {
         return "local var";
       }
-      if (location.kind === 110 && isExpression2(location) || isThisInTypeQuery(location)) {
+      if (location2.kind === 110 && isExpression2(location2) || isThisInTypeQuery(location2)) {
         return "parameter";
       }
       const flags = getCombinedLocalAndExportSymbolFlags(symbol2);
@@ -238113,7 +238161,7 @@ ${content}
             }
           });
           if (!unionPropertyKind) {
-            const typeOfUnionProperty = typeChecker.getTypeOfSymbolAtLocation(symbol2, location);
+            const typeOfUnionProperty = typeChecker.getTypeOfSymbolAtLocation(symbol2, location2);
             if (typeOfUnionProperty.getCallSignatures().length) {
               return "method";
             }
@@ -238154,26 +238202,26 @@ ${content}
       }
       return modifiers.size > 0 ? arrayFrom(modifiers.values()).join(",") : "";
     }
-    function getSymbolDisplayPartsDocumentationAndSymbolKindWorker(typeChecker, symbol2, sourceFile, enclosingDeclaration, location, type, semanticMeaning, alias, maximumLength, verbosityLevel) {
+    function getSymbolDisplayPartsDocumentationAndSymbolKindWorker(typeChecker, symbol2, sourceFile, enclosingDeclaration, location2, type, semanticMeaning, alias, maximumLength, verbosityLevel) {
       var _a7;
       const displayParts = [];
       let documentation = [];
       let tags = [];
       const symbolFlags = getCombinedLocalAndExportSymbolFlags(symbol2);
-      let symbolKind = semanticMeaning & 1 ? getSymbolKindOfConstructorPropertyMethodAccessorFunctionOrVar(typeChecker, symbol2, location) : "";
+      let symbolKind = semanticMeaning & 1 ? getSymbolKindOfConstructorPropertyMethodAccessorFunctionOrVar(typeChecker, symbol2, location2) : "";
       let hasAddedSymbolInfo = false;
-      const isThisExpression = location.kind === 110 && isInExpressionContext(location) || isThisInTypeQuery(location);
+      const isThisExpression = location2.kind === 110 && isInExpressionContext(location2) || isThisInTypeQuery(location2);
       let documentationFromAlias;
       let tagsFromAlias;
       let hasMultipleSignatures = false;
       const typeWriterOut = { canIncreaseExpansionDepth: false, truncated: false };
       let symbolWasExpanded = false;
-      if (location.kind === 110 && !isThisExpression) {
+      if (location2.kind === 110 && !isThisExpression) {
         return { displayParts: [keywordPart(110)], documentation: [], symbolKind: "primitive type", tags: undefined };
       }
       if (symbolKind !== "" || symbolFlags & 32 || symbolFlags & 2097152) {
         if (symbolKind === "getter" || symbolKind === "setter") {
-          const declaration = find2(symbol2.declarations, (declaration2) => declaration2.name === location && declaration2.kind !== 212);
+          const declaration = find2(symbol2.declarations, (declaration2) => declaration2.name === location2 && declaration2.kind !== 212);
           if (declaration) {
             switch (declaration.kind) {
               case 178:
@@ -238193,20 +238241,20 @@ ${content}
           }
         }
         let signature;
-        type ?? (type = isThisExpression ? typeChecker.getTypeAtLocation(location) : typeChecker.getTypeOfSymbolAtLocation(symbol2, location));
-        if (location.parent && location.parent.kind === 212) {
-          const right = location.parent.name;
-          if (right === location || right && right.getFullWidth() === 0) {
-            location = location.parent;
+        type ?? (type = isThisExpression ? typeChecker.getTypeAtLocation(location2) : typeChecker.getTypeOfSymbolAtLocation(symbol2, location2));
+        if (location2.parent && location2.parent.kind === 212) {
+          const right = location2.parent.name;
+          if (right === location2 || right && right.getFullWidth() === 0) {
+            location2 = location2.parent;
           }
         }
         let callExpressionLike;
-        if (isCallOrNewExpression(location)) {
-          callExpressionLike = location;
-        } else if (isCallExpressionTarget(location) || isNewExpressionTarget(location)) {
-          callExpressionLike = location.parent;
-        } else if (location.parent && (isJsxOpeningLikeElement(location.parent) || isTaggedTemplateExpression(location.parent)) && isFunctionLike(symbol2.valueDeclaration)) {
-          callExpressionLike = location.parent;
+        if (isCallOrNewExpression(location2)) {
+          callExpressionLike = location2;
+        } else if (isCallExpressionTarget(location2) || isNewExpressionTarget(location2)) {
+          callExpressionLike = location2.parent;
+        } else if (location2.parent && (isJsxOpeningLikeElement(location2.parent) || isTaggedTemplateExpression(location2.parent)) && isFunctionLike(symbol2.valueDeclaration)) {
+          callExpressionLike = location2.parent;
         }
         if (callExpressionLike) {
           signature = typeChecker.getResolvedSignature(callExpressionLike);
@@ -238265,9 +238313,9 @@ ${content}
             hasAddedSymbolInfo = true;
             hasMultipleSignatures = allSignatures.length > 1;
           }
-        } else if (isNameOfFunctionDeclaration(location) && !(symbolFlags & 98304) || location.kind === 137 && location.parent.kind === 177) {
-          const functionDeclaration = location.parent;
-          const locationIsSymbolDeclaration = symbol2.declarations && find2(symbol2.declarations, (declaration) => declaration === (location.kind === 137 ? functionDeclaration.parent : functionDeclaration));
+        } else if (isNameOfFunctionDeclaration(location2) && !(symbolFlags & 98304) || location2.kind === 137 && location2.parent.kind === 177) {
+          const functionDeclaration = location2.parent;
+          const locationIsSymbolDeclaration = symbol2.declarations && find2(symbol2.declarations, (declaration) => declaration === (location2.kind === 137 ? functionDeclaration.parent : functionDeclaration));
           if (locationIsSymbolDeclaration) {
             const allSignatures = functionDeclaration.kind === 177 ? type.getNonNullableType().getConstructSignatures() : type.getNonNullableType().getCallSignatures();
             if (!typeChecker.isImplementationOfOverload(functionDeclaration)) {
@@ -238323,7 +238371,7 @@ ${content}
         displayParts.push(spacePart());
         displayParts.push(operatorPart(64));
         displayParts.push(spacePart());
-        addRange(displayParts, typeToDisplayParts(typeChecker, location.parent && isConstTypeReference(location.parent) ? typeChecker.getTypeAtLocation(location.parent) : typeChecker.getDeclaredTypeOfSymbol(symbol2), enclosingDeclaration, 8388608, maximumLength, verbosityLevel, typeWriterOut));
+        addRange(displayParts, typeToDisplayParts(typeChecker, location2.parent && isConstTypeReference(location2.parent) ? typeChecker.getTypeAtLocation(location2.parent) : typeChecker.getDeclaredTypeOfSymbol(symbol2), enclosingDeclaration, 8388608, maximumLength, verbosityLevel, typeWriterOut));
       }
       if (symbolFlags & 384) {
         prefixNextMeaning();
@@ -238505,7 +238553,7 @@ ${content}
             }
           }
         } else {
-          symbolKind = getSymbolKind(typeChecker, symbol2, location);
+          symbolKind = getSymbolKind(typeChecker, symbol2, location2);
         }
       }
       if (documentation.length === 0 && !hasMultipleSignatures) {
@@ -238529,7 +238577,7 @@ ${content}
           }
         }
       }
-      if (documentation.length === 0 && isIdentifier(location) && symbol2.valueDeclaration && isBindingElement(symbol2.valueDeclaration)) {
+      if (documentation.length === 0 && isIdentifier(location2) && symbol2.valueDeclaration && isBindingElement(symbol2.valueDeclaration)) {
         const declaration = symbol2.valueDeclaration;
         const parent2 = declaration.parent;
         const name3 = declaration.propertyName || declaration.name;
@@ -238542,7 +238590,7 @@ ${content}
           }) || emptyArray;
         }
       }
-      if (tags.length === 0 && !hasMultipleSignatures && !isInJSDoc(location)) {
+      if (tags.length === 0 && !hasMultipleSignatures && !isInJSDoc(location2)) {
         tags = symbol2.getContextualJsDocTags(enclosingDeclaration, typeChecker);
       }
       if (documentation.length === 0 && documentationFromAlias) {
@@ -238583,7 +238631,7 @@ ${content}
         if (verbosityLevel === undefined) {
           return false;
         }
-        const type2 = symbol22.flags & (32 | 64) ? typeChecker.getDeclaredTypeOfSymbol(symbol22) : typeChecker.getTypeOfSymbolAtLocation(symbol22, location);
+        const type2 = symbol22.flags & (32 | 64) ? typeChecker.getDeclaredTypeOfSymbol(symbol22) : typeChecker.getTypeOfSymbolAtLocation(symbol22, location2);
         if (!type2 || typeChecker.isLibType(type2)) {
           return false;
         }
@@ -238715,8 +238763,8 @@ ${content}
         addRange(displayParts, typeParameterParts);
       }
     }
-    function getSymbolDisplayPartsDocumentationAndSymbolKind(typeChecker, symbol2, sourceFile, enclosingDeclaration, location, semanticMeaning = getMeaningFromLocation(location), alias, maximumLength, verbosityLevel) {
-      return getSymbolDisplayPartsDocumentationAndSymbolKindWorker(typeChecker, symbol2, sourceFile, enclosingDeclaration, location, undefined, semanticMeaning, alias, maximumLength, verbosityLevel);
+    function getSymbolDisplayPartsDocumentationAndSymbolKind(typeChecker, symbol2, sourceFile, enclosingDeclaration, location2, semanticMeaning = getMeaningFromLocation(location2), alias, maximumLength, verbosityLevel) {
+      return getSymbolDisplayPartsDocumentationAndSymbolKindWorker(typeChecker, symbol2, sourceFile, enclosingDeclaration, location2, undefined, semanticMeaning, alias, maximumLength, verbosityLevel);
     }
     function isLocalVariableOrFunction(symbol2) {
       if (symbol2.parent) {
@@ -242404,10 +242452,10 @@ ${options2.prefix}` : `
             formatContext
           };
           let offset = 0;
-          pasteLocations.forEach((location, i2) => {
-            const oldTextLength = location.end - location.pos;
+          pasteLocations.forEach((location2, i2) => {
+            const oldTextLength = location2.end - location2.pos;
             const textToBePasted = actualPastedText ?? pastedText[i2];
-            const startPos = location.pos + offset;
+            const startPos = location2.pos + offset;
             const endPos = startPos + textToBePasted.length;
             const range = { pos: startPos, end: endPos };
             offset += textToBePasted.length - oldTextLength;
@@ -246059,9 +246107,9 @@ ${options2.prefix}` : `
       }
       positionToLineOffset(position) {
         failIfInvalidPosition(position);
-        const location = this.textStorage.positionToLineOffset(position);
-        failIfInvalidLocation(location);
-        return location;
+        const location2 = this.textStorage.positionToLineOffset(position);
+        failIfInvalidLocation(location2);
+        return location2;
       }
       isJavaScript() {
         return this.scriptKind === 1 || this.scriptKind === 2;
@@ -246077,11 +246125,11 @@ ${options2.prefix}` : `
       Debug.assert(typeof position === "number", `Expected position ${position} to be a number.`);
       Debug.assert(position >= 0, `Expected position to be non-negative.`);
     }
-    function failIfInvalidLocation(location) {
-      Debug.assert(typeof location.line === "number", `Expected line ${location.line} to be a number.`);
-      Debug.assert(typeof location.offset === "number", `Expected offset ${location.offset} to be a number.`);
-      Debug.assert(location.line > 0, `Expected line to be non-${location.line === 0 ? "zero" : "negative"}`);
-      Debug.assert(location.offset > 0, `Expected offset to be non-${location.offset === 0 ? "zero" : "negative"}`);
+    function failIfInvalidLocation(location2) {
+      Debug.assert(typeof location2.line === "number", `Expected line ${location2.line} to be a number.`);
+      Debug.assert(typeof location2.offset === "number", `Expected offset ${location2.offset} to be a number.`);
+      Debug.assert(location2.line > 0, `Expected line to be non-${location2.line === 0 ? "zero" : "negative"}`);
+      Debug.assert(location2.offset > 0, `Expected offset to be non-${location2.offset === 0 ? "zero" : "negative"}`);
     }
     function scriptInfoIsContainedByBackgroundProject(info) {
       return some(info.containingProjects, isBackgroundProject);
@@ -250266,9 +250314,9 @@ Dynamic files must always be opened with service's current directory or service 
       openClientFile(fileName, fileContent, scriptKind, projectRootPath) {
         return this.openClientFileWithNormalizedPath(toNormalizedPath(fileName), fileContent, scriptKind, false, projectRootPath ? toNormalizedPath(projectRootPath) : undefined);
       }
-      getOriginalLocationEnsuringConfiguredProject(project, location) {
-        const isSourceOfProjectReferenceRedirect = project.isSourceOfProjectReferenceRedirect(location.fileName);
-        const originalLocation = isSourceOfProjectReferenceRedirect ? location : project.getSourceMapper().tryGetSourcePosition(location);
+      getOriginalLocationEnsuringConfiguredProject(project, location2) {
+        const isSourceOfProjectReferenceRedirect = project.isSourceOfProjectReferenceRedirect(location2.fileName);
+        const originalLocation = isSourceOfProjectReferenceRedirect ? location2 : project.getSourceMapper().tryGetSourcePosition(location2);
         if (!originalLocation)
           return;
         const { fileName } = originalLocation;
@@ -250283,13 +250331,13 @@ Dynamic files must always be opened with service's current directory or service 
         if (!configuredProject) {
           if (project.getCompilerOptions().disableReferencedProjectLoad) {
             if (isSourceOfProjectReferenceRedirect) {
-              return location;
+              return location2;
             }
-            return (scriptInfo == null ? undefined : scriptInfo.containingProjects.length) ? originalLocation : location;
+            return (scriptInfo == null ? undefined : scriptInfo.containingProjects.length) ? originalLocation : location2;
           }
-          configuredProject = this.createConfiguredProject(configFileName, `Creating project for original file: ${originalFileInfo.fileName}${location !== originalLocation ? " for location: " + location.fileName : ""}`);
+          configuredProject = this.createConfiguredProject(configFileName, `Creating project for original file: ${originalFileInfo.fileName}${location2 !== originalLocation ? " for location: " + location2.fileName : ""}`);
         }
-        const result = this.tryFindDefaultConfiguredProjectForOpenScriptInfoOrClosedFileInfo(originalFileInfo, 5, updateProjectFoundUsingFind(configuredProject, 4), (project2) => `Creating project referenced in solution ${project2.projectName} to find possible configured project for original file: ${originalFileInfo.fileName}${location !== originalLocation ? " for location: " + location.fileName : ""}`);
+        const result = this.tryFindDefaultConfiguredProjectForOpenScriptInfoOrClosedFileInfo(originalFileInfo, 5, updateProjectFoundUsingFind(configuredProject, 4), (project2) => `Creating project referenced in solution ${project2.projectName} to find possible configured project for original file: ${originalFileInfo.fileName}${location2 !== originalLocation ? " for location: " + location2.fileName : ""}`);
         if (!result.defaultProject)
           return;
         if (result.defaultProject === project)
@@ -251590,8 +251638,8 @@ ${json3}${newLine}`;
       const queue = createQueue();
       queue.enqueue({ project: defaultProject, location: initialLocation });
       forEachProjectInProjects(projects, initialLocation.fileName, (project, path) => {
-        const location = { fileName: path, pos: initialLocation.pos };
-        queue.enqueue({ project, location });
+        const location2 = { fileName: path, pos: initialLocation.pos };
+        queue.enqueue({ project, location: location2 });
       });
       const projectService = defaultProject.projectService;
       const cancellationToken = defaultProject.getCancellationToken();
@@ -251603,16 +251651,16 @@ ${json3}${newLine}`;
           while (!queue.isEmpty()) {
             if (cancellationToken.isCancellationRequested())
               break onCancellation;
-            const { project, location } = queue.dequeue();
+            const { project, location: location2 } = queue.dequeue();
             if (resultsMap.has(project))
               continue;
-            if (isLocationProjectReferenceRedirect(project, location))
+            if (isLocationProjectReferenceRedirect(project, location2))
               continue;
             updateProjectIfDirty(project);
-            if (!project.containsFile(toNormalizedPath(location.fileName))) {
+            if (!project.containsFile(toNormalizedPath(location2.fileName))) {
               continue;
             }
-            const projectResults = searchPosition(project, location);
+            const projectResults = searchPosition(project, location2);
             resultsMap.set(project, projectResults ?? emptyArray2);
             searchedProjectKeys.add(getProjectKey(project));
           }
@@ -251623,9 +251671,9 @@ ${json3}${newLine}`;
                 return;
               if (resultsMap.has(project))
                 return;
-              const location = mapDefinitionInProject2(defaultDefinition, project, getGeneratedDefinition, getSourceDefinition);
-              if (location) {
-                queue.enqueue({ project, location });
+              const location2 = mapDefinitionInProject2(defaultDefinition, project, getGeneratedDefinition, getSourceDefinition);
+              if (location2) {
+                queue.enqueue({ project, location: location2 });
               }
             });
           }
@@ -251634,8 +251682,8 @@ ${json3}${newLine}`;
         return firstIterator(resultsMap.values());
       }
       return resultsMap;
-      function searchPosition(project, location) {
-        const projectResults = getResultsForPosition(project, location);
+      function searchPosition(project, location2) {
+        const projectResults = getResultsForPosition(project, location2);
         if (!projectResults || !forPositionInResult)
           return projectResults;
         for (const result of projectResults) {
@@ -251679,14 +251727,14 @@ ${json3}${newLine}`;
       const sourceDefinition = getSourceDefinition();
       return sourceDefinition && project.containsFile(toNormalizedPath(sourceDefinition.fileName)) ? sourceDefinition : undefined;
     }
-    function isLocationProjectReferenceRedirect(project, location) {
-      if (!location)
+    function isLocationProjectReferenceRedirect(project, location2) {
+      if (!location2)
         return false;
       const program = project.getLanguageService().getProgram();
       if (!program)
         return false;
-      const sourceFile = program.getSourceFile(location.fileName);
-      return !!sourceFile && sourceFile.resolvedPath !== sourceFile.path && sourceFile.resolvedPath !== project.toPath(location.fileName);
+      const sourceFile = program.getSourceFile(location2.fileName);
+      return !!sourceFile && sourceFile.resolvedPath !== sourceFile.path && sourceFile.resolvedPath !== project.toPath(location2.fileName);
     }
     function getProjectKey(project) {
       return isConfiguredProject(project) ? project.canonicalConfigFilePath : project.getProjectName();
@@ -251694,8 +251742,8 @@ ${json3}${newLine}`;
     function documentSpanLocation({ fileName, textSpan }) {
       return { fileName, pos: textSpan.start };
     }
-    function getMappedLocationForProject(location, project) {
-      return getMappedLocation(location, project.getSourceMapper(), (p3) => project.projectService.fileExists(p3));
+    function getMappedLocationForProject(location2, project) {
+      return getMappedLocation(location2, project.getSourceMapper(), (p3) => project.projectService.fileExists(p3));
     }
     function getMappedDocumentSpanForProject(documentSpan, project) {
       return getMappedDocumentSpan(documentSpan, project.getSourceMapper(), (p3) => project.projectService.fileExists(p3));
@@ -253877,8 +253925,8 @@ Additional information: BADCLIENT: Bad error code, ${badCode} not found in range
         const { locations } = args;
         const { file: file2, languageService } = this.getFileAndLanguageServiceForSyntacticOperation(args);
         const scriptInfo = Debug.checkDefined(this.projectService.getScriptInfo(file2));
-        return map2(locations, (location) => {
-          const pos = this.getPosition(location, scriptInfo);
+        return map2(locations, (location2) => {
+          const pos = this.getPosition(location2, scriptInfo);
           const selectionRange = languageService.getSmartSelectionRange(file2, pos);
           return simplifiedResult ? this.mapSelectionRange(selectionRange, scriptInfo) : selectionRange;
         });
@@ -255163,7 +255211,7 @@ Additional information: BADCLIENT: Bad error code, ${badCode} not found in range
 });
 
 // frontend/packages/miniapp-kit/src/cli.ts
-import { dirname as dirname15, resolve as resolve5 } from "node:path";
+import { dirname as dirname16, resolve as resolve5 } from "node:path";
 import { fileURLToPath as fileURLToPath2 } from "node:url";
 
 // frontend/packages/miniapp-kit/src/args.ts
@@ -255341,12 +255389,12 @@ export default {
 var CACHE_DIR = ".kit/cache/workers";
 var SKIPPED = new Set(["node_modules", ".git", ".kit", "dist"]);
 var BUILDER_VERSION = 1;
-async function hashTree(hash4, root, relative2) {
-  const entries = await readdir11(join24(root, relative2), { withFileTypes: true }).catch(() => []);
+async function hashTree(hash4, root, relative3) {
+  const entries = await readdir11(join24(root, relative3), { withFileTypes: true }).catch(() => []);
   for (const entry of entries.sort((a2, b3) => a2.name.localeCompare(b3.name))) {
     if (SKIPPED.has(entry.name))
       continue;
-    const path = relative2 === "" ? entry.name : `${relative2}/${entry.name}`;
+    const path = relative3 === "" ? entry.name : `${relative3}/${entry.name}`;
     if (entry.isDirectory())
       await hashTree(hash4, root, path);
     else if (entry.isFile())
@@ -255520,17 +255568,17 @@ init_src();
 import { existsSync as existsSync16 } from "node:fs";
 import { mkdtemp as mkdtemp5, rm as rm10, writeFile as writeFile13 } from "node:fs/promises";
 import { createRequire as createRequire7 } from "node:module";
-import { dirname as dirname10, join as join27, relative as relative2 } from "node:path";
+import { dirname as dirname11, join as join27, relative as relative3 } from "node:path";
 async function checkSeedContract(root, kitRoot) {
   const seed = join27(root, PROJECT_PATHS.seed);
   if (!existsSync16(seed))
     return [];
   const ts = (await Promise.resolve().then(() => __toESM(require_typescript(), 1))).default;
-  const libDirectory = existsSync16(join27(kitRoot, "scripts/typescript-lib/lib.es2023.d.ts")) ? join27(kitRoot, "scripts/typescript-lib") : dirname10(createRequire7(import.meta.url).resolve("typescript/lib/lib.es2023.d.ts"));
-  const temporary = await mkdtemp5(join27(dirname10(seed), ".seed-contract-"));
+  const libDirectory = existsSync16(join27(kitRoot, "scripts/typescript-lib/lib.es2023.d.ts")) ? join27(kitRoot, "scripts/typescript-lib") : dirname11(createRequire7(import.meta.url).resolve("typescript/lib/lib.es2023.d.ts"));
+  const temporary = await mkdtemp5(join27(dirname11(seed), ".seed-contract-"));
   try {
     const entry2 = join27(temporary, "contract.ts");
-    const sdk = relative2(temporary, join27(root, "packages/sdk/src/index.ts"));
+    const sdk = relative3(temporary, join27(root, "packages/sdk/src/index.ts"));
     await writeFile13(entry2, `import seed from '../seed.ts';
 import type { SeedContext, SeedPlan, SchemaType } from ${JSON.stringify(sdk)};
 const contract: (context: SeedContext) => SeedPlan<SchemaType> | Promise<SeedPlan<SchemaType>> = seed;
@@ -255786,7 +255834,7 @@ import { createHash as createHash17, randomUUID as randomUUID5 } from "node:cryp
 import { existsSync as existsSync28 } from "node:fs";
 import { mkdir as mkdir24, readdir as readdir17, readFile as readFile38, writeFile as writeFile26 } from "node:fs/promises";
 import { homedir } from "node:os";
-import { dirname as dirname14, join as join52, resolve as resolve4 } from "node:path";
+import { dirname as dirname15, join as join52, resolve as resolve4 } from "node:path";
 import { createInterface } from "node:readline";
 
 // frontend/packages/project-host/src/bridge.ts
@@ -255896,7 +255944,11 @@ var OPEN_DEADLINE_MS = 30000;
 async function exchangeSessionLive(deps, request) {
   if (!exports_external.uuid().safeParse(request.projectId).success || !exports_external.uuid().safeParse(request.environmentId).success || !/^[a-z][a-z0-9-]{1,31}$/.test(request.app))
     throw new HostOpenError("unavailable");
+  if (deps.signal?.aborted)
+    throw new HostOpenError("forbidden");
   const controller = new AbortController;
+  const abort = () => controller.abort();
+  deps.signal?.addEventListener("abort", abort, { once: true });
   let timer;
   try {
     return await Promise.race([
@@ -255908,7 +255960,12 @@ async function exchangeSessionLive(deps, request) {
         }, OPEN_DEADLINE_MS);
       })
     ]);
+  } catch (error51) {
+    if (deps.signal?.aborted)
+      throw new HostOpenError("forbidden");
+    throw error51;
   } finally {
+    deps.signal?.removeEventListener("abort", abort);
     clearTimeout(timer);
   }
 }
@@ -256092,7 +256149,7 @@ import { spawn as spawn4 } from "node:child_process";
 import { existsSync as existsSync19, readFileSync as readFileSync3 } from "node:fs";
 import { mkdir as mkdir12, readFile as readFile22, rm as rm13, writeFile as writeFile14 } from "node:fs/promises";
 import { createRequire as createRequire10 } from "node:module";
-import { dirname as dirname11, join as join31 } from "node:path";
+import { dirname as dirname12, join as join31 } from "node:path";
 init_pack();
 
 // frontend/packages/miniapp-kit/src/python-build.ts
@@ -256309,10 +256366,10 @@ function resolveViteBin(appDir) {
   try {
     const manifestPath = createRequire10(join31(appDir, "package.json")).resolve("vite/package.json");
     const declared = JSON.parse(readFileSync3(manifestPath, "utf8")).bin;
-    const relative3 = typeof declared === "string" ? declared : declared?.vite;
-    if (typeof relative3 !== "string")
+    const relative4 = typeof declared === "string" ? declared : declared?.vite;
+    if (typeof relative4 !== "string")
       throw new Error('vite has no "vite" bin');
-    return join31(dirname11(manifestPath), relative3);
+    return join31(dirname12(manifestPath), relative4);
   } catch (error51) {
     throw new BuildError(`vite is not installed for ${appDir}; run bun install (${error51 instanceof Error ? error51.message : String(error51)})`);
   }
@@ -257030,9 +257087,9 @@ function readNavigationTiming(clock, headScript, moduleStart) {
     const raw2 = values[field3];
     if (typeof raw2 !== "number" || !Number.isFinite(raw2) || raw2 <= 0)
       continue;
-    const relative3 = raw2 - offset;
-    if (relative3 >= 0 && relative3 <= 600000)
-      result[key] = Math.round(relative3);
+    const relative4 = raw2 - offset;
+    if (relative4 >= 0 && relative4 <= 600000)
+      result[key] = Math.round(relative4);
   }
   for (const [key, value2] of [
     ["headScriptMs", headScript],
@@ -257384,7 +257441,7 @@ observer.observe({type:'paint',buffered:true});
 } catch { unsupported=true;report() }
 })();`;
 }
-function createViteTracePlugin(options2, handlerFactory, parser2, forwarder, paint, navigationReader, resourceReader) {
+function createViteTracePlugin(options2, handlerFactory, parser2, forwarder, paint, navigationReader, resourceReader, loaded) {
   const handle = handlerFactory(options2, parser2, forwarder);
   let base = "/";
   return {
@@ -257425,6 +257482,13 @@ function createViteTracePlugin(options2, handlerFactory, parser2, forwarder, pai
       if (!options2.enabled)
         return;
       return [
+        ...loaded ? [
+          {
+            tag: "script",
+            injectTo: "head-prepend",
+            children: "(" + loaded.toString() + ")()"
+          }
+        ] : [],
         {
           tag: "script",
           attrs: { type: "module" },
@@ -257548,7 +257612,7 @@ traceMark('host_loaded')
 const parseLivePreviewDiagnostic = ${parseLivePreviewDiagnostic.toString()}
 const appSelect = document.getElementById('app')
 const asSelect = document.getElementById('as')
-const frame = document.getElementById('frame')
+let frame = document.getElementById('frame')
 const statusEl = document.getElementById('status')
 const params = new URLSearchParams(location.search)
 const requestedLocale = params.get('locale')
@@ -257575,7 +257639,6 @@ asSelect.value = config.principals.includes(params.get('as')) ? params.get('as')
 
 let session = null
 let port = null
-let nonce = null
 let refreshTimer = null
 let studioSend = null
 let studioOrigin = null
@@ -257696,17 +257759,129 @@ async function exchange(slug, as) {
 }
 
 let openingGeneration = 0
+let appLaunch = null
+function currentLaunch(launch) { return launch === appLaunch && !launch.failed && launch.generation === openingGeneration }
+function closePending(launch) {
+  for(const candidate of launch.pending)candidate.close()
+  launch.pending.clear()
+  clearTimeout(launch.pendingTimer)
+  clearTimeout(launch.retryTimer)
+  launch.negotiating=false
+}
+function discardApp(launch) {
+  closePending(launch)
+  port?.close()
+  port=null
+  clearTimeout(launch.prepareTimer)
+  launch.frame.removeAttribute('src')
+  launch.frame.style.visibility='hidden'
+  launch.failed=true
+}
+function connectApp(launch) {
+  if (!currentLaunch(launch) || !launch.session || !launch.loaded) return
+  if(launch.negotiating||(port&&launch.activeDocumentId===launch.documentId))return
+  closePending(launch)
+  const attempt=++launch.connectionAttempt
+  launch.negotiating=true
+  launch.frame.style.visibility = ''
+  launch.frame.contentWindow.postMessage({type:'kit-preview-trace-init',version:1,attemptId:traceAttempt||traceFallback}, launch.origin)
+  launch.pendingTimer=setTimeout(()=>{if(currentLaunch(launch)&&launch.connectionAttempt===attempt)closePending(launch)},10000)
+  const send=()=>{
+    if(!currentLaunch(launch)||!launch.negotiating||launch.connectionAttempt!==attempt)return
+    const channel = new MessageChannel()
+    const nonce = Array.from(crypto.getRandomValues(new Uint8Array(16)), value => value.toString(16).padStart(2, '0')).join('')
+    launch.pending.add(channel.port1)
+    channel.port1.onmessage = event => {
+      if (!currentLaunch(launch)) return
+      const message = event.data
+      if (message?.type === 'hello' && message.nonce === nonce && launch.connectionAttempt===attempt && launch.pending.has(channel.port1)) {
+        launch.pending.delete(channel.port1)
+        closePending(launch)
+        port?.close()
+        port = channel.port1
+        launch.activeDocumentId=launch.documentId
+        markStatus('connected')
+        port.postMessage({
+          type:'context', token:launch.session.token, expiresAt:launch.session.expiresAt,
+          session:launch.session.session, gatewayUrl:config.appGatewayUrl ?? config.gatewayUrl,
+          host:'superapp', locale, safeArea:{top:0,right:0,bottom:0,left:0},
+        })
+        traceMark('sdk_ready')
+        if (config.live) notifyStudio({type:'kit-live',event:'ready'})
+      } else if (message?.type === 'op' && port === channel.port1) reply(channel.port1, message)
+    }
+    launch.frame.contentWindow.postMessage({type:'init',nonce,launchId:crypto.randomUUID()}, launch.origin, [channel.port2])
+    if(launch.negotiating)launch.retryTimer=setTimeout(send,250)
+  }
+  send()
+}
+function releaseApp(launch) {
+  if (!currentLaunch(launch) || !launch.session || !launch.prepared || launch.released) return
+  launch.released=true
+  launch.frame.style.visibility=''
+  launch.frame.contentWindow.postMessage({type:'kit-app-execute',version:1,nonce:launch.nonce},launch.origin)
+}
+function createAppLaunch(generation, slug) {
+  if(appLaunch)closePending(appLaunch)
+  clearTimeout(appLaunch?.prepareTimer)
+  port?.close()
+  port=null
+  session=null
+  clearInterval(refreshTimer)
+  const next=frame.cloneNode(false)
+  next.removeAttribute('src')
+  frame.replaceWith(next)
+  frame=next
+  const base=config.apps.find(app=>app.slug===slug).url
+  const path=pendingPath.startsWith('/')?pendingPath.slice(1):pendingPath
+  const url=new URL(base+path)
+  const preparing=Boolean(config.prepareApps&&config.bridge)
+  next.style.visibility=preparing?'hidden':''
+  const launch={generation,frame:next,slug,origin:url.origin,url:url.href,preparing,nonce:Array.from(crypto.getRandomValues(new Uint8Array(16)),value=>value.toString(16).padStart(2,'0')).join(''),session:null,loaded:false,prepared:false,released:false,pending:new Set(),pendingTimer:null,retryTimer:null,connectionAttempt:0,documentId:null,activeDocumentId:null,documents:new Set()}
+  appLaunch=launch
+  next.addEventListener('load',()=>{if(currentLaunch(launch)&&!launch.preparing&&next.getAttribute('src')){traceMark('app_load');if(!launch.readySupport){closePending(launch);launch.documentId=crypto.randomUUID();launch.loaded=true;connectApp(launch)}}})
+  if (preparing) {
+    url.searchParams.set('__kit_prepare',launch.nonce)
+    url.searchParams.set('__kit_parent',location.origin)
+    const start=()=>setTimeout(()=>{if(currentLaunch(launch)){
+      traceMark('app_src_set');next.src=url.href
+      launch.prepareTimer=setTimeout(()=>{if(currentLaunch(launch)&&!launch.prepared){traceMark('failure','timeout');discardApp(launch);setStatus(t.launchError,true);markStatus('error:unavailable')}},30000)
+    }},0)
+    // Native starts its bridge on the Host's load-end. An iframe must not delay it.
+    if(document.readyState==='complete')start()
+    else window.addEventListener('load',start,{once:true})
+  }
+  return launch
+}
+window.addEventListener('message',event=>{
+  const launch=appLaunch,data=event.data
+  if(!launch||!currentLaunch(launch)||event.source!==launch.frame.contentWindow||event.origin!==launch.origin||data?.version!==1)return
+  if(data.type==='kit-app-prepared'&&launch.preparing&&data.nonce===launch.nonce){launch.prepared=true;clearTimeout(launch.prepareTimer);releaseApp(launch)}
+  else if(data.type==='kit-app-loaded'&&launch.preparing&&launch.released&&launch.session){traceMark('app_load');if(data.documentId===launch.documentId)connectApp(launch)}
+  else if(data.type==='kit-app-ready'&&(!launch.preparing||launch.released)&&launch.session&&typeof data.documentId==='string'&&/^[a-f0-9]{32}$/.test(data.documentId)&&!launch.documents.has(data.documentId)){
+    const initialFallback=!launch.readySupport&&(launch.pending.size>0||port)
+    launch.readySupport=true
+    launch.documentId=data.documentId
+    launch.documents.add(data.documentId)
+    if(launch.documents.size>16)launch.documents.delete(launch.documents.values().next().value)
+    launch.loaded=true
+    if(initialFallback){if(port)launch.activeDocumentId=data.documentId}
+    else {closePending(launch);connectApp(launch)}
+  }
+})
 async function open() {
   const generation = ++openingGeneration
+  const slug = appSelect.value
+  const launch = createAppLaunch(generation, slug)
   if(config.bridge){
     try{await waitForStudio()}catch(error){
       if(generation!==openingGeneration)return
+      discardApp(launch)
       setStatus(t.launchError,true);markStatus('error:unavailable');return
     }
     if(generation!==openingGeneration)return
     asSelect.value=studioIdentity===null?'self':studioIdentity
   }
-  const slug = appSelect.value
   const as = asSelect.value
   if(!config.bridge){
     const nextUrl = new URL(location.href)
@@ -257715,28 +257890,24 @@ async function open() {
     history.replaceState(null, '', nextUrl)
   }
   document.getElementById('app-title').textContent = slug
-  clearInterval(refreshTimer)
-  port?.close()
-  port = null
-  session = null
   markStatus(null)
   setStatus(t.opening + ' ' + slug + ' · ' + roleLabel(as) + '…')
   try {
     const exchanged = await exchange(slug, as)
     if (generation !== openingGeneration) return
     session = exchanged
+    launch.session = exchanged
   } catch (error) {
     if (generation !== openingGeneration) return
     traceMark('failure','protocol')
-    frame.removeAttribute('src')
+    discardApp(launch)
     setStatus(error.code + ': ' + slug + ' · ' + roleLabel(as), true)
     markStatus('error:' + error.code)
     return
   }
   setStatus(slug + ' · ' + roleLabel(as) + ' · ' + session.session.permissions.join(', '))
-  const base = config.apps.find((a) => a.slug === slug).url
-  traceMark('app_src_set')
-  frame.src = base + pendingPath.replace(/^\\//, '')
+  if (launch.preparing) releaseApp(launch)
+  else { traceMark('app_src_set'); frame.src = launch.url }
   pendingPath = ''
   refreshTimer = setInterval(refresh, 5 * 60 * 1000)
 }
@@ -257748,6 +257919,7 @@ async function refresh() {
     const refreshed = await exchange(app, identity)
     if(generation !== openingGeneration || app !== appSelect.value || identity !== asSelect.value) return
     session = refreshed
+    if(appLaunch&&currentLaunch(appLaunch))appLaunch.session=refreshed
     port?.postMessage({ type: 'context_update', token: session.token, expiresAt: session.expiresAt, session: session.session })
   } catch (error) {
     if(generation !== openingGeneration) return
@@ -257774,37 +257946,6 @@ function reply(target, op) {
       target.postMessage({ type: 'reply', requestId: op.requestId, ok: false, code: 'HOST_UNAVAILABLE', retryable: false })
   }
 }
-
-frame.addEventListener('load', () => {
-  if (!session || !frame.getAttribute('src')) return
-  traceMark('app_load')
-  frame.contentWindow.postMessage({type:'kit-preview-trace-init',version:1,attemptId:traceAttempt||traceFallback},new URL(frame.src).origin)
-  // Plain HTML remains visible; SDK-ready is only acknowledged after its nonce-bound hello.
-  const channel = new MessageChannel()
-  nonce = Array.from(crypto.getRandomValues(new Uint8Array(16)), (b) => b.toString(16).padStart(2, '0')).join('')
-  channel.port1.onmessage = (event) => {
-    const message = event.data
-    if (message?.type === 'hello' && message.nonce === nonce && session) {
-      port = channel.port1
-      markStatus('connected')
-      port.postMessage({
-        type: 'context',
-        token: session.token,
-        expiresAt: session.expiresAt,
-        session: session.session,
-        gatewayUrl: config.appGatewayUrl ?? config.gatewayUrl,
-        host: 'superapp',
-        locale,
-        safeArea: { top: 0, right: 0, bottom: 0, left: 0 },
-      })
-      traceMark('sdk_ready')
-      if (config.live) notifyStudio({ type: 'kit-live', event: 'ready' })
-    } else if (message?.type === 'op') {
-      reply(channel.port1, message)
-    }
-  }
-  frame.contentWindow.postMessage({ type: 'init', nonce, launchId: crypto.randomUUID() }, new URL(config.apps.find(app => app.slug === appSelect.value).url).origin, [channel.port2])
-})
 
 window.addEventListener('message',event=>{
   const data=event.data
@@ -258217,6 +258358,7 @@ init_src();
 function createLiveHostHandler(options2) {
   const configFor = (apps) => ({
     projectId: options2.projectId,
+    prepareApps: true,
     gatewayUrl: options2.live.gatewayUrl,
     apps,
     principals: options2.principals ?? ["self", "admin", "member", "anonymous"],
@@ -258249,6 +258391,260 @@ function createLiveHostHandler(options2) {
           "referrer-policy": "no-referrer"
         }
       });
+    }
+  };
+}
+
+// frontend/packages/miniapp-kit/src/dev/prepared-app.ts
+function announceAppLoaded() {
+  const scope = window;
+  if (scope.__kitAppDocument)
+    return;
+  const documentId = Array.from(crypto.getRandomValues(new Uint8Array(16)), (value2) => value2.toString(16).padStart(2, "0")).join("");
+  scope.__kitAppDocument = documentId;
+  const ready = () => window.parent.postMessage({ type: "kit-app-ready", version: 1, documentId }, "*");
+  if (document.readyState === "loading")
+    window.addEventListener("DOMContentLoaded", ready, { once: true });
+  else
+    queueMicrotask(ready);
+  window.addEventListener("load", () => {
+    window.parent.postMessage({ type: "kit-app-loaded", version: 1, documentId }, "*");
+  }, { once: true });
+}
+function prepareDocument(options2, loaded) {
+  const parsed = new DOMParser().parseFromString(options2.html, "text/html");
+  if (options2.cspNonce) {
+    for (const tag2 of parsed.querySelectorAll("script,style,link"))
+      tag2.setAttribute("nonce", options2.cspNonce);
+    options2.html = "<!doctype html>" + parsed.documentElement.outerHTML;
+  }
+  const base = new URL(parsed.querySelector("base")?.getAttribute("href") ?? location.href, location.href);
+  const requested = new Set;
+  const loading = [];
+  let failed2 = false;
+  const append = (link) => {
+    if (options2.cspNonce)
+      link.setAttribute("nonce", options2.cspNonce);
+    loading.push(new Promise((resolve3) => {
+      link.addEventListener("load", () => resolve3(), { once: true });
+      link.addEventListener("error", () => {
+        failed2 = true;
+        resolve3();
+      }, { once: true });
+    }));
+    document.head.append(link);
+  };
+  const moduleLink = (path) => {
+    const url2 = new URL(path, base);
+    if (url2.origin !== location.origin || requested.has(url2.href) || requested.size >= 128)
+      return;
+    requested.add(url2.href);
+    const link = document.createElement("link");
+    link.rel = "modulepreload";
+    link.href = url2.href;
+    append(link);
+  };
+  for (const path of options2.modules.slice(0, 128))
+    moduleLink(path);
+  const entries = [];
+  for (const source of parsed.querySelectorAll('script[type="module"][src],link[rel="stylesheet"][href]')) {
+    if (requested.size >= 80)
+      break;
+    const module = source.tagName === "SCRIPT";
+    const url2 = new URL(source.getAttribute(module ? "src" : "href"), base);
+    if (url2.origin !== location.origin || requested.has(url2.href))
+      continue;
+    requested.add(url2.href);
+    if (module)
+      entries.push(url2.pathname + url2.search);
+    const link = document.createElement("link");
+    link.rel = module ? "modulepreload" : "preload";
+    if (!module)
+      link.as = "style";
+    link.href = url2.href;
+    for (const name3 of ["crossorigin", "integrity", "referrerpolicy", "nonce"]) {
+      const value2 = source.getAttribute(name3);
+      if (value2 !== null)
+        link.setAttribute(name3, value2);
+    }
+    append(link);
+  }
+  const controller = new AbortController;
+  let deadline;
+  const exhausted = new Promise((resolve3) => {
+    deadline = setTimeout(() => {
+      failed2 = true;
+      controller.abort();
+      console.warn("kit: preview preparation budget exhausted");
+      resolve3();
+    }, 15000);
+  });
+  const preparing = (async () => {
+    try {
+      if (options2.manifestPath && entries.length) {
+        const response = await fetch(options2.manifestPath, {
+          method: "POST",
+          signal: controller.signal,
+          headers: { "content-type": "application/json" },
+          body: JSON.stringify({ entries: entries.slice(0, 16) })
+        });
+        if (!response.ok)
+          throw new Error("Preview module preparation failed");
+        const body2 = await response.json();
+        if (!Array.isArray(body2.modules) || body2.modules.length > 128 || body2.modules.some((value2) => typeof value2 !== "string"))
+          throw new Error("Invalid preview module preparation");
+        for (const url2 of body2.modules)
+          moduleLink(url2);
+      }
+      await Promise.all(loading);
+    } catch {
+      failed2 = true;
+      console.warn("kit: preview module preparation failed");
+    }
+  })();
+  const prepared = Promise.race([preparing, exhausted]).finally(() => clearTimeout(deadline));
+  let released = false;
+  const execute = async () => {
+    await prepared;
+    const target2 = new URL(location.href);
+    target2.searchParams.delete("__kit_prepare");
+    target2.searchParams.delete("__kit_parent");
+    if (failed2) {
+      console.warn("kit: loading the authenticated App after a preload failure");
+      location.replace(target2.href);
+      return;
+    }
+    history.replaceState(null, "", target2);
+    document.open();
+    loaded();
+    document.write(options2.html);
+    document.close();
+  };
+  window.addEventListener("message", (event) => {
+    if (released || event.source !== window.parent || event.origin !== options2.parentOrigin)
+      return;
+    const message2 = event.data;
+    if (message2?.type !== "kit-app-execute" || message2.version !== 1 || message2.nonce !== options2.nonce)
+      return;
+    released = true;
+    if (document.readyState === "complete")
+      execute();
+    else
+      window.addEventListener("load", execute, { once: true });
+  });
+  window.parent.postMessage({ type: "kit-app-prepared", version: 1, nonce: options2.nonce }, options2.parentOrigin);
+}
+function renderPreparedApp(options2, boot = prepareDocument, loaded = announceAppLoaded) {
+  if (!/^[a-f0-9]{32}$/.test(options2.nonce) || new URL(options2.parentOrigin).origin !== options2.parentOrigin) {
+    throw new Error("Invalid preview preparation scope");
+  }
+  const input = JSON.stringify(options2).replace(/</g, "\\u003c");
+  const nonce = options2.cspNonce ? ' nonce="' + options2.cspNonce.replaceAll("&", "&amp;").replaceAll('"', "&quot;").replaceAll("<", "&lt;") + '"' : "";
+  return `<!doctype html><html><head><meta charset="utf-8"><script${nonce}>(${boot.toString()})(${input},${loaded.toString()})</script></head><body></body></html>`;
+}
+function createPreparedAppPlugin(options2, render, boot, loaded, parse9, allowed) {
+  let base = "/";
+  let cspNonce;
+  return {
+    name: "kit-prepared-app",
+    configResolved(config3) {
+      base = config3.base;
+      cspNonce = config3.html?.cspNonce;
+    },
+    configureServer(server2) {
+      if (!options2.enabled)
+        return;
+      server2.middlewares.use(async (request, response, next) => {
+        if (request.url?.split("?")[0] !== base + "__kit/preload")
+          return next();
+        if (request.method !== "POST") {
+          response.statusCode = 405;
+          response.end();
+          return;
+        }
+        try {
+          let body2 = "";
+          for await (const chunk of request) {
+            body2 += chunk.toString();
+            if (Buffer.byteLength(body2) > 8192) {
+              response.statusCode = 413;
+              response.end();
+              return;
+            }
+          }
+          const data = JSON.parse(body2);
+          if (!Array.isArray(data.entries) || data.entries.length > 16 || data.entries.some((entry2) => typeof entry2 !== "string" || !entry2.startsWith(base) || entry2.startsWith("//"))) {
+            response.statusCode = 400;
+            response.end();
+            return;
+          }
+          const pending = [...data.entries];
+          const seen = new Set;
+          const modules = [];
+          const client = server2.environments.client;
+          while (pending.length && seen.size < 128) {
+            const batch = pending.splice(0, 16).filter((url2) => {
+              if (seen.has(url2) || seen.size >= 128)
+                return false;
+              seen.add(url2);
+              return true;
+            });
+            const transformed = await Promise.all(batch.map(async (url2) => {
+              const internal = base === "/" ? url2 : "/" + url2.slice(base.length);
+              const module = await client.moduleGraph.getModuleByUrl(internal);
+              if (!module || module.file && !allowed("/@fs/" + module.file, server2))
+                return { url: url2, result: null };
+              const result = await client.transformRequest(internal);
+              return { url: url2, result };
+            }));
+            for (const { url: url2, result } of transformed) {
+              if (!result)
+                continue;
+              modules.push(url2);
+              for (const node of parse9(result.code).body) {
+                if (!["ImportDeclaration", "ExportNamedDeclaration", "ExportAllDeclaration"].includes(node.type) || typeof node.source?.value !== "string" || !/^(?:\/|\.)/.test(node.source.value))
+                  continue;
+                const target2 = new URL(node.source.value, "http://kit.invalid" + url2);
+                if (target2.origin === "http://kit.invalid" && target2.pathname.startsWith(base))
+                  pending.push(target2.pathname + target2.search);
+              }
+            }
+          }
+          response.setHeader("content-type", "application/json");
+          response.setHeader("cache-control", "no-store");
+          response.end(JSON.stringify({ modules }));
+        } catch {
+          console.warn("kit: preview module graph preparation failed");
+          response.statusCode = 503;
+          response.end();
+        }
+      });
+    },
+    transformIndexHtml: {
+      order: "post",
+      handler(html, context) {
+        if (!options2.enabled || !context.originalUrl)
+          return;
+        const url2 = new URL(context.originalUrl, "http://kit.invalid");
+        const nonce = url2.searchParams.get("__kit_prepare");
+        const parentOrigin = url2.searchParams.get("__kit_parent");
+        if (!nonce || !parentOrigin || !/^[a-f0-9]{32}$/.test(nonce))
+          return;
+        try {
+          if (!/^https?:$/.test(new URL(parentOrigin).protocol) || new URL(parentOrigin).origin !== parentOrigin)
+            return;
+        } catch {
+          return;
+        }
+        return render({
+          html,
+          modules: [],
+          manifestPath: base + "__kit/preload",
+          cspNonce,
+          nonce,
+          parentOrigin
+        }, boot, loaded);
+      }
     }
   };
 }
@@ -258935,7 +259331,7 @@ async function assertNoDevVarsInHistory(git, root, tip, base) {
 // frontend/packages/miniapp-kit/src/dev/watcher.ts
 init_runtime2();
 import { watch as watchFiles } from "node:fs";
-import { relative as relative3, sep as sep2 } from "node:path";
+import { relative as relative4, sep as sep2 } from "node:path";
 
 // frontend/packages/miniapp-kit/src/dev/watcher-build.ts
 init_src2();
@@ -259731,7 +260127,7 @@ function classifyChange(path, changes) {
   return false;
 }
 function watchRoot(root, changed, failed2) {
-  const watcher = watchFiles(root, { recursive: true }, (_event, path) => changed(path ? relative3(root, `${root}/${path}`) : null));
+  const watcher = watchFiles(root, { recursive: true }, (_event, path) => changed(path ? relative4(root, `${root}/${path}`) : null));
   watcher.on("error", failed2);
   return watcher;
 }
@@ -260304,11 +260700,12 @@ function stop(code = 0) {
   })();
 }
 try {
-  const { createServer } = await import(pathToFileURL(entry).href);
-  const timing = (${createViteTracePlugin.toString()})({ enabled: Boolean(process.env.MINIAPP_SESSION_LIVE_TOKEN), notifyUrl: process.env.KIT_LIVE_NOTIFY_URL, notifyKey: process.env.KIT_LIVE_NOTIFY }, ${createPreviewTraceHandler.toString()}, ${parseBrowserTraceBatch.toString()}, ${forwardBrowserTrace.toString()}, ${appPaintScript.toString()}, ${readNavigationTiming.toString()}, ${summarizeResources.toString()});
+  const { createServer, parseAst, isFileServingAllowed } = await import(pathToFileURL(entry).href);
+  const timing = (${createViteTracePlugin.toString()})({ enabled: Boolean(process.env.MINIAPP_SESSION_LIVE_TOKEN), notifyUrl: process.env.KIT_LIVE_NOTIFY_URL, notifyKey: process.env.KIT_LIVE_NOTIFY }, ${createPreviewTraceHandler.toString()}, ${parseBrowserTraceBatch.toString()}, ${forwardBrowserTrace.toString()}, ${appPaintScript.toString()}, ${readNavigationTiming.toString()}, ${summarizeResources.toString()}, ${announceAppLoaded.toString()});
+  const prepared = (${createPreparedAppPlugin.toString()})({ enabled: Boolean(process.env.MINIAPP_SESSION_LIVE_TOKEN) }, ${renderPreparedApp.toString()}, ${prepareDocument.toString()}, ${announceAppLoaded.toString()}, parseAst, isFileServingAllowed);
   server = await createServer({
     root,
-    plugins: [timing],
+    plugins: [timing, prepared],
     logLevel: 'warn',
     server: { port: Number(process.argv[1]), strictPort: true, warmup: { clientFiles: ['./index.html'] } },
   });
@@ -260452,7 +260849,7 @@ init_src();
 import { randomBytes as randomBytes4 } from "node:crypto";
 import { existsSync as existsSync22 } from "node:fs";
 import { readFile as readFile30, realpath } from "node:fs/promises";
-import { relative as relative4, resolve as resolve3, sep as sep3 } from "node:path";
+import { relative as relative5, resolve as resolve3, sep as sep3 } from "node:path";
 init_runtime2();
 init_session_runtime();
 
@@ -260671,7 +261068,7 @@ async function checkBrowser(options2, input, app, hostUrl, redact2, importer) {
 async function scenarioPath(root, path) {
   const base = await realpath(root);
   const file2 = await realpath(resolve3(root, path));
-  const rel = relative4(base, file2);
+  const rel = relative5(base, file2);
   if (rel === ".." || rel.startsWith(".." + sep3) || !/\.(?:ts|js|mjs)$/.test(file2))
     throw new LiveE2EError("E2E scenario must be a source-relative JS/TS module");
   return file2;
@@ -261220,7 +261617,7 @@ init_dist();
 init_vendor();
 import { existsSync as existsSync24 } from "node:fs";
 import { mkdir as mkdir18, readdir as readdir14, readFile as readFile32, writeFile as writeFile20 } from "node:fs/promises";
-import { dirname as dirname12, join as join42, relative as relative5 } from "node:path";
+import { dirname as dirname13, join as join42, relative as relative6 } from "node:path";
 var TEMPLATE_DIR = "templates/project";
 var DEFAULT_APP_SPECS = ["web", "admin"];
 var NAME_PATTERN = /^[a-z][a-z0-9-]{0,63}$/;
@@ -261259,7 +261656,7 @@ async function newProject(options2) {
   const files = [];
   const sources = await listFiles(template);
   const put = async (target2, text2) => {
-    await mkdir18(dirname12(join42(root, target2)), { recursive: true });
+    await mkdir18(dirname13(join42(root, target2)), { recursive: true });
     await writeFile20(join42(root, target2), text2);
     files.push(target2);
   };
@@ -261416,7 +261813,7 @@ async function listFiles(root) {
       if (entry2.isDirectory())
         await walk(path);
       else if (entry2.isFile())
-        files.push(relative5(root, path).split("\\").join("/"));
+        files.push(relative6(root, path).split("\\").join("/"));
     }
   };
   await walk(root);
@@ -261983,11 +262380,11 @@ async function integrate(git2, source, threadRef) {
 // frontend/packages/miniapp-kit/src/sdk-fingerprint.ts
 import { createHash as createHash16 } from "node:crypto";
 import { readdir as readdir16, readFile as readFile35 } from "node:fs/promises";
-import { join as join45, relative as relative6, sep as sep4 } from "node:path";
+import { join as join45, relative as relative7, sep as sep4 } from "node:path";
 async function sdkVendorHash(kitRoot) {
   const root = join45(kitRoot, "vendor");
   const entries = await readdir16(root, { recursive: true, withFileTypes: true });
-  const files = entries.filter((entry2) => entry2.isFile()).map((entry2) => relative6(root, join45(entry2.parentPath, entry2.name)).split(sep4).join("/")).sort();
+  const files = entries.filter((entry2) => entry2.isFile()).map((entry2) => relative7(root, join45(entry2.parentPath, entry2.name)).split(sep4).join("/")).sort();
   const digest5 = createHash16("sha256");
   for (const path of files) {
     const content = await readFile35(join45(root, path));
@@ -262804,7 +263201,7 @@ async function validateVersion(options2) {
 // frontend/packages/miniapp-kit/src/workdir.ts
 import { existsSync as existsSync27 } from "node:fs";
 import { readFile as readFile37, unlink, writeFile as writeFile25 } from "node:fs/promises";
-import { dirname as dirname13, join as join51 } from "node:path";
+import { dirname as dirname14, join as join51 } from "node:path";
 var CONFIG_FILE = ".fdpocket.json";
 var LEGACY_CONFIG_FILE = ".tokoyo.json";
 var WORKDIR_DIRS = {
@@ -262877,10 +263274,10 @@ function locateWorkdir(start) {
   return locateFile(start, CONFIG_FILE);
 }
 function locateFile(start, name3) {
-  for (let current = start;; current = dirname13(current)) {
+  for (let current = start;; current = dirname14(current)) {
     if (existsSync27(join51(current, name3)))
       return current;
-    if (dirname13(current) === current)
+    if (dirname14(current) === current)
       return null;
   }
 }
@@ -263295,7 +263692,7 @@ async function writeBuildReport(workdir, built, policyRevision) {
     schemaVersion: built.schema_version,
     ...policyRevision === undefined ? {} : { policyRevision }
   });
-  await mkdir24(dirname14(path), { recursive: true });
+  await mkdir24(dirname15(path), { recursive: true });
   await writeFile26(path, `${JSON.stringify(report2, null, 2)}
 `);
 }
@@ -263780,7 +264177,7 @@ async function addAsset(context, flags) {
   const workdir = await findWorkdir(context.cwd);
   const bytes3 = await fetchVerified(context, path, flags.url, flags.sha256);
   const target2 = join52(sourceOf(workdir), ...segments);
-  await mkdir24(dirname14(target2), { recursive: true });
+  await mkdir24(dirname15(target2), { recursive: true });
   await writeFile26(target2, bytes3);
   print(context, {
     path,
@@ -263888,7 +264285,7 @@ async function e2eCommand(context, flags) {
 
 // frontend/packages/miniapp-kit/src/cli.ts
 function kitRootOf(scriptUrl) {
-  return resolve5(dirname15(fileURLToPath2(scriptUrl)), "..");
+  return resolve5(dirname16(fileURLToPath2(scriptUrl)), "..");
 }
 async function main(argv, scriptUrl) {
   let args;

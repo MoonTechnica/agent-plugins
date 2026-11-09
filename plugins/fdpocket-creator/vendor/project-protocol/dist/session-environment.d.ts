@@ -100,6 +100,8 @@ export declare const sessionEnvironmentViewSchema: z.ZodObject<{
         createdAt: z.ZodString;
     }, z.core.$strict>>>>;
     live: z.ZodObject<{
+        authenticationReady: z.ZodCatch<z.ZodOptional<z.ZodBoolean>>;
+        resourceGeneration: z.ZodCatch<z.ZodOptional<z.ZodNullable<z.ZodUUID>>>;
         kind: z.ZodNullable<z.ZodEnum<{
             sandbox: "sandbox";
             connect: "connect";
