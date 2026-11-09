@@ -18105,7 +18105,7 @@ var init_resolve = __esm(() => {
       requiredPermission: exports_external.string().regex(PERMISSION_PATTERN).nullable(),
       capabilities: capabilitiesSchema,
       anonymous: exports_external.strictObject({ allowed: exports_external.boolean(), write: exports_external.boolean() }),
-      originHost: exports_external.string().refine((label) => parseOriginLabel(label)?.app != null, "invalid app origin label")
+      originHost: exports_external.string().refine((label) => parseOriginLabel(label) !== null, "invalid origin label")
     }),
     user: exports_external.strictObject({
       bootstrap: exports_external.strictObject({

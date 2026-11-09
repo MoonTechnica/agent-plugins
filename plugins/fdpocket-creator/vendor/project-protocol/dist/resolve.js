@@ -94,11 +94,12 @@ const activeSchema = z.strictObject({
         anonymous: z.strictObject({ allowed: z.boolean(), write: z.boolean() }),
         /**
          * CORS で許すこの App 専用オリジンのホスト名のラベル（`{Project}--{App}[--{環境}]`。app-origins.md §3）。
-         * アプリ用ドメインは Gateway の設定が持つ（DB に焼き込まない）。
+         * アプリ用ドメインは Gateway の設定が持つ（DB に焼き込まない）。App を指定しない解決（起動の App
+         * 選択の一覧 `/v1/apps`）だけは、DB が入口のラベル（`{Project}[--{環境}]`）を返す。
          */
         originHost: z
             .string()
-            .refine((label) => parseOriginLabel(label)?.app != null, 'invalid app origin label'),
+            .refine((label) => parseOriginLabel(label) !== null, 'invalid origin label'),
     }),
     user: z.strictObject({
         bootstrap: z.strictObject({
