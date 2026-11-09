@@ -259566,18 +259566,16 @@ async function prepareSessionChanges(options2, changes, signal, baseline = { rev
     }
   }
   if (changes.samples && !changes.schema && baseline.revision) {
-    const source = await collectWorkingSource(root);
     const payload = {
       baseRevision: baseline.revision,
-      source: { hash: source.hash, sizeBytes: source.sizeBytes },
+      sourceHash: (await collectWorkingSource(root)).hash,
       manifest: manifest2
     };
     events.push({
       notification: {
         kind: "sample",
         payload: { hash: digest4(JSON.stringify(payload)), ...payload }
-      },
-      bundle: source.bytes
+      }
     });
   }
   const builds = [];

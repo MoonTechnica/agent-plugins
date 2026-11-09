@@ -51,7 +51,8 @@ export interface SessionPythonPayload {
 export interface SessionSamplePayload {
     hash: string;
     baseRevision: string;
-    source: SessionSourceDescriptor;
+    /** Tells one request from the next; the declaration itself is evaluated in the Sandbox. */
+    sourceHash: string;
     manifest: NormalizedProjectManifest;
 }
 export interface SessionSyncJob {
