@@ -37,6 +37,7 @@ export * from "./realtime.js";
 export * from "./resolve.js";
 export * from "./safety.js";
 export * from "./sandbox-dispatch.js";
+export * from "./search.js";
 export * from "./session-environment.js";
 export * from "./session-live-events.js";
 export * from "./session-sample-plan.js";

@@ -15,6 +15,33 @@ import "schema"
 // 名義だけを外す。reason は残す理由、days は残す日数（1〜3650）。検証が形を確かめ、審査 Agent が理由を読む
 attribute @@platform.retain(reason: String, days: Int)
 
+// 全文検索（search.md）。fields は検索の対象にする文字列の列（1〜8 個）。Platform が migration に FTS5 の仮想表と
+// トリガーを足し、Gateway が検索の計算フィールドを用意する。モデルは `with PlatformSearch` で ftsMatch / ftsRank を持つ
+attribute @@platform.search(_ fields: FieldReference[])
+
+// 検索の計算フィールド（`@@platform.search` のあるモデルに付ける mixin。実装は Gateway）。
+//   where:   { ftsMatch: { args: { q: '東京オフィス' }, equals: true } }
+//   orderBy: { ftsRank:  { args: { q: '東京オフィス' }, sort: 'asc' } }   // bm25（小さいほど関連が高い）
+// q は利用者の入力をそのまま渡してよい（語の分割・引用・エスケープは Gateway がする）
+type PlatformSearch {
+  ftsMatch(q: String) Boolean @computed
+  ftsRank(q: String) Float @computed
+}
+
+// ベクトル検索（search.md §3.4）。field は埋め込みを JSON の配列の文字列（'[0.1, 0.2, …]'。省略可能な String）で持つ列、
+// dims は次元数（1〜1536）。Platform が migration に副表（libSQL の F32_BLOB と近似索引）と同期のトリガーを足す。
+// モデルは `with PlatformVector` で vecMatch / vecDistance を持つ
+attribute @@platform.vector(_ field: FieldReference, dims: Int)
+
+// ベクトル検索の計算フィールド（`@@platform.vector` のあるモデルに付ける mixin。実装は Gateway）。
+//   where:   { vecMatch:    { args: { v: '[0.1, 0.2]', k: 50 }, equals: true } }   // 近い順の上位 k 件（近似）。ポリシーはその後に効く
+//   orderBy: { vecDistance: { args: { v: '[0.1, 0.2]' }, sort: 'asc' } }          // コサイン距離（0 が同じ、2 が反対）
+// v の次元数は dims と同じ（違うと入力エラー）
+type PlatformVector {
+  vecMatch(v: String, k: Int) Boolean @computed
+  vecDistance(v: String) Float @computed
+}
+
 // auth() の型（data-model.md §3.3）。Gateway が $setAuth で渡す。権限の判定は auth().permissions?[name == '…']
 type Permission {
   name String

@@ -5,6 +5,6 @@
   "type": "module",
   "devDependencies": {
     "@workspace/sdk": "workspace:*",
-    "@zenstackhq/orm": "3.9.7"
+    "@zenstackhq/orm": "3.10.1"
   }
 }

@@ -45,6 +45,7 @@ Project は利用者向けの `web` と、必要なら管理用の `admin` の A
 | `$fdpocket-app-listing` | **必ず**（版を作るターン）。掲載情報（名前・キャッチコピー・説明・カテゴリ・タグ・アイコン・カバー） |
 | `$fdpocket-app-admin` | 管理画面を作るとき・権限（Role / Permission）を設計するとき |
 | `$fdpocket-app-storage` | ファイル（画像・添付・書類）を扱うとき |
+| `$fdpocket-app-search` | キーワード検索・検索ボックス・横断検索・「探す」を入れるとき（全文検索。`@@platform.search` と `ftsMatch`） |
 | `$fdpocket-app-integrations` | 外部 API・api / jobs・秘密・schedule を扱うとき |
 | `$fdpocket-app-notifications` | 通知テンプレート・利用者の同意・サーバーからの送信を扱うとき |
 | `$fdpocket-app-ai` | AI の機能（要約・下書き・分類・チャット・画像や PDF の読み取り）を入れるとき |

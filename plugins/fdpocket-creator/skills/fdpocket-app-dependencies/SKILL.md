@@ -43,7 +43,6 @@ npm の公開パッケージは足してよい。ただし**足したものは�
 3. `node <kit>/scripts/kit.mjs build` が通ることを確かめる（`vite_warnings` に大きなチャンクの警告が出ていないか）。
 
 - **git・URL・`file:`・`link:` の依存は不可**（`bun.lock` が npm レジストリの版 + integrity でないと `kit build` と `kit check` が落とす）。
-- **`bunfig.toml` を変えない**: 公開から 7 日未満の版は解決されない（`minimumReleaseAge`）。新しすぎる版が要るなら一つ前の版にする。
-  各 package は自分の `package.json` に宣言した依存だけを解決する（`linker = "isolated"`）。宣言していない package を import すると動かない（`$fdpocket-app-structure`）。
+- **`bunfig.toml` を変えない**: 各 package は自分の `package.json` に宣言した依存だけを解決する（`linker = "isolated"`）。宣言していない package を import すると動かない（`$fdpocket-app-structure`）。
   依存の install スクリプトは動かない（`ignoreScripts`）。install スクリプトが無いと動かないパッケージは使えない。
 - `packages/miniapp-sdk/` と `packages/project-protocol/` は Kit が置く。npm の同名・類似のパッケージを足さない。

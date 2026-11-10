@@ -29,10 +29,10 @@
   "dependencies": {
     "@modelcontextprotocol/server": "2.4.0",
     "@workspace/project-protocol": "workspace:*",
-    "@zenstackhq/client-helpers": "3.9.7",
-    "@zenstackhq/orm": "3.9.7",
-    "@zenstackhq/schema": "3.9.7",
-    "@zenstackhq/tanstack-query": "3.9.7"
+    "@zenstackhq/client-helpers": "3.10.1",
+    "@zenstackhq/orm": "3.10.1",
+    "@zenstackhq/schema": "3.10.1",
+    "@zenstackhq/tanstack-query": "3.10.1"
   },
   "peerDependencies": {
     "@tailwindcss/vite": "^4",

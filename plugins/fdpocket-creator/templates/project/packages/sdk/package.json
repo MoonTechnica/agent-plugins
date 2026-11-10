@@ -8,7 +8,7 @@
   },
   "dependencies": {
     "@workspace/miniapp-sdk": "workspace:*",
-    "@zenstackhq/orm": "3.9.7",
-    "@zenstackhq/schema": "3.9.7"
+    "@zenstackhq/orm": "3.10.1",
+    "@zenstackhq/schema": "3.10.1"
   }
 }

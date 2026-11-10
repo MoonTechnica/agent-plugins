@@ -345,6 +345,33 @@ await client.idempotent(crypto.randomUUID()).db.task.create({ data })   // 二�
 | 上限 | 1 リクエストの本体 1 MiB、`createMany` は 500 行、`include` の入れ子は深さ 3 まで |
 | 書いた後に読めない | 保存はされたが、新しい値をポリシー上読み返せないときは `POST_WRITE_READ_DENIED`（`committed: true`）。**失敗として扱わない**（一覧を読み直す） |
 
+**全文検索**（手順は `$fdpocket-app-search`）: モデルに `with PlatformSearch` と `@@platform.search([title, body])`（文字列の列 1〜8 個）を書くと、
+`kit db migrate` が検索の索引と同期のトリガーを migration に足す（SQL は書かない）。検索は `findMany` の `where` と `orderBy` に
+引数付きのフィールドで書く。ポリシー（`@@allow('read', …)`）がそのまま効き、権限のない行は結果にも件数にも出ない。
+
+```ts
+await client.db.post.findMany({
+  where: { ftsMatch: { args: { q: '東京オフィス' }, equals: true } },
+  orderBy: [{ ftsRank: { args: { q: '東京オフィス' }, sort: 'asc' } }, { id: 'asc' }],   // 小さいほど関連が高い
+  take: 20,
+})
+```
+
+`q` は利用者の入力をそのまま渡す（Gateway が語に分けて引用する）。空白区切りの語は AND、3 文字未満の語は部分一致。ページングは `take` と `skip`。
+
+**ベクトル検索**（`$fdpocket-app-search` §6）: モデルに `with PlatformVector` と `@@platform.vector(embedding, dims: 1536)` を書く
+（`embedding` は JSON の配列の文字列を持つ省略可能な String）。埋め込みの生成は Platform の AI にはなく、python の App か外部の API で作る。
+
+```ts
+await client.db.article.findMany({
+  where: { vecMatch: { args: { v: JSON.stringify(queryVector), k: 50 }, equals: true } },   // 近い順の上位 k 件（最大 500）
+  orderBy: [{ vecDistance: { args: { v: JSON.stringify(queryVector) }, sort: 'asc' } }, { id: 'asc' }], // コサイン距離
+  take: 10,
+})
+```
+
+ポリシーは上位 `k` 件を選んだ後に効くので、権限のない行が上位にあると結果は `k` 件に満たない。次元数が `dims` と違う `v` は `VALIDATION_FAILED`。
+
 **React**（`@workspace/miniapp-sdk/react`）: データのフックは ZenStack の公式をそのまま再輸出している。
 
 ```tsx
@@ -819,7 +846,7 @@ key はモデル内で安定した名前で、data には ID を書かない。�
 - npm の公開パッケージは足してよい（足す前に `$fdpocket-app-dependencies` の基準で調べる）。`package.json` に書いて `bun install` し、
   **`bun.lock` を commit する**。
 - **git・URL・`file:` の依存は不可**（`kit build` が install の前に落とす）。`bun.lock` は npm レジストリの版 + integrity と `workspace:` だけ。
-- **`bunfig.toml` を変えない**（`minimumReleaseAge`: 公開 7 日未満の版を解決しない / `ignoreScripts`: 依存の install スクリプトを動かさない / `linker = "isolated"`: 各 package は自分の `package.json` に宣言した依存だけを解決する）。
+- **`bunfig.toml` を変えない**（`ignoreScripts`: 依存の install スクリプトを動かさない / `linker = "isolated"`: 各 package は自分の `package.json` に宣言した依存だけを解決する）。
   `kit build` は `--frozen-lockfile --ignore-scripts` で入れるので、書き換えても効かない。
 - SDKの依存宣言が変わる更新時は、元のアプリ依存とlockの整合を確認してからSDK差分をlockへ反映し、
   その後に固定インストールする。ローカルで更新されたSDK宣言と`bun.lock`は通常の編集と一緒にcommitする。

@@ -87,7 +87,7 @@ OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 SOFTWARE.
 ```
 
-## @zenstackhq/client-helpers 3.9.7
+## @zenstackhq/client-helpers 3.10.1
 
 License: MIT
 
@@ -115,7 +115,7 @@ OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 SOFTWARE.
 ```
 
-## @zenstackhq/common-helpers 3.9.7
+## @zenstackhq/common-helpers 3.10.1
 
 License: MIT
 
@@ -143,7 +143,7 @@ OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 SOFTWARE.
 ```
 
-## @zenstackhq/orm 3.9.7
+## @zenstackhq/orm 3.10.1
 
 License: MIT
 
@@ -171,7 +171,7 @@ OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 SOFTWARE.
 ```
 
-## @zenstackhq/plugin-policy 3.9.7
+## @zenstackhq/plugin-policy 3.10.1
 
 License: MIT
 
@@ -199,7 +199,7 @@ OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 SOFTWARE.
 ```
 
-## @zenstackhq/schema 3.9.7
+## @zenstackhq/schema 3.10.1
 
 License: MIT
 
@@ -227,7 +227,7 @@ OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 SOFTWARE.
 ```
 
-## @zenstackhq/server 3.9.7
+## @zenstackhq/server 3.10.1
 
 License: MIT
 
@@ -255,7 +255,7 @@ OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 SOFTWARE.
 ```
 
-## @zenstackhq/zod 3.9.7
+## @zenstackhq/zod 3.10.1
 
 License: MIT
 
@@ -1004,14 +1004,14 @@ OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 SOFTWARE.
 ```
 
-## nanoid 3.3.16
+## nanoid 5.1.16
 
 License: MIT
 
 ```text
 The MIT License (MIT)
 
-Copyright 2017 Andrey Sitnik <andrey@sitnik.ru>
+Copyright 2017 Andrey Sitnik <andrey@sitnik.es>
 
 Permission is hereby granted, free of charge, to any person obtaining a copy of
 this software and associated documentation files (the "Software"), to deal in
