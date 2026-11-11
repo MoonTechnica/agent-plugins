@@ -46858,7 +46858,7 @@ async function settleEmbedding(ai2, plan, upstream) {
       costUsd: cost
     });
   }
-  return Response.json(body);
+  return body;
 }
 var text3, embeddingRequestSchema, embeddingModelOf = (request) => request.model ?? AI_EMBEDDING_MODEL_DEFAULT, usageSchema, answerSchema;
 var init_embedding = __esm(() => {
@@ -47394,7 +47394,7 @@ function registerAiOpenAiRoutes(app, adapters, config2, runtime, logger) {
         run: run.toLowerCase(),
         model: embeddingModelOf(request2)
       });
-      return embed(job.ai, turnId, plan2, request2);
+      return embed(c, job.ai, turnId, plan2, request2);
     }
     const { claims, resolved, ai: ai2 } = await open(c);
     const request = await parseEmbeddingRequest(c);
@@ -47408,7 +47408,7 @@ function registerAiOpenAiRoutes(app, adapters, config2, runtime, logger) {
       userId: claims.actorId,
       model: embeddingModelOf(request)
     });
-    return embed(ai2, turnId, plan, request);
+    return embed(c, ai2, turnId, plan, request);
   });
   async function parseEmbeddingRequest(c) {
     const parsed = embeddingRequestSchema.safeParse(await jsonBody(c));
@@ -47416,9 +47416,9 @@ function registerAiOpenAiRoutes(app, adapters, config2, runtime, logger) {
       throw new GatewayError("VALIDATION_FAILED", "invalid embeddings request");
     return parsed.data;
   }
-  async function embed(ai2, turnId, plan, request) {
+  async function embed(c, ai2, turnId, plan, request) {
     const upstream = await startEmbedding(ai2, { ...plan, turnId }, request);
-    return settleEmbedding(ai2, { ...plan, turnId }, upstream);
+    return c.json(await settleEmbedding(ai2, { ...plan, turnId }, upstream));
   }
   async function parseRequest(c) {
     const parsed = requestSchema.safeParse(await jsonBody(c));
