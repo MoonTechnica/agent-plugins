@@ -359,8 +359,9 @@ await client.db.post.findMany({
 
 `q` は利用者の入力をそのまま渡す（Gateway が語に分けて引用する）。空白区切りの語は AND、3 文字未満の語は部分一致。ページングは `take` と `skip`。
 
-**ベクトル検索**（`$fdpocket-app-search` §6）: モデルに `with PlatformVector` と `@@platform.vector(embedding, dims: 1536)` を書く
-（`embedding` は JSON の配列の文字列を持つ省略可能な String）。埋め込みの生成は Platform の AI にはなく、python の App か外部の API で作る。
+**ベクトル検索**（`$fdpocket-app-search` §6）: モデルに `with PlatformVector` と `@@platform.vector(embedding, dims: 1536, modelField: embeddingModel)` を書く
+（`embedding` は JSON の配列の文字列を持つ省略可能な String、`embeddingModel` は作ったモデル名の String。モデルが違うベクトルは比べられないので必ず記録する）。
+埋め込みの生成は Platform の AI（`client.ai.embed`。`$fdpocket-app-ai` §3b）。索引の調整（`maxNeighbors` / `compress` / `searchL` / `insertL` / `alpha`）と精度の上げ方は `$fdpocket-app-search` §6.4。
 
 ```ts
 await client.db.article.findMany({

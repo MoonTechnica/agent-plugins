@@ -101,14 +101,17 @@ model Article with PlatformSearch, PlatformVector {
   title     String
   body      String
   embedding String?          // 埋め込みを JSON の配列の文字列（'[0.12, -0.03, …]'）で持つ。省略可能な String
+  embeddingModel String?     // その埋め込みを作ったモデル名（必ず記録する。§6.2）
 
   @@platform.search([title, body])
-  @@platform.vector(embedding, dims: 1536)      // 次元数は埋め込みのモデルと同じ（1〜1536）
+  @@platform.vector(embedding, dims: 1536, modelField: embeddingModel)   // 次元数は埋め込みのモデルと同じ（1〜1536）
   @@allow('read', workspace.members?[userId == auth().id])
 }
 ```
 
 - `with PlatformVector` と `@@platform.vector(列, dims: N)` は組で書く（`kit check` が止める）。列は `String`（配列でない）。
+- **`modelField` は必ず書く**（埋め込みを作ったモデル名を持つ `String` 列。無いと `kit check` が警告する）。§6.2。
+- 索引の調整（`maxNeighbors` / `compress` / `searchL` / `insertL` / `alpha`）は §6.4。最初は書かない（Turso の既定で始める）。
 - migration は §3 と同じ（`kit generate` → `kit db migrate`）。副表（`_platform_vec_<モデル名>`）・近似索引・同期のトリガーが入る。
   **SQL を書かない。内部表を触らない。**
 - 埋め込みを持たない行（`null`）は検索に出ない。
@@ -120,9 +123,21 @@ model Article with PlatformSearch, PlatformVector {
 ```ts
 // api の App（利用者のリクエストを受けたとき）。jobs なら forJob(event).ai.embed(...)
 const user = createServerClient<SchemaType>({ env }).asUser(request)
-const { embeddings } = await user.ai.embed(article.body, { dimensions: 1536 })
-await user.db.article.update({ where: { id }, data: { embedding: JSON.stringify(embeddings[0]) } })
+const { embeddings, model } = await user.ai.embed(article.body, { model: EMBEDDING_MODEL, dimensions: 1536 })
+await user.db.article.update({
+  where: { id },
+  data: { embedding: JSON.stringify(embeddings[0]), embeddingModel: model },   // モデル名も一緒に保存する
+})
 ```
+
+**モデルは 1 つの定数（`EMBEDDING_MODEL`）で決め、保存にも検索にも同じものを使う。** 理由と手順:
+
+- 埋め込みは**モデルごとに別の空間**のベクトルで、次元数が同じでも混ぜて比べられない（比べても距離は意味を持たず、結果が静かに悪くなる）。
+  だから保存した行に `embeddingModel` を残し、**検索する文の埋め込みも同じモデルで作る**。
+- モデルを変えるときは、**全行を作り直す**（古い行と新しい行を混ぜたまま運用しない）。作り直す行は
+  `where: { OR: [{ embeddingModel: null }, { embeddingModel: { not: EMBEDDING_MODEL } }] }` で見つかる。jobs で分けて作り直し、
+  終わるまでは古いモデルのまま検索する（切り替えは全行が終わってから `EMBEDDING_MODEL` を変える）。
+- `embed` が返す `model` は提供元が実際に使ったモデル名。`model` を指定しなければ Platform の既定になり、既定が変わると混ざる。**必ず `model` を明示する。**
 
 - `dimensions` は `@@platform.vector` の `dims` と同じにする（既定のモデルは 1536 次元）。
 - 記事を作る・更新する処理の中で、本文から埋め込みを作り直して書く（本文を変えたのに古い埋め込みを残さない）。
@@ -147,9 +162,58 @@ const { data } = hooks.article.useFindMany({
 - キーワードも併用したいときは、`where` に `ftsMatch` と `vecMatch` の両方を書くと **AND（両方に合うもの）** になる。
   「どちらかに合う」が欲しいなら、2 回引いて画面で重複を除いて並べる。
 
+### 6.4 精度を上げる
+
+出典を分けて書く。**効果は実データで測ってから決める**（§6.5）。
+
+**A. Turso 公式の調整**（docs.turso.tech/features/ai-and-embeddings。`@@platform.vector` の引数。指定しなければ Turso の既定）
+
+| 引数 | 意味 | 精度を上げたいとき |
+|---|---|---|
+| `maxNeighbors` | 各ノードが持つ近傍数（既定は 3√次元数） | 大きくする（容量・挿入時間が増える） |
+| `searchL` | 検索時に訪れる近傍数の上限（既定 200） | 大きくする（検索が遅くなる） |
+| `insertL` | 挿入時に訪れる近傍数の上限（既定 70） | 大きくする（挿入が遅くなる） |
+| `alpha` | グラフの密度（既定 1.2。1 以上） | 大きくする（容量が増える） |
+| `compress` | 近傍の保存に使う型（`float32` / `float16` / `floatb16` / `float8` / `float1bit`） | 圧縮しない（既定）。容量が問題になったときだけ圧縮する |
+
+- 公式の推奨は「FLOAT32 から始める」。**行数が多く容量が問題になるまで、圧縮（`compress`）や `maxNeighbors` の縮小はしない**（どちらも精度が下がる）。
+- 近似検索（DiskANN）は最適でない近傍を返すことがある。取りこぼしを減らすには `k` を多めに取る（§6.3）。
+- 調整を変えると索引を作り直す migration が出る（`kit generate` → `kit db migrate`）。範囲外の値は `kit check` が止める。
+- 公式に**書かれていない**もの: 圧縮型ごとの精度の落ち幅、RAG 向けの推奨設定、ハイブリッド検索。ここは次の B と §6.5 で補う。
+
+**B. 一般的な RAG の精度向上策**（Turso 公式ではない。広く使われる方法。効果は題材で変わる）
+
+1. **ハイブリッド（キーワード + ベクトル）を第一候補にする。** 型番・固有名詞はキーワード、言い換えはベクトルが強い。
+   2 回引いて**順位を足し合わせる**（Reciprocal Rank Fusion。各結果の `1 / (60 + 順位)` を ID ごとに足して並べ直す）:
+
+   ```ts
+   function fuse(lists: string[][], take: number): string[] {
+     const score = new Map<string, number>()
+     for (const ids of lists) ids.forEach((id, rank) => score.set(id, (score.get(id) ?? 0) + 1 / (60 + rank + 1)))
+     return [...score].sort((a, b) => b[1] - a[1]).slice(0, take).map(([id]) => id)
+   }
+   // fuse([ftsIds, vecIds], 10)  → その ID の行を取り直して、この順に並べる
+   ```
+
+2. **長い文書は分けて埋め込む（チャンク）。** 1 つのベクトルに長文を詰めると意味が薄まる。目安は 200〜500 トークン、前後を 10〜20% 重ねる。
+   チャンクを別モデル（`ArticleChunk`: `articleId`・`position`・`text`・`embedding`・`embeddingModel`）にし、結果は親の記事にまとめて出す。
+3. **各チャンクの先頭に文脈を足してから埋め込む**（文書のタイトル・節の見出し）。「この節は何の文書の何の話か」がベクトルにも FTS にも入る。
+4. **上位を並べ直す（リランク）。** 上位 20 件ほどを `client.ai.chat` に渡して関連の強い順に 5 件へ絞る。費用が増えるので、精度が足りないときだけ。
+5. **`k` は表示件数の 3〜5 倍**（近似とポリシーによる目減りを吸収する。§6.3）。
+6. **クエリを整える。** 利用者の短い入力は、そのまま埋め込むより、検索向けの文に書き直して（`client.ai.chat`）から埋め込むと当たりやすい。費用が増えるので任意。
+
+### 6.5 測って決める（評価）
+
+精度は感覚で決めず、**小さな評価セット**で測る。
+
+- 「質問」と「正解の文書 ID」の組を 20〜50 件、`tests/` に置く（実際の利用者の言い方で）。
+- 指標は **recall@k**（正解が上位 k 件に入る割合）と **MRR**（正解の順位の逆数の平均）。
+- 変更（チャンクの長さ・ハイブリッド・`searchL` など）の前後で同じセットを回し、**良くなったものだけ**残す。
+- 埋め込みのモデルを変えたときも、再生成の前後で測る。
+
 ## 7. 守ること
 
 - 検索の列を増やしすぎない。`body` のような長い列は、本当に探すときだけ。
-- 埋め込みは本文を変えるたびに作り直す。作り直しは重いので、保存の処理（api / jobs）に寄せ、画面から毎回作らない。
+- 埋め込みは本文を変えるたびに作り直す。作り直すときはモデル名（`embeddingModel`）も更新する。作り直しは重いので、保存の処理（api / jobs）に寄せ、画面から毎回作らない。
 - 全件を検索結果に出さない。`take` は 20 前後で、必ずページングする。
 - 検索のテストは「別の Workspace の行が結果に出ない」ことを必ず入れる（`$fdpocket-app-testing`）。

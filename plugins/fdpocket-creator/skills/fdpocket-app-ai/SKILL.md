@@ -66,10 +66,11 @@ const summary = result.json                          // schema を指定し、�
 検索のときも検索文を埋め込みにして引く（手順は `$fdpocket-app-search` §6）。
 
 ```ts
-const { embeddings } = await client.ai.embed(['東京オフィスの移転について', '経費精算のルール'], { dimensions: 1536 })
+const { embeddings, model } = await client.ai.embed(['東京オフィスの移転について', '経費精算のルール'], { model: 'openai/text-embedding-3-small', dimensions: 1536 })
 const embedding = JSON.stringify(embeddings[0])     // @@platform.vector の列（JSON の配列の文字列）に保存する
 ```
 
+- **`model` を明示し、返る `model` を保存する**（`embeddingModel` 列。`@@platform.vector` の `modelField`）。モデルが違うベクトルは次元数が同じでも比べられない。検索する文の埋め込みにも同じ `model` を使う（`$fdpocket-app-search` §6.2）。
 - **`dimensions` はベクトル検索の `dims` と同じにする**（既定のモデルは 1536 次元）。違うと保存か検索が失敗する。
 - 1 回に 64 件まで（1 件 32,000 字まで）。大量の既存データは jobs で分けて作る（`forJob(event).ai.embed`。`servicePermissions: [jobs.consume, ai.chat]`）。
 - 本文を書き換えたら、埋め込みも作り直して保存する（古い埋め込みを残さない）。画面から入力のたびに作らない（利用者が検索を押したときだけ）。

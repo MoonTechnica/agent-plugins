@@ -18290,11 +18290,34 @@ function vectorDeclarations(schemaInput) {
     if (typeof fieldName !== "string" || typeof dims !== "number")
       continue;
     const field2 = model.fields[fieldName];
+    const named = (key) => attribute.args?.find((a) => a.name === key)?.value;
+    const modelFieldName = named("modelField")?.field;
+    const modelField = modelFieldName === undefined ? undefined : model.fields[modelFieldName];
+    const options2 = {};
+    const maxNeighbors = named("maxNeighbors")?.value;
+    const compress = named("compress")?.value;
+    const searchL = named("searchL")?.value;
+    const insertL = named("insertL")?.value;
+    const alpha = named("alpha")?.value;
+    if (typeof maxNeighbors === "number")
+      options2.maxNeighbors = maxNeighbors;
+    if (typeof compress === "string")
+      options2.compress = compress;
+    if (typeof searchL === "number")
+      options2.searchL = searchL;
+    if (typeof insertL === "number")
+      options2.insertL = insertL;
+    if (typeof alpha === "number")
+      options2.alpha = alpha;
     declarations.push({
       model: name3,
       table: mapped(model.attributes, "@@map") ?? model.name ?? name3,
       column: mapped(field2?.attributes, "@map") ?? field2?.name ?? fieldName,
-      dims
+      dims,
+      ...modelFieldName === undefined ? {} : {
+        modelColumn: mapped(modelField?.attributes, "@map") ?? modelField?.name ?? modelFieldName
+      },
+      ...Object.keys(options2).length > 0 ? { options: options2 } : {}
     });
   }
   return declarations.sort((a, b2) => a.table.localeCompare(b2.table));
@@ -18306,11 +18329,15 @@ function renderVectorSql(declaration) {
   const source = `${quote(table)}`;
   const insertNew = `INSERT INTO ${vec}(rowid, "emb") SELECT new."rowid", vector(new.${quote(column)}) WHERE new.${quote(column)} IS NOT NULL;`;
   const deleteOld = `DELETE FROM ${vec} WHERE rowid = old."rowid";`;
+  const indexExpression = `libsql_vector_idx(${[
+    '"emb"',
+    ...optionPairs(declaration.options).map(([key, value]) => `'${key}=${value}'`)
+  ].join(", ")})`;
   return [
-    `${VECTOR_MARKER} ${quote(table)} column=${column} dims=${dims}`,
+    `${VECTOR_MARKER} ${quote(table)} ${vectorMarkerOf(declaration)}`,
     dropVectorSql(table),
     `CREATE TABLE ${vec} ("emb" F32_BLOB(${dims}));`,
-    `CREATE INDEX ${quote(vectorIndexOf(table))} ON ${vec}(libsql_vector_idx("emb"));`,
+    `CREATE INDEX ${quote(vectorIndexOf(table))} ON ${vec}(${indexExpression});`,
     `CREATE TRIGGER ${ai} AFTER INSERT ON ${source} BEGIN ${insertNew} END;`,
     `CREATE TRIGGER ${ad} AFTER DELETE ON ${source} BEGIN ${deleteOld} END;`,
     `CREATE TRIGGER ${au} AFTER UPDATE ON ${source} BEGIN ${deleteOld} ${insertNew} END;`,
@@ -18326,7 +18353,7 @@ function planVectorSql(input) {
   const parts = [];
   for (const declaration of declarations) {
     const redefined = input.draftSql.includes(`DROP TABLE ${quote(declaration.table)}`);
-    const now = `column=${declaration.column} dims=${declaration.dims}`;
+    const now = vectorMarkerOf(declaration);
     if (redefined || applied.get(declaration.table) !== now)
       parts.push(renderVectorSql(declaration));
   }
@@ -18347,7 +18374,17 @@ var SEARCH_ATTRIBUTE = "@@platform.search", PLATFORM_PREFIX = "_platform_", SEAR
   ...triggersOf(table).map((trigger) => `DROP TRIGGER IF EXISTS ${quote(trigger)};`),
   `DROP TABLE IF EXISTS ${quote(searchTableOf(table))};`
 ].join(`
-`), markerLine = (kind) => new RegExp(`^-- platform:${kind} "((?:[^"]|"")+)" (?:(removed)|(\\S.*))$`, "gm"), sameColumns = (a, b2) => a !== null && a !== undefined && a.length === b2.length && a.every((column, i) => column === b2[i]), INDEX_BLOCK, VECTOR_ATTRIBUTE = "@@platform.vector", VECTOR_TABLE_PREFIX, VECTOR_DIMS_MAX = 1536, VECTOR_MARKER = "-- platform:vector", vectorTableOf = (table) => `${VECTOR_TABLE_PREFIX}${table}`, vectorIndexOf = (table) => `${vectorTableOf(table)}_idx`, vectorTriggersOf = (table) => ["ai", "ad", "au"].map((suffix) => `${vectorTableOf(table)}_${suffix}`), dropVectorSql = (table) => [
+`), markerLine = (kind) => new RegExp(`^-- platform:${kind} "((?:[^"]|"")+)" (?:(removed)|(\\S.*))$`, "gm"), sameColumns = (a, b2) => a !== null && a !== undefined && a.length === b2.length && a.every((column, i) => column === b2[i]), INDEX_BLOCK, VECTOR_ATTRIBUTE = "@@platform.vector", VECTOR_TABLE_PREFIX, VECTOR_DIMS_MAX = 1536, VECTOR_MARKER = "-- platform:vector", VECTOR_COMPRESS, VECTOR_OPTION_LIMITS, optionPairs = (options2) => options2 ? [
+  ["max_neighbors", options2.maxNeighbors],
+  ["compress_neighbors", options2.compress],
+  ["search_l", options2.searchL],
+  ["insert_l", options2.insertL],
+  ["alpha", options2.alpha]
+].filter((pair) => pair[1] !== undefined) : [], vectorMarkerOf = (d) => [
+  `column=${d.column}`,
+  `dims=${d.dims}`,
+  ...optionPairs(d.options).map(([key, value]) => `${key}=${value}`)
+].join(" "), vectorTableOf = (table) => `${VECTOR_TABLE_PREFIX}${table}`, vectorIndexOf = (table) => `${vectorTableOf(table)}_idx`, vectorTriggersOf = (table) => ["ai", "ad", "au"].map((suffix) => `${vectorTableOf(table)}_${suffix}`), dropVectorSql = (table) => [
   ...vectorTriggersOf(table).map((trigger) => `DROP TRIGGER IF EXISTS ${quote(trigger)};`),
   `DROP TABLE IF EXISTS ${quote(vectorTableOf(table))};`
 ].join(`
@@ -18356,6 +18393,13 @@ var init_search = __esm(() => {
   SEARCH_TABLE_PREFIX = `${PLATFORM_PREFIX}fts_`;
   INDEX_BLOCK = new RegExp(`^-- platform:(?:search|vector) [^\\n]*\\n[\\s\\S]*?^${END_MARKER}$\\n?`, "gm");
   VECTOR_TABLE_PREFIX = `${PLATFORM_PREFIX}vec_`;
+  VECTOR_COMPRESS = ["float1bit", "float8", "float16", "floatb16", "float32"];
+  VECTOR_OPTION_LIMITS = {
+    maxNeighbors: { min: 1, max: 512 },
+    searchL: { min: 1, max: 2000 },
+    insertL: { min: 1, max: 1000 },
+    alpha: { min: 1, max: 4 }
+  };
 });
 
 // frontend/packages/project-protocol/src/session-environment.ts
@@ -28873,6 +28917,33 @@ async function checkZModel(root, load) {
           path,
           message: `${name3}: ${VECTOR_ATTRIBUTE} dims must be an integer in 1..${VECTOR_DIMS_MAX}`
         });
+      }
+      const numberOf = (value) => isNode(value) && value.$type === "NumberLiteral" ? Number(value.value) : Number.NaN;
+      const optionError = (message2) => errors5.push({ code: "VECTOR_OPTION_INVALID", path, message: `${name3}: ${message2}` });
+      for (const key of ["maxNeighbors", "searchL", "insertL", "alpha"]) {
+        const value = argOf(vector, key, -1);
+        if (value === undefined)
+          continue;
+        const { min, max } = VECTOR_OPTION_LIMITS[key];
+        const n = numberOf(value);
+        if (!Number.isFinite(n) || n < min || n > max || key !== "alpha" && !Number.isInteger(n))
+          optionError(`${VECTOR_ATTRIBUTE} ${key} must be ${key === "alpha" ? "a number" : "an integer"} in ${min}..${max}`);
+      }
+      const compress = argOf(vector, "compress", -1);
+      if (compress !== undefined && !(isNode(compress) && compress.$type === "StringLiteral" && VECTOR_COMPRESS.includes(String(compress.value))))
+        optionError(`${VECTOR_ATTRIBUTE} compress must be one of ${VECTOR_COMPRESS.join(", ")}`);
+      const modelTarget = argOf(vector, "modelField", -1);
+      if (modelTarget === undefined) {
+        warnings.push({
+          code: "VECTOR_MODEL_NOT_RECORDED",
+          path,
+          message: `${name3}: add modelField: <String field> to ${VECTOR_ATTRIBUTE} and store the model name next to each embedding (vectors from different models cannot be compared; the field also finds rows to re-embed when the model changes)`
+        });
+      } else {
+        const modelField = fields.find((candidate) => candidate.name === refText(modelTarget?.target));
+        const modelType = modelField?.type;
+        if (modelType?.type !== "String" || modelType.array === true)
+          optionError(`${VECTOR_ATTRIBUTE} modelField must be a String field (not an array)`);
       }
     }
     const byUser = fields.some((field2) => isRelation(field2) && refText(field2.type.reference) === "User");

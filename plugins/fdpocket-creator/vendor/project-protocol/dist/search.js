@@ -133,6 +133,30 @@ export const VECTOR_TABLE_PREFIX = `${PLATFORM_PREFIX}vec_`;
 /** 次元数の上限（search.md §3.4。libSQL の上限は 65,536 だが、初期は 1,536 まで） */
 export const VECTOR_DIMS_MAX = 1536;
 const VECTOR_MARKER = '-- platform:vector';
+/** `compress_neighbors` に渡せる型（公式の一覧） */
+export const VECTOR_COMPRESS = ['float1bit', 'float8', 'float16', 'floatb16', 'float32'];
+/** 調整の値の範囲（公式は下限だけ。上限は暴走を防ぐ Platform の保護値） */
+export const VECTOR_OPTION_LIMITS = {
+    maxNeighbors: { min: 1, max: 512 },
+    searchL: { min: 1, max: 2000 },
+    insertL: { min: 1, max: 1000 },
+    alpha: { min: 1, max: 4 },
+};
+const optionPairs = (options) => options
+    ? [
+        ['max_neighbors', options.maxNeighbors],
+        ['compress_neighbors', options.compress],
+        ['search_l', options.searchL],
+        ['insert_l', options.insertL],
+        ['alpha', options.alpha],
+    ].filter((pair) => pair[1] !== undefined)
+    : [];
+/** 印の本文（宣言が変わったかの比較にも使う。調整を変えると索引を作り直す） */
+const vectorMarkerOf = (d) => [
+    `column=${d.column}`,
+    `dims=${d.dims}`,
+    ...optionPairs(d.options).map(([key, value]) => `${key}=${value}`),
+].join(' ');
 export const vectorTableOf = (table) => `${VECTOR_TABLE_PREFIX}${table}`;
 export const vectorIndexOf = (table) => `${vectorTableOf(table)}_idx`;
 export function vectorDeclarations(schemaInput) {
@@ -148,11 +172,36 @@ export function vectorDeclarations(schemaInput) {
         if (typeof fieldName !== 'string' || typeof dims !== 'number')
             continue;
         const field = model.fields[fieldName];
+        const named = (key) => attribute.args?.find((a) => a.name === key)?.value;
+        const modelFieldName = named('modelField')?.field;
+        const modelField = modelFieldName === undefined ? undefined : model.fields[modelFieldName];
+        const options = {};
+        const maxNeighbors = named('maxNeighbors')?.value;
+        const compress = named('compress')?.value;
+        const searchL = named('searchL')?.value;
+        const insertL = named('insertL')?.value;
+        const alpha = named('alpha')?.value;
+        if (typeof maxNeighbors === 'number')
+            options.maxNeighbors = maxNeighbors;
+        if (typeof compress === 'string')
+            options.compress = compress;
+        if (typeof searchL === 'number')
+            options.searchL = searchL;
+        if (typeof insertL === 'number')
+            options.insertL = insertL;
+        if (typeof alpha === 'number')
+            options.alpha = alpha;
         declarations.push({
             model: name,
             table: mapped(model.attributes, '@@map') ?? model.name ?? name,
             column: mapped(field?.attributes, '@map') ?? field?.name ?? fieldName,
             dims,
+            ...(modelFieldName === undefined
+                ? {}
+                : {
+                    modelColumn: mapped(modelField?.attributes, '@map') ?? modelField?.name ?? modelFieldName,
+                }),
+            ...(Object.keys(options).length > 0 ? { options } : {}),
         });
     }
     return declarations.sort((a, b) => a.table.localeCompare(b.table));
@@ -170,11 +219,15 @@ export function renderVectorSql(declaration) {
     const source = `${quote(table)}`;
     const insertNew = `INSERT INTO ${vec}(rowid, "emb") SELECT new."rowid", vector(new.${quote(column)}) WHERE new.${quote(column)} IS NOT NULL;`;
     const deleteOld = `DELETE FROM ${vec} WHERE rowid = old."rowid";`;
+    const indexExpression = `libsql_vector_idx(${[
+        '"emb"',
+        ...optionPairs(declaration.options).map(([key, value]) => `'${key}=${value}'`),
+    ].join(', ')})`;
     return [
-        `${VECTOR_MARKER} ${quote(table)} column=${column} dims=${dims}`,
+        `${VECTOR_MARKER} ${quote(table)} ${vectorMarkerOf(declaration)}`,
         dropVectorSql(table),
         `CREATE TABLE ${vec} ("emb" F32_BLOB(${dims}));`,
-        `CREATE INDEX ${quote(vectorIndexOf(table))} ON ${vec}(libsql_vector_idx("emb"));`,
+        `CREATE INDEX ${quote(vectorIndexOf(table))} ON ${vec}(${indexExpression});`,
         `CREATE TRIGGER ${ai} AFTER INSERT ON ${source} BEGIN ${insertNew} END;`,
         `CREATE TRIGGER ${ad} AFTER DELETE ON ${source} BEGIN ${deleteOld} END;`,
         `CREATE TRIGGER ${au} AFTER UPDATE ON ${source} BEGIN ${deleteOld} ${insertNew} END;`,
@@ -190,7 +243,7 @@ export function planVectorSql(input) {
     const parts = [];
     for (const declaration of declarations) {
         const redefined = input.draftSql.includes(`DROP TABLE ${quote(declaration.table)}`);
-        const now = `column=${declaration.column} dims=${declaration.dims}`;
+        const now = vectorMarkerOf(declaration);
         if (redefined || applied.get(declaration.table) !== now)
             parts.push(renderVectorSql(declaration));
     }

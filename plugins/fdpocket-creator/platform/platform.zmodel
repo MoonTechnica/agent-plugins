@@ -29,9 +29,11 @@ type PlatformSearch {
 }
 
 // ベクトル検索（search.md §3.4）。field は埋め込みを JSON の配列の文字列（'[0.1, 0.2, …]'。省略可能な String）で持つ列、
-// dims は次元数（1〜1536）。Platform が migration に副表（libSQL の F32_BLOB と近似索引）と同期のトリガーを足す。
+// dims は次元数（1〜1536）。modelField は埋め込みを作ったモデル名を持つ String 列（推奨。モデルが違うベクトルは比べられない）。
+// maxNeighbors / compress / searchL / insertL / alpha は Turso の libsql_vector_idx の調整（精度・速度・容量のつり合い。
+// 指定しなければ Turso の既定）。Platform が migration に副表（libSQL の F32_BLOB と近似索引）と同期のトリガーを足す。
 // モデルは `with PlatformVector` で vecMatch / vecDistance を持つ
-attribute @@platform.vector(_ field: FieldReference, dims: Int)
+attribute @@platform.vector(_ field: FieldReference, dims: Int, modelField: FieldReference?, maxNeighbors: Int?, compress: String?, searchL: Int?, insertL: Int?, alpha: Float?)
 
 // ベクトル検索の計算フィールド（`@@platform.vector` のあるモデルに付ける mixin。実装は Gateway）。
 //   where:   { vecMatch:    { args: { v: '[0.1, 0.2]', k: 50 }, equals: true } }   // 近い順の上位 k 件（近似）。ポリシーはその後に効く

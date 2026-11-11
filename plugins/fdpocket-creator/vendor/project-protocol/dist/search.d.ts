@@ -54,12 +54,52 @@ export declare const VECTOR_ATTRIBUTE = "@@platform.vector";
 export declare const VECTOR_TABLE_PREFIX = "_platform_vec_";
 /** 次元数の上限（search.md §3.4。libSQL の上限は 65,536 だが、初期は 1,536 まで） */
 export declare const VECTOR_DIMS_MAX = 1536;
+/**
+ * 近似索引（DiskANN）の調整。Turso 公式の `libsql_vector_idx` の設定（docs.turso.tech/features/ai-and-embeddings）。
+ * 精度・速度・容量のつり合いで、指定が無ければ Turso の既定（FLOAT32・max_neighbors = 3√次元数・search_l = 200 など）。
+ */
+export interface VectorOptions {
+    /** 各ノードが持つ近傍数。小さいほど容量は減るが精度は下がる */
+    maxNeighbors?: number;
+    /** 近傍の保存に使う型。圧縮するほど容量は減るが精度は下がる */
+    compress?: (typeof VECTOR_COMPRESS)[number];
+    /** 検索時に訪れる近傍数の上限。小さいほど速いが精度は下がる */
+    searchL?: number;
+    /** 挿入時に訪れる近傍数の上限 */
+    insertL?: number;
+    /** グラフの密度。小さいほど疎で速いが精度は下がる */
+    alpha?: number;
+}
+/** `compress_neighbors` に渡せる型（公式の一覧） */
+export declare const VECTOR_COMPRESS: readonly ["float1bit", "float8", "float16", "floatb16", "float32"];
+/** 調整の値の範囲（公式は下限だけ。上限は暴走を防ぐ Platform の保護値） */
+export declare const VECTOR_OPTION_LIMITS: {
+    readonly maxNeighbors: {
+        readonly min: 1;
+        readonly max: 512;
+    };
+    readonly searchL: {
+        readonly min: 1;
+        readonly max: 2000;
+    };
+    readonly insertL: {
+        readonly min: 1;
+        readonly max: 1000;
+    };
+    readonly alpha: {
+        readonly min: 1;
+        readonly max: 4;
+    };
+};
 export interface VectorDeclaration {
     model: string;
     table: string;
     /** ベクトルを JSON の配列の文字列（`'[0.1, 0.2]'`）で持つ列 */
     column: string;
     dims: number;
+    /** 埋め込みを作ったモデル名を持つ列（任意。モデルが違うベクトルは比べられないので、記録して再生成の対象を見つける） */
+    modelColumn?: string;
+    options?: VectorOptions;
 }
 export declare const vectorTableOf: (table: string) => string;
 export declare const vectorIndexOf: (table: string) => string;
