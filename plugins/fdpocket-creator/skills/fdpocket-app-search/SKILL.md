@@ -115,15 +115,20 @@ model Article with PlatformSearch, PlatformVector {
 
 ### 6.2 埋め込みを作って保存する
 
-**Platform の AI（`client.ai`）は埋め込みを作れない**（チャットだけ）。埋め込みは次のどちらかで作る。
+**`client.ai.embed(...)`（Platform の AI。`$fdpocket-app-ai` §3b）で作る。** 費用は使った本人のクレジット。
 
-| 方法 | 使う場面 |
-|---|---|
-| python の App（`$fdpocket-app-python`） | 自前のモデルで作る（多言語の sentence-transformers など）。画像・音声の埋め込みもここ |
-| api の App から外部の埋め込み API（`$fdpocket-app-integrations`） | OpenAI などの API を呼ぶ。`network.egress` に宛先を宣言し、鍵は `secrets` に置く |
+```ts
+// api の App（利用者のリクエストを受けたとき）。jobs なら forJob(event).ai.embed(...)
+const user = createServerClient<SchemaType>({ env }).asUser(request)
+const { embeddings } = await user.ai.embed(article.body, { dimensions: 1536 })
+await user.db.article.update({ where: { id }, data: { embedding: JSON.stringify(embeddings[0]) } })
+```
 
-保存するときは `embedding: JSON.stringify(vector)`（数の配列）。**`dims` と同じ長さ**にする（違うと書き込みが失敗する）。
-記事を作る・更新する処理の中で、本文から埋め込みを作り直して書く（本文を変えたのに古い埋め込みを残さない）。
+- `dimensions` は `@@platform.vector` の `dims` と同じにする（既定のモデルは 1536 次元）。
+- 記事を作る・更新する処理の中で、本文から埋め込みを作り直して書く（本文を変えたのに古い埋め込みを残さない）。
+  既存の大量のデータは jobs で分けて作る（1 回 64 件まで）。
+- 自前のモデルで作りたいとき（画像・音声の埋め込み、多言語の専用モデル）は python の App（`$fdpocket-app-python`）や、
+  api から外部の API（`$fdpocket-app-integrations`）でもよい。
 
 ### 6.3 近いものを引く
 
@@ -135,7 +140,7 @@ const { data } = hooks.article.useFindMany({
 })
 ```
 
-- `v` は検索したい文の埋め込み（`dims` 個の数の配列を JSON にした文字列）。次元数が違う・数でない値は入力エラー（`VALIDATION_FAILED`）。
+- `v` は検索したい文の埋め込み（`client.ai.embed(検索文)` の結果を `JSON.stringify` した文字列。`dims` 個の数）。次元数が違う・数でない値は入力エラー（`VALIDATION_FAILED`）。
 - `vecMatch` は**近い順の上位 `k` 件**（既定の目安 50、最大 500）を選ぶ近似検索。`vecDistance` はコサイン距離（0 が同じ、2 が反対）。
 - **ポリシーは `k` 件を選んだ後に効く。** 権限のない行が上位にいると、結果は `k` 件より少なくなる（`take` に満たない）。
   `k` は `take` の 5 倍ほどにする。見える行が全体のごく一部のアプリ（行ごとに持ち主が違う個人データなど）には、ベクトル検索を勧めない。

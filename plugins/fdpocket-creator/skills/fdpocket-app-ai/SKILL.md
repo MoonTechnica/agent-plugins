@@ -60,6 +60,23 @@ const summary = result.json                          // schema を指定し、�
 - api から呼ぶときは利用者のリクエストを受けたときだけ。`asUser(request)` の戻り値の `ai` を使い、
   `servicePermissions: [ai.chat]` を宣言する。
 
+## 3b. 埋め込み（ベクトル検索に使う）
+
+意味が近いものを探す（類似する資料・問い合わせ・おすすめ）には、文を**埋め込み**（数のベクトル）にして `@@platform.vector` の列に保存し、
+検索のときも検索文を埋め込みにして引く（手順は `$fdpocket-app-search` §6）。
+
+```ts
+const { embeddings } = await client.ai.embed(['東京オフィスの移転について', '経費精算のルール'], { dimensions: 1536 })
+const embedding = JSON.stringify(embeddings[0])     // @@platform.vector の列（JSON の配列の文字列）に保存する
+```
+
+- **`dimensions` はベクトル検索の `dims` と同じにする**（既定のモデルは 1536 次元）。違うと保存か検索が失敗する。
+- 1 回に 64 件まで（1 件 32,000 字まで）。大量の既存データは jobs で分けて作る（`forJob(event).ai.embed`。`servicePermissions: [jobs.consume, ai.chat]`）。
+- 本文を書き換えたら、埋め込みも作り直して保存する（古い埋め込みを残さない）。画面から入力のたびに作らない（利用者が検索を押したときだけ）。
+- 費用は使った本人のクレジット（チャットと同じ財布。1 件あたりの費用は小さい）。許可は `ai.chat` に含まれる。
+- `kit dev` の埋め込みは**費用 0 の模擬**（文字の 3 グラムを次元に散らす。言葉が重なる文は近くなるが、意味は分からない）。本物の意味の近さはライブプレビュー・本番で確かめる。
+- フレームワーク: Vercel AI SDK は `createOpenAI(client.ai.openai()).textEmbeddingModel('embedding')`、LangChain は `new OpenAIEmbeddings({ model: 'embedding', apiKey, configuration: { baseURL, fetch } })`。
+
 ## 3a. エージェント（フレームワークを使う）
 
 `client.ai.openai()` は OpenAI 互換の接続先（`baseURL`・`apiKey`・`fetch`）を返す。Mastra・Vercel AI SDK・LangChain.js に

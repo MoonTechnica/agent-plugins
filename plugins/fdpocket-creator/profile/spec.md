@@ -518,6 +518,7 @@ notifications:
 |---|---|
 | `client.ai.chat(input)` | 1 ターン送って結果を待つ。`input`（`AiChatInput`）: `conversation`（会話の名前。`[A-Za-z0-9_.:-]` で 64 字まで。同じ名前の履歴を Platform が持つ）・`message`・`attachments`（`[{ fileId }]`。Storage のファイル、4 個まで）・`instructions`（宣言した指示文の名前）・`schema`（宣言した Schema の名前。JSON で返させる）・`model`・`onToken`（渡すと届いた分から順に呼ぶ）・`signal`（待つのをやめる） |
 | `client.ai.reset(conversation)` | 会話を切る（次のターンから履歴を送らない） |
+| `client.ai.embed(input, options?)` | 文を埋め込み（意味を表す数のベクトル）にする。`input` は文字列か文字列の配列（1 回 64 件まで・1 件 32,000 字まで）。入力と同じ順の `{ embeddings: number[][], model }` を返す。`options`: `model`（省略で既定の埋め込みモデル `openai/text-embedding-3-small`。別名 `embedding`）・`dimensions`（次元。ベクトル検索の `dims` に合わせる。既定は 1536）・`signal`。費用は使った本人のクレジット。ベクトル検索の使い方は `$fdpocket-app-search` §6 |
 | `client.ai.openai()` | OpenAI 互換の接続先（`OpenAiCompatible`: `baseURL`・`apiKey`・`fetch`）。Mastra・LangChain・Vercel AI SDK・OpenAI SDK にそのまま渡し、エージェント（ツール呼び出しのループ）・構造化出力・ストリーミングを作る。会話の履歴はフレームワークが持つ |
 
 結果（`AiTurnResult`）: `text`・`json`（`schema` を指定し、正常に終わったときだけ）・`finishReason`（`AiFinishReason`。
@@ -533,8 +534,8 @@ notifications:
 - AI を使う画面には「AI を使うとクレジットを消費します」と分かる表示を置く。
 - 回数・同時に動かす数の制限は無い（エージェントのように続けて・並べて呼べる）。上限は払う人のクレジットだけ。
 - api（サーバー）からは、利用者のリクエストを受けたときだけ、`asUser(request)` の戻り値の `ai`（同じ `chat` / `reset` /
-  `openai()`）でその利用者として呼ぶ（`servicePermissions: [ai.chat]`。その利用者のクレジットから引く）。
-- jobs からは、受け取った queue / scheduled のイベントを `createServerClient(...).forJob(event)` に渡し、`.ai.openai()` で呼ぶ
+  `openai()` / `embed()`）でその利用者として呼ぶ（`servicePermissions: [ai.chat]`。その利用者のクレジットから引く）。
+- jobs からは、受け取った queue / scheduled のイベントを `createServerClient(...).forJob(event)` に渡し、`.ai.openai()` / `.ai.embed()` で呼ぶ
   （`servicePermissions: [jobs.consume, ai.chat]`）。払うのは、`asUser(request).jobs.schedule(...)` で**利用者として登録した
   ジョブならその利用者**、project.yaml の **cron なら Project の持ち主**、python のタスクが `ctx.jobs` で登録したジョブなら
   **そのタスクの払う人**。サーバーとして（`asUser` 無しで）登録したジョブは
@@ -552,7 +553,7 @@ const { baseURL, apiKey, fetch } = client.ai.openai()
 const llm = new ChatOpenAI({ model: 'auto', apiKey, configuration: { baseURL, fetch } })
 ```
 
-- 使えるのは Chat Completions（`/chat/completions`）だけ。Responses API・Embeddings・画像生成は無い。
+- 使えるのは Chat Completions（`/chat/completions`）と Embeddings（`/embeddings`。`client.ai.embed` か、`createOpenAI(client.ai.openai()).textEmbeddingModel('embedding')` / `OpenAIEmbeddings`）。Responses API・画像生成は無い。
 - Storage のファイルは画像・ファイル・音声・動画の場所に `fdpocket-file:<fileId>` と書く（read ポリシーで確かめて渡す）。
 - 断られたときは OpenAI の形のエラー（本文の `error.code` が `SdkErrorCode`）。`402`（`QUOTA_EXCEEDED`）は再試行しない。
 - 自分の API キーで外部の AI を呼ぶこともできる（`$fdpocket-app-integrations`。費用は作者持ち）。利用者に払ってもらうならこの `client.ai`。

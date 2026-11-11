@@ -1,7 +1,7 @@
 import '../zod-jitless.ts';
 import { type NotificationSendRequest, type NotificationSendResponse } from '@workspace/project-protocol';
 import type { SchemaDef } from '@zenstackhq/schema';
-import { type Ai, type OpenAiCompatible } from '../ai/client.ts';
+import { type Ai } from '../ai/client.ts';
 import { type Connections } from '../connections/client.ts';
 import type { DbClient } from '../db/types.ts';
 import { type Python } from '../python/client.ts';
@@ -32,9 +32,7 @@ export interface ServerClient<S extends SchemaDef = SchemaDef> extends ServerDat
      * 利用者の無い `jobs.schedule`（サーバーとしての登録）のジョブは AI を使えない
      */
     forJob(event: JobRun): {
-        readonly ai: {
-            openai(): OpenAiCompatible;
-        };
+        readonly ai: Pick<Ai, 'openai' | 'embed'>;
         /** python の App のタスクを依頼する（払うのはこのジョブの払う人。python-backend.md §5） */
         readonly python: Python;
     };

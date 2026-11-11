@@ -11,6 +11,22 @@ export const AI_ATTACHMENTS_MAX = 4;
 export const AI_ATTACHMENTS_MAX_BYTES = 20 * 1024 * 1024;
 /** 1 ターンの本文（UTF-8） */
 export const AI_MESSAGE_MAX_BYTES = 32 * 1024;
+/**
+ * 埋め込み（`/v1/ai/openai/embeddings`。project-ai.md §3.7）。モデルを指定しなければ既定のモデルで、次元は 1536。
+ * 1 回の要求の上限は、OpenRouter への 1 往復で読み切れ、費用が大きく跳ねない大きさにしてある
+ */
+export const AI_EMBEDDING_MODEL_DEFAULT = 'openai/text-embedding-3-small';
+export const AI_EMBEDDING_INPUTS_MAX = 64;
+export const AI_EMBEDDING_INPUT_CHARS_MAX = 32_000;
+export const AI_EMBEDDING_TOTAL_CHARS_MAX = 200_000;
+/** `dimensions` の上限（ベクトル検索の `@@platform.vector` は 1536 まで。search.md §3.4） */
+export const AI_EMBEDDING_DIMENSIONS_MAX = 3072;
+/** 埋め込みの応答（OpenAI の形。SDK が `encoding_format: 'float'` で読む） */
+export const aiEmbeddingsResponse = z.looseObject({
+    object: z.literal('list'),
+    data: z.array(z.looseObject({ index: z.int().min(0), embedding: z.array(z.number()) })),
+    model: z.string(),
+});
 export const AI_ATTACHMENT_KINDS = ['image', 'file', 'audio', 'video'];
 const ATTACHMENT_KINDS = {
     'image/png': 'image',

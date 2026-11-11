@@ -1,4 +1,4 @@
-import { aiResetResponse, aiTurnEvent, aiTurnRequestSchema, aiTurnResult, } from '@workspace/project-protocol';
+import { AI_EMBEDDING_DIMENSIONS_MAX, AI_EMBEDDING_INPUTS_MAX, aiEmbeddingsResponse, aiResetResponse, aiTurnEvent, aiTurnRequestSchema, aiTurnResult, } from '@workspace/project-protocol';
 import { SdkError } from "../errors.js";
 import { gatewayBase, readResponse } from "../transport.js";
 export function createAi(transport, gateway) {
@@ -35,6 +35,43 @@ export function createAi(transport, gateway) {
                     retryable: true,
                 });
             }
+        },
+        async embed(input, { signal, ...options } = {}) {
+            const texts = typeof input === 'string' ? [input] : [...input];
+            if (texts.length < 1 ||
+                texts.length > AI_EMBEDDING_INPUTS_MAX ||
+                texts.some((text) => text === '') ||
+                (options.dimensions !== undefined &&
+                    (!Number.isInteger(options.dimensions) ||
+                        options.dimensions < 1 ||
+                        options.dimensions > AI_EMBEDDING_DIMENSIONS_MAX))) {
+                throw new SdkError('VALIDATION_FAILED', 'invalid ai.embed input');
+            }
+            let response;
+            try {
+                response = await transport.fetch(`${gatewayBase(gateway)}/v1/ai/openai/embeddings`, {
+                    method: 'POST',
+                    headers: { 'content-type': 'application/json' },
+                    body: JSON.stringify({ input: texts, encoding_format: 'float', ...options }),
+                    ...(signal ? { signal } : {}),
+                });
+            }
+            catch (error) {
+                if (signal?.aborted)
+                    throw signal.reason;
+                throw error;
+            }
+            const parsed = aiEmbeddingsResponse.safeParse(await readResponse(response));
+            // 返ったベクトルの数が入力と違えば、取り違えて保存しないよう失敗にする
+            if (!parsed.success || parsed.data.data.length !== texts.length) {
+                throw new SdkError('GATEWAY_UNAVAILABLE', 'unexpected ai embeddings response', {
+                    retryable: true,
+                });
+            }
+            return {
+                embeddings: [...parsed.data.data].sort((a, b) => a.index - b.index).map((d) => d.embedding),
+                model: parsed.data.model,
+            };
         },
         openai() {
             return {

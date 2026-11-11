@@ -107,7 +107,10 @@ export function createServerClient(options) {
             const run = `${event.cron === undefined ? 'queue' : 'schedule'}:${event.id}`;
             const transport = serviceTransport({ [RUN_CONTEXT_HEADER]: run });
             return {
-                ai: { openai: () => createAi(transport, base).openai() },
+                ai: {
+                    openai: () => createAi(transport, base).openai(),
+                    embed: (input, options) => createAi(transport, base).embed(input, options),
+                },
                 python: createPython(transport),
             };
         },

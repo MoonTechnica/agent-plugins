@@ -24,6 +24,19 @@ export interface Ai {
      * `model` は `auto`（Jev Router）か project.yaml の許可一覧の ID
      */
     openai(): OpenAiCompatible;
+    /**
+     * 文を埋め込み（意味を表す数のベクトル）にする（project-ai.md §3.7）。ベクトル検索（`@@platform.vector`）に保存・検索する値を作る。
+     * 入力と同じ順のベクトルを返す（1 回 64 件まで）。`model` を省略すると既定の埋め込みモデル（1536 次元）。
+     * 費用は使った本人のクレジットから引く（chat と同じ）。`dimensions` はベクトル検索の `dims` に合わせる
+     */
+    embed(input: string | readonly string[], options?: {
+        model?: string;
+        dimensions?: number;
+        signal?: AbortSignal;
+    }): Promise<{
+        embeddings: number[][];
+        model: string;
+    }>;
 }
 export interface OpenAiCompatible {
     baseURL: string;

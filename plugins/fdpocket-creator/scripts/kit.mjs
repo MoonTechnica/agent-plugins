@@ -16754,7 +16754,7 @@ var init_manifest = __esm(() => {
 function aiAttachmentKindOf(contentType) {
   return ATTACHMENT_KINDS[contentType.split(";")[0]?.trim().toLowerCase() ?? ""] ?? null;
 }
-var AI_ATTACHMENTS_MAX = 4, AI_ATTACHMENTS_MAX_BYTES, AI_MESSAGE_MAX_BYTES, ATTACHMENT_KINDS, aiTurnRequestSchema, AI_FINISH_REASONS, aiTurnResult, aiTurnEvent, aiResetResponse;
+var AI_ATTACHMENTS_MAX = 4, AI_ATTACHMENTS_MAX_BYTES, AI_MESSAGE_MAX_BYTES, AI_EMBEDDING_MODEL_DEFAULT = "openai/text-embedding-3-small", AI_EMBEDDING_INPUTS_MAX = 64, AI_EMBEDDING_INPUT_CHARS_MAX = 32000, AI_EMBEDDING_TOTAL_CHARS_MAX = 200000, AI_EMBEDDING_DIMENSIONS_MAX = 3072, aiEmbeddingsResponse, ATTACHMENT_KINDS, aiTurnRequestSchema, AI_FINISH_REASONS, aiTurnResult, aiTurnEvent, aiResetResponse;
 var init_ai = __esm(() => {
   init_zod();
   init_contract();
@@ -16762,6 +16762,11 @@ var init_ai = __esm(() => {
   init_manifest();
   AI_ATTACHMENTS_MAX_BYTES = 20 * 1024 * 1024;
   AI_MESSAGE_MAX_BYTES = 32 * 1024;
+  aiEmbeddingsResponse = exports_external.looseObject({
+    object: exports_external.literal("list"),
+    data: exports_external.array(exports_external.looseObject({ index: exports_external.int().min(0), embedding: exports_external.array(exports_external.number()) })),
+    model: exports_external.string()
+  });
   ATTACHMENT_KINDS = {
     "image/png": "image",
     "image/jpeg": "image",
@@ -46801,6 +46806,81 @@ var init_completion = __esm(() => {
   init_errors4();
 });
 
+// frontend/packages/project-gateway/src/ai/embedding.ts
+async function startEmbedding(ai2, plan, request) {
+  if (plan.model.kind !== "model" || !plan.model.providerSlug) {
+    await ai2.platform.fail(plan.turnId, null, "not_embedding_model");
+    throw new GatewayError("VALIDATION_FAILED", "not_embedding_model");
+  }
+  const body = {
+    model: plan.model.id,
+    input: request.input,
+    ...request.dimensions === undefined ? {} : { dimensions: request.dimensions },
+    ...request.encoding_format === undefined ? {} : { encoding_format: request.encoding_format },
+    user: await sha256Hex2(new TextEncoder().encode(plan.userId)),
+    provider: { only: [plan.model.providerSlug], allow_fallbacks: false, data_collection: "deny" }
+  };
+  let upstream;
+  try {
+    upstream = await ai2.openRouter.embeddings(body);
+  } catch (cause) {
+    await ai2.platform.fail(plan.turnId, null, "provider_unreachable");
+    if (cause instanceof GatewayError)
+      throw cause;
+    throw new GatewayError("GATEWAY_UNAVAILABLE", "ai provider is unreachable", { cause });
+  }
+  if (!upstream.ok) {
+    await upstream.body?.cancel();
+    await ai2.platform.fail(plan.turnId, null, `provider_${upstream.status}`);
+    throw providerError(upstream.status);
+  }
+  return upstream;
+}
+async function settleEmbedding(ai2, plan, upstream) {
+  let body;
+  try {
+    body = await upstream.json();
+  } catch (cause) {
+    await ai2.platform.fail(plan.turnId, null, "stream_lost");
+    throw new GatewayError("GATEWAY_UNAVAILABLE", "ai response was not readable", { cause });
+  }
+  const answer = answerSchema.safeParse(body);
+  const id = answer.success ? answer.data.id ?? null : null;
+  const cost = answer.success ? answer.data.usage?.cost : undefined;
+  if (!answer.success || id === null || cost === undefined) {
+    await ai2.platform.fail(plan.turnId, id, "usage_missing");
+  } else {
+    await ai2.platform.settle({
+      turnId: plan.turnId,
+      generationId: id,
+      modelUsed: answer.data.model ?? "",
+      usage: answer.data.usage ?? {},
+      costUsd: cost
+    });
+  }
+  return Response.json(body);
+}
+var text3, embeddingRequestSchema, embeddingModelOf = (request) => request.model ?? AI_EMBEDDING_MODEL_DEFAULT, usageSchema, answerSchema;
+var init_embedding = __esm(() => {
+  init_src();
+  init_zod();
+  init_errors4();
+  init_completion();
+  text3 = exports_external.string().min(1).max(AI_EMBEDDING_INPUT_CHARS_MAX);
+  embeddingRequestSchema = exports_external.looseObject({
+    model: exports_external.string().min(1).max(160).optional(),
+    input: exports_external.union([text3, exports_external.array(text3).min(1).max(AI_EMBEDDING_INPUTS_MAX)]),
+    dimensions: exports_external.int().min(1).max(AI_EMBEDDING_DIMENSIONS_MAX).optional(),
+    encoding_format: exports_external.enum(["float", "base64"]).optional()
+  }).refine((request) => [request.input].flat().reduce((sum, item) => sum + item.length, 0) <= AI_EMBEDDING_TOTAL_CHARS_MAX);
+  usageSchema = exports_external.looseObject({ cost: exports_external.number().finite().min(0).optional() });
+  answerSchema = exports_external.looseObject({
+    id: exports_external.string().min(1).optional(),
+    model: exports_external.string().optional(),
+    usage: usageSchema.optional()
+  });
+});
+
 // frontend/packages/project-gateway/src/internal/audit.ts
 function auditPolicyVersionOf(schema, policyVersion) {
   const fields = schema?.models?.AuditEvent?.fields;
@@ -46863,17 +46943,17 @@ function auditStatement(context, action2, fileId, decision, reason) {
   };
 }
 function toRow(row) {
-  const text3 = (value) => value === null || value === undefined ? null : String(value);
+  const text4 = (value) => value === null || value === undefined ? null : String(value);
   return {
     id: String(row.id),
     bucket: String(row.bucket),
     objectKey: String(row.objectKey),
     ownerId: String(row.ownerId),
-    workspaceId: text3(row.workspaceId),
+    workspaceId: text4(row.workspaceId),
     visibility: String(row.visibility),
     status: String(row.status),
-    originalName: text3(row.originalName),
-    contentType: text3(row.contentType),
+    originalName: text4(row.originalName),
+    contentType: text4(row.contentType),
     sizeBytes: row.sizeBytes === null ? null : Number(row.sizeBytes),
     createdAt: toIso(String(row.createdAt))
   };
@@ -47105,7 +47185,7 @@ function registerAiRoutes(app, adapters, config2, runtime, logger) {
         });
       }
     };
-    turn.onDelta((text3) => send({ type: "delta", text: text3 }));
+    turn.onDelta((text4) => send({ type: "delta", text: text4 }));
     turn.done.then((result) => send({ type: "done", result })).catch((error51) => send({
       type: "error",
       code: error51 instanceof GatewayError ? error51.code : "GATEWAY_UNAVAILABLE",
@@ -47193,11 +47273,11 @@ function createAiAccess(adapters, config2, runtime) {
 function createTurn(platform, input) {
   let listener = () => {};
   const done = (async () => {
-    const { completion, cost } = await measureCompletion(platform, input.turnId, input.upstream, (text4) => listener(text4));
+    const { completion, cost } = await measureCompletion(platform, input.turnId, input.upstream, (text5) => listener(text5));
     if (cost === null || !completion.id || !completion.usage) {
       throw completion.refused ? new GatewayError("VALIDATION_FAILED", "provider_refused") : new GatewayError("GATEWAY_UNAVAILABLE", "ai usage was not reported");
     }
-    const text3 = completion.content;
+    const text4 = completion.content;
     const model = completion.model ?? input.plan.model.id;
     const finishReason = finishReasonOf(completion.finishReason ?? "other");
     const { credits } = await platform.finish({
@@ -47208,12 +47288,12 @@ function createTurn(platform, input) {
       costUsd: cost,
       userContent: input.message,
       userAttachments: input.attachments.map(({ fileId, kind }) => ({ fileId, kind })),
-      assistant: text3
+      assistant: text4
     });
     return {
-      text: text3,
+      text: text4,
       finishReason,
-      ...input.schema && finishReason === "stop" ? jsonOf(text3) : {},
+      ...input.schema && finishReason === "stop" ? jsonOf(text4) : {},
       credits,
       responseId: completion.id,
       model
@@ -47229,9 +47309,9 @@ function createTurn(platform, input) {
 function finishReasonOf(reason) {
   return AI_FINISH_REASONS.includes(reason) ? reason : "other";
 }
-function jsonOf(text3) {
+function jsonOf(text4) {
   try {
-    return { json: JSON.parse(text3) };
+    return { json: JSON.parse(text4) };
   } catch (error51) {
     if (error51 instanceof SyntaxError)
       return {};
@@ -47299,6 +47379,47 @@ function registerAiOpenAiRoutes(app, adapters, config2, runtime, logger) {
     });
     return complete(c, ai2, turnId, plan, request, messages);
   });
+  app.post("/v1/ai/openai/embeddings", async (c) => {
+    const run = c.req.header(RUN_CONTEXT_HEADER);
+    const turnId = crypto.randomUUID();
+    if (run !== undefined) {
+      const job = await openJob(c);
+      const request2 = await parseEmbeddingRequest(c);
+      if (!/^(queue|schedule|python):[0-9a-f-]{36}$/i.test(run)) {
+        throw new GatewayError("VALIDATION_FAILED", "invalid run");
+      }
+      const plan2 = await job.ai.platform.beginJob({
+        turnId,
+        credentialId: job.credentialId,
+        run: run.toLowerCase(),
+        model: embeddingModelOf(request2)
+      });
+      return embed(job.ai, turnId, plan2, request2);
+    }
+    const { claims, resolved, ai: ai2 } = await open(c);
+    const request = await parseEmbeddingRequest(c);
+    const plan = await ai2.platform.beginRequest({
+      turnId,
+      projectId: claims.aud,
+      environment: claims.env,
+      versionId: resolved.versionId,
+      environmentId: claims.envId,
+      appSlug: claims.app,
+      userId: claims.actorId,
+      model: embeddingModelOf(request)
+    });
+    return embed(ai2, turnId, plan, request);
+  });
+  async function parseEmbeddingRequest(c) {
+    const parsed = embeddingRequestSchema.safeParse(await jsonBody(c));
+    if (!parsed.success)
+      throw new GatewayError("VALIDATION_FAILED", "invalid embeddings request");
+    return parsed.data;
+  }
+  async function embed(ai2, turnId, plan, request) {
+    const upstream = await startEmbedding(ai2, { ...plan, turnId }, request);
+    return settleEmbedding(ai2, { ...plan, turnId }, upstream);
+  }
   async function parseRequest(c) {
     const parsed = requestSchema.safeParse(await jsonBody(c));
     if (!parsed.success)
@@ -47379,6 +47500,7 @@ var init_openai_routes = __esm(() => {
   init_errors4();
   init_session();
   init_completion();
+  init_embedding();
   init_routes();
   FILE_REF = /^fdpocket-file:([0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12})$/i;
   PASS_THROUGH = [
@@ -47783,8 +47905,8 @@ function textOf(value) {
     return value.toISOString();
   return "";
 }
-function bound(text3) {
-  return [...text3].slice(0, TRIGGER_PARAM_MAX_LENGTH).join("");
+function bound(text4) {
+  return [...text4].slice(0, TRIGGER_PARAM_MAX_LENGTH).join("");
 }
 function sameValue(a, b2) {
   if (a instanceof Date && b2 instanceof Date)
@@ -51166,7 +51288,7 @@ async function readBody(c) {
     return "";
   const decoder2 = new TextDecoder;
   let size = 0;
-  let text3 = "";
+  let text4 = "";
   try {
     while (true) {
       const { done, value } = await reader.read();
@@ -51177,9 +51299,9 @@ async function readBody(c) {
         await reader.cancel();
         throw new GatewayError("PAYLOAD_TOO_LARGE", "request too large");
       }
-      text3 += decoder2.decode(value, { stream: true });
+      text4 += decoder2.decode(value, { stream: true });
     }
-    return text3 + decoder2.decode();
+    return text4 + decoder2.decode();
   } finally {
     reader.releaseLock();
   }
@@ -54209,20 +54331,20 @@ var require_parse = __commonJS((exports, module) => {
     r: "\r",
     t: "\t"
   };
-  var text3;
+  var text4;
   function error51(m3) {
     throw {
       name: "SyntaxError",
       message: m3,
       at,
-      text: text3
+      text: text4
     };
   }
   function next(c2) {
     if (c2 && c2 !== ch) {
       error51("Expected '" + c2 + "' instead of '" + ch + "'");
     }
-    ch = text3.charAt(at);
+    ch = text4.charAt(at);
     at += 1;
     return ch;
   }
@@ -54393,7 +54515,7 @@ var require_parse = __commonJS((exports, module) => {
   }
   module.exports = function(source, reviver) {
     var result;
-    text3 = source;
+    text4 = source;
     at = 0;
     ch = " ";
     result = value();
@@ -78124,8 +78246,8 @@ var init_session_seed_diagnostics = __esm(() => {
 });
 
 // frontend/packages/project-gateway/src/session-seed.ts
-async function sessionSeedDigest(text3) {
-  return Array.from(new Uint8Array(await crypto.subtle.digest("SHA-256", new TextEncoder().encode(text3))), (x3) => x3.toString(16).padStart(2, "0")).join("");
+async function sessionSeedDigest(text4) {
+  return Array.from(new Uint8Array(await crypto.subtle.digest("SHA-256", new TextEncoder().encode(text4))), (x3) => x3.toString(16).padStart(2, "0")).join("");
 }
 function serializeSessionSeedPlan(input) {
   if (!input || typeof input !== "object" || !("operations" in input) || !Array.isArray(input.operations))
@@ -78139,8 +78261,8 @@ function serializeSessionSeedPlan(input) {
   };
   return sessionSeedPlanSchema.parse(plan);
 }
-function schemaOf(text3) {
-  const schema2 = JSON.parse(text3);
+function schemaOf(text4) {
+  const schema2 = JSON.parse(text4);
   if (!schema2 || typeof schema2 !== "object" || !schema2.models || typeof schema2.models !== "object" || Array.isArray(schema2.models))
     throw new Error("invalid session seed schema");
   const pending = [{ node: schema2, depth: 0 }];
@@ -78665,7 +78787,7 @@ async function rawArtifact(c2) {
     return "";
   const decoder2 = new TextDecoder("utf-8", { fatal: true, ignoreBOM: true });
   let size = 0;
-  let text3 = "";
+  let text4 = "";
   try {
     while (true) {
       const { done, value: value2 } = await reader.read();
@@ -78676,9 +78798,9 @@ async function rawArtifact(c2) {
         await reader.cancel();
         throw new GatewayError("PAYLOAD_TOO_LARGE", "initialization artifact is too large");
       }
-      text3 += decoder2.decode(value2, { stream: true });
+      text4 += decoder2.decode(value2, { stream: true });
     }
-    return text3 + decoder2.decode();
+    return text4 + decoder2.decode();
   } catch (error51) {
     if (error51 instanceof GatewayError)
       throw error51;
@@ -81932,10 +82054,10 @@ function createDevAi(options2) {
       async chat(body) {
         const request = body;
         const schema2 = request.response_format?.json_schema?.schema;
-        const text3 = schema2 === undefined ? `（kit dev の模擬の応答。本番では AI が答えます）${lastUserText(request.messages)}` : JSON.stringify(sampleOf(schema2));
+        const text4 = schema2 === undefined ? `（kit dev の模擬の応答。本番では AI が答えます）${lastUserText(request.messages)}` : JSON.stringify(sampleOf(schema2));
         const id = `gen-kit-dev-${crypto.randomUUID()}`;
         const events = [
-          { id, model: "kit-dev/mock", choices: [{ delta: { content: text3 } }] },
+          { id, model: "kit-dev/mock", choices: [{ delta: { content: text4 } }] },
           {
             id,
             model: "kit-dev/mock",
@@ -81949,9 +82071,50 @@ function createDevAi(options2) {
 
 `;
         return new Response(sse, { headers: { "content-type": "text/event-stream" } });
+      },
+      async embeddings(body) {
+        const request = body;
+        const dims = request.dimensions ?? EMBEDDING_DIMENSIONS_DEFAULT;
+        const inputs = typeof request.input === "string" ? [request.input] : request.input;
+        const data = inputs.map((text4, index2) => {
+          const vector = mockEmbedding(text4, dims);
+          return {
+            object: "embedding",
+            index: index2,
+            embedding: request.encoding_format === "base64" ? base64Of(vector) : vector
+          };
+        });
+        return Response.json({
+          object: "list",
+          data,
+          model: "kit-dev/mock-embedding",
+          id: `gen-emb-kit-dev-${crypto.randomUUID()}`,
+          usage: { prompt_tokens: 0, total_tokens: 0, cost: 0 }
+        });
       }
     }
   };
+}
+function mockEmbedding(text4, dims) {
+  const chars = [...text4];
+  const vector = new Array(dims).fill(0);
+  const grams = chars.length < 3 ? [chars.join("")] : chars.slice(2).map((_3, i2) => chars.slice(i2, i2 + 3).join(""));
+  for (const gram of grams) {
+    let hash4 = 2166136261;
+    for (const unit of gram) {
+      hash4 = Math.imul(hash4 ^ unit.codePointAt(0), 16777619) >>> 0;
+    }
+    vector[hash4 % dims] += hash4 >>> 16 & 1 ? 1 : -1;
+  }
+  const norm = Math.hypot(...vector) || 1;
+  return vector.map((x3) => x3 / norm);
+}
+function base64Of(vector) {
+  const bytes3 = new Uint8Array(new Float32Array(vector).buffer);
+  let binary = "";
+  for (const byte of bytes3)
+    binary += String.fromCharCode(byte);
+  return btoa(binary);
 }
 function lastUserText(messages) {
   const content = messages?.filter((m3) => m3.role === "user").at(-1)?.content;
@@ -81984,7 +82147,7 @@ function sampleOf(schema2) {
       return null;
   }
 }
-var JEV_ROUTER = "typesafe/jev-router", ALL_MODALITIES;
+var JEV_ROUTER = "typesafe/jev-router", ALL_MODALITIES, EMBEDDING_DIMENSIONS_DEFAULT = 1536;
 var init_ai2 = __esm(() => {
   init_src3();
   init_src();
@@ -82474,8 +82637,8 @@ var init_session_sample = __esm(() => {
 function pascal(slug) {
   return slug.split("-").map((part) => part.charAt(0).toUpperCase() + part.slice(1)).join("");
 }
-function commentOf(text3) {
-  return text3.replace(/\*\//g, "* /").replace(/\s+/g, " ").trim();
+function commentOf(text4) {
+  return text4.replace(/\*\//g, "* /").replace(/\s+/g, " ").trim();
 }
 function renderServerEnvTypes(manifest2) {
   const lines = [
@@ -82668,19 +82831,19 @@ var init_compiler_fingerprint = __esm(() => {
 
 // frontend/packages/miniapp-kit/src/generation-inputs.ts
 function standardGenerationInputs(schema2) {
-  let text3 = schema2.split(/\r?\n/).filter((line) => !line.trimStart().startsWith("//")).join(`
+  let text4 = schema2.split(/\r?\n/).filter((line) => !line.trimStart().startsWith("//")).join(`
 `);
-  if (text3.includes("//") || text3.includes("/*") || text3.includes("*/"))
+  if (text4.includes("//") || text4.includes("/*") || text4.includes("*/"))
     return false;
   const imports = /^\s*import\s+(['"])platform\1\s*$/gm;
-  if ([...text3.matchAll(imports)].length !== 1)
+  if ([...text4.matchAll(imports)].length !== 1)
     return false;
-  text3 = text3.replace(imports, "");
+  text4 = text4.replace(imports, "");
   const policy = /\bplugin\s+policy\s*\{\s*provider\s*=\s*(['"])@zenstackhq\/plugin-policy\1\s*\}/g;
-  if ([...text3.matchAll(policy)].length !== 1)
+  if ([...text4.matchAll(policy)].length !== 1)
     return false;
-  text3 = text3.replace(policy, "");
-  return !/\b(import|plugin|generator)\b/.test(text3);
+  text4 = text4.replace(policy, "");
+  return !/\b(import|plugin|generator)\b/.test(text4);
 }
 function generationUiInput(path, webApps) {
   const parts = path.split("/");
@@ -88844,9 +89007,9 @@ var require_typescript = __commonJS((exports, module) => {
       }
       return false;
     }
-    function indexOfAnyCharCode(text3, charCodes, start) {
-      for (let i2 = start ?? 0;i2 < text3.length; i2++) {
-        if (contains2(charCodes, text3.charCodeAt(i2))) {
+    function indexOfAnyCharCode(text4, charCodes, start) {
+      for (let i2 = start ?? 0;i2 < text4.length; i2++) {
+        if (contains2(charCodes, text4.charCodeAt(i2))) {
           return i2;
         }
       }
@@ -89767,8 +89930,8 @@ var require_typescript = __commonJS((exports, module) => {
     function toArray(value2) {
       return isArray2(value2) ? value2 : [value2];
     }
-    function isString3(text3) {
-      return typeof text3 === "string";
+    function isString3(text4) {
+      return typeof text4 === "string";
     }
     function isNumber3(x3) {
       return typeof x3 === "number";
@@ -90390,8 +90553,8 @@ Verbose Debug Information: ` + (typeof verboseDebugInfo === "string" ? verboseDe
         } else if (hasProperty(func, "name")) {
           return func.name;
         } else {
-          const text3 = Function.prototype.toString.call(func);
-          const match2 = /^function\s+([\w$]+)\s*\(/.exec(text3);
+          const text4 = Function.prototype.toString.call(func);
+          const match2 = /^function\s+([\w$]+)\s*\(/.exec(text4);
           return match2 ? match2[1] : "";
         }
       }
@@ -90621,12 +90784,12 @@ Verbose Debug Information: ` + (typeof verboseDebugInfo === "string" ? verboseDe
           },
           __debugTypeToString: {
             value() {
-              let text3 = weakTypeTextMap.get(this);
-              if (text3 === undefined) {
-                text3 = this.checker.typeToString(this);
-                weakTypeTextMap.set(this, text3);
+              let text4 = weakTypeTextMap.get(this);
+              if (text4 === undefined) {
+                text4 = this.checker.typeToString(this);
+                weakTypeTextMap.set(this, text4);
               }
-              return text3;
+              return text4;
             }
           }
         });
@@ -90692,14 +90855,14 @@ Verbose Debug Information: ` + (typeof verboseDebugInfo === "string" ? verboseDe
                 value(includeTrivia) {
                   if (nodeIsSynthesized(this))
                     return "";
-                  let text3 = weakNodeTextMap.get(this);
-                  if (text3 === undefined) {
+                  let text4 = weakNodeTextMap.get(this);
+                  if (text4 === undefined) {
                     const parseNode = getParseTreeNode(this);
                     const sourceFile = parseNode && getSourceFileOfNode(parseNode);
-                    text3 = sourceFile ? getSourceTextOfNodeFromSourceFile(sourceFile, parseNode, includeTrivia) : "";
-                    weakNodeTextMap.set(this, text3);
+                    text4 = sourceFile ? getSourceTextOfNodeFromSourceFile(sourceFile, parseNode, includeTrivia) : "";
+                    weakNodeTextMap.set(this, text4);
                   }
-                  return text3;
+                  return text4;
                 }
               }
             });
@@ -90956,9 +91119,9 @@ m2: ${this.mapper2.__debugToString().split(`
           return getSourceTextOfNodeFromSourceFile(sourceFile, node, false);
         }
         function renderFlowNode(flowNode2, circular) {
-          let text3 = getHeader2(flowNode2.flags);
+          let text4 = getHeader2(flowNode2.flags);
           if (circular) {
-            text3 = `${text3}#${getDebugFlowNodeId(flowNode2)}`;
+            text4 = `${text4}#${getDebugFlowNodeId(flowNode2)}`;
           }
           if (isFlowSwitchClause(flowNode2)) {
             const clauses = [];
@@ -90971,13 +91134,13 @@ m2: ${this.mapper2.__debugToString().split(`
                 clauses.push(getNodeText(clause.expression));
               }
             }
-            text3 += ` (${clauses.join(", ")})`;
+            text4 += ` (${clauses.join(", ")})`;
           } else if (hasNode(flowNode2)) {
             if (flowNode2.node) {
-              text3 += ` (${getNodeText(flowNode2.node)})`;
+              text4 += ` (${getNodeText(flowNode2.node)})`;
             }
           }
-          return circular === "circularity" ? `Circular(${text3})` : text3;
+          return circular === "circularity" ? `Circular(${text4})` : text4;
         }
         function renderGraph() {
           const columnCount = columnWidths.length;
@@ -91051,8 +91214,8 @@ m2: ${this.mapper2.__debugToString().split(`
 ${lanes.join(`
 `)}
 `;
-          function writeLane(lane, text3) {
-            lanes[lane] += text3;
+          function writeLane(lane, text4) {
+            lanes[lane] += text4;
           }
         }
         function getBoxCharacter(connector) {
@@ -91130,8 +91293,8 @@ ${lanes.join(`
         this.prerelease = prereleaseArray;
         this.build = buildArray;
       }
-      static tryParse(text3) {
-        const result = tryParseComponents(text3);
+      static tryParse(text4) {
+        const result = tryParseComponents(text4);
         if (!result)
           return;
         const { major, minor, patch, prerelease, build: build2 } = result;
@@ -91177,8 +91340,8 @@ ${lanes.join(`
     };
     _Version.zero = new _Version(0, 0, 0, ["0"]);
     var Version = _Version;
-    function tryParseComponents(text3) {
-      const match2 = versionRegExp.exec(text3);
+    function tryParseComponents(text4) {
+      const match2 = versionRegExp.exec(text4);
       if (!match2)
         return;
       const [, major, minor = "0", patch = "0", prerelease = "", build2 = ""] = match2;
@@ -91227,8 +91390,8 @@ ${lanes.join(`
       constructor(spec) {
         this._alternatives = spec ? Debug.checkDefined(parseRange(spec), "Invalid range spec.") : emptyArray;
       }
-      static tryParse(text3) {
-        const sets = parseRange(text3);
+      static tryParse(text4) {
+        const sets = parseRange(text4);
         if (sets) {
           const range = new _VersionRange("");
           range._alternatives = sets;
@@ -91250,9 +91413,9 @@ ${lanes.join(`
     var partialRegExp = /^([x*0]|[1-9]\d*)(?:\.([x*0]|[1-9]\d*)(?:\.([x*0]|[1-9]\d*)(?:-([a-z0-9-.]+))?(?:\+([a-z0-9-.]+))?)?)?$/i;
     var hyphenRegExp = /^\s*([a-z0-9-+.*]+)\s+-\s+([a-z0-9-+.*]+)\s*$/i;
     var rangeRegExp = /^([~^<>=]|<=|>=)?\s*([a-z0-9-+.*]+)$/i;
-    function parseRange(text3) {
+    function parseRange(text4) {
       const alternatives = [];
-      for (let range of text3.trim().split(logicalOrRegExp)) {
+      for (let range of text4.trim().split(logicalOrRegExp)) {
         if (!range)
           continue;
         const comparators = [];
@@ -91272,8 +91435,8 @@ ${lanes.join(`
       }
       return alternatives;
     }
-    function parsePartial(text3) {
-      const match2 = partialRegExp.exec(text3);
+    function parsePartial(text4) {
+      const match2 = partialRegExp.exec(text4);
       if (!match2)
         return;
       const [, major, minor = "*", patch = "*", prerelease, build2] = match2;
@@ -91295,8 +91458,8 @@ ${lanes.join(`
       }
       return true;
     }
-    function parseComparator(operator, text3, comparators) {
-      const result = parsePartial(text3);
+    function parseComparator(operator, text4, comparators) {
+      const result = parsePartial(text4);
       if (!result)
         return false;
       const { version: version22, major, minor, patch } = result;
@@ -97684,16 +97847,16 @@ ${lanes.join(`
     function characterCodeToRegularExpressionFlag(ch) {
       return charCodeToRegExpFlag.get(ch);
     }
-    function computeLineStarts(text3) {
+    function computeLineStarts(text4) {
       const result = [];
       let pos = 0;
       let lineStart = 0;
-      while (pos < text3.length) {
-        const ch = text3.charCodeAt(pos);
+      while (pos < text4.length) {
+        const ch = text4.charCodeAt(pos);
         pos++;
         switch (ch) {
           case 13:
-            if (text3.charCodeAt(pos) === 10) {
+            if (text4.charCodeAt(pos) === 10) {
               pos++;
             }
           case 10:
@@ -97789,8 +97952,8 @@ ${lanes.join(`
     function isOctalDigit(ch) {
       return ch >= 48 && ch <= 55;
     }
-    function couldStartTrivia(text3, pos) {
-      const ch = text3.charCodeAt(pos);
+    function couldStartTrivia(text4, pos) {
+      const ch = text4.charCodeAt(pos);
       switch (ch) {
         case 13:
         case 10:
@@ -97810,16 +97973,16 @@ ${lanes.join(`
           return ch > 127;
       }
     }
-    function skipTrivia(text3, pos, stopAfterLineBreak, stopAtComments, inJSDoc) {
+    function skipTrivia(text4, pos, stopAfterLineBreak, stopAtComments, inJSDoc) {
       if (positionIsSynthesized(pos)) {
         return pos;
       }
       let canConsumeStar = false;
       while (true) {
-        const ch = text3.charCodeAt(pos);
+        const ch = text4.charCodeAt(pos);
         switch (ch) {
           case 13:
-            if (text3.charCodeAt(pos + 1) === 10) {
+            if (text4.charCodeAt(pos + 1) === 10) {
               pos++;
             }
           case 10:
@@ -97839,10 +98002,10 @@ ${lanes.join(`
             if (stopAtComments) {
               break;
             }
-            if (text3.charCodeAt(pos + 1) === 47) {
+            if (text4.charCodeAt(pos + 1) === 47) {
               pos += 2;
-              while (pos < text3.length) {
-                if (isLineBreak(text3.charCodeAt(pos))) {
+              while (pos < text4.length) {
+                if (isLineBreak(text4.charCodeAt(pos))) {
                   break;
                 }
                 pos++;
@@ -97850,10 +98013,10 @@ ${lanes.join(`
               canConsumeStar = false;
               continue;
             }
-            if (text3.charCodeAt(pos + 1) === 42) {
+            if (text4.charCodeAt(pos + 1) === 42) {
               pos += 2;
-              while (pos < text3.length) {
-                if (text3.charCodeAt(pos) === 42 && text3.charCodeAt(pos + 1) === 47) {
+              while (pos < text4.length) {
+                if (text4.charCodeAt(pos) === 42 && text4.charCodeAt(pos + 1) === 47) {
                   pos += 2;
                   break;
                 }
@@ -97867,15 +98030,15 @@ ${lanes.join(`
           case 124:
           case 61:
           case 62:
-            if (isConflictMarkerTrivia(text3, pos)) {
-              pos = scanConflictMarkerTrivia(text3, pos);
+            if (isConflictMarkerTrivia(text4, pos)) {
+              pos = scanConflictMarkerTrivia(text4, pos);
               canConsumeStar = false;
               continue;
             }
             break;
           case 35:
-            if (pos === 0 && isShebangTrivia(text3, pos)) {
-              pos = scanShebangTrivia(text3, pos);
+            if (pos === 0 && isShebangTrivia(text4, pos)) {
+              pos = scanShebangTrivia(text4, pos);
               canConsumeStar = false;
               continue;
             }
@@ -97898,36 +98061,36 @@ ${lanes.join(`
       }
     }
     var mergeConflictMarkerLength = "<<<<<<<".length;
-    function isConflictMarkerTrivia(text3, pos) {
+    function isConflictMarkerTrivia(text4, pos) {
       Debug.assert(pos >= 0);
-      if (pos === 0 || isLineBreak(text3.charCodeAt(pos - 1))) {
-        const ch = text3.charCodeAt(pos);
-        if (pos + mergeConflictMarkerLength < text3.length) {
+      if (pos === 0 || isLineBreak(text4.charCodeAt(pos - 1))) {
+        const ch = text4.charCodeAt(pos);
+        if (pos + mergeConflictMarkerLength < text4.length) {
           for (let i2 = 0;i2 < mergeConflictMarkerLength; i2++) {
-            if (text3.charCodeAt(pos + i2) !== ch) {
+            if (text4.charCodeAt(pos + i2) !== ch) {
               return false;
             }
           }
-          return ch === 61 || text3.charCodeAt(pos + mergeConflictMarkerLength) === 32;
+          return ch === 61 || text4.charCodeAt(pos + mergeConflictMarkerLength) === 32;
         }
       }
       return false;
     }
-    function scanConflictMarkerTrivia(text3, pos, error210) {
+    function scanConflictMarkerTrivia(text4, pos, error210) {
       if (error210) {
         error210(Diagnostics.Merge_conflict_marker_encountered, pos, mergeConflictMarkerLength);
       }
-      const ch = text3.charCodeAt(pos);
-      const len = text3.length;
+      const ch = text4.charCodeAt(pos);
+      const len = text4.length;
       if (ch === 60 || ch === 62) {
-        while (pos < len && !isLineBreak(text3.charCodeAt(pos))) {
+        while (pos < len && !isLineBreak(text4.charCodeAt(pos))) {
           pos++;
         }
       } else {
         Debug.assert(ch === 124 || ch === 61);
         while (pos < len) {
-          const currentChar = text3.charCodeAt(pos);
-          if ((currentChar === 61 || currentChar === 62) && currentChar !== ch && isConflictMarkerTrivia(text3, pos)) {
+          const currentChar = text4.charCodeAt(pos);
+          if ((currentChar === 61 || currentChar === 62) && currentChar !== ch && isConflictMarkerTrivia(text4, pos)) {
             break;
           }
           pos++;
@@ -97936,16 +98099,16 @@ ${lanes.join(`
       return pos;
     }
     var shebangTriviaRegex = /^#!.*/;
-    function isShebangTrivia(text3, pos) {
+    function isShebangTrivia(text4, pos) {
       Debug.assert(pos === 0);
-      return shebangTriviaRegex.test(text3);
+      return shebangTriviaRegex.test(text4);
     }
-    function scanShebangTrivia(text3, pos) {
-      const shebang = shebangTriviaRegex.exec(text3)[0];
+    function scanShebangTrivia(text4, pos) {
+      const shebang = shebangTriviaRegex.exec(text4)[0];
       pos = pos + shebang.length;
       return pos;
     }
-    function iterateCommentRanges(reduce, text3, pos, trailing, cb, state, initial) {
+    function iterateCommentRanges(reduce, text4, pos, trailing, cb, state, initial) {
       let pendingPos;
       let pendingEnd;
       let pendingKind;
@@ -97955,17 +98118,17 @@ ${lanes.join(`
       let accumulator = initial;
       if (pos === 0) {
         collecting = true;
-        const shebang = getShebang(text3);
+        const shebang = getShebang(text4);
         if (shebang) {
           pos = shebang.length;
         }
       }
       scan:
-        while (pos >= 0 && pos < text3.length) {
-          const ch = text3.charCodeAt(pos);
+        while (pos >= 0 && pos < text4.length) {
+          const ch = text4.charCodeAt(pos);
           switch (ch) {
             case 13:
-              if (text3.charCodeAt(pos + 1) === 10) {
+              if (text4.charCodeAt(pos + 1) === 10) {
                 pos++;
               }
             case 10:
@@ -97985,23 +98148,23 @@ ${lanes.join(`
               pos++;
               continue;
             case 47:
-              const nextChar = text3.charCodeAt(pos + 1);
+              const nextChar = text4.charCodeAt(pos + 1);
               let hasTrailingNewLine = false;
               if (nextChar === 47 || nextChar === 42) {
                 const kind = nextChar === 47 ? 2 : 3;
                 const startPos = pos;
                 pos += 2;
                 if (nextChar === 47) {
-                  while (pos < text3.length) {
-                    if (isLineBreak(text3.charCodeAt(pos))) {
+                  while (pos < text4.length) {
+                    if (isLineBreak(text4.charCodeAt(pos))) {
                       hasTrailingNewLine = true;
                       break;
                     }
                     pos++;
                   }
                 } else {
-                  while (pos < text3.length) {
-                    if (text3.charCodeAt(pos) === 42 && text3.charCodeAt(pos + 1) === 47) {
+                  while (pos < text4.length) {
+                    if (text4.charCodeAt(pos) === 42 && text4.charCodeAt(pos + 1) === 47) {
                       pos += 2;
                       break;
                     }
@@ -98040,30 +98203,30 @@ ${lanes.join(`
       }
       return accumulator;
     }
-    function forEachLeadingCommentRange(text3, pos, cb, state) {
-      return iterateCommentRanges(false, text3, pos, false, cb, state);
+    function forEachLeadingCommentRange(text4, pos, cb, state) {
+      return iterateCommentRanges(false, text4, pos, false, cb, state);
     }
-    function forEachTrailingCommentRange(text3, pos, cb, state) {
-      return iterateCommentRanges(false, text3, pos, true, cb, state);
+    function forEachTrailingCommentRange(text4, pos, cb, state) {
+      return iterateCommentRanges(false, text4, pos, true, cb, state);
     }
-    function reduceEachLeadingCommentRange(text3, pos, cb, state, initial) {
-      return iterateCommentRanges(true, text3, pos, false, cb, state, initial);
+    function reduceEachLeadingCommentRange(text4, pos, cb, state, initial) {
+      return iterateCommentRanges(true, text4, pos, false, cb, state, initial);
     }
-    function reduceEachTrailingCommentRange(text3, pos, cb, state, initial) {
-      return iterateCommentRanges(true, text3, pos, true, cb, state, initial);
+    function reduceEachTrailingCommentRange(text4, pos, cb, state, initial) {
+      return iterateCommentRanges(true, text4, pos, true, cb, state, initial);
     }
     function appendCommentRange(pos, end, kind, hasTrailingNewLine, _state2, comments = []) {
       comments.push({ kind, pos, end, hasTrailingNewLine });
       return comments;
     }
-    function getLeadingCommentRanges(text3, pos) {
-      return reduceEachLeadingCommentRange(text3, pos, appendCommentRange, undefined, undefined);
+    function getLeadingCommentRanges(text4, pos) {
+      return reduceEachLeadingCommentRange(text4, pos, appendCommentRange, undefined, undefined);
     }
-    function getTrailingCommentRanges(text3, pos) {
-      return reduceEachTrailingCommentRange(text3, pos, appendCommentRange, undefined, undefined);
+    function getTrailingCommentRanges(text4, pos) {
+      return reduceEachTrailingCommentRange(text4, pos, appendCommentRange, undefined, undefined);
     }
-    function getShebang(text3) {
-      const match2 = shebangTriviaRegex.exec(text3);
+    function getShebang(text4) {
+      const match2 = shebangTriviaRegex.exec(text4);
       if (match2) {
         return match2[0];
       }
@@ -98087,7 +98250,7 @@ ${lanes.join(`
       return true;
     }
     function createScanner(languageVersion, skipTrivia2, languageVariant = 0, textInitial, onError, start, length2) {
-      var text3 = textInitial;
+      var text4 = textInitial;
       var pos;
       var end;
       var fullStartPos;
@@ -98099,7 +98262,7 @@ ${lanes.join(`
       var skipJsDocLeadingAsterisks = 0;
       var scriptKind = 0;
       var jsDocParsingMode = 0;
-      setText(text3, start, length2);
+      setText(text4, start, length2);
       var scanner2 = {
         getTokenFullStart: () => fullStartPos,
         getStartPos: () => fullStartPos,
@@ -98108,7 +98271,7 @@ ${lanes.join(`
         getToken: () => token2,
         getTokenStart: () => tokenStart,
         getTokenPos: () => tokenStart,
-        getTokenText: () => text3.substring(tokenStart, pos),
+        getTokenText: () => text4.substring(tokenStart, pos),
         getTokenValue: () => tokenValue,
         hasUnicodeEscape: () => (tokenFlags & 1024) !== 0,
         hasExtendedUnicodeEscape: () => (tokenFlags & 8) !== 0,
@@ -98163,13 +98326,13 @@ ${lanes.join(`
       }
       return scanner2;
       function codePointUnchecked(pos2) {
-        return codePointAt(text3, pos2);
+        return codePointAt(text4, pos2);
       }
       function codePointChecked(pos2) {
         return pos2 >= 0 && pos2 < end ? codePointUnchecked(pos2) : -1;
       }
       function charCodeUnchecked(pos2) {
-        return text3.charCodeAt(pos2);
+        return text4.charCodeAt(pos2);
       }
       function charCodeChecked(pos2) {
         return pos2 >= 0 && pos2 < end ? charCodeUnchecked(pos2) : -1;
@@ -98194,7 +98357,7 @@ ${lanes.join(`
             if (allowSeparator) {
               allowSeparator = false;
               isPreviousTokenSeparator = true;
-              result += text3.substring(start2, pos);
+              result += text4.substring(start2, pos);
             } else {
               tokenFlags |= 16384;
               if (isPreviousTokenSeparator) {
@@ -98219,7 +98382,7 @@ ${lanes.join(`
           tokenFlags |= 16384;
           error210(Diagnostics.Numeric_separators_are_not_allowed_here, pos - 1, 1);
         }
-        return result + text3.substring(start2, pos);
+        return result + text4.substring(start2, pos);
       }
       function scanNumber() {
         let start2 = pos;
@@ -98266,7 +98429,7 @@ ${lanes.join(`
           if (!finalFragment) {
             error210(Diagnostics.Digit_expected);
           } else {
-            scientificFragment = text3.substring(end2, preNumericPart) + finalFragment;
+            scientificFragment = text4.substring(end2, preNumericPart) + finalFragment;
             end2 = pos;
           }
         }
@@ -98280,7 +98443,7 @@ ${lanes.join(`
             result += scientificFragment;
           }
         } else {
-          result = text3.substring(start2, end2);
+          result = text4.substring(start2, end2);
         }
         if (tokenFlags & 8192) {
           error210(Diagnostics.Decimals_with_leading_zeros_are_not_allowed, start2, end2 - start2);
@@ -98304,7 +98467,7 @@ ${lanes.join(`
         }
         const identifierStart = pos;
         const { length: length3 } = scanIdentifierParts();
-        if (length3 === 1 && text3[identifierStart] === "n") {
+        if (length3 === 1 && text4[identifierStart] === "n") {
           if (isScientific) {
             error210(Diagnostics.A_bigint_literal_cannot_use_exponential_notation, numericStart, identifierStart - numericStart + 1);
           } else {
@@ -98324,7 +98487,7 @@ ${lanes.join(`
           }
           pos++;
         }
-        tokenValue = text3.substring(start2, pos);
+        tokenValue = text4.substring(start2, pos);
         return isOctal2;
       }
       function scanExactNumberOfHexDigits(count, canHaveSeparators) {
@@ -98378,25 +98541,25 @@ ${lanes.join(`
         let start2 = pos;
         while (true) {
           if (pos >= end) {
-            result += text3.substring(start2, pos);
+            result += text4.substring(start2, pos);
             tokenFlags |= 4;
             error210(Diagnostics.Unterminated_string_literal);
             break;
           }
           const ch = charCodeUnchecked(pos);
           if (ch === quote22) {
-            result += text3.substring(start2, pos);
+            result += text4.substring(start2, pos);
             pos++;
             break;
           }
           if (ch === 92 && !jsxAttributeString) {
-            result += text3.substring(start2, pos);
+            result += text4.substring(start2, pos);
             result += scanEscapeSequence(1 | 2);
             start2 = pos;
             continue;
           }
           if ((ch === 10 || ch === 13) && !jsxAttributeString) {
-            result += text3.substring(start2, pos);
+            result += text4.substring(start2, pos);
             tokenFlags |= 4;
             error210(Diagnostics.Unterminated_string_literal);
             break;
@@ -98413,7 +98576,7 @@ ${lanes.join(`
         let resultingToken;
         while (true) {
           if (pos >= end) {
-            contents += text3.substring(start2, pos);
+            contents += text4.substring(start2, pos);
             tokenFlags |= 4;
             error210(Diagnostics.Unterminated_template_literal);
             resultingToken = startedWithBacktick ? 15 : 18;
@@ -98421,25 +98584,25 @@ ${lanes.join(`
           }
           const currChar = charCodeUnchecked(pos);
           if (currChar === 96) {
-            contents += text3.substring(start2, pos);
+            contents += text4.substring(start2, pos);
             pos++;
             resultingToken = startedWithBacktick ? 15 : 18;
             break;
           }
           if (currChar === 36 && pos + 1 < end && charCodeUnchecked(pos + 1) === 123) {
-            contents += text3.substring(start2, pos);
+            contents += text4.substring(start2, pos);
             pos += 2;
             resultingToken = startedWithBacktick ? 16 : 17;
             break;
           }
           if (currChar === 92) {
-            contents += text3.substring(start2, pos);
+            contents += text4.substring(start2, pos);
             contents += scanEscapeSequence(1 | (shouldEmitInvalidEscapeError ? 2 : 0));
             start2 = pos;
             continue;
           }
           if (currChar === 13) {
-            contents += text3.substring(start2, pos);
+            contents += text4.substring(start2, pos);
             pos++;
             if (pos < end && charCodeUnchecked(pos) === 10) {
               pos++;
@@ -98484,7 +98647,7 @@ ${lanes.join(`
             }
             tokenFlags |= 2048;
             if (flags & 6) {
-              const code = parseInt(text3.substring(start2 + 1, pos), 8);
+              const code = parseInt(text4.substring(start2 + 1, pos), 8);
               if (flags & 4 && !(flags & 32) && ch !== 48) {
                 error210(Diagnostics.Octal_escape_sequences_and_backreferences_are_not_allowed_in_a_character_class_If_this_was_intended_as_an_escape_sequence_use_the_syntax_0_instead, start2, pos - start2, "\\x" + code.toString(16).padStart(2, "0"));
               } else {
@@ -98492,7 +98655,7 @@ ${lanes.join(`
               }
               return String.fromCharCode(code);
             }
-            return text3.substring(start2, pos);
+            return text4.substring(start2, pos);
           case 56:
           case 57:
             tokenFlags |= 2048;
@@ -98500,11 +98663,11 @@ ${lanes.join(`
               if (flags & 4 && !(flags & 32)) {
                 error210(Diagnostics.Decimal_escape_sequences_and_backreferences_are_not_allowed_in_a_character_class, start2, pos - start2);
               } else {
-                error210(Diagnostics.Escape_sequence_0_is_not_allowed, start2, pos - start2, text3.substring(start2, pos));
+                error210(Diagnostics.Escape_sequence_0_is_not_allowed, start2, pos - start2, text4.substring(start2, pos));
               }
               return String.fromCharCode(ch);
             }
-            return text3.substring(start2, pos);
+            return text4.substring(start2, pos);
           case 98:
             return "\b";
           case 116:
@@ -98540,13 +98703,13 @@ ${lanes.join(`
                 if (flags & 6) {
                   error210(Diagnostics.Hexadecimal_digit_expected);
                 }
-                return text3.substring(start2, pos);
+                return text4.substring(start2, pos);
               }
             }
             tokenFlags |= 1024;
-            const escapedValue = parseInt(text3.substring(start2 + 2, pos), 16);
+            const escapedValue = parseInt(text4.substring(start2 + 2, pos), 16);
             const escapedValueString = String.fromCharCode(escapedValue);
-            if (flags & 16 && escapedValue >= 55296 && escapedValue <= 56319 && pos + 6 < end && text3.substring(pos, pos + 2) === "\\u" && charCodeUnchecked(pos + 2) !== 123) {
+            if (flags & 16 && escapedValue >= 55296 && escapedValue <= 56319 && pos + 6 < end && text4.substring(pos, pos + 2) === "\\u" && charCodeUnchecked(pos + 2) !== 123) {
               const nextStart = pos;
               let nextPos = pos + 2;
               for (;nextPos < nextStart + 6; nextPos++) {
@@ -98554,7 +98717,7 @@ ${lanes.join(`
                   return escapedValueString;
                 }
               }
-              const nextEscapedValue = parseInt(text3.substring(nextStart + 2, nextPos), 16);
+              const nextEscapedValue = parseInt(text4.substring(nextStart + 2, nextPos), 16);
               if (nextEscapedValue >= 56320 && nextEscapedValue <= 57343) {
                 pos = nextPos;
                 return escapedValueString + String.fromCharCode(nextEscapedValue);
@@ -98568,11 +98731,11 @@ ${lanes.join(`
                 if (flags & 6) {
                   error210(Diagnostics.Hexadecimal_digit_expected);
                 }
-                return text3.substring(start2, pos);
+                return text4.substring(start2, pos);
               }
             }
             tokenFlags |= 4096;
-            return String.fromCharCode(parseInt(text3.substring(start2 + 2, pos), 16));
+            return String.fromCharCode(parseInt(text4.substring(start2 + 2, pos), 16));
           case 13:
             if (pos < end && charCodeUnchecked(pos) === 10) {
               pos++;
@@ -98621,7 +98784,7 @@ ${lanes.join(`
         }
         if (isInvalidExtendedEscape) {
           tokenFlags |= 2048;
-          return text3.substring(start2, pos);
+          return text4.substring(start2, pos);
         }
         tokenFlags |= 8;
         return utf16EncodeAsString(escapedValue);
@@ -98666,7 +98829,7 @@ ${lanes.join(`
               break;
             }
             tokenFlags |= 1024;
-            result += text3.substring(start2, pos);
+            result += text4.substring(start2, pos);
             result += utf16EncodeAsString(ch);
             pos += 6;
             start2 = pos;
@@ -98674,7 +98837,7 @@ ${lanes.join(`
             break;
           }
         }
-        result += text3.substring(start2, pos);
+        result += text4.substring(start2, pos);
         return result;
       }
       function getIdentifierToken() {
@@ -98713,7 +98876,7 @@ ${lanes.join(`
           if (!isDigit2(ch) || ch - 48 >= base) {
             break;
           }
-          value2 += text3[pos];
+          value2 += text4[pos];
           pos++;
           isPreviousTokenSeparator = false;
         }
@@ -98746,8 +98909,8 @@ ${lanes.join(`
           }
           const ch = codePointUnchecked(pos);
           if (pos === 0) {
-            if (ch === 35 && isShebangTrivia(text3, pos)) {
-              pos = scanShebangTrivia(text3, pos);
+            if (ch === 35 && isShebangTrivia(text4, pos)) {
+              pos = scanShebangTrivia(text4, pos);
               if (skipTrivia2) {
                 continue;
               } else {
@@ -98896,7 +99059,7 @@ ${lanes.join(`
                   }
                   pos++;
                 }
-                commentDirectives = appendIfCommentDirective(commentDirectives, text3.slice(tokenStart, pos), commentDirectiveRegExSingleLine, tokenStart);
+                commentDirectives = appendIfCommentDirective(commentDirectives, text4.slice(tokenStart, pos), commentDirectiveRegExSingleLine, tokenStart);
                 if (skipTrivia2) {
                   continue;
                 } else {
@@ -98924,7 +99087,7 @@ ${lanes.join(`
                 if (isJSDoc2 && shouldParseJSDoc()) {
                   tokenFlags |= 2;
                 }
-                commentDirectives = appendIfCommentDirective(commentDirectives, text3.slice(lastLineStart, pos), commentDirectiveRegExMultiLine, lastLineStart);
+                commentDirectives = appendIfCommentDirective(commentDirectives, text4.slice(lastLineStart, pos), commentDirectiveRegExMultiLine, lastLineStart);
                 if (!commentClosed) {
                   error210(Diagnostics.Asterisk_Slash_expected);
                 }
@@ -98991,8 +99154,8 @@ ${lanes.join(`
               pos++;
               return token2 = 27;
             case 60:
-              if (isConflictMarkerTrivia(text3, pos)) {
-                pos = scanConflictMarkerTrivia(text3, pos, error210);
+              if (isConflictMarkerTrivia(text4, pos)) {
+                pos = scanConflictMarkerTrivia(text4, pos, error210);
                 if (skipTrivia2) {
                   continue;
                 } else {
@@ -99014,8 +99177,8 @@ ${lanes.join(`
               pos++;
               return token2 = 30;
             case 61:
-              if (isConflictMarkerTrivia(text3, pos)) {
-                pos = scanConflictMarkerTrivia(text3, pos, error210);
+              if (isConflictMarkerTrivia(text4, pos)) {
+                pos = scanConflictMarkerTrivia(text4, pos, error210);
                 if (skipTrivia2) {
                   continue;
                 } else {
@@ -99034,8 +99197,8 @@ ${lanes.join(`
               pos++;
               return token2 = 64;
             case 62:
-              if (isConflictMarkerTrivia(text3, pos)) {
-                pos = scanConflictMarkerTrivia(text3, pos, error210);
+              if (isConflictMarkerTrivia(text4, pos)) {
+                pos = scanConflictMarkerTrivia(text4, pos, error210);
                 if (skipTrivia2) {
                   continue;
                 } else {
@@ -99072,8 +99235,8 @@ ${lanes.join(`
               pos++;
               return token2 = 19;
             case 124:
-              if (isConflictMarkerTrivia(text3, pos)) {
-                pos = scanConflictMarkerTrivia(text3, pos, error210);
+              if (isConflictMarkerTrivia(text4, pos)) {
+                pos = scanConflictMarkerTrivia(text4, pos, error210);
                 if (skipTrivia2) {
                   continue;
                 } else {
@@ -99117,7 +99280,7 @@ ${lanes.join(`
               pos++;
               return token2 = 0;
             case 35:
-              if (pos !== 0 && text3[pos + 1] === "!") {
+              if (pos !== 0 && text4[pos + 1] === "!") {
                 error210(Diagnostics.can_only_be_used_at_the_start_of_a_file, pos, 2);
                 pos++;
                 return token2 = 0;
@@ -99183,7 +99346,7 @@ ${lanes.join(`
         if (jsDocParsingMode === 3) {
           return false;
         }
-        return jsDocSeeOrLink.test(text3.slice(fullStartPos, pos));
+        return jsDocSeeOrLink.test(text4.slice(fullStartPos, pos));
       }
       function reScanInvalidIdentifier() {
         Debug.assert(token2 === 0, "'reScanInvalidIdentifier' should only be called when the current token is 'SyntaxKind.Unknown'.");
@@ -99203,7 +99366,7 @@ ${lanes.join(`
           pos += charSize(ch);
           while (pos < end && isIdentifierPart(ch = codePointUnchecked(pos), languageVersion2))
             pos += charSize(ch);
-          tokenValue = text3.substring(tokenStart, pos);
+          tokenValue = text4.substring(tokenStart, pos);
           if (ch === 92) {
             tokenValue += scanIdentifierParts();
           }
@@ -99332,7 +99495,7 @@ ${lanes.join(`
               });
             }
           }
-          tokenValue = text3.substring(tokenStart, pos);
+          tokenValue = text4.substring(tokenStart, pos);
           token2 = 14;
         }
         return token2;
@@ -99698,7 +99861,7 @@ ${lanes.join(`
           }
           let start2 = pos;
           let operand;
-          switch (text3.slice(pos, pos + 2)) {
+          switch (text4.slice(pos, pos + 2)) {
             case "--":
             case "&&":
               error210(Diagnostics.Expected_a_class_set_operand);
@@ -99757,7 +99920,7 @@ ${lanes.join(`
                   pos++;
                   error210(Diagnostics.Operators_must_not_be_mixed_within_a_character_class_Wrap_it_in_a_nested_class_instead, pos - 2, 2);
                   start2 = pos - 2;
-                  operand = text3.slice(start2, pos);
+                  operand = text4.slice(start2, pos);
                   continue;
                 } else {
                   if (!operand) {
@@ -99796,19 +99959,19 @@ ${lanes.join(`
                 } else {
                   error210(Diagnostics.Unexpected_0_Did_you_mean_to_escape_it_with_backslash, pos - 1, 1, String.fromCharCode(ch));
                 }
-                operand = text3.slice(start2, pos);
+                operand = text4.slice(start2, pos);
                 continue;
             }
             if (isClassContentExit(charCodeChecked(pos))) {
               break;
             }
             start2 = pos;
-            switch (text3.slice(pos, pos + 2)) {
+            switch (text4.slice(pos, pos + 2)) {
               case "--":
               case "&&":
                 error210(Diagnostics.Operators_must_not_be_mixed_within_a_character_class_Wrap_it_in_a_nested_class_instead, pos, 2);
                 pos += 2;
-                operand = text3.slice(start2, pos);
+                operand = text4.slice(start2, pos);
                 break;
               default:
                 operand = scanClassSetOperand();
@@ -99985,7 +100148,7 @@ ${lanes.join(`
               case 126:
                 error210(Diagnostics.A_character_class_must_not_contain_a_reserved_double_punctuator_Did_you_mean_to_escape_it_with_backslash, pos, 2);
                 pos += 2;
-                return text3.substring(pos - 2, pos);
+                return text4.substring(pos - 2, pos);
             }
           }
           switch (ch) {
@@ -100118,7 +100281,7 @@ ${lanes.join(`
         function scanSourceCharacter() {
           const size = anyUnicodeMode ? charSize(codePointChecked(pos)) : 1;
           pos += size;
-          return size > 0 ? text3.substring(pos - size, pos) : "";
+          return size > 0 ? text4.substring(pos - size, pos) : "";
         }
         function scanExpectedChar(ch) {
           if (charCodeChecked(pos) === ch) {
@@ -100234,8 +100397,8 @@ ${lanes.join(`
             break;
           }
           if (char === 60) {
-            if (isConflictMarkerTrivia(text3, pos)) {
-              pos = scanConflictMarkerTrivia(text3, pos, error210);
+            if (isConflictMarkerTrivia(text4, pos)) {
+              pos = scanConflictMarkerTrivia(text4, pos, error210);
               return token2 = 7;
             }
             break;
@@ -100255,7 +100418,7 @@ ${lanes.join(`
           }
           pos++;
         }
-        tokenValue = text3.substring(fullStartPos, pos);
+        tokenValue = text4.substring(fullStartPos, pos);
         return firstNonWhitespace === -1 ? 13 : 12;
       }
       function scanJsxIdentifier() {
@@ -100310,7 +100473,7 @@ ${lanes.join(`
         if (pos === tokenStart) {
           return scanJsDocToken();
         }
-        tokenValue = text3.substring(tokenStart, pos);
+        tokenValue = text4.substring(tokenStart, pos);
         return token2 = 82;
       }
       function scanJsDocToken() {
@@ -100388,7 +100551,7 @@ ${lanes.join(`
           let char = ch;
           while (pos < end && isIdentifierPart(char = codePointUnchecked(pos), languageVersion) || char === 45)
             pos += charSize(char);
-          tokenValue = text3.substring(tokenStart, pos);
+          tokenValue = text4.substring(tokenStart, pos);
           if (char === 92) {
             tokenValue += scanIdentifierParts();
           }
@@ -100424,7 +100587,7 @@ ${lanes.join(`
         const saveTokenValue = tokenValue;
         const saveTokenFlags = tokenFlags;
         const saveErrorExpectations = commentDirectives;
-        setText(text3, start2, length3);
+        setText(text4, start2, length3);
         const result = callback();
         end = saveEnd;
         pos = savePos;
@@ -100443,14 +100606,14 @@ ${lanes.join(`
         return speculationHelper(callback, false);
       }
       function getText() {
-        return text3;
+        return text4;
       }
       function clearCommentDirectives() {
         commentDirectives = undefined;
       }
       function setText(newText, start2, length3) {
-        text3 = newText || "";
-        end = length3 === undefined ? text3.length : start2 + length3;
+        text4 = newText || "";
+        end = length3 === undefined ? text4.length : start2 + length3;
         resetTokenState(start2 || 0);
       }
       function setOnError(errorCallback) {
@@ -101995,8 +102158,8 @@ ${lanes.join(`
       if (parseTreeNode && parseTreeNode.kind === 170) {
         const paramIdx = parseTreeNode.parent.parameters.indexOf(parseTreeNode);
         const previousSibling = paramIdx > 0 ? parseTreeNode.parent.parameters[paramIdx - 1] : undefined;
-        const text3 = sourceFile.text;
-        const commentRanges = previousSibling ? concatenate(getTrailingCommentRanges(text3, skipTrivia(text3, previousSibling.end + 1, false, true)), getLeadingCommentRanges(text3, node.pos)) : getTrailingCommentRanges(text3, skipTrivia(text3, node.pos, false, true));
+        const text4 = sourceFile.text;
+        const commentRanges = previousSibling ? concatenate(getTrailingCommentRanges(text4, skipTrivia(text4, previousSibling.end + 1, false, true)), getLeadingCommentRanges(text4, node.pos)) : getTrailingCommentRanges(text4, skipTrivia(text4, node.pos, false, true));
         return some(commentRanges) && hasInternalAnnotation(last(commentRanges), sourceFile);
       }
       const leadingCommentRanges = parseTreeNode && getLeadingCommentRangesOfNode(parseTreeNode, sourceFile);
@@ -102041,7 +102204,7 @@ ${lanes.join(`
     var stringWriter = createSingleLineStringWriter();
     function createSingleLineStringWriter() {
       var str = "";
-      const writeText = (text3) => str += text3;
+      const writeText = (text4) => str += text4;
       return {
         getText: () => str,
         write: writeText,
@@ -102332,15 +102495,15 @@ ${lanes.join(`
     function insertStatementAfterCustomPrologue(to, statement) {
       return insertStatementAfterPrologue(to, statement, isAnyPrologueDirective);
     }
-    function isRecognizedTripleSlashComment(text3, commentPos, commentEnd) {
-      if (text3.charCodeAt(commentPos + 1) === 47 && commentPos + 2 < commentEnd && text3.charCodeAt(commentPos + 2) === 47) {
-        const textSubStr = text3.substring(commentPos, commentEnd);
+    function isRecognizedTripleSlashComment(text4, commentPos, commentEnd) {
+      if (text4.charCodeAt(commentPos + 1) === 47 && commentPos + 2 < commentEnd && text4.charCodeAt(commentPos + 2) === 47) {
+        const textSubStr = text4.substring(commentPos, commentEnd);
         return fullTripleSlashReferencePathRegEx.test(textSubStr) || fullTripleSlashAMDReferencePathRegEx.test(textSubStr) || fullTripleSlashAMDModuleRegEx.test(textSubStr) || fullTripleSlashReferenceTypeReferenceDirectiveRegEx.test(textSubStr) || fullTripleSlashLibReferenceRegEx.test(textSubStr) || defaultLibReferenceRegEx.test(textSubStr) ? true : false;
       }
       return false;
     }
-    function isPinnedComment(text3, start) {
-      return text3.charCodeAt(start + 1) === 42 && text3.charCodeAt(start + 2) === 33;
+    function isPinnedComment(text4, start) {
+      return text4.charCodeAt(start + 1) === 42 && text4.charCodeAt(start + 2) === 33;
     }
     function createCommentDirectivesMap(sourceFile, commentDirectives) {
       const directivesByLine = new Map(commentDirectives.map((commentDirective) => [
@@ -102408,12 +102571,12 @@ ${lanes.join(`
       if (nodeIsMissing(node)) {
         return "";
       }
-      let text3 = sourceText.substring(includeTrivia ? node.pos : skipTrivia(sourceText, node.pos), node.end);
+      let text4 = sourceText.substring(includeTrivia ? node.pos : skipTrivia(sourceText, node.pos), node.end);
       if (isJSDocTypeExpressionOrChild(node)) {
-        text3 = text3.split(/\r\n|\n|\r/).map((line) => line.replace(/^\s*\*/, "").trimStart()).join(`
+        text4 = text4.split(/\r\n|\n|\r/).map((line) => line.replace(/^\s*\*/, "").trimStart()).join(`
 `);
       }
-      return text3;
+      return text4;
     }
     function getTextOfNode(node, includeTrivia = false) {
       return getSourceTextOfNodeFromSourceFile(getSourceFileOfNode(node), node, includeTrivia);
@@ -103572,9 +103735,9 @@ ${lanes.join(`
     function getLeadingCommentRangesOfNode(node, sourceFileOfNode) {
       return node.kind !== 12 ? getLeadingCommentRanges(sourceFileOfNode.text, node.pos) : undefined;
     }
-    function getJSDocCommentRanges(node, text3) {
-      const commentRanges = node.kind === 170 || node.kind === 169 || node.kind === 219 || node.kind === 220 || node.kind === 218 || node.kind === 261 || node.kind === 282 ? concatenate(getTrailingCommentRanges(text3, node.pos), getLeadingCommentRanges(text3, node.pos)) : getLeadingCommentRanges(text3, node.pos);
-      return filter(commentRanges, (comment) => comment.end <= node.end && text3.charCodeAt(comment.pos + 1) === 42 && text3.charCodeAt(comment.pos + 2) === 42 && text3.charCodeAt(comment.pos + 3) !== 47);
+    function getJSDocCommentRanges(node, text4) {
+      const commentRanges = node.kind === 170 || node.kind === 169 || node.kind === 219 || node.kind === 220 || node.kind === 218 || node.kind === 261 || node.kind === 282 ? concatenate(getTrailingCommentRanges(text4, node.pos), getLeadingCommentRanges(text4, node.pos)) : getLeadingCommentRanges(text4, node.pos);
+      return filter(commentRanges, (comment) => comment.end <= node.end && text4.charCodeAt(comment.pos + 1) === 42 && text4.charCodeAt(comment.pos + 2) === 42 && text4.charCodeAt(comment.pos + 3) !== 47);
     }
     var fullTripleSlashReferencePathRegEx = /^\/\/\/\s*<reference\s+path\s*=\s*(?:'[^']*'|"[^"]*").*?\/>/;
     var fullTripleSlashReferenceTypeReferenceDirectiveRegEx = /^\/\/\/\s*<reference\s+types\s*=\s*(?:'[^']*'|"[^"]*").*?\/>/;
@@ -106080,8 +106243,8 @@ ${lanes.join(`
       sourceFilePath = isSourceFileInCommonSourceDirectory ? sourceFilePath.substring(commonSourceDirectory.length) : sourceFilePath;
       return combinePaths(newDirPath, sourceFilePath);
     }
-    function writeFile13(host, diagnostics, fileName, text3, writeByteOrderMark, sourceFiles, data) {
-      host.writeFile(fileName, text3, writeByteOrderMark, (hostErrorMessage) => {
+    function writeFile13(host, diagnostics, fileName, text4, writeByteOrderMark, sourceFiles, data) {
+      host.writeFile(fileName, text4, writeByteOrderMark, (hostErrorMessage) => {
         diagnostics.add(createCompilerDiagnostic(Diagnostics.Could_not_write_file_0_Colon_1, fileName, hostErrorMessage));
       }, sourceFiles, data);
     }
@@ -106230,7 +106393,7 @@ ${lanes.join(`
         writer.writeLine();
       }
     }
-    function emitComments(text3, lineMap, writer, comments, leadingSeparator, trailingSeparator, newLine, writeComment) {
+    function emitComments(text4, lineMap, writer, comments, leadingSeparator, trailingSeparator, newLine, writeComment) {
       if (comments && comments.length > 0) {
         if (leadingSeparator) {
           writer.writeSpace(" ");
@@ -106241,7 +106404,7 @@ ${lanes.join(`
             writer.writeSpace(" ");
             emitInterveningSeparator = false;
           }
-          writeComment(text3, lineMap, writer, comment.pos, comment.end, newLine);
+          writeComment(text4, lineMap, writer, comment.pos, comment.end, newLine);
           if (comment.hasTrailingNewLine) {
             writer.writeLine();
           } else {
@@ -106253,15 +106416,15 @@ ${lanes.join(`
         }
       }
     }
-    function emitDetachedComments(text3, lineMap, writer, writeComment, node, newLine, removeComments) {
+    function emitDetachedComments(text4, lineMap, writer, writeComment, node, newLine, removeComments) {
       let leadingComments;
       let currentDetachedCommentInfo;
       if (removeComments) {
         if (node.pos === 0) {
-          leadingComments = filter(getLeadingCommentRanges(text3, node.pos), isPinnedCommentLocal);
+          leadingComments = filter(getLeadingCommentRanges(text4, node.pos), isPinnedCommentLocal);
         }
       } else {
-        leadingComments = getLeadingCommentRanges(text3, node.pos);
+        leadingComments = getLeadingCommentRanges(text4, node.pos);
       }
       if (leadingComments) {
         const detachedComments = [];
@@ -106279,32 +106442,32 @@ ${lanes.join(`
         }
         if (detachedComments.length) {
           const lastCommentLine = getLineOfLocalPositionFromLineMap(lineMap, last(detachedComments).end);
-          const nodeLine = getLineOfLocalPositionFromLineMap(lineMap, skipTrivia(text3, node.pos));
+          const nodeLine = getLineOfLocalPositionFromLineMap(lineMap, skipTrivia(text4, node.pos));
           if (nodeLine >= lastCommentLine + 2) {
             emitNewLineBeforeLeadingComments(lineMap, writer, node, leadingComments);
-            emitComments(text3, lineMap, writer, detachedComments, false, true, newLine, writeComment);
+            emitComments(text4, lineMap, writer, detachedComments, false, true, newLine, writeComment);
             currentDetachedCommentInfo = { nodePos: node.pos, detachedCommentEndPos: last(detachedComments).end };
           }
         }
       }
       return currentDetachedCommentInfo;
       function isPinnedCommentLocal(comment) {
-        return isPinnedComment(text3, comment.pos);
+        return isPinnedComment(text4, comment.pos);
       }
     }
-    function writeCommentRange(text3, lineMap, writer, commentPos, commentEnd, newLine) {
-      if (text3.charCodeAt(commentPos + 1) === 42) {
+    function writeCommentRange(text4, lineMap, writer, commentPos, commentEnd, newLine) {
+      if (text4.charCodeAt(commentPos + 1) === 42) {
         const firstCommentLineAndCharacter = computeLineAndCharacterOfPosition(lineMap, commentPos);
         const lineCount = lineMap.length;
         let firstCommentLineIndent;
         for (let pos = commentPos, currentLine = firstCommentLineAndCharacter.line;pos < commentEnd; currentLine++) {
-          const nextLineStart = currentLine + 1 === lineCount ? text3.length + 1 : lineMap[currentLine + 1];
+          const nextLineStart = currentLine + 1 === lineCount ? text4.length + 1 : lineMap[currentLine + 1];
           if (pos !== commentPos) {
             if (firstCommentLineIndent === undefined) {
-              firstCommentLineIndent = calculateIndent(text3, lineMap[firstCommentLineAndCharacter.line], commentPos);
+              firstCommentLineIndent = calculateIndent(text4, lineMap[firstCommentLineAndCharacter.line], commentPos);
             }
             const currentWriterIndentSpacing = writer.getIndent() * getIndentSize();
-            const spacesToEmit = currentWriterIndentSpacing - firstCommentLineIndent + calculateIndent(text3, pos, nextLineStart);
+            const spacesToEmit = currentWriterIndentSpacing - firstCommentLineIndent + calculateIndent(text4, pos, nextLineStart);
             if (spacesToEmit > 0) {
               let numberOfSingleSpacesToEmit = spacesToEmit % getIndentSize();
               const indentSizeSpaceString = getIndentString((spacesToEmit - numberOfSingleSpacesToEmit) / getIndentSize());
@@ -106317,16 +106480,16 @@ ${lanes.join(`
               writer.rawWrite("");
             }
           }
-          writeTrimmedCurrentLine(text3, commentEnd, writer, newLine, pos, nextLineStart);
+          writeTrimmedCurrentLine(text4, commentEnd, writer, newLine, pos, nextLineStart);
           pos = nextLineStart;
         }
       } else {
-        writer.writeComment(text3.substring(commentPos, commentEnd));
+        writer.writeComment(text4.substring(commentPos, commentEnd));
       }
     }
-    function writeTrimmedCurrentLine(text3, commentEnd, writer, newLine, pos, nextLineStart) {
+    function writeTrimmedCurrentLine(text4, commentEnd, writer, newLine, pos, nextLineStart) {
       const end = Math.min(commentEnd, nextLineStart - 1);
-      const currentLineText = text3.substring(pos, end).trim();
+      const currentLineText = text4.substring(pos, end).trim();
       if (currentLineText) {
         writer.writeComment(currentLineText);
         if (end !== commentEnd) {
@@ -106336,10 +106499,10 @@ ${lanes.join(`
         writer.rawWrite(newLine);
       }
     }
-    function calculateIndent(text3, pos, end) {
+    function calculateIndent(text4, pos, end) {
       let currentLineIndent = 0;
-      for (;pos < end && isWhiteSpaceSingleLine(text3.charCodeAt(pos)); pos++) {
-        if (text3.charCodeAt(pos) === 9) {
+      for (;pos < end && isWhiteSpaceSingleLine(text4.charCodeAt(pos)); pos++) {
+        if (text4.charCodeAt(pos) === 9) {
           currentLineIndent += getIndentSize() - currentLineIndent % getIndentSize();
         } else {
           currentLineIndent++;
@@ -106756,9 +106919,9 @@ ${lanes.join(`
     function readJson(path, host) {
       return readJsonOrUndefined(path, host) || {};
     }
-    function tryParseJson(text3) {
+    function tryParseJson(text4) {
       try {
-        return JSON.parse(text3);
+        return JSON.parse(text4);
       } catch {
         return;
       }
@@ -107182,9 +107345,9 @@ ${lanes.join(`
       this.original = undefined;
       this.emitNode = undefined;
     }
-    function SourceMapSource(fileName, text3, skipTrivia2) {
+    function SourceMapSource(fileName, text4, skipTrivia2) {
       this.fileName = fileName;
-      this.text = text3;
+      this.text = text4;
       this.skipTrivia = skipTrivia2 || ((pos) => pos);
     }
     var objectAllocator = {
@@ -107207,8 +107370,8 @@ ${lanes.join(`
       Object.assign(objectAllocator, alloc);
       forEach2(objectAllocatorPatchers, (fn) => fn(objectAllocator));
     }
-    function formatStringFromArgs(text3, args) {
-      return text3.replace(/\{(\d+)\}/g, (_match, index2) => "" + Debug.checkDefined(args[+index2]));
+    function formatStringFromArgs(text4, args) {
+      return text4.replace(/\{(\d+)\}/g, (_match, index2) => "" + Debug.checkDefined(args[+index2]));
     }
     var localizedDiagnosticMessages;
     function setLocalizedDiagnosticMessages(messages) {
@@ -107227,15 +107390,15 @@ ${lanes.join(`
         length2 = sourceText.length - start;
       }
       assertDiagnosticLocation(sourceText, start, length2);
-      let text3 = getLocaleSpecificMessage(message2);
+      let text4 = getLocaleSpecificMessage(message2);
       if (some(args)) {
-        text3 = formatStringFromArgs(text3, args);
+        text4 = formatStringFromArgs(text4, args);
       }
       return {
         file: undefined,
         start,
         length: length2,
-        messageText: text3,
+        messageText: text4,
         category: message2.category,
         code: message2.code,
         reportsUnnecessary: message2.reportsUnnecessary,
@@ -107283,15 +107446,15 @@ ${lanes.join(`
     }
     function createFileDiagnostic(file2, start, length2, message2, ...args) {
       assertDiagnosticLocation(file2.text, start, length2);
-      let text3 = getLocaleSpecificMessage(message2);
+      let text4 = getLocaleSpecificMessage(message2);
       if (some(args)) {
-        text3 = formatStringFromArgs(text3, args);
+        text4 = formatStringFromArgs(text4, args);
       }
       return {
         file: file2,
         start,
         length: length2,
-        messageText: text3,
+        messageText: text4,
         category: message2.category,
         code: message2.code,
         reportsUnnecessary: message2.reportsUnnecessary,
@@ -107299,22 +107462,22 @@ ${lanes.join(`
       };
     }
     function formatMessage(message2, ...args) {
-      let text3 = getLocaleSpecificMessage(message2);
+      let text4 = getLocaleSpecificMessage(message2);
       if (some(args)) {
-        text3 = formatStringFromArgs(text3, args);
+        text4 = formatStringFromArgs(text4, args);
       }
-      return text3;
+      return text4;
     }
     function createCompilerDiagnostic(message2, ...args) {
-      let text3 = getLocaleSpecificMessage(message2);
+      let text4 = getLocaleSpecificMessage(message2);
       if (some(args)) {
-        text3 = formatStringFromArgs(text3, args);
+        text4 = formatStringFromArgs(text4, args);
       }
       return {
         file: undefined,
         start: undefined,
         length: undefined,
-        messageText: text3,
+        messageText: text4,
         category: message2.category,
         code: message2.code,
         reportsUnnecessary: message2.reportsUnnecessary,
@@ -107333,12 +107496,12 @@ ${lanes.join(`
       };
     }
     function chainDiagnosticMessages(details, message2, ...args) {
-      let text3 = getLocaleSpecificMessage(message2);
+      let text4 = getLocaleSpecificMessage(message2);
       if (some(args)) {
-        text3 = formatStringFromArgs(text3, args);
+        text4 = formatStringFromArgs(text4, args);
       }
       return {
-        messageText: text3,
+        messageText: text4,
         category: message2.category,
         code: message2.code,
         next: details === undefined || Array.isArray(details) ? details : [details]
@@ -107912,8 +108075,8 @@ ${lanes.join(`
       return withoutPrefix === undefined ? undefined : stripLeadingDirectorySeparator(withoutPrefix);
     }
     var reservedCharacterPattern = /[^\w\s/]/g;
-    function regExpEscape(text3) {
-      return text3.replace(reservedCharacterPattern, escapeRegExpCharacter);
+    function regExpEscape(text4) {
+      return text4.replace(reservedCharacterPattern, escapeRegExpCharacter);
     }
     function escapeRegExpCharacter(match2) {
       return "\\" + match2;
@@ -108183,7 +108346,7 @@ ${lanes.join(`
       return ModuleSpecifierEnding2;
     })(ModuleSpecifierEnding || {});
     function usesExtensionsOnImports({ imports }, hasExtension2 = or(hasJSFileExtension, hasTSFileExtension)) {
-      return firstDefined(imports, ({ text: text3 }) => pathIsRelative(text3) && !fileExtensionIsOneOf(text3, extensionsNotSupportingExtensionlessResolution) ? hasExtension2(text3) : undefined) || false;
+      return firstDefined(imports, ({ text: text4 }) => pathIsRelative(text4) && !fileExtensionIsOneOf(text4, extensionsNotSupportingExtensionlessResolution) ? hasExtension2(text4) : undefined) || false;
     }
     function getModuleSpecifierEndingPreference(preference, resolutionMode, compilerOptions, sourceFile) {
       const moduleResolution = getEmitModuleResolutionKind(compilerOptions);
@@ -108470,15 +108633,15 @@ ${lanes.join(`
     function pseudoBigIntToString({ negative, base10Value }) {
       return (negative && base10Value !== "0" ? "-" : "") + base10Value;
     }
-    function parseBigInt(text3) {
-      if (!isValidBigIntString(text3, false)) {
+    function parseBigInt(text4) {
+      if (!isValidBigIntString(text4, false)) {
         return;
       }
-      return parseValidBigInt(text3);
+      return parseValidBigInt(text4);
     }
-    function parseValidBigInt(text3) {
-      const negative = text3.startsWith("-");
-      const base10Value = parsePseudoBigInt(`${negative ? text3.slice(1) : text3}n`);
+    function parseValidBigInt(text4) {
+      const negative = text4.startsWith("-");
+      const base10Value = parsePseudoBigInt(`${negative ? text4.slice(1) : text4}n`);
       return { negative, base10Value };
     }
     function isValidBigIntString(s3, roundTripOnly) {
@@ -108717,8 +108880,8 @@ ${lanes.join(`
     function isFunctionExpressionOrArrowFunction(node) {
       return node.kind === 219 || node.kind === 220;
     }
-    function escapeSnippetText(text3) {
-      return text3.replace(/\$/g, () => "\\$");
+    function escapeSnippetText(text4) {
+      return text4.replace(/\$/g, () => "\\$");
     }
     function isNumericLiteralName(name3) {
       return (+name3).toString() === name3;
@@ -110944,10 +111107,10 @@ ${lanes.join(`
         return update(updated, original);
       }
       function createNumericLiteral(value2, numericLiteralFlags = 0) {
-        const text3 = typeof value2 === "number" ? value2 + "" : value2;
-        Debug.assert(text3.charCodeAt(0) !== 45, "Negative numbers should be created in combination with createPrefixUnaryExpression");
+        const text4 = typeof value2 === "number" ? value2 + "" : value2;
+        Debug.assert(text4.charCodeAt(0) !== 45, "Negative numbers should be created in combination with createPrefixUnaryExpression");
         const node = createBaseDeclaration(9);
-        node.text = text3;
+        node.text = text4;
         node.numericLiteralFlags = numericLiteralFlags;
         if (numericLiteralFlags & 384)
           node.transformFlags |= 1024;
@@ -110959,14 +111122,14 @@ ${lanes.join(`
         node.transformFlags |= 32;
         return node;
       }
-      function createBaseStringLiteral(text3, isSingleQuote) {
+      function createBaseStringLiteral(text4, isSingleQuote) {
         const node = createBaseDeclaration(11);
-        node.text = text3;
+        node.text = text4;
         node.singleQuote = isSingleQuote;
         return node;
       }
-      function createStringLiteral(text3, isSingleQuote, hasExtendedUnicodeEscape) {
-        const node = createBaseStringLiteral(text3, isSingleQuote);
+      function createStringLiteral(text4, isSingleQuote, hasExtendedUnicodeEscape) {
+        const node = createBaseStringLiteral(text4, isSingleQuote);
         node.hasExtendedUnicodeEscape = hasExtendedUnicodeEscape;
         if (hasExtendedUnicodeEscape)
           node.transformFlags |= 1024;
@@ -110977,27 +111140,27 @@ ${lanes.join(`
         node.textSourceNode = sourceNode;
         return node;
       }
-      function createRegularExpressionLiteral(text3) {
+      function createRegularExpressionLiteral(text4) {
         const node = createBaseToken(14);
-        node.text = text3;
+        node.text = text4;
         return node;
       }
-      function createLiteralLikeNode(kind, text3) {
+      function createLiteralLikeNode(kind, text4) {
         switch (kind) {
           case 9:
-            return createNumericLiteral(text3, 0);
+            return createNumericLiteral(text4, 0);
           case 10:
-            return createBigIntLiteral(text3);
+            return createBigIntLiteral(text4);
           case 11:
-            return createStringLiteral(text3, undefined);
+            return createStringLiteral(text4, undefined);
           case 12:
-            return createJsxText(text3, false);
+            return createJsxText(text4, false);
           case 13:
-            return createJsxText(text3, true);
+            return createJsxText(text4, true);
           case 14:
-            return createRegularExpressionLiteral(text3);
+            return createRegularExpressionLiteral(text4);
           case 15:
-            return createTemplateLiteralLikeNode(kind, text3, undefined, 0);
+            return createTemplateLiteralLikeNode(kind, text4, undefined, 0);
         }
       }
       function createBaseIdentifier(escapedText) {
@@ -111008,8 +111171,8 @@ ${lanes.join(`
         node.symbol = undefined;
         return node;
       }
-      function createBaseGeneratedIdentifier(text3, autoGenerateFlags, prefix2, suffix) {
-        const node = createBaseIdentifier(escapeLeadingUnderscores(text3));
+      function createBaseGeneratedIdentifier(text4, autoGenerateFlags, prefix2, suffix) {
+        const node = createBaseIdentifier(escapeLeadingUnderscores(text4));
         setIdentifierAutoGenerate(node, {
           flags: autoGenerateFlags,
           id: nextAutoGenerateId,
@@ -111019,14 +111182,14 @@ ${lanes.join(`
         nextAutoGenerateId++;
         return node;
       }
-      function createIdentifier(text3, originalKeywordKind, hasExtendedUnicodeEscape) {
-        if (originalKeywordKind === undefined && text3) {
-          originalKeywordKind = stringToToken(text3);
+      function createIdentifier(text4, originalKeywordKind, hasExtendedUnicodeEscape) {
+        if (originalKeywordKind === undefined && text4) {
+          originalKeywordKind = stringToToken(text4);
         }
         if (originalKeywordKind === 80) {
           originalKeywordKind = undefined;
         }
-        const node = createBaseIdentifier(escapeLeadingUnderscores(text3));
+        const node = createBaseIdentifier(escapeLeadingUnderscores(text4));
         if (hasExtendedUnicodeEscape)
           node.flags |= 256;
         if (node.escapedText === "await") {
@@ -111053,17 +111216,17 @@ ${lanes.join(`
           flags2 |= 8;
         return createBaseGeneratedIdentifier("", flags2, undefined, undefined);
       }
-      function createUniqueName(text3, flags2 = 0, prefix2, suffix) {
+      function createUniqueName(text4, flags2 = 0, prefix2, suffix) {
         Debug.assert(!(flags2 & 7), "Argument out of range: flags");
         Debug.assert((flags2 & (16 | 32)) !== 32, "GeneratedIdentifierFlags.FileLevel cannot be set without also setting GeneratedIdentifierFlags.Optimistic");
-        return createBaseGeneratedIdentifier(text3, 3 | flags2, prefix2, suffix);
+        return createBaseGeneratedIdentifier(text4, 3 | flags2, prefix2, suffix);
       }
       function getGeneratedNameForNode(node, flags2 = 0, prefix2, suffix) {
         Debug.assert(!(flags2 & 7), "Argument out of range: flags");
-        const text3 = !node ? "" : isMemberName(node) ? formatGeneratedName(false, prefix2, node, suffix, idText) : `generated@${getNodeId(node)}`;
+        const text4 = !node ? "" : isMemberName(node) ? formatGeneratedName(false, prefix2, node, suffix, idText) : `generated@${getNodeId(node)}`;
         if (prefix2 || suffix)
           flags2 |= 16;
-        const name3 = createBaseGeneratedIdentifier(text3, 4 | flags2, prefix2, suffix);
+        const name3 = createBaseGeneratedIdentifier(text4, 4 | flags2, prefix2, suffix);
         name3.original = node;
         return name3;
       }
@@ -111073,13 +111236,13 @@ ${lanes.join(`
         node.transformFlags |= 16777216;
         return node;
       }
-      function createPrivateIdentifier(text3) {
-        if (!startsWith2(text3, "#"))
-          Debug.fail("First character of private identifier must be #: " + text3);
-        return createBasePrivateIdentifier(escapeLeadingUnderscores(text3));
+      function createPrivateIdentifier(text4) {
+        if (!startsWith2(text4, "#"))
+          Debug.fail("First character of private identifier must be #: " + text4);
+        return createBasePrivateIdentifier(escapeLeadingUnderscores(text4));
       }
-      function createBaseGeneratedPrivateIdentifier(text3, autoGenerateFlags, prefix2, suffix) {
-        const node = createBasePrivateIdentifier(escapeLeadingUnderscores(text3));
+      function createBaseGeneratedPrivateIdentifier(text4, autoGenerateFlags, prefix2, suffix) {
+        const node = createBasePrivateIdentifier(escapeLeadingUnderscores(text4));
         setIdentifierAutoGenerate(node, {
           flags: autoGenerateFlags,
           id: nextAutoGenerateId,
@@ -111089,16 +111252,16 @@ ${lanes.join(`
         nextAutoGenerateId++;
         return node;
       }
-      function createUniquePrivateName(text3, prefix2, suffix) {
-        if (text3 && !startsWith2(text3, "#"))
-          Debug.fail("First character of private identifier must be #: " + text3);
-        const autoGenerateFlags = 8 | (text3 ? 3 : 1);
-        return createBaseGeneratedPrivateIdentifier(text3 ?? "", autoGenerateFlags, prefix2, suffix);
+      function createUniquePrivateName(text4, prefix2, suffix) {
+        if (text4 && !startsWith2(text4, "#"))
+          Debug.fail("First character of private identifier must be #: " + text4);
+        const autoGenerateFlags = 8 | (text4 ? 3 : 1);
+        return createBaseGeneratedPrivateIdentifier(text4 ?? "", autoGenerateFlags, prefix2, suffix);
       }
       function getGeneratedPrivateNameForNode(node, prefix2, suffix) {
-        const text3 = isMemberName(node) ? formatGeneratedName(true, prefix2, node, suffix, idText) : `#generated@${getNodeId(node)}`;
+        const text4 = isMemberName(node) ? formatGeneratedName(true, prefix2, node, suffix, idText) : `#generated@${getNodeId(node)}`;
         const flags2 = prefix2 || suffix ? 16 : 0;
-        const name3 = createBaseGeneratedPrivateIdentifier(text3, 4 | flags2, prefix2, suffix);
+        const name3 = createBaseGeneratedPrivateIdentifier(text4, 4 | flags2, prefix2, suffix);
         name3.original = node;
         return name3;
       }
@@ -112186,24 +112349,24 @@ ${lanes.join(`
       function updateTemplateExpression(node, head, templateSpans) {
         return node.head !== head || node.templateSpans !== templateSpans ? update(createTemplateExpression(head, templateSpans), node) : node;
       }
-      function checkTemplateLiteralLikeNode(kind, text3, rawText, templateFlags = 0) {
+      function checkTemplateLiteralLikeNode(kind, text4, rawText, templateFlags = 0) {
         Debug.assert(!(templateFlags & ~7176), "Unsupported template flags.");
         let cooked = undefined;
-        if (rawText !== undefined && rawText !== text3) {
+        if (rawText !== undefined && rawText !== text4) {
           cooked = getCookedText(kind, rawText);
           if (typeof cooked === "object") {
             return Debug.fail("Invalid raw text");
           }
         }
-        if (text3 === undefined) {
+        if (text4 === undefined) {
           if (cooked === undefined) {
             return Debug.fail("Arguments 'text' and 'rawText' may not both be undefined.");
           }
-          text3 = cooked;
+          text4 = cooked;
         } else if (cooked !== undefined) {
-          Debug.assert(text3 === cooked, "Expected argument 'text' to be the normalized (i.e. 'cooked') version of argument 'rawText'.");
+          Debug.assert(text4 === cooked, "Expected argument 'text' to be the normalized (i.e. 'cooked') version of argument 'rawText'.");
         }
-        return text3;
+        return text4;
       }
       function getTransformFlagsOfTemplateLiteralLike(templateFlags) {
         let transformFlags = 1024;
@@ -112212,43 +112375,43 @@ ${lanes.join(`
         }
         return transformFlags;
       }
-      function createTemplateLiteralLikeToken(kind, text3, rawText, templateFlags) {
+      function createTemplateLiteralLikeToken(kind, text4, rawText, templateFlags) {
         const node = createBaseToken(kind);
-        node.text = text3;
+        node.text = text4;
         node.rawText = rawText;
         node.templateFlags = templateFlags & 7176;
         node.transformFlags = getTransformFlagsOfTemplateLiteralLike(node.templateFlags);
         return node;
       }
-      function createTemplateLiteralLikeDeclaration(kind, text3, rawText, templateFlags) {
+      function createTemplateLiteralLikeDeclaration(kind, text4, rawText, templateFlags) {
         const node = createBaseDeclaration(kind);
-        node.text = text3;
+        node.text = text4;
         node.rawText = rawText;
         node.templateFlags = templateFlags & 7176;
         node.transformFlags = getTransformFlagsOfTemplateLiteralLike(node.templateFlags);
         return node;
       }
-      function createTemplateLiteralLikeNode(kind, text3, rawText, templateFlags) {
+      function createTemplateLiteralLikeNode(kind, text4, rawText, templateFlags) {
         if (kind === 15) {
-          return createTemplateLiteralLikeDeclaration(kind, text3, rawText, templateFlags);
+          return createTemplateLiteralLikeDeclaration(kind, text4, rawText, templateFlags);
         }
-        return createTemplateLiteralLikeToken(kind, text3, rawText, templateFlags);
+        return createTemplateLiteralLikeToken(kind, text4, rawText, templateFlags);
       }
-      function createTemplateHead(text3, rawText, templateFlags) {
-        text3 = checkTemplateLiteralLikeNode(16, text3, rawText, templateFlags);
-        return createTemplateLiteralLikeNode(16, text3, rawText, templateFlags);
+      function createTemplateHead(text4, rawText, templateFlags) {
+        text4 = checkTemplateLiteralLikeNode(16, text4, rawText, templateFlags);
+        return createTemplateLiteralLikeNode(16, text4, rawText, templateFlags);
       }
-      function createTemplateMiddle(text3, rawText, templateFlags) {
-        text3 = checkTemplateLiteralLikeNode(16, text3, rawText, templateFlags);
-        return createTemplateLiteralLikeNode(17, text3, rawText, templateFlags);
+      function createTemplateMiddle(text4, rawText, templateFlags) {
+        text4 = checkTemplateLiteralLikeNode(16, text4, rawText, templateFlags);
+        return createTemplateLiteralLikeNode(17, text4, rawText, templateFlags);
       }
-      function createTemplateTail(text3, rawText, templateFlags) {
-        text3 = checkTemplateLiteralLikeNode(16, text3, rawText, templateFlags);
-        return createTemplateLiteralLikeNode(18, text3, rawText, templateFlags);
+      function createTemplateTail(text4, rawText, templateFlags) {
+        text4 = checkTemplateLiteralLikeNode(16, text4, rawText, templateFlags);
+        return createTemplateLiteralLikeNode(18, text4, rawText, templateFlags);
       }
-      function createNoSubstitutionTemplateLiteral(text3, rawText, templateFlags) {
-        text3 = checkTemplateLiteralLikeNode(16, text3, rawText, templateFlags);
-        return createTemplateLiteralLikeDeclaration(15, text3, rawText, templateFlags);
+      function createNoSubstitutionTemplateLiteral(text4, rawText, templateFlags) {
+        text4 = checkTemplateLiteralLikeNode(16, text4, rawText, templateFlags);
+        return createTemplateLiteralLikeDeclaration(15, text4, rawText, templateFlags);
       }
       function createYieldExpression(asteriskToken, expression2) {
         Debug.assert(!asteriskToken || !!expression2, "A `YieldExpression` with an asteriskToken must have an expression.");
@@ -113193,32 +113356,32 @@ ${lanes.join(`
       function updateJSDocMemberName(node, left, right) {
         return node.left !== left || node.right !== right ? update(createJSDocMemberName(left, right), node) : node;
       }
-      function createJSDocLink(name3, text3) {
+      function createJSDocLink(name3, text4) {
         const node = createBaseNode(325);
         node.name = name3;
-        node.text = text3;
+        node.text = text4;
         return node;
       }
-      function updateJSDocLink(node, name3, text3) {
-        return node.name !== name3 ? update(createJSDocLink(name3, text3), node) : node;
+      function updateJSDocLink(node, name3, text4) {
+        return node.name !== name3 ? update(createJSDocLink(name3, text4), node) : node;
       }
-      function createJSDocLinkCode(name3, text3) {
+      function createJSDocLinkCode(name3, text4) {
         const node = createBaseNode(326);
         node.name = name3;
-        node.text = text3;
+        node.text = text4;
         return node;
       }
-      function updateJSDocLinkCode(node, name3, text3) {
-        return node.name !== name3 ? update(createJSDocLinkCode(name3, text3), node) : node;
+      function updateJSDocLinkCode(node, name3, text4) {
+        return node.name !== name3 ? update(createJSDocLinkCode(name3, text4), node) : node;
       }
-      function createJSDocLinkPlain(name3, text3) {
+      function createJSDocLinkPlain(name3, text4) {
         const node = createBaseNode(327);
         node.name = name3;
-        node.text = text3;
+        node.text = text4;
         return node;
       }
-      function updateJSDocLinkPlain(node, name3, text3) {
-        return node.name !== name3 ? update(createJSDocLinkPlain(name3, text3), node) : node;
+      function updateJSDocLinkPlain(node, name3, text4) {
+        return node.name !== name3 ? update(createJSDocLinkPlain(name3, text4), node) : node;
       }
       function updateJSDocImplementsTag(node, tagName = getDefaultTagName(node), className, comment) {
         return node.tagName !== tagName || node.class !== className || node.comment !== comment ? update(createJSDocImplementsTag(tagName, className, comment), node) : node;
@@ -113266,13 +113429,13 @@ ${lanes.join(`
       function updateJSDocImportTag(node, tagName, importClause, moduleSpecifier, attributes, comment) {
         return node.tagName !== tagName || node.comment !== comment || node.importClause !== importClause || node.moduleSpecifier !== moduleSpecifier || node.attributes !== attributes ? update(createJSDocImportTag(tagName, importClause, moduleSpecifier, attributes, comment), node) : node;
       }
-      function createJSDocText(text3) {
+      function createJSDocText(text4) {
         const node = createBaseNode(322);
-        node.text = text3;
+        node.text = text4;
         return node;
       }
-      function updateJSDocText(node, text3) {
-        return node.text !== text3 ? update(createJSDocText(text3), node) : node;
+      function updateJSDocText(node, text4) {
+        return node.text !== text4 ? update(createJSDocText(text4), node) : node;
       }
       function createJSDocComment(comment, tags) {
         const node = createBaseNode(321);
@@ -113342,15 +113505,15 @@ ${lanes.join(`
       function updateJsxFragment(node, openingFragment, children, closingFragment) {
         return node.openingFragment !== openingFragment || node.children !== children || node.closingFragment !== closingFragment ? update(createJsxFragment(openingFragment, children, closingFragment), node) : node;
       }
-      function createJsxText(text3, containsOnlyTriviaWhiteSpaces) {
+      function createJsxText(text4, containsOnlyTriviaWhiteSpaces) {
         const node = createBaseNode(12);
-        node.text = text3;
+        node.text = text4;
         node.containsOnlyTriviaWhiteSpaces = !!containsOnlyTriviaWhiteSpaces;
         node.transformFlags |= 2;
         return node;
       }
-      function updateJsxText(node, text3, containsOnlyTriviaWhiteSpaces) {
-        return node.text !== text3 || node.containsOnlyTriviaWhiteSpaces !== containsOnlyTriviaWhiteSpaces ? update(createJsxText(text3, containsOnlyTriviaWhiteSpaces), node) : node;
+      function updateJsxText(node, text4, containsOnlyTriviaWhiteSpaces) {
+        return node.text !== text4 || node.containsOnlyTriviaWhiteSpaces !== containsOnlyTriviaWhiteSpaces ? update(createJsxText(text4, containsOnlyTriviaWhiteSpaces), node) : node;
       }
       function createJsxOpeningFragment() {
         const node = createBaseNode(290);
@@ -114378,8 +114541,8 @@ ${lanes.join(`
     };
     var factory = createNodeFactory(4, syntheticFactory);
     var SourceMapSource2;
-    function createSourceMapSource(fileName, text3, skipTrivia2) {
-      return new (SourceMapSource2 || (SourceMapSource2 = objectAllocator.getSourceMapSourceConstructor()))(fileName, text3, skipTrivia2);
+    function createSourceMapSource(fileName, text4, skipTrivia2) {
+      return new (SourceMapSource2 || (SourceMapSource2 = objectAllocator.getSourceMapSourceConstructor()))(fileName, text4, skipTrivia2);
     }
     function setOriginalNode(node, original) {
       if (node.original !== original) {
@@ -114552,8 +114715,8 @@ ${lanes.join(`
       getOrCreateEmitNode(node).leadingComments = comments;
       return node;
     }
-    function addSyntheticLeadingComment(node, kind, text3, hasTrailingNewLine) {
-      return setSyntheticLeadingComments(node, append(getSyntheticLeadingComments(node), { kind, pos: -1, end: -1, hasTrailingNewLine, text: text3 }));
+    function addSyntheticLeadingComment(node, kind, text4, hasTrailingNewLine) {
+      return setSyntheticLeadingComments(node, append(getSyntheticLeadingComments(node), { kind, pos: -1, end: -1, hasTrailingNewLine, text: text4 }));
     }
     function getSyntheticTrailingComments(node) {
       var _a7;
@@ -114563,8 +114726,8 @@ ${lanes.join(`
       getOrCreateEmitNode(node).trailingComments = comments;
       return node;
     }
-    function addSyntheticTrailingComment(node, kind, text3, hasTrailingNewLine) {
-      return setSyntheticTrailingComments(node, append(getSyntheticTrailingComments(node), { kind, pos: -1, end: -1, hasTrailingNewLine, text: text3 }));
+    function addSyntheticTrailingComment(node, kind, text4, hasTrailingNewLine) {
+      return setSyntheticTrailingComments(node, append(getSyntheticTrailingComments(node), { kind, pos: -1, end: -1, hasTrailingNewLine, text: text4 }));
     }
     function moveSyntheticComments(node, original) {
       setSyntheticLeadingComments(node, getSyntheticLeadingComments(original));
@@ -117050,8 +117213,8 @@ ${lanes.join(`
         }
       }
     }
-    function isJSDocLikeText(text3, start) {
-      return text3.charCodeAt(start + 1) === 42 && text3.charCodeAt(start + 2) === 42 && text3.charCodeAt(start + 3) !== 47;
+    function isJSDocLikeText(text4, start) {
+      return text4.charCodeAt(start + 1) === 42 && text4.charCodeAt(start + 2) === 42 && text4.charCodeAt(start + 3) !== 47;
     }
     function isFileProbablyExternalModule(sourceFile) {
       return forEach2(sourceFile.statements, isAnExternalModuleIndicatorNode) || getImportMetaIfNecessary(sourceFile);
@@ -117631,8 +117794,8 @@ ${lanes.join(`
       (_b = tracing) == null || _b.pop();
       return result;
     }
-    function parseIsolatedEntityName(text3, languageVersion) {
-      return Parser.parseIsolatedEntityName(text3, languageVersion);
+    function parseIsolatedEntityName(text4, languageVersion) {
+      return Parser.parseIsolatedEntityName(text4, languageVersion);
     }
     function parseJsonText(fileName, sourceText) {
       return Parser.parseJsonText(fileName, sourceText);
@@ -118445,10 +118608,10 @@ ${lanes.join(`
         const result = kind === 80 ? factoryCreateIdentifier("", undefined) : isTemplateLiteralKind(kind) ? factory2.createTemplateLiteralLikeNode(kind, "", "", undefined) : kind === 9 ? factoryCreateNumericLiteral("", undefined) : kind === 11 ? factoryCreateStringLiteral("", undefined) : kind === 283 ? factory2.createMissingDeclaration() : factoryCreateToken(kind);
         return finishNode(result, pos);
       }
-      function internIdentifier(text3) {
-        let identifier = identifiers.get(text3);
+      function internIdentifier(text4) {
+        let identifier = identifiers.get(text4);
         if (identifier === undefined) {
-          identifiers.set(text3, identifier = text3);
+          identifiers.set(text4, identifier = text4);
         }
         return identifier;
       }
@@ -118457,10 +118620,10 @@ ${lanes.join(`
           identifierCount++;
           const pos = scanner2.hasPrecedingJSDocLeadingAsterisks() ? scanner2.getTokenStart() : getNodePos();
           const originalKeywordKind = token2();
-          const text3 = internIdentifier(scanner2.getTokenValue());
+          const text4 = internIdentifier(scanner2.getTokenValue());
           const hasExtendedUnicodeEscape = scanner2.hasExtendedUnicodeEscape();
           nextTokenWithoutCheck();
-          return finishNode(factoryCreateIdentifier(text3, originalKeywordKind, hasExtendedUnicodeEscape), pos);
+          return finishNode(factoryCreateIdentifier(text4, originalKeywordKind, hasExtendedUnicodeEscape), pos);
         }
         if (token2() === 81) {
           parseErrorAtCurrentToken(privateIdentifierDiagnosticMessage || Diagnostics.Private_identifiers_are_not_allowed_outside_class_bodies);
@@ -122701,12 +122864,12 @@ ${lanes.join(`
             let margin;
             let indent3 = start - (content.lastIndexOf(`
 `, start) + 1) + 4;
-            function pushComment(text3) {
+            function pushComment(text4) {
               if (!margin) {
                 margin = indent3;
               }
-              comments.push(text3);
-              indent3 += text3.length;
+              comments.push(text4);
+              indent3 += text4.length;
             }
             nextTokenJSDoc();
             while (parseOptionalJsdoc(5))
@@ -122955,12 +123118,12 @@ ${lanes.join(`
             let linkEnd2;
             let state = 0;
             let margin;
-            function pushComment(text3) {
+            function pushComment(text4) {
               if (!margin) {
                 margin = indent3;
               }
-              comments2.push(text3);
-              indent3 += text3.length;
+              comments2.push(text4);
+              indent3 += text4.length;
             }
             if (initialMargin !== undefined) {
               if (initialMargin !== "") {
@@ -123057,13 +123220,13 @@ ${lanes.join(`
             nextTokenJSDoc();
             skipWhitespace();
             const name3 = parseJSDocLinkName();
-            const text3 = [];
+            const text4 = [];
             while (token2() !== 20 && token2() !== 4 && token2() !== 1) {
-              text3.push(scanner2.getTokenText());
+              text4.push(scanner2.getTokenText());
               nextTokenJSDoc();
             }
             const create2 = linkType === "link" ? factory2.createJSDocLink : linkType === "linkcode" ? factory2.createJSDocLinkCode : factory2.createJSDocLinkPlain;
-            return finishNode(create2(name3, text3.join("")), start2, scanner2.getTokenEnd());
+            return finishNode(create2(name3, text4.join("")), start2, scanner2.getTokenEnd());
           }
           function parseJSDocLinkName() {
             if (tokenIsIdentifierOrKeyword(token2())) {
@@ -123546,8 +123709,8 @@ ${lanes.join(`
             const start2 = scanner2.getTokenStart();
             const end2 = scanner2.getTokenEnd();
             const originalKeywordKind = token2();
-            const text3 = internIdentifier(scanner2.getTokenValue());
-            const result2 = finishNode(factoryCreateIdentifier(text3, originalKeywordKind), start2, end2);
+            const text4 = internIdentifier(scanner2.getTokenValue());
+            const result2 = finishNode(factoryCreateIdentifier(text4, originalKeywordKind), start2, end2);
             nextTokenJSDoc();
             return result2;
           }
@@ -123639,14 +123802,14 @@ ${lanes.join(`
         }
         return;
         function visitNode3(node) {
-          let text3 = "";
+          let text4 = "";
           if (aggressiveChecks && shouldCheckNode(node)) {
-            text3 = oldText.substring(node.pos, node.end);
+            text4 = oldText.substring(node.pos, node.end);
           }
           unsetNodeChildren(node, origSourceFile);
           setTextRangePosEnd(node, node.pos + delta, node.end + delta);
           if (aggressiveChecks && shouldCheckNode(node)) {
-            Debug.assert(text3 === newText.substring(node.pos, node.end));
+            Debug.assert(text4 === newText.substring(node.pos, node.end));
           }
           forEachChild(node, visitNode3, visitArray2);
           if (hasJSDocNodes(node)) {
@@ -124007,8 +124170,8 @@ ${lanes.join(`
     }
     var tripleSlashXMLCommentStartRegEx = /^\/\/\/\s*<(\S+)\s.*?\/>/m;
     var singleLinePragmaRegEx = /^\/\/\/?\s*@([^\s:]+)((?:[^\S\r\n]|:).*)?$/m;
-    function extractPragmas(pragmas, range, text3) {
-      const tripleSlash = range.kind === 2 && tripleSlashXMLCommentStartRegEx.exec(text3);
+    function extractPragmas(pragmas, range, text4) {
+      const tripleSlash = range.kind === 2 && tripleSlashXMLCommentStartRegEx.exec(text4);
       if (tripleSlash) {
         const name3 = tripleSlash[1].toLowerCase();
         const pragma = commentPragmas[name3];
@@ -124019,7 +124182,7 @@ ${lanes.join(`
           const argument = {};
           for (const arg of pragma.args) {
             const matcher = getNamedArgRegEx(arg.name);
-            const matchResult = matcher.exec(text3);
+            const matchResult = matcher.exec(text4);
             if (!matchResult && !arg.optional) {
               return;
             } else if (matchResult) {
@@ -124042,14 +124205,14 @@ ${lanes.join(`
         }
         return;
       }
-      const singleLine = range.kind === 2 && singleLinePragmaRegEx.exec(text3);
+      const singleLine = range.kind === 2 && singleLinePragmaRegEx.exec(text4);
       if (singleLine) {
         return addPragmaForMatch(pragmas, range, 2, singleLine);
       }
       if (range.kind === 3) {
         const multiLinePragmaRegEx = /@(\S+)(\s+(?:\S.*)?)?$/gm;
         let multiLineMatch;
-        while (multiLineMatch = multiLinePragmaRegEx.exec(text3)) {
+        while (multiLineMatch = multiLinePragmaRegEx.exec(text4)) {
           addPragmaForMatch(pragmas, range, 4, multiLineMatch);
         }
       }
@@ -124069,12 +124232,12 @@ ${lanes.join(`
       pragmas.push({ name: name3, args: { arguments: argument, range } });
       return;
     }
-    function getNamedPragmaArguments(pragma, text3) {
-      if (!text3)
+    function getNamedPragmaArguments(pragma, text4) {
+      if (!text4)
         return {};
       if (!pragma.args)
         return {};
-      const args = text3.trim().split(/\s+/);
+      const args = text4.trim().split(/\s+/);
       const argMap = {};
       for (let i2 = 0;i2 < pragma.args.length; i2++) {
         const argument = pragma.args[i2];
@@ -125784,33 +125947,33 @@ ${lanes.join(`
         }
       }
       function parseResponseFile(fileName) {
-        const text3 = tryReadFile(fileName, readFile22 || ((fileName2) => sys.readFile(fileName2)));
-        if (!isString3(text3)) {
-          errors6.push(text3);
+        const text4 = tryReadFile(fileName, readFile22 || ((fileName2) => sys.readFile(fileName2)));
+        if (!isString3(text4)) {
+          errors6.push(text4);
           return;
         }
         const args = [];
         let pos = 0;
         while (true) {
-          while (pos < text3.length && text3.charCodeAt(pos) <= 32)
+          while (pos < text4.length && text4.charCodeAt(pos) <= 32)
             pos++;
-          if (pos >= text3.length)
+          if (pos >= text4.length)
             break;
           const start = pos;
-          if (text3.charCodeAt(start) === 34) {
+          if (text4.charCodeAt(start) === 34) {
             pos++;
-            while (pos < text3.length && text3.charCodeAt(pos) !== 34)
+            while (pos < text4.length && text4.charCodeAt(pos) !== 34)
               pos++;
-            if (pos < text3.length) {
-              args.push(text3.substring(start + 1, pos));
+            if (pos < text4.length) {
+              args.push(text4.substring(start + 1, pos));
               pos++;
             } else {
               errors6.push(createCompilerDiagnostic(Diagnostics.Unterminated_quoted_string_in_response_file_0, fileName));
             }
           } else {
-            while (text3.charCodeAt(pos) > 32)
+            while (text4.charCodeAt(pos) > 32)
               pos++;
-            args.push(text3.substring(start, pos));
+            args.push(text4.substring(start, pos));
           }
         }
         parseStrings(args);
@@ -125972,13 +126135,13 @@ ${lanes.join(`
       return isString3(textOrDiagnostic) ? parseJsonText(fileName, textOrDiagnostic) : { fileName, parseDiagnostics: [textOrDiagnostic] };
     }
     function tryReadFile(fileName, readFile22) {
-      let text3;
+      let text4;
       try {
-        text3 = readFile22(fileName);
+        text4 = readFile22(fileName);
       } catch (e2) {
         return createCompilerDiagnostic(Diagnostics.Cannot_read_file_0_Colon_1, fileName, e2.message);
       }
-      return text3 === undefined ? createCompilerDiagnostic(Diagnostics.Cannot_read_file_0, fileName) : text3;
+      return text4 === undefined ? createCompilerDiagnostic(Diagnostics.Cannot_read_file_0, fileName) : text4;
     }
     function commandLineOptionsToMap(options2) {
       return arrayToMap(options2, getOptionName);
@@ -131047,10 +131210,10 @@ ${lanes.join(`
           } else {
             let pattern;
             if (node.name.kind === 11) {
-              const { text: text3 } = node.name;
-              pattern = tryParsePattern(text3);
+              const { text: text4 } = node.name;
+              pattern = tryParsePattern(text4);
               if (pattern === undefined) {
-                errorOnFirstToken(node.name, Diagnostics.Pattern_0_can_have_at_most_one_Asterisk_character, text3);
+                errorOnFirstToken(node.name, Diagnostics.Pattern_0_can_have_at_most_one_Asterisk_character, text4);
               }
             }
             const symbol2 = declareSymbolAndAddToSymbolTable(node, 512, 110735);
@@ -138712,14 +138875,14 @@ ${lanes.join(`
           if (context.flags & 4) {
             const rawtext = result.escapedText;
             let i2 = ((_c = context.typeParameterNamesByTextNextNameCount) == null ? undefined : _c.get(rawtext)) || 0;
-            let text3 = rawtext;
-            while (((_d = context.typeParameterNamesByText) == null ? undefined : _d.has(text3)) || typeParameterShadowsOtherTypeParameterInScope(text3, context, type)) {
+            let text4 = rawtext;
+            while (((_d = context.typeParameterNamesByText) == null ? undefined : _d.has(text4)) || typeParameterShadowsOtherTypeParameterInScope(text4, context, type)) {
               i2++;
-              text3 = `${rawtext}_${i2}`;
+              text4 = `${rawtext}_${i2}`;
             }
-            if (text3 !== rawtext) {
+            if (text4 !== rawtext) {
               const typeArguments = getIdentifierTypeArguments(result);
-              result = factory.createIdentifier(text3);
+              result = factory.createIdentifier(text4);
               setIdentifierTypeArguments(result, typeArguments);
             }
             if (context.mustCreateTypeParametersNamesLookups) {
@@ -138730,7 +138893,7 @@ ${lanes.join(`
             }
             context.typeParameterNamesByTextNextNameCount.set(rawtext, i2);
             context.typeParameterNames.set(getTypeId(type), result);
-            context.typeParameterNamesByText.add(text3);
+            context.typeParameterNamesByText.add(text4);
           }
           return result;
         }
@@ -141099,9 +141262,9 @@ ${lanes.join(`
             objectFlags |= 512;
             return;
           }
-          const text3 = getPropertyNameFromType(exprType);
+          const text4 = getPropertyNameFromType(exprType);
           const flags = 4 | (e2.initializer ? 16777216 : 0);
-          const symbol2 = createSymbol(flags, text3);
+          const symbol2 = createSymbol(flags, text4);
           symbol2.links.type = getTypeFromBindingElement(e2, includePatternInType, reportErrors2);
           members.set(symbol2.escapedName, symbol2);
         });
@@ -144624,13 +144787,13 @@ ${lanes.join(`
       }
       function getUnresolvedSymbolForEntityName(name3) {
         const identifier = name3.kind === 167 ? name3.right : name3.kind === 212 ? name3.name : name3;
-        const text3 = identifier.escapedText;
-        if (text3) {
+        const text4 = identifier.escapedText;
+        if (text4) {
           const parentSymbol = name3.kind === 167 ? getUnresolvedSymbolForEntityName(name3.left) : name3.kind === 212 ? getUnresolvedSymbolForEntityName(name3.expression) : undefined;
-          const path = parentSymbol ? `${getSymbolPath(parentSymbol)}.${text3}` : text3;
+          const path = parentSymbol ? `${getSymbolPath(parentSymbol)}.${text4}` : text4;
           let result = unresolvedSymbols.get(path);
           if (!result) {
-            unresolvedSymbols.set(path, result = createSymbol(524288, text3, 1048576));
+            unresolvedSymbols.set(path, result = createSymbol(524288, text4, 1048576));
             result.parent = parentSymbol;
             result.links.declaredType = unresolvedType;
           }
@@ -146065,14 +146228,14 @@ ${lanes.join(`
         }
         const newTypes = [];
         const newTexts = [];
-        let text3 = texts[0];
+        let text4 = texts[0];
         if (!addSpans(texts, types2)) {
           return stringType2;
         }
         if (newTypes.length === 0) {
-          return getStringLiteralType(text3);
+          return getStringLiteralType(text4);
         }
-        newTexts.push(text3);
+        newTexts.push(text4);
         if (every(newTexts, (t2) => t2 === "")) {
           if (every(newTypes, (t2) => !!(t2.flags & 32))) {
             return stringType2;
@@ -146091,17 +146254,17 @@ ${lanes.join(`
           for (let i2 = 0;i2 < types22.length; i2++) {
             const t2 = types22[i2];
             if (t2.flags & (15360 | 8 | 4)) {
-              text3 += getTemplateStringForType(t2) || "";
-              text3 += texts2[i2 + 1];
+              text4 += getTemplateStringForType(t2) || "";
+              text4 += texts2[i2 + 1];
             } else if (t2.flags & 4194304) {
-              text3 += t2.texts[0];
+              text4 += t2.texts[0];
               if (!addSpans(t2.texts, t2.types))
                 return false;
-              text3 += texts2[i2 + 1];
+              text4 += texts2[i2 + 1];
             } else if (isGenericIndexType(t2) || isPatternLiteralPlaceholderType(t2)) {
               newTypes.push(t2);
-              newTexts.push(text3);
-              text3 = texts2[i2 + 1];
+              newTexts.push(text4);
+              text4 = texts2[i2 + 1];
             } else {
               return false;
             }
@@ -151555,8 +151718,8 @@ ${lanes.join(`
         const n2 = +s3;
         return isFinite(n2) && (!roundTripOnly || "" + n2 === s3);
       }
-      function parseBigIntLiteralType(text3) {
-        return getBigIntLiteralType(parseValidBigInt(text3));
+      function parseBigIntLiteralType(text4) {
+        return getBigIntLiteralType(parseValidBigInt(text4));
       }
       function isMemberOfStringMapping(source, target) {
         if (target.flags & 1) {
@@ -152786,8 +152949,8 @@ ${lanes.join(`
         const nameType = getLiteralTypeFromPropertyName(name3);
         if (!isTypeUsableAsPropertyName(nameType))
           return errorType;
-        const text3 = getPropertyNameFromType(nameType);
-        return getTypeOfPropertyOfType(type, text3) || includeUndefinedInIndexSignature((_a7 = getApplicableIndexInfoForName(type, text3)) == null ? undefined : _a7.type) || errorType;
+        const text4 = getPropertyNameFromType(nameType);
+        return getTypeOfPropertyOfType(type, text4) || includeUndefinedInIndexSignature((_a7 = getApplicableIndexInfoForName(type, text4)) == null ? undefined : _a7.type) || errorType;
       }
       function getTypeOfDestructuredArrayElement(type, index2) {
         return everyType(type, isTupleLikeType) && getTupleElementType(type, index2) || includeUndefinedInIndexSignature(checkIteratedTypeOrElementType(65, type, undefinedType2, undefined)) || errorType;
@@ -152912,8 +153075,8 @@ ${lanes.join(`
         }
         const witnesses = [];
         for (const clause of switchStatement.caseBlock.clauses) {
-          const text3 = clause.kind === 297 ? clause.expression.text : undefined;
-          witnesses.push(text3 && !contains2(witnesses, text3) ? text3 : undefined);
+          const text4 = clause.kind === 297 ? clause.expression.text : undefined;
+          witnesses.push(text4 && !contains2(witnesses, text4) ? text4 : undefined);
         }
         return witnesses;
       }
@@ -153994,7 +154157,7 @@ ${lanes.join(`
             return filterType(type, (t2) => getTypeFacts(t2, notEqualFacts) === notEqualFacts);
           }
           const clauseWitnesses = witnesses.slice(clauseStart, clauseEnd);
-          return getUnionType(map2(clauseWitnesses, (text3) => text3 ? narrowTypeByTypeName(type, text3) : neverType2));
+          return getUnionType(map2(clauseWitnesses, (text4) => text4 ? narrowTypeByTypeName(type, text4) : neverType2));
         }
         function narrowTypeBySwitchOnTrue(type, { switchStatement, clauseStart, clauseEnd }) {
           const defaultIndex = findIndex(switchStatement.caseBlock.clauses, (clause) => clause.kind === 298);
@@ -155325,8 +155488,8 @@ ${lanes.join(`
         }
         const nameType = getLiteralTypeFromPropertyName(name3);
         if (isTypeUsableAsPropertyName(nameType)) {
-          const text3 = getPropertyNameFromType(nameType);
-          return getTypeOfPropertyOfType(parentType, text3);
+          const text4 = getPropertyNameFromType(nameType);
+          return getTypeOfPropertyOfType(parentType, text4);
         }
       }
       function getContextualTypeForStaticPropertyDeclaration(declaration, contextFlags) {
@@ -158967,8 +159130,8 @@ ${lanes.join(`
           } else {
             let relatedInformation;
             if (node.arguments.length === 1) {
-              const text3 = getSourceFileOfNode(node).text;
-              if (isLineBreak(text3.charCodeAt(skipTrivia(text3, node.expression.end, true) - 1))) {
+              const text4 = getSourceFileOfNode(node).text;
+              if (isLineBreak(text4.charCodeAt(skipTrivia(text4, node.expression.end, true) - 1))) {
                 relatedInformation = createDiagnosticForNode(node.expression, Diagnostics.Are_you_missing_a_semicolon);
               }
             }
@@ -161191,8 +161354,8 @@ ${lanes.join(`
           const name3 = property.name;
           const exprType = getLiteralTypeFromPropertyName(name3);
           if (isTypeUsableAsPropertyName(exprType)) {
-            const text3 = getPropertyNameFromType(exprType);
-            const prop = getPropertyOfType(objectLiteralType, text3);
+            const text4 = getPropertyNameFromType(exprType);
+            const prop = getPropertyOfType(objectLiteralType, text4);
             if (prop) {
               markPropertyAsReferenced(prop, property, rightIsThis);
               checkPropertyAccessibility(property, false, true, objectLiteralType, prop);
@@ -166478,8 +166641,8 @@ ${lanes.join(`
         } else if (isBigIntLiteral(member.name)) {
           error210(member.name, Diagnostics.An_enum_member_cannot_have_a_numeric_name);
         } else {
-          const text3 = getTextOfPropertyName(member.name);
-          if (isNumericLiteralName(text3) && !isInfinityOrNaNString(text3)) {
+          const text4 = getTextOfPropertyName(member.name);
+          if (isNumericLiteralName(text4) && !isInfinityOrNaNString(text4)) {
             error210(member.name, Diagnostics.An_enum_member_cannot_have_a_numeric_name);
           }
         }
@@ -169499,26 +169662,26 @@ ${lanes.join(`
               case 125:
               case 124:
               case 123:
-                const text3 = visibilityToString(modifierToFlag(modifier.kind));
+                const text4 = visibilityToString(modifierToFlag(modifier.kind));
                 if (flags & 7) {
                   return grammarErrorOnNode(modifier, Diagnostics.Accessibility_modifier_already_seen);
                 } else if (flags & 16) {
-                  return grammarErrorOnNode(modifier, Diagnostics._0_modifier_must_precede_1_modifier, text3, "override");
+                  return grammarErrorOnNode(modifier, Diagnostics._0_modifier_must_precede_1_modifier, text4, "override");
                 } else if (flags & 256) {
-                  return grammarErrorOnNode(modifier, Diagnostics._0_modifier_must_precede_1_modifier, text3, "static");
+                  return grammarErrorOnNode(modifier, Diagnostics._0_modifier_must_precede_1_modifier, text4, "static");
                 } else if (flags & 512) {
-                  return grammarErrorOnNode(modifier, Diagnostics._0_modifier_must_precede_1_modifier, text3, "accessor");
+                  return grammarErrorOnNode(modifier, Diagnostics._0_modifier_must_precede_1_modifier, text4, "accessor");
                 } else if (flags & 8) {
-                  return grammarErrorOnNode(modifier, Diagnostics._0_modifier_must_precede_1_modifier, text3, "readonly");
+                  return grammarErrorOnNode(modifier, Diagnostics._0_modifier_must_precede_1_modifier, text4, "readonly");
                 } else if (flags & 1024) {
-                  return grammarErrorOnNode(modifier, Diagnostics._0_modifier_must_precede_1_modifier, text3, "async");
+                  return grammarErrorOnNode(modifier, Diagnostics._0_modifier_must_precede_1_modifier, text4, "async");
                 } else if (node.parent.kind === 269 || node.parent.kind === 308) {
-                  return grammarErrorOnNode(modifier, Diagnostics._0_modifier_cannot_appear_on_a_module_or_namespace_element, text3);
+                  return grammarErrorOnNode(modifier, Diagnostics._0_modifier_cannot_appear_on_a_module_or_namespace_element, text4);
                 } else if (flags & 64) {
                   if (modifier.kind === 123) {
-                    return grammarErrorOnNode(modifier, Diagnostics._0_modifier_cannot_be_used_with_1_modifier, text3, "abstract");
+                    return grammarErrorOnNode(modifier, Diagnostics._0_modifier_cannot_be_used_with_1_modifier, text4, "abstract");
                   } else {
-                    return grammarErrorOnNode(modifier, Diagnostics._0_modifier_must_precede_1_modifier, text3, "abstract");
+                    return grammarErrorOnNode(modifier, Diagnostics._0_modifier_must_precede_1_modifier, text4, "abstract");
                   }
                 } else if (isPrivateIdentifierClassElementDeclaration(node)) {
                   return grammarErrorOnNode(modifier, Diagnostics.An_accessibility_modifier_cannot_be_used_with_a_private_identifier);
@@ -172273,10 +172436,10 @@ ${lanes.join(`
     var sourceMapCommentRegExpDontCareLineStart = /\/\/[@#] source[M]appingURL=(.+)\r?\n?$/;
     var sourceMapCommentRegExp = /^\/\/[@#] source[M]appingURL=(.+)\r?\n?$/;
     var whitespaceOrMapCommentRegExp = /^\s*(\/\/[@#] .*)?$/;
-    function getLineInfo(text3, lineStarts) {
+    function getLineInfo(text4, lineStarts) {
       return {
         getLineCount: () => lineStarts.length,
-        getLineText: (line) => text3.substring(lineStarts[line], lineStarts[line + 1])
+        getLineText: (line) => text4.substring(lineStarts[line], lineStarts[line + 1])
       };
     }
     function tryGetSourceMappingURL(lineInfo) {
@@ -172296,9 +172459,9 @@ ${lanes.join(`
     function isRawSourceMap(x3) {
       return x3 !== null && typeof x3 === "object" && x3.version === 3 && typeof x3.file === "string" && typeof x3.mappings === "string" && isArray2(x3.sources) && every(x3.sources, isString3) && (x3.sourceRoot === undefined || x3.sourceRoot === null || typeof x3.sourceRoot === "string") && (x3.sourcesContent === undefined || x3.sourcesContent === null || isArray2(x3.sourcesContent) && every(x3.sourcesContent, isStringOrNull)) && (x3.names === undefined || x3.names === null || isArray2(x3.names) && every(x3.names, isString3));
     }
-    function tryParseRawSourceMap(text3) {
+    function tryParseRawSourceMap(text4) {
       try {
-        const parsed = JSON.parse(text3);
+        const parsed = JSON.parse(text4);
         if (isRawSourceMap(parsed)) {
           return parsed;
         }
@@ -172766,9 +172929,9 @@ ${lanes.join(`
           }
         }
       } else if (!isGeneratedIdentifier(decl.name)) {
-        const text3 = idText(decl.name);
-        if (!uniqueExports.get(text3)) {
-          uniqueExports.set(text3, true);
+        const text4 = idText(decl.name);
+        if (!uniqueExports.get(text4)) {
+          uniqueExports.set(text4, true);
           exportedNames = append(exportedNames, decl.name);
           if (isLocalName(decl.name)) {
             multiMapSparseArrayAdd(exportedBindings, getOriginalNodeId(decl), decl.name);
@@ -173610,16 +173773,16 @@ ${lanes.join(`
       return template.templateFlags & 26656 ? factory2.createVoidZero() : factory2.createStringLiteral(template.text);
     }
     function getRawLiteral(factory2, node, currentSourceFile) {
-      let text3 = node.rawText;
-      if (text3 === undefined) {
+      let text4 = node.rawText;
+      if (text4 === undefined) {
         Debug.assertIsDefined(currentSourceFile, "Template literal node is missing 'rawText' and does not have a source file. Possibly bad transform.");
-        text3 = getSourceTextOfNodeFromSourceFile(currentSourceFile, node);
+        text4 = getSourceTextOfNodeFromSourceFile(currentSourceFile, node);
         const isLast = node.kind === 15 || node.kind === 18;
-        text3 = text3.substring(1, text3.length - (isLast ? 1 : 2));
+        text4 = text4.substring(1, text4.length - (isLast ? 1 : 2));
       }
-      text3 = text3.replace(/\r\n?/g, `
+      text4 = text4.replace(/\r\n?/g, `
 `);
-      return setTextRange(factory2.createStringLiteral(text3), node);
+      return setTextRange(factory2.createStringLiteral(text4), node);
     }
     var USE_NEW_TYPE_METADATA_FORMAT = false;
     function transformTypeScript(context) {
@@ -176327,8 +176490,8 @@ ${lanes.join(`
         return identifier;
       }
       function createHoistedVariableForPrivateName(name3, suffix) {
-        const text3 = tryGetTextOfPropertyName(name3);
-        return createHoistedVariableForClass((text3 == null ? undefined : text3.substring(1)) ?? name3, name3, suffix);
+        const text4 = tryGetTextOfPropertyName(name3);
+        return createHoistedVariableForClass((text4 == null ? undefined : text4.substring(1)) ?? name3, name3, suffix);
       }
       function accessPrivateIdentifier2(name3) {
         const info = accessPrivateIdentifier(lexicalEnvironment, name3);
@@ -180714,15 +180877,15 @@ ${lanes.join(`
         const fixed = fixupWhitespaceAndDecodeEntities(node.text);
         return fixed === undefined ? undefined : factory2.createStringLiteral(fixed);
       }
-      function fixupWhitespaceAndDecodeEntities(text3) {
+      function fixupWhitespaceAndDecodeEntities(text4) {
         let acc;
         let firstNonWhitespace = 0;
         let lastNonWhitespace = -1;
-        for (let i2 = 0;i2 < text3.length; i2++) {
-          const c2 = text3.charCodeAt(i2);
+        for (let i2 = 0;i2 < text4.length; i2++) {
+          const c2 = text4.charCodeAt(i2);
           if (isLineBreak(c2)) {
             if (firstNonWhitespace !== -1 && lastNonWhitespace !== -1) {
-              acc = addLineOfJsxText(acc, text3.substr(firstNonWhitespace, lastNonWhitespace - firstNonWhitespace + 1));
+              acc = addLineOfJsxText(acc, text4.substr(firstNonWhitespace, lastNonWhitespace - firstNonWhitespace + 1));
             }
             firstNonWhitespace = -1;
           } else if (!isWhiteSpaceSingleLine(c2)) {
@@ -180732,14 +180895,14 @@ ${lanes.join(`
             }
           }
         }
-        return firstNonWhitespace !== -1 ? addLineOfJsxText(acc, text3.substr(firstNonWhitespace)) : acc;
+        return firstNonWhitespace !== -1 ? addLineOfJsxText(acc, text4.substr(firstNonWhitespace)) : acc;
       }
       function addLineOfJsxText(acc, trimmedLine) {
         const decoded = decodeEntities(trimmedLine);
         return acc === undefined ? decoded : acc + " " + decoded;
       }
-      function decodeEntities(text3) {
-        return text3.replace(/&((#((\d+)|x([\da-fA-F]+)))|(\w+));/g, (match2, _all, _number2, _digits, decimal, hex3, word) => {
+      function decodeEntities(text4) {
+        return text4.replace(/&((#((\d+)|x([\da-fA-F]+)))|(\w+));/g, (match2, _all, _number2, _digits, decimal, hex3, word) => {
           if (decimal) {
             return utf16EncodeAsString(parseInt(decimal, 10));
           } else if (hex3) {
@@ -180750,9 +180913,9 @@ ${lanes.join(`
           }
         });
       }
-      function tryDecodeEntities(text3) {
-        const decoded = decodeEntities(text3);
-        return decoded === text3 ? undefined : decoded;
+      function tryDecodeEntities(text4) {
+        const decoded = decodeEntities(text4);
+        return decoded === text4 ? undefined : decoded;
       }
       function getTagName(node) {
         if (node.kind === 285) {
@@ -180771,8 +180934,8 @@ ${lanes.join(`
       function getAttributeName(node) {
         const name3 = node.name;
         if (isIdentifier(name3)) {
-          const text3 = idText(name3);
-          return /^[A-Z_]\w*$/i.test(text3) ? name3 : factory2.createStringLiteral(text3);
+          const text4 = idText(name3);
+          return /^[A-Z_]\w*$/i.test(text4) ? name3 : factory2.createStringLiteral(text4);
         }
         return factory2.createStringLiteral(idText(name3.namespace) + ":" + idText(name3.name));
       }
@@ -184202,14 +184365,14 @@ ${lanes.join(`
           name3 = variable.name;
           hoistVariableDeclaration(variable.name);
         } else {
-          const text3 = idText(variable.name);
-          name3 = declareLocal(text3);
+          const text4 = idText(variable.name);
+          name3 = declareLocal(text4);
           if (!renamedCatchVariables) {
             renamedCatchVariables = /* @__PURE__ */ new Map;
             renamedCatchVariableDeclarations = [];
             context.enableSubstitution(80);
           }
-          renamedCatchVariables.set(text3, true);
+          renamedCatchVariables.set(text4, true);
           renamedCatchVariableDeclarations[getOriginalNodeId(variable)] = name3;
         }
         const exception = peekBlock();
@@ -185869,12 +186032,12 @@ ${lanes.join(`
         for (const externalImport of externalImports) {
           const externalModuleName = getExternalModuleNameLiteral(factory2, externalImport, currentSourceFile, host, resolver, compilerOptions);
           if (externalModuleName) {
-            const text3 = externalModuleName.text;
-            const groupIndex = groupIndices.get(text3);
+            const text4 = externalModuleName.text;
+            const groupIndex = groupIndices.get(text4);
             if (groupIndex !== undefined) {
               dependencyGroups[groupIndex].externalImports.push(externalImport);
             } else {
-              groupIndices.set(text3, dependencyGroups.length);
+              groupIndices.set(text4, dependencyGroups.length);
               dependencyGroups.push({
                 name: externalModuleName,
                 externalImports: [externalImport]
@@ -189351,9 +189514,9 @@ ${lanes.join(`
         } else {
           writer.writeLine();
         }
-        const text3 = writer.getText();
+        const text4 = writer.getText();
         const data = { sourceMapUrlPos, diagnostics: transform22.diagnostics };
-        writeFile13(host, emitterDiagnostics, jsFilePath, text3, !!compilerOptions.emitBOM, sourceFiles, data);
+        writeFile13(host, emitterDiagnostics, jsFilePath, text4, !!compilerOptions.emitBOM, sourceFiles, data);
         writer.clear();
         return !data.skippedDtsWrite;
       }
@@ -189602,9 +189765,9 @@ ${lanes.join(`
         return ownWriter || (ownWriter = createTextWriter(newLine));
       }
       function endPrint() {
-        const text3 = ownWriter.getText();
+        const text4 = ownWriter.getText();
         ownWriter.clear();
-        return text3;
+        return text4;
       }
       function print(hint, node, sourceFile) {
         if (sourceFile) {
@@ -190224,11 +190387,11 @@ ${lanes.join(`
         emitLiteral(node, false);
       }
       function emitLiteral(node, jsxAttributeEscape) {
-        const text3 = getLiteralTextOfNode(node, undefined, printerOptions.neverAsciiEscape, jsxAttributeEscape);
+        const text4 = getLiteralTextOfNode(node, undefined, printerOptions.neverAsciiEscape, jsxAttributeEscape);
         if ((printerOptions.sourceMap || printerOptions.inlineSourceMap) && (node.kind === 11 || isTemplateLiteralKind(node.kind))) {
-          writeLiteral(text3);
+          writeLiteral(text4);
         } else {
-          writeStringLiteral(text3);
+          writeStringLiteral(text4);
         }
       }
       function emitSnippetNode(hint, node, snippet) {
@@ -190652,8 +190815,8 @@ ${lanes.join(`
       function mayNeedDotDotForPropertyAccess(expression2) {
         expression2 = skipPartiallyEmittedExpressions(expression2);
         if (isNumericLiteral(expression2)) {
-          const text3 = getLiteralTextOfNode(expression2, undefined, true, false);
-          return !(expression2.numericLiteralFlags & 448) && !text3.includes(tokenToString(25)) && !text3.includes(String.fromCharCode(69)) && !text3.includes(String.fromCharCode(101));
+          const text4 = getLiteralTextOfNode(expression2, undefined, true, false);
+          return !(expression2.numericLiteralFlags & 448) && !text4.includes(tokenToString(25)) && !text4.includes(String.fromCharCode(69)) && !text4.includes(String.fromCharCode(101));
         } else if (isAccessExpression(expression2)) {
           const constantValue = getConstantValue(expression2);
           return typeof constantValue === "number" && isFinite(constantValue) && constantValue >= 0 && Math.floor(constantValue) === constantValue;
@@ -191746,9 +191909,9 @@ ${lanes.join(`
       function emitJSDoc(node) {
         write("/**");
         if (node.comment) {
-          const text3 = getTextOfJSDocComment(node.comment);
-          if (text3) {
-            const lines = text3.split(/\r\n?|\n/);
+          const text4 = getTextOfJSDocComment(node.comment);
+          if (text4) {
+            const lines = text4.split(/\r\n?|\n/);
             for (const line of lines) {
               writeLine();
               writeSpace();
@@ -191893,10 +192056,10 @@ ${lanes.join(`
         emit(tagName);
       }
       function emitJSDocComment(comment) {
-        const text3 = getTextOfJSDocComment(comment);
-        if (text3) {
+        const text4 = getTextOfJSDocComment(comment);
+        if (text4) {
           writeSpace();
-          write(text3);
+          write(text4);
         }
       }
       function emitJSDocTypeExpression(typeExpression) {
@@ -192399,8 +192562,8 @@ ${lanes.join(`
           writeLine();
         }
       }
-      function writeLines(text3) {
-        const lines = text3.split(/\r\n?|\n/);
+      function writeLines(text4) {
+        const lines = text4.split(/\r\n?|\n/);
         const indentation = guessIndentation(lines);
         for (const lineText of lines) {
           const line = indentation ? lineText.slice(indentation) : lineText;
@@ -192585,8 +192748,8 @@ ${lanes.join(`
         if (node.kind === 11 && node.textSourceNode) {
           const textSourceNode = node.textSourceNode;
           if (isIdentifier(textSourceNode) || isPrivateIdentifier(textSourceNode) || isNumericLiteral(textSourceNode) || isJsxNamespacedName(textSourceNode)) {
-            const text3 = isNumericLiteral(textSourceNode) ? textSourceNode.text : getTextOfNode2(textSourceNode);
-            return jsxAttributeEscape ? `"${escapeJsxAttributeString(text3)}"` : neverAsciiEscape || getEmitFlags(node) & 16777216 ? `"${escapeString(text3)}"` : `"${escapeNonAsciiString(text3)}"`;
+            const text4 = isNumericLiteral(textSourceNode) ? textSourceNode.text : getTextOfNode2(textSourceNode);
+            return jsxAttributeEscape ? `"${escapeJsxAttributeString(text4)}"` : neverAsciiEscape || getEmitFlags(node) & 16777216 ? `"${escapeString(text4)}"` : `"${escapeNonAsciiString(text4)}"`;
           } else {
             return getLiteralTextOfNode(textSourceNode, getSourceFileOfNode(textSourceNode), neverAsciiEscape, jsxAttributeEscape);
           }
@@ -193059,9 +193222,9 @@ ${lanes.join(`
         }
       }
       function writeSynthesizedComment(comment) {
-        const text3 = formatSynthesizedComment(comment);
-        const lineMap = comment.kind === 3 ? computeLineStarts(text3) : undefined;
-        writeCommentRange(text3, lineMap, writer, 0, text3.length, newLine);
+        const text4 = formatSynthesizedComment(comment);
+        const lineMap = comment.kind === 3 ? computeLineStarts(text4) : undefined;
+        writeCommentRange(text4, lineMap, writer, 0, text4.length, newLine);
       }
       function formatSynthesizedComment(comment) {
         return comment.kind === 3 ? `/*${comment.text}*/` : `//${comment.text}`;
@@ -193132,9 +193295,9 @@ ${lanes.join(`
           emitLeadingComment(commentPos, commentEnd, kind, hasTrailingNewLine, rangePos);
         }
       }
-      function shouldWriteComment(text3, pos) {
+      function shouldWriteComment(text4, pos) {
         if (printerOptions.onlyPrintJsDocStyle) {
-          return isJSDocLikeText(text3, pos) || isPinnedComment(text3, pos);
+          return isJSDocLikeText(text4, pos) || isPinnedComment(text4, pos);
         }
         return true;
       }
@@ -193244,11 +193407,11 @@ ${lanes.join(`
           }
         }
       }
-      function emitComment(text3, lineMap, writer2, commentPos, commentEnd, newLine2) {
+      function emitComment(text4, lineMap, writer2, commentPos, commentEnd, newLine2) {
         if (!currentSourceFile || !shouldWriteComment(currentSourceFile.text, commentPos))
           return;
         emitPos(commentPos);
-        writeCommentRange(text3, lineMap, writer2, commentPos, commentEnd, newLine2);
+        writeCommentRange(text4, lineMap, writer2, commentPos, commentEnd, newLine2);
         emitPos(commentEnd);
       }
       function isTripleSlashComment(commentPos, commentEnd) {
@@ -193873,19 +194036,19 @@ ${lanes.join(`
     }
     function createGetSourceFile(readFile22, setParentNodes) {
       return (fileName, languageVersionOrOptions, onError) => {
-        let text3;
+        let text4;
         try {
           mark("beforeIORead");
-          text3 = readFile22(fileName);
+          text4 = readFile22(fileName);
           mark("afterIORead");
           measure("I/O Read", "beforeIORead", "afterIORead");
         } catch (e2) {
           if (onError) {
             onError(e2.message);
           }
-          text3 = "";
+          text4 = "";
         }
-        return text3 !== undefined ? createSourceFile(fileName, text3, languageVersionOrOptions, setParentNodes) : undefined;
+        return text4 !== undefined ? createSourceFile(fileName, text4, languageVersionOrOptions, setParentNodes) : undefined;
       };
     }
     function createWriteFileMeasuringIO(actualWriteFile, createDirectory, directoryExists) {
@@ -194098,8 +194261,8 @@ ${lanes.join(`
           return "\x1B[94m";
       }
     }
-    function formatColorAndReset(text3, formatStyle) {
-      return formatStyle + text3 + resetEscapeSequence;
+    function formatColorAndReset(text4, formatStyle) {
+      return formatStyle + text4 + resetEscapeSequence;
     }
     function formatCodeSpan(file2, start, length2, indent3, squiggleColor, host) {
       const { line: firstLine, character: firstLineChar } = getLineAndCharacterOfPosition(file2, start);
@@ -195320,8 +195483,8 @@ ${lanes.join(`
           getGlobalTypingsCacheLocation: program.getGlobalTypingsCacheLocation
         };
       }
-      function writeFile22(fileName, text3, writeByteOrderMark, onError, sourceFiles, data) {
-        host.writeFile(fileName, text3, writeByteOrderMark, onError, sourceFiles, data);
+      function writeFile22(fileName, text4, writeByteOrderMark, onError, sourceFiles, data) {
+        host.writeFile(fileName, text4, writeByteOrderMark, onError, sourceFiles, data);
       }
       function emitBuildInfo(writeFileCallback) {
         var _a22, _b2;
@@ -195765,8 +195928,8 @@ ${lanes.join(`
       function moduleNameIsEqualTo(a2, b3) {
         return a2.kind === 80 ? b3.kind === 80 && a2.escapedText === b3.escapedText : b3.kind === 11 && a2.text === b3.text;
       }
-      function createSyntheticImport(text3, file2) {
-        const externalHelpersModuleReference = factory.createStringLiteral(text3);
+      function createSyntheticImport(text4, file2) {
+        const externalHelpersModuleReference = factory.createStringLiteral(text4);
         const importDecl = factory.createImportDeclaration(undefined, undefined, externalHelpersModuleReference);
         addInternalEmitFlags(importDecl, 2);
         setParent(externalHelpersModuleReference, importDecl);
@@ -197398,8 +197561,8 @@ ${lanes.join(`
       const outputFiles = [];
       const { emitSkipped, diagnostics } = program.emit(sourceFile, writeFile22, cancellationToken, emitOnlyDtsFiles, customTransformers, forceDtsEmit);
       return { outputFiles, emitSkipped, diagnostics };
-      function writeFile22(fileName, text3, writeByteOrderMark) {
-        outputFiles.push({ name: fileName, writeByteOrderMark, text: text3 });
+      function writeFile22(fileName, text4, writeByteOrderMark) {
+        outputFiles.push({ name: fileName, writeByteOrderMark, text: text4 });
       }
     }
     var SignatureInfo = /* @__PURE__ */ ((SignatureInfo2) => {
@@ -197605,9 +197768,9 @@ ${lanes.join(`
       }
       BuilderState2.updateSignatureOfFile = updateSignatureOfFile;
       function computeDtsSignature(programOfThisState, sourceFile, cancellationToken, host, onNewSignature) {
-        programOfThisState.emit(sourceFile, (fileName, text3, _writeByteOrderMark, _onError, sourceFiles, data) => {
+        programOfThisState.emit(sourceFile, (fileName, text4, _writeByteOrderMark, _onError, sourceFiles, data) => {
           Debug.assert(isDeclarationFileName(fileName), `File extension for signature expected to be dts: Got:: ${fileName}`);
-          onNewSignature(computeSignatureWithDiagnostics(programOfThisState, sourceFile, text3, host, data), sourceFiles);
+          onNewSignature(computeSignatureWithDiagnostics(programOfThisState, sourceFile, text4, host, data), sourceFiles);
         }, cancellationToken, 2, undefined, true);
       }
       BuilderState2.computeDtsSignature = computeDtsSignature;
@@ -198538,18 +198701,18 @@ ${lanes.join(`
       }
       return { host, newProgram, oldProgram, configFileParsingDiagnostics: configFileParsingDiagnostics || emptyArray };
     }
-    function getTextHandlingSourceMapForSignature(text3, data) {
-      return (data == null ? undefined : data.sourceMapUrlPos) !== undefined ? text3.substring(0, data.sourceMapUrlPos) : text3;
+    function getTextHandlingSourceMapForSignature(text4, data) {
+      return (data == null ? undefined : data.sourceMapUrlPos) !== undefined ? text4.substring(0, data.sourceMapUrlPos) : text4;
     }
-    function computeSignatureWithDiagnostics(program, sourceFile, text3, host, data) {
+    function computeSignatureWithDiagnostics(program, sourceFile, text4, host, data) {
       var _a7;
-      text3 = getTextHandlingSourceMapForSignature(text3, data);
+      text4 = getTextHandlingSourceMapForSignature(text4, data);
       let sourceFileDirectory;
       if ((_a7 = data == null ? undefined : data.diagnostics) == null ? undefined : _a7.length) {
-        text3 += data.diagnostics.map((diagnostic) => `${locationInfo(diagnostic)}${DiagnosticCategory[diagnostic.category]}${diagnostic.code}: ${flattenDiagnosticMessageText2(diagnostic.messageText)}`).join(`
+        text4 += data.diagnostics.map((diagnostic) => `${locationInfo(diagnostic)}${DiagnosticCategory[diagnostic.category]}${diagnostic.code}: ${flattenDiagnosticMessageText2(diagnostic.messageText)}`).join(`
 `);
       }
-      return (host.createHash ?? generateDjb2Hash)(text3);
+      return (host.createHash ?? generateDjb2Hash)(text4);
       function flattenDiagnosticMessageText2(diagnostic) {
         return isString3(diagnostic) ? diagnostic : diagnostic === undefined ? "" : !diagnostic.next ? diagnostic.messageText : diagnostic.messageText + diagnostic.next.map(flattenDiagnosticMessageText2).join(`
 `);
@@ -198562,8 +198725,8 @@ ${lanes.join(`
         return `${ensurePathIsNonModuleName(getRelativePathFromDirectory(sourceFileDirectory, diagnostic.file.resolvedPath, program.getCanonicalFileName))}(${diagnostic.start},${diagnostic.length})`;
       }
     }
-    function computeSignature(text3, host, data) {
-      return (host.createHash ?? generateDjb2Hash)(getTextHandlingSourceMapForSignature(text3, data));
+    function computeSignature(text4, host, data) {
+      return (host.createHash ?? generateDjb2Hash)(getTextHandlingSourceMapForSignature(text4, data));
     }
     function createBuilderProgram(kind, { newProgram, host, oldProgram, configFileParsingDiagnostics }) {
       let oldState = oldProgram && oldProgram.state;
@@ -198707,7 +198870,7 @@ ${lanes.join(`
         Debug.assert(isBuilderProgramStateWithDefinedProgram(state));
         if (!getEmitDeclarations(state.compilerOptions))
           return writeFile22 || maybeBind(host, host.writeFile);
-        return (fileName, text3, writeByteOrderMark, onError, sourceFiles, data) => {
+        return (fileName, text4, writeByteOrderMark, onError, sourceFiles, data) => {
           var _a7, _b, _c;
           if (isDeclarationFileName(fileName)) {
             if (!state.compilerOptions.outFile) {
@@ -198717,7 +198880,7 @@ ${lanes.join(`
                 const file2 = sourceFiles[0];
                 const info = state.fileInfos.get(file2.resolvedPath);
                 if (info.signature === file2.version) {
-                  const signature = computeSignatureWithDiagnostics(state.program, file2, text3, host, data);
+                  const signature = computeSignatureWithDiagnostics(state.program, file2, text4, host, data);
                   if (!((_a7 = data == null ? undefined : data.diagnostics) == null ? undefined : _a7.length))
                     emitSignature = signature;
                   if (signature !== file2.version) {
@@ -198749,14 +198912,14 @@ ${lanes.join(`
             }
           }
           if (writeFile22)
-            writeFile22(fileName, text3, writeByteOrderMark, onError, sourceFiles, data);
+            writeFile22(fileName, text4, writeByteOrderMark, onError, sourceFiles, data);
           else if (host.writeFile)
-            host.writeFile(fileName, text3, writeByteOrderMark, onError, sourceFiles, data);
+            host.writeFile(fileName, text4, writeByteOrderMark, onError, sourceFiles, data);
           else
-            state.program.writeFile(fileName, text3, writeByteOrderMark, onError, sourceFiles, data);
+            state.program.writeFile(fileName, text4, writeByteOrderMark, onError, sourceFiles, data);
           function handleNewSignature(oldSignatureFormat, newSignature) {
             const oldSignature = !oldSignatureFormat || isString3(oldSignatureFormat) ? oldSignatureFormat : oldSignatureFormat[0];
-            newSignature ?? (newSignature = computeSignature(text3, host, data));
+            newSignature ?? (newSignature = computeSignature(text4, host, data));
             if (newSignature === oldSignature) {
               if (oldSignatureFormat === oldSignature)
                 return;
@@ -200469,15 +200632,15 @@ ${lanes.join(`
       };
       return compilerHost;
     }
-    function getSourceFileVersionAsHashFromText(host, text3) {
-      if (text3.match(sourceMapCommentRegExpDontCareLineStart)) {
-        let lineEnd = text3.length;
+    function getSourceFileVersionAsHashFromText(host, text4) {
+      if (text4.match(sourceMapCommentRegExpDontCareLineStart)) {
+        let lineEnd = text4.length;
         let lineStart = lineEnd;
         for (let pos = lineEnd - 1;pos >= 0; pos--) {
-          const ch = text3.charCodeAt(pos);
+          const ch = text4.charCodeAt(pos);
           switch (ch) {
             case 10:
-              if (pos && text3.charCodeAt(pos - 1) === 13) {
+              if (pos && text4.charCodeAt(pos - 1) === 13) {
                 pos--;
               }
             case 13:
@@ -200489,9 +200652,9 @@ ${lanes.join(`
               }
               break;
           }
-          const line = text3.substring(lineStart, lineEnd);
+          const line = text4.substring(lineStart, lineEnd);
           if (line.match(sourceMapCommentRegExp)) {
-            text3 = text3.substring(0, lineStart);
+            text4 = text4.substring(0, lineStart);
             break;
           } else if (!line.match(whitespaceOrMapCommentRegExp)) {
             break;
@@ -200499,7 +200662,7 @@ ${lanes.join(`
           lineEnd = lineStart;
         }
       }
-      return (host.createHash || generateDjb2Hash)(text3);
+      return (host.createHash || generateDjb2Hash)(text4);
     }
     function setGetSourceFileAsHashVersioned(compilerHost) {
       const originalGetSourceFile = compilerHost.getSourceFile;
@@ -200957,8 +201120,8 @@ ${lanes.join(`
           return;
         if (hostSourceFile.version)
           return hostSourceFile.version;
-        const text3 = readFileWithCache(path);
-        return text3 !== undefined ? getSourceFileVersionAsHashFromText(compilerHost, text3) : undefined;
+        const text4 = readFileWithCache(path);
+        return text4 !== undefined ? getSourceFileVersionAsHashFromText(compilerHost, text4) : undefined;
       }
       function onReleaseOldSourceFile(oldSourceFile, _oldOptions, hasSourceFileByPath) {
         const hostSourceFileInfo = sourceFilesCache.get(oldSourceFile.resolvedPath);
@@ -201731,7 +201894,7 @@ ${lanes.join(`
         const isIncremental = isIncrementalCompilation(options2);
         let outputTimeStampMap;
         let now2;
-        const { emitResult, diagnostics } = emitFilesAndReportErrors(program, (d2) => host.reportDiagnostic(d2), state.write, undefined, (name3, text3, writeByteOrderMark, onError, sourceFiles, data) => {
+        const { emitResult, diagnostics } = emitFilesAndReportErrors(program, (d2) => host.reportDiagnostic(d2), state.write, undefined, (name3, text4, writeByteOrderMark, onError, sourceFiles, data) => {
           var _a22;
           const path = toPath2(state, name3);
           emittedOutputs.set(toPath2(state, name3), name3);
@@ -201754,7 +201917,7 @@ ${lanes.join(`
             }
           }
           const modifiedTime = (data == null ? undefined : data.differsOnlyInMap) ? getModifiedTime(state.host, name3) : undefined;
-          (writeFileCallback || compilerHost.writeFile)(name3, text3, writeByteOrderMark, onError, sourceFiles, data);
+          (writeFileCallback || compilerHost.writeFile)(name3, text4, writeByteOrderMark, onError, sourceFiles, data);
           if (data == null ? undefined : data.differsOnlyInMap)
             state.host.setModifiedTime(name3, modifiedTime);
           else if (!isIncremental && state.watch) {
@@ -202106,8 +202269,8 @@ ${lanes.join(`
               buildInfoVersionMap = getBuildInfoFileVersionMap(incrementalBuildInfo, buildInfoPath, host);
             const resolvedInputPath = buildInfoVersionMap.roots.get(inputPath);
             version22 = buildInfoVersionMap.fileInfos.get(resolvedInputPath ?? inputPath);
-            const text3 = version22 ? state.readFileWithCache(resolvedInputPath ?? inputFile) : undefined;
-            currentVersion = text3 !== undefined ? getSourceFileVersionAsHashFromText(host, text3) : undefined;
+            const text4 = version22 ? state.readFileWithCache(resolvedInputPath ?? inputFile) : undefined;
+            currentVersion = text4 !== undefined ? getSourceFileVersionAsHashFromText(host, text4) : undefined;
             if (version22 && version22 === currentVersion)
               pseudoInputUpToDate = true;
           }
@@ -202805,7 +202968,7 @@ ${lanes.join(`
     }
     function generateOptionOutput(sys2, option, rightAlignOfLeft, leftAlignOfRight) {
       var _a7;
-      const text3 = [];
+      const text4 = [];
       const colors = createColors(sys2);
       const name3 = getDisplayNameTextOfOption(option);
       const valueCandidates = getValueCandidate(option);
@@ -202816,38 +202979,38 @@ ${lanes.join(`
         if (option.description) {
           description3 = getDiagnosticText(option.description);
         }
-        text3.push(...getPrettyOutput(name3, description3, rightAlignOfLeft, leftAlignOfRight, terminalWidth, true), sys2.newLine);
+        text4.push(...getPrettyOutput(name3, description3, rightAlignOfLeft, leftAlignOfRight, terminalWidth, true), sys2.newLine);
         if (showAdditionalInfoOutput(valueCandidates, option)) {
           if (valueCandidates) {
-            text3.push(...getPrettyOutput(valueCandidates.valueType, valueCandidates.possibleValues, rightAlignOfLeft, leftAlignOfRight, terminalWidth, false), sys2.newLine);
+            text4.push(...getPrettyOutput(valueCandidates.valueType, valueCandidates.possibleValues, rightAlignOfLeft, leftAlignOfRight, terminalWidth, false), sys2.newLine);
           }
           if (defaultValueDescription) {
-            text3.push(...getPrettyOutput(getDiagnosticText(Diagnostics.default_Colon), defaultValueDescription, rightAlignOfLeft, leftAlignOfRight, terminalWidth, false), sys2.newLine);
+            text4.push(...getPrettyOutput(getDiagnosticText(Diagnostics.default_Colon), defaultValueDescription, rightAlignOfLeft, leftAlignOfRight, terminalWidth, false), sys2.newLine);
           }
         }
-        text3.push(sys2.newLine);
+        text4.push(sys2.newLine);
       } else {
-        text3.push(colors.blue(name3), sys2.newLine);
+        text4.push(colors.blue(name3), sys2.newLine);
         if (option.description) {
           const description3 = getDiagnosticText(option.description);
-          text3.push(description3);
+          text4.push(description3);
         }
-        text3.push(sys2.newLine);
+        text4.push(sys2.newLine);
         if (showAdditionalInfoOutput(valueCandidates, option)) {
           if (valueCandidates) {
-            text3.push(`${valueCandidates.valueType} ${valueCandidates.possibleValues}`);
+            text4.push(`${valueCandidates.valueType} ${valueCandidates.possibleValues}`);
           }
           if (defaultValueDescription) {
             if (valueCandidates)
-              text3.push(sys2.newLine);
+              text4.push(sys2.newLine);
             const diagType = getDiagnosticText(Diagnostics.default_Colon);
-            text3.push(`${diagType} ${defaultValueDescription}`);
+            text4.push(`${diagType} ${defaultValueDescription}`);
           }
-          text3.push(sys2.newLine);
+          text4.push(sys2.newLine);
         }
-        text3.push(sys2.newLine);
+        text4.push(sys2.newLine);
       }
-      return text3;
+      return text4;
       function formatDefaultValue(defaultValue, type) {
         return defaultValue !== undefined && typeof type === "object" ? arrayFrom(type.entries()).filter(([, value2]) => value2 === defaultValue).map(([name22]) => name22).join("/") : String(defaultValue);
       }
@@ -204719,8 +204882,8 @@ ${lanes.join(`
     ((ScriptSnapshot2) => {
 
       class StringScriptSnapshot {
-        constructor(text3) {
-          this.text = text3;
+        constructor(text4) {
+          this.text = text4;
         }
         getText(start, end) {
           return start === 0 && end === this.text.length ? this.text : this.text.substring(start, end);
@@ -204732,8 +204895,8 @@ ${lanes.join(`
           return;
         }
       }
-      function fromString(text3) {
-        return new StringScriptSnapshot(text3);
+      function fromString(text4) {
+        return new StringScriptSnapshot(text4);
       }
       ScriptSnapshot2.fromString = fromString;
     })(ScriptSnapshot || (ScriptSnapshot = {}));
@@ -206421,8 +206584,8 @@ ${lanes.join(`
     function makeImport(defaultImport, namedImports, moduleSpecifier, quotePreference, isTypeOnly) {
       return factory.createImportDeclaration(undefined, defaultImport || namedImports ? factory.createImportClause(isTypeOnly ? 156 : undefined, defaultImport, namedImports && namedImports.length ? factory.createNamedImports(namedImports) : undefined) : undefined, typeof moduleSpecifier === "string" ? makeStringLiteral(moduleSpecifier, quotePreference) : moduleSpecifier, undefined);
     }
-    function makeStringLiteral(text3, quotePreference) {
-      return factory.createStringLiteral(text3, quotePreference === 0);
+    function makeStringLiteral(text4, quotePreference) {
+      return factory.createStringLiteral(text4, quotePreference === 0);
     }
     var QuotePreference = /* @__PURE__ */ ((QuotePreference6) => {
       QuotePreference6[QuotePreference6["Single"] = 0] = "Single";
@@ -206553,9 +206716,9 @@ ${lanes.join(`
       }
       return;
     }
-    function isTextWhiteSpaceLike(text3, startPos, endPos) {
+    function isTextWhiteSpaceLike(text4, startPos, endPos) {
       for (let i2 = startPos;i2 < endPos; i2++) {
-        if (!isWhiteSpaceLike(text3.charCodeAt(i2))) {
+        if (!isWhiteSpaceLike(text4.charCodeAt(i2))) {
           return false;
         }
       }
@@ -206608,7 +206771,7 @@ ${lanes.join(`
       let indent3;
       let length2;
       resetWriter();
-      const unknownWrite = (text3) => writeKind(text3, 17);
+      const unknownWrite = (text4) => writeKind(text4, 17);
       return {
         displayParts: () => {
           const finalText = displayParts.length && displayParts[displayParts.length - 1].text;
@@ -206620,15 +206783,15 @@ ${lanes.join(`
           }
           return displayParts;
         },
-        writeKeyword: (text3) => writeKind(text3, 5),
-        writeOperator: (text3) => writeKind(text3, 12),
-        writePunctuation: (text3) => writeKind(text3, 15),
-        writeTrailingSemicolon: (text3) => writeKind(text3, 15),
-        writeSpace: (text3) => writeKind(text3, 16),
-        writeStringLiteral: (text3) => writeKind(text3, 8),
-        writeParameter: (text3) => writeKind(text3, 13),
-        writeProperty: (text3) => writeKind(text3, 14),
-        writeLiteral: (text3) => writeKind(text3, 8),
+        writeKeyword: (text4) => writeKind(text4, 5),
+        writeOperator: (text4) => writeKind(text4, 12),
+        writePunctuation: (text4) => writeKind(text4, 15),
+        writeTrailingSemicolon: (text4) => writeKind(text4, 15),
+        writeSpace: (text4) => writeKind(text4, 16),
+        writeStringLiteral: (text4) => writeKind(text4, 8),
+        writeParameter: (text4) => writeKind(text4, 13),
+        writeProperty: (text4) => writeKind(text4, 14),
+        writeLiteral: (text4) => writeKind(text4, 8),
         writeSymbol,
         writeLine,
         write: unknownWrite,
@@ -206662,19 +206825,19 @@ ${lanes.join(`
           lineStart = false;
         }
       }
-      function writeKind(text3, kind) {
+      function writeKind(text4, kind) {
         if (length2 > absoluteMaximumLength)
           return;
         writeIndent();
-        length2 += text3.length;
-        displayParts.push(displayPart(text3, kind));
+        length2 += text4.length;
+        displayParts.push(displayPart(text4, kind));
       }
-      function writeSymbol(text3, symbol2) {
+      function writeSymbol(text4, symbol2) {
         if (length2 > absoluteMaximumLength)
           return;
         writeIndent();
-        length2 += text3.length;
-        displayParts.push(symbolPart(text3, symbol2));
+        length2 += text4.length;
+        displayParts.push(symbolPart(text4, symbol2));
       }
       function writeLine() {
         if (length2 > absoluteMaximumLength)
@@ -206690,8 +206853,8 @@ ${lanes.join(`
         length2 = 0;
       }
     }
-    function symbolPart(text3, symbol2) {
-      return displayPart(text3, displayPartKind(symbol2));
+    function symbolPart(text4, symbol2) {
+      return displayPart(text4, displayPartKind(symbol2));
       function displayPartKind(symbol22) {
         const flags = symbol22.flags;
         if (flags & 3) {
@@ -206726,8 +206889,8 @@ ${lanes.join(`
         return 17;
       }
     }
-    function displayPart(text3, kind) {
-      return { text: text3, kind: SymbolDisplayPartKind[kind] };
+    function displayPart(text4, kind) {
+      return { text: text4, kind: SymbolDisplayPartKind[kind] };
     }
     function spacePart() {
       return displayPart(" ", 16);
@@ -206741,31 +206904,31 @@ ${lanes.join(`
     function operatorPart(kind) {
       return displayPart(tokenToString(kind), 12);
     }
-    function parameterNamePart(text3) {
-      return displayPart(text3, 13);
+    function parameterNamePart(text4) {
+      return displayPart(text4, 13);
     }
-    function propertyNamePart(text3) {
-      return displayPart(text3, 14);
+    function propertyNamePart(text4) {
+      return displayPart(text4, 14);
     }
-    function textOrKeywordPart(text3) {
-      const kind = stringToToken(text3);
-      return kind === undefined ? textPart(text3) : keywordPart(kind);
+    function textOrKeywordPart(text4) {
+      const kind = stringToToken(text4);
+      return kind === undefined ? textPart(text4) : keywordPart(kind);
     }
-    function textPart(text3) {
-      return displayPart(text3, 17);
+    function textPart(text4) {
+      return displayPart(text4, 17);
     }
-    function typeAliasNamePart(text3) {
-      return displayPart(text3, 0);
+    function typeAliasNamePart(text4) {
+      return displayPart(text4, 0);
     }
-    function typeParameterNamePart(text3) {
-      return displayPart(text3, 18);
+    function typeParameterNamePart(text4) {
+      return displayPart(text4, 18);
     }
-    function linkTextPart(text3) {
-      return displayPart(text3, 24);
+    function linkTextPart(text4) {
+      return displayPart(text4, 24);
     }
-    function linkNamePart(text3, target) {
+    function linkNamePart(text4, target) {
       return {
-        text: text3,
+        text: text4,
         kind: SymbolDisplayPartKind[23],
         target: {
           fileName: getSourceFileOfNode(target).fileName,
@@ -206773,8 +206936,8 @@ ${lanes.join(`
         }
       };
     }
-    function linkPart(text3) {
-      return displayPart(text3, 22);
+    function linkPart(text4) {
+      return displayPart(text4, 22);
     }
     function buildLinkParts(link, checker) {
       var _a7;
@@ -206789,45 +206952,45 @@ ${lanes.join(`
         const targetSymbol = symbol2 && checker ? getSymbolTarget(symbol2, checker) : undefined;
         const suffix = findLinkNameEnd(link.text);
         const name3 = getTextOfNode(link.name) + link.text.slice(0, suffix);
-        const text3 = skipSeparatorFromLinkText(link.text.slice(suffix));
+        const text4 = skipSeparatorFromLinkText(link.text.slice(suffix));
         const decl = (targetSymbol == null ? undefined : targetSymbol.valueDeclaration) || ((_a7 = targetSymbol == null ? undefined : targetSymbol.declarations) == null ? undefined : _a7[0]);
         if (decl) {
           parts.push(linkNamePart(name3, decl));
-          if (text3)
-            parts.push(linkTextPart(text3));
+          if (text4)
+            parts.push(linkTextPart(text4));
         } else {
           const separator = suffix === 0 || link.text.charCodeAt(suffix) === 124 && name3.charCodeAt(name3.length - 1) !== 32 ? " " : "";
-          parts.push(linkTextPart(name3 + separator + text3));
+          parts.push(linkTextPart(name3 + separator + text4));
         }
       }
       parts.push(linkPart("}"));
       return parts;
     }
-    function skipSeparatorFromLinkText(text3) {
+    function skipSeparatorFromLinkText(text4) {
       let pos = 0;
-      if (text3.charCodeAt(pos++) === 124) {
-        while (pos < text3.length && text3.charCodeAt(pos) === 32)
+      if (text4.charCodeAt(pos++) === 124) {
+        while (pos < text4.length && text4.charCodeAt(pos) === 32)
           pos++;
-        return text3.slice(pos);
+        return text4.slice(pos);
       }
-      return text3;
+      return text4;
     }
-    function findLinkNameEnd(text3) {
-      let pos = text3.indexOf("://");
+    function findLinkNameEnd(text4) {
+      let pos = text4.indexOf("://");
       if (pos === 0) {
-        while (pos < text3.length && text3.charCodeAt(pos) !== 124)
+        while (pos < text4.length && text4.charCodeAt(pos) !== 124)
           pos++;
         return pos;
       }
-      if (text3.indexOf("()") === 0)
+      if (text4.indexOf("()") === 0)
         return 2;
-      if (text3.charAt(0) === "<") {
+      if (text4.charAt(0) === "<") {
         let brackets2 = 0;
         let i2 = 0;
-        while (i2 < text3.length) {
-          if (text3[i2] === "<")
+        while (i2 < text4.length) {
+          if (text4[i2] === "<")
             brackets2++;
-          if (text3[i2] === ">")
+          if (text4[i2] === ">")
             brackets2--;
           i2++;
           if (!brackets2)
@@ -206894,33 +207057,33 @@ ${lanes.join(`
     function getUniqueSymbolId(symbol2, checker) {
       return getSymbolId(skipAlias(symbol2, checker));
     }
-    function getFirstNonSpaceCharacterPosition(text3, position) {
-      while (isWhiteSpaceLike(text3.charCodeAt(position))) {
+    function getFirstNonSpaceCharacterPosition(text4, position) {
+      while (isWhiteSpaceLike(text4.charCodeAt(position))) {
         position += 1;
       }
       return position;
     }
-    function getPrecedingNonSpaceCharacterPosition(text3, position) {
-      while (position > -1 && isWhiteSpaceSingleLine(text3.charCodeAt(position))) {
+    function getPrecedingNonSpaceCharacterPosition(text4, position) {
+      while (position > -1 && isWhiteSpaceSingleLine(text4.charCodeAt(position))) {
         position -= 1;
       }
       return position + 1;
     }
     function copyComments(sourceNode, targetNode) {
       const sourceFile = sourceNode.getSourceFile();
-      const text3 = sourceFile.text;
-      if (hasLeadingLineBreak(sourceNode, text3)) {
+      const text4 = sourceFile.text;
+      if (hasLeadingLineBreak(sourceNode, text4)) {
         copyLeadingComments(sourceNode, targetNode, sourceFile);
       } else {
         copyTrailingAsLeadingComments(sourceNode, targetNode, sourceFile);
       }
       copyTrailingComments(sourceNode, targetNode, sourceFile);
     }
-    function hasLeadingLineBreak(node, text3) {
+    function hasLeadingLineBreak(node, text4) {
       const start = node.getFullStart();
       const end = node.getStart();
       for (let i2 = start;i2 < end; i2++) {
-        if (text3.charCodeAt(i2) === 10)
+        if (text4.charCodeAt(i2) === 10)
           return true;
       }
       return false;
@@ -207001,9 +207164,9 @@ ${lanes.join(`
           return checker.getContextualType(node, contextFlags);
       }
     }
-    function quote6(sourceFile, preferences, text3) {
+    function quote6(sourceFile, preferences, text4) {
       const quotePreference = getQuotePreference(sourceFile, preferences);
-      const quoted3 = JSON.stringify(text3);
+      const quoted3 = JSON.stringify(text4);
       return quotePreference === 0 ? `'${stripQuotes(quoted3).replace(/'/g, () => "\\'").replace(/\\"/g, '"')}'` : quoted3;
     }
     function isEqualityOperatorKind(kind) {
@@ -207358,7 +207521,7 @@ ${lanes.join(`
       }
     }
     function consumesNodeCoreModules(sourceFile) {
-      return some(sourceFile.imports, ({ text: text3 }) => nodeCoreModules.has(text3));
+      return some(sourceFile.imports, ({ text: text4 }) => nodeCoreModules.has(text4));
     }
     function isInsideNodeModules(fileOrDirectory) {
       return contains2(getPathComponents(fileOrDirectory), "node_modules");
@@ -208046,20 +208209,20 @@ ${lanes.join(`
     }
     function createClassifier() {
       const scanner2 = createScanner(99, false);
-      function getClassificationsForLine(text3, lexState, syntacticClassifierAbsent) {
-        return convertClassificationsToResult(getEncodedLexicalClassifications(text3, lexState, syntacticClassifierAbsent), text3);
+      function getClassificationsForLine(text4, lexState, syntacticClassifierAbsent) {
+        return convertClassificationsToResult(getEncodedLexicalClassifications(text4, lexState, syntacticClassifierAbsent), text4);
       }
-      function getEncodedLexicalClassifications(text3, lexState, syntacticClassifierAbsent) {
+      function getEncodedLexicalClassifications(text4, lexState, syntacticClassifierAbsent) {
         let token2 = 0;
         let lastNonTriviaToken = 0;
         const templateStack = [];
         const { prefix: prefix2, pushTemplate } = getPrefixFromLexState(lexState);
-        text3 = prefix2 + text3;
+        text4 = prefix2 + text4;
         const offset = prefix2.length;
         if (pushTemplate) {
           templateStack.push(16);
         }
-        scanner2.setText(text3);
+        scanner2.setText(text4);
         let endOfLineState = 0;
         const spans = [];
         let angleBracketStack = 0;
@@ -208071,7 +208234,7 @@ ${lanes.join(`
           }
           const end = scanner2.getTokenEnd();
           pushEncodedClassification(scanner2.getTokenStart(), end, offset, classFromKind(token2), spans);
-          if (end >= text3.length) {
+          if (end >= text4.length) {
             const end2 = getNewEndOfLineState(scanner2, token2, lastOrUndefined(templateStack));
             if (end2 !== undefined) {
               endOfLineState = end2;
@@ -208205,7 +208368,7 @@ ${lanes.join(`
         result.push(start - offset, length2, classification);
       }
     }
-    function convertClassificationsToResult(classifications, text3) {
+    function convertClassificationsToResult(classifications, text4) {
       const entries = [];
       const dense = classifications.spans;
       let lastEnd = 0;
@@ -208222,7 +208385,7 @@ ${lanes.join(`
         entries.push({ length: length2, classification: convertClassification(type) });
         lastEnd = start + length2;
       }
-      const whitespaceLength = text3.length - lastEnd;
+      const whitespaceLength = text4.length - lastEnd;
       if (whitespaceLength > 0) {
         entries.push({ length: whitespaceLength, classification: 4 });
       }
@@ -208559,14 +208722,14 @@ ${lanes.join(`
               triviaScanner.resetTokenState(end);
               continue;
             case 7:
-              const text3 = sourceFile.text;
-              const ch = text3.charCodeAt(start);
+              const text4 = sourceFile.text;
+              const ch = text4.charCodeAt(start);
               if (ch === 60 || ch === 62) {
                 pushClassification(start, width, 1);
                 continue;
               }
               Debug.assert(ch === 124 || ch === 61);
-              classifyDisabledMergeCode(text3, start, end);
+              classifyDisabledMergeCode(text4, start, end);
               break;
             case 6:
               break;
@@ -208686,8 +208849,8 @@ ${lanes.join(`
       function tryClassifyTripleSlashComment(start, width) {
         const tripleSlashXMLCommentRegEx = /^(\/\/\/\s*)(<)(?:(\S+)((?:[^/]|\/[^>])*)(\/>)?)?/m;
         const attributeRegex = /(\s)(\S+)(\s*)(=)(\s*)('[^']+'|"[^"]+")/g;
-        const text3 = sourceFile.text.substr(start, width);
-        const match2 = tripleSlashXMLCommentRegEx.exec(text3);
+        const text4 = sourceFile.text.substr(start, width);
+        const match2 = tripleSlashXMLCommentRegEx.exec(text4);
         if (!match2) {
           return false;
         }
@@ -208747,10 +208910,10 @@ ${lanes.join(`
           processElement(child);
         }
       }
-      function classifyDisabledMergeCode(text3, start, end) {
+      function classifyDisabledMergeCode(text4, start, end) {
         let i2;
         for (i2 = start;i2 < end; i2++) {
-          if (isLineBreak(text3.charCodeAt(i2))) {
+          if (isLineBreak(text4.charCodeAt(i2))) {
             break;
           }
         }
@@ -209795,10 +209958,10 @@ ${lanes.join(`
         currentCandidate++;
       }
     }
-    function createSegment(text3) {
+    function createSegment(text4) {
       return {
-        totalTextChunk: createTextChunk(text3),
-        subWordTextChunks: breakPatternIntoTextChunks(text3)
+        totalTextChunk: createTextChunk(text4),
+        subWordTextChunks: breakPatternIntoTextChunks(text4)
       };
     }
     function isUpperCaseLetter(ch) {
@@ -209868,13 +210031,13 @@ ${lanes.join(`
       }
       return result;
     }
-    function createTextChunk(text3) {
-      const textLowerCase = text3.toLowerCase();
+    function createTextChunk(text4) {
+      const textLowerCase = text4.toLowerCase();
       return {
-        text: text3,
+        text: text4,
         textLowerCase,
-        isLowerCase: text3 === textLowerCase,
-        characterSpans: breakIntoCharacterSpans(text3)
+        isLowerCase: text4 === textLowerCase,
+        characterSpans: breakIntoCharacterSpans(text4)
       };
     }
     function breakIntoCharacterSpans(identifier) {
@@ -210350,8 +210513,8 @@ ${lanes.join(`
           sourceFileLike.set(path, false);
           return;
         }
-        const text3 = host.readFile(fileName);
-        const file2 = text3 ? createSourceFileLike(text3) : false;
+        const text4 = host.readFile(fileName);
+        const file2 = text4 ? createSourceFileLike(text4) : false;
         sourceFileLike.set(path, file2);
         return file2 ? file2 : undefined;
       }
@@ -210406,9 +210569,9 @@ ${lanes.join(`
         return;
       return createDocumentPositionMapper(host, map22, mapFileName);
     }
-    function createSourceFileLike(text3, lineMap) {
+    function createSourceFileLike(text4, lineMap) {
       return {
-        text: text3,
+        text: text4,
         lineMap,
         getLineAndCharacterOfPosition(pos) {
           return computeLineAndCharacterOfPosition(getLineStarts(this), pos);
@@ -210669,13 +210832,13 @@ interface Symbol {
       const newLine = getNewLineCharacter(options2);
       const compilerHost = {
         getSourceFile: (fileName) => fileName === normalizePath(inputFileName) ? sourceFile : fileName === normalizePath(barebonesLibName) ? barebonesLibSourceFile : undefined,
-        writeFile: (name3, text3) => {
+        writeFile: (name3, text4) => {
           if (fileExtensionIs(name3, ".map")) {
             Debug.assertEqual(sourceMapText, undefined, "Unexpected multiple source map outputs, file:", name3);
-            sourceMapText = text3;
+            sourceMapText = text4;
           } else {
             Debug.assertEqual(outputText, undefined, "Unexpected multiple outputs, file:", name3);
-            outputText = text3;
+            outputText = text4;
           }
         },
         getDefaultLibFileName: () => barebonesLibName,
@@ -211364,9 +211527,9 @@ interface Symbol {
         return cleanText(getModuleName(node));
       }
       if (name3) {
-        const text3 = isIdentifier(name3) ? name3.text : isElementAccessExpression(name3) ? `[${nodeText(name3.argumentExpression)}]` : nodeText(name3);
-        if (text3.length > 0) {
-          return cleanText(text3);
+        const text4 = isIdentifier(name3) ? name3.text : isElementAccessExpression(name3) ? `[${nodeText(name3.argumentExpression)}]` : nodeText(name3);
+        if (text4.length > 0) {
+          return cleanText(text4);
         }
       }
       switch (node.kind) {
@@ -211568,9 +211731,9 @@ interface Symbol {
           return false;
       }
     }
-    function cleanText(text3) {
-      text3 = text3.length > maxLength ? text3.substring(0, maxLength) + "..." : text3;
-      return text3.replace(/\\?(?:\r?\n|[\r\u2028\u2029])/g, "");
+    function cleanText(text4) {
+      text4 = text4.length > maxLength ? text4.substring(0, maxLength) + "..." : text4;
+      return text4.replace(/\\?(?:\r?\n|[\r\u2028\u2029])/g, "");
     }
     var ts_refactor_exports = {};
     __export2(ts_refactor_exports, {
@@ -214300,23 +214463,23 @@ ${newComment.split(`
     }
     function concatConsecutiveString(index2, nodes) {
       const indexes = [];
-      let text3 = "", rawText = "";
+      let text4 = "", rawText = "";
       while (index2 < nodes.length) {
         const node = nodes[index2];
         if (isStringLiteralLike(node)) {
-          text3 += node.text;
+          text4 += node.text;
           rawText += escapeRawStringForTemplate(getTextOfNode(node).slice(1, -1));
           indexes.push(index2);
           index2++;
         } else if (isTemplateExpression(node)) {
-          text3 += node.head.text;
+          text4 += node.head.text;
           rawText += getRawTextOfTemplate(node.head);
           break;
         } else {
           break;
         }
       }
-      return [index2, text3, rawText, indexes];
+      return [index2, text4, rawText, indexes];
     }
     function nodesToTemplate({ nodes, operators }, file2) {
       const copyOperatorComments = copyTrailingOperatorComments(operators, file2);
@@ -214340,9 +214503,9 @@ ${newComment.split(`
           const spans = map2(currentNode.templateSpans, (span, index2) => {
             copyExpressionComments(span);
             const isLastSpan = index2 === currentNode.templateSpans.length - 1;
-            const text3 = span.literal.text + (isLastSpan ? subsequentText : "");
+            const text4 = span.literal.text + (isLastSpan ? subsequentText : "");
             const rawText = getRawTextOfTemplate(span.literal) + (isLastSpan ? rawSubsequentText : "");
-            return factory.createTemplateSpan(span.expression, isLast && isLastSpan ? factory.createTemplateTail(text3, rawText) : factory.createTemplateMiddle(text3, rawText));
+            return factory.createTemplateSpan(span.expression, isLast && isLastSpan ? factory.createTemplateTail(text4, rawText) : factory.createTemplateMiddle(text4, rawText));
           });
           templateSpans.push(...spans);
         } else {
@@ -216918,9 +217081,9 @@ ${newComment.split(`
       }
     };
     var SourceMapSourceObject = class {
-      constructor(fileName, text3, skipTrivia2) {
+      constructor(fileName, text4, skipTrivia2) {
         this.fileName = fileName;
-        this.text = text3;
+        this.text = text4;
         this.skipTrivia = skipTrivia2 || ((pos) => pos);
       }
       getLineAndCharacterOfPosition(pos) {
@@ -218035,7 +218198,7 @@ ${newComment.split(`
         var _a22;
         const sourceFile = syntaxTreeCache.getCurrentSourceFile(fileName);
         const textChanges2 = [];
-        const { text: text3 } = sourceFile;
+        const { text: text4 } = sourceFile;
         let hasComment = false;
         let isCommenting = insertComment || false;
         const positions = [];
@@ -218046,7 +218209,7 @@ ${newComment.split(`
         const openMultilineRegex = isJsx ? "\\{\\/\\*" : "\\/\\*";
         const closeMultilineRegex = isJsx ? "\\*\\/\\}" : "\\*\\/";
         while (pos <= textRange.end) {
-          const offset = text3.substr(pos, openMultiline.length) === openMultiline ? openMultiline.length : 0;
+          const offset = text4.substr(pos, openMultiline.length) === openMultiline ? openMultiline.length : 0;
           const commentRange = isInComment(sourceFile, pos + offset);
           if (commentRange) {
             if (isJsx) {
@@ -218060,8 +218223,8 @@ ${newComment.split(`
             hasComment = true;
             pos = commentRange.end + 1;
           } else {
-            const newPos = text3.substring(pos, textRange.end).search(`(${openMultilineRegex})|(${closeMultilineRegex})`);
-            isCommenting = insertComment !== undefined ? insertComment : isCommenting || !isTextWhiteSpaceLike(text3, pos, newPos === -1 ? textRange.end : pos + newPos);
+            const newPos = text4.substring(pos, textRange.end).search(`(${openMultilineRegex})|(${closeMultilineRegex})`);
+            isCommenting = insertComment !== undefined ? insertComment : isCommenting || !isTextWhiteSpaceLike(text4, pos, newPos === -1 ? textRange.end : pos + newPos);
             pos = newPos === -1 ? textRange.end + 1 : pos + newPos + closeMultiline.length;
           }
         }
@@ -218071,7 +218234,7 @@ ${newComment.split(`
           }
           insertSorted(positions, textRange.end, compareValues);
           const firstPos = positions[0];
-          if (text3.substr(firstPos, openMultiline.length) !== openMultiline) {
+          if (text4.substr(firstPos, openMultiline.length) !== openMultiline) {
             textChanges2.push({
               newText: openMultiline,
               span: {
@@ -218081,7 +218244,7 @@ ${newComment.split(`
             });
           }
           for (let i2 = 1;i2 < positions.length - 1; i2++) {
-            if (text3.substr(positions[i2] - closeMultiline.length, closeMultiline.length) !== closeMultiline) {
+            if (text4.substr(positions[i2] - closeMultiline.length, closeMultiline.length) !== closeMultiline) {
               textChanges2.push({
                 newText: closeMultiline,
                 span: {
@@ -218090,7 +218253,7 @@ ${newComment.split(`
                 }
               });
             }
-            if (text3.substr(positions[i2], openMultiline.length) !== openMultiline) {
+            if (text4.substr(positions[i2], openMultiline.length) !== openMultiline) {
               textChanges2.push({
                 newText: openMultiline,
                 span: {
@@ -218112,7 +218275,7 @@ ${newComment.split(`
         } else {
           for (const pos2 of positions) {
             const from = pos2 - closeMultiline.length > 0 ? pos2 - closeMultiline.length : 0;
-            const offset = text3.substr(from, closeMultiline.length) === closeMultiline ? closeMultiline.length : 0;
+            const offset = text4.substr(from, closeMultiline.length) === closeMultiline ? closeMultiline.length : 0;
             textChanges2.push({
               newText: "",
               span: {
@@ -218409,11 +218572,11 @@ ${newComment.split(`
       const nameTable = sourceFile.nameTable = /* @__PURE__ */ new Map;
       sourceFile.forEachChild(function walk(node) {
         if (isIdentifier(node) && !isTagName(node) && node.escapedText || isStringOrNumericLiteralLike(node) && literalIsName(node)) {
-          const text3 = getEscapedTextOfIdentifierOrLiteral(node);
-          nameTable.set(text3, nameTable.get(text3) === undefined ? node.pos : -1);
+          const text4 = getEscapedTextOfIdentifierOrLiteral(node);
+          nameTable.set(text4, nameTable.get(text4) === undefined ? node.pos : -1);
         } else if (isPrivateIdentifier(node)) {
-          const text3 = node.escapedText;
-          nameTable.set(text3, nameTable.get(text3) === undefined ? node.pos : -1);
+          const text4 = node.escapedText;
+          nameTable.set(text4, nameTable.get(text4) === undefined ? node.pos : -1);
         }
         forEachChild(node, walk);
         if (hasJSDocNodes(node)) {
@@ -219030,19 +219193,19 @@ ${newComment.split(`
         return { text: `${prefix2}static {}`, pos, end };
       }
       const declName = isAssignedExpression(node) ? node.parent.name : Debug.checkDefined(getNameOfDeclaration(node), "Expected call hierarchy item to have a name");
-      let text3 = isIdentifier(declName) ? idText(declName) : isStringOrNumericLiteralLike(declName) ? declName.text : isComputedPropertyName(declName) ? isStringOrNumericLiteralLike(declName.expression) ? declName.expression.text : undefined : undefined;
-      if (text3 === undefined) {
+      let text4 = isIdentifier(declName) ? idText(declName) : isStringOrNumericLiteralLike(declName) ? declName.text : isComputedPropertyName(declName) ? isStringOrNumericLiteralLike(declName.expression) ? declName.expression.text : undefined : undefined;
+      if (text4 === undefined) {
         const typeChecker = program.getTypeChecker();
         const symbol2 = typeChecker.getSymbolAtLocation(declName);
         if (symbol2) {
-          text3 = typeChecker.symbolToString(symbol2, node);
+          text4 = typeChecker.symbolToString(symbol2, node);
         }
       }
-      if (text3 === undefined) {
+      if (text4 === undefined) {
         const printer = createPrinterWithRemoveCommentsOmitTrailingSemicolon();
-        text3 = usingSingleLineStringWriter((writer) => printer.writeNode(4, node, node.getSourceFile(), writer));
+        text4 = usingSingleLineStringWriter((writer) => printer.writeNode(4, node, node.getSourceFile(), writer));
       }
-      return { text: text3, pos: declName.getStart(), end: declName.getEnd() };
+      return { text: text4, pos: declName.getStart(), end: declName.getEnd() };
     }
     function getCallHierarchItemContainerName(node) {
       var _a7, _b, _c, _d;
@@ -220226,22 +220389,22 @@ ${newComment.split(`
         if (isJSDocIndexSignature(node)) {
           return transformJSDocIndexSignature(node);
         }
-        let text3 = node.typeName.text;
+        let text4 = node.typeName.text;
         switch (node.typeName.text) {
           case "String":
           case "Boolean":
           case "Object":
           case "Number":
-            text3 = text3.toLowerCase();
+            text4 = text4.toLowerCase();
             break;
           case "array":
           case "date":
           case "promise":
-            text3 = text3[0].toUpperCase() + text3.slice(1);
+            text4 = text4[0].toUpperCase() + text4.slice(1);
             break;
         }
-        name3 = factory.createIdentifier(text3);
-        if ((text3 === "Array" || text3 === "Promise") && !node.typeArguments) {
+        name3 = factory.createIdentifier(text4);
+        if ((text4 === "Array" || text4 === "Promise") && !node.typeArguments) {
           args = factory.createNodeArray([factory.createTypeReferenceNode("any", emptyArray)]);
         } else {
           args = visitNodes2(node.typeArguments, transformJSDocType, isTypeNode);
@@ -221060,9 +221223,9 @@ ${newComment.split(`
     function collectExportRenames(sourceFile, checker, identifiers) {
       const res = /* @__PURE__ */ new Map;
       forEachExportReference(sourceFile, (node) => {
-        const { text: text3 } = node.name;
-        if (!res.has(text3) && (isIdentifierANonContextualKeyword(node.name) || checker.resolveName(text3, node, 111551, true))) {
-          res.set(text3, makeUniqueName(`_${text3}`, identifiers));
+        const { text: text4 } = node.name;
+        if (!res.has(text4) && (isIdentifierANonContextualKeyword(node.name) || checker.resolveName(text4, node, 111551, true))) {
+          res.set(text4, makeUniqueName(`_${text4}`, identifiers));
         }
       });
       return res;
@@ -221072,8 +221235,8 @@ ${newComment.split(`
         if (isAssignmentLhs) {
           return;
         }
-        const { text: text3 } = node.name;
-        changes.replaceNode(sourceFile, node, factory.createIdentifier(exports2.get(text3) || text3));
+        const { text: text4 } = node.name;
+        changes.replaceNode(sourceFile, node, factory.createIdentifier(exports2.get(text4) || text4));
       });
     }
     function forEachExportReference(sourceFile, cb) {
@@ -221197,12 +221360,12 @@ ${newComment.split(`
       return statements && [statements, false];
     }
     function convertNamedExport(sourceFile, assignment, changes, exports2) {
-      const { text: text3 } = assignment.left.name;
-      const rename4 = exports2.get(text3);
+      const { text: text4 } = assignment.left.name;
+      const rename4 = exports2.get(text4);
       if (rename4 !== undefined) {
         const newNodes = [
           makeConst(undefined, rename4, assignment.right),
-          makeExportDeclaration([factory.createExportSpecifier(false, rename4, text3)])
+          makeExportDeclaration([factory.createExportSpecifier(false, rename4, text4)])
         ];
         changes.replaceNodeWithNodes(sourceFile, assignment.parent, newNodes);
       } else {
@@ -224760,9 +224923,9 @@ ${newComment.split(`
         const implementsToken = heritageClauses[1].getFirstToken();
         const implementsFullStart = implementsToken.getFullStart();
         changes.replaceRange(sourceFile, { pos: implementsFullStart, end: implementsFullStart }, factory.createToken(28));
-        const text3 = sourceFile.text;
+        const text4 = sourceFile.text;
         let end = implementsToken.end;
-        while (end < text3.length && isWhiteSpaceSingleLine(text3.charCodeAt(end))) {
+        while (end < text4.length && isWhiteSpaceSingleLine(text4.charCodeAt(end))) {
           end++;
         }
         changes.deleteRange(sourceFile, { pos: implementsToken.getStart(), end });
@@ -227674,8 +227837,8 @@ ${newComment.split(`
     function createStubbedMethodBody(quotePreference) {
       return createStubbedBody(Diagnostics.Method_not_implemented.message, quotePreference);
     }
-    function createStubbedBody(text3, quotePreference) {
-      return factory.createBlock([factory.createThrowStatement(factory.createNewExpression(factory.createIdentifier("Error"), undefined, [factory.createStringLiteral(text3, quotePreference === 0)]))], true);
+    function createStubbedBody(text4, quotePreference) {
+      return factory.createBlock([factory.createThrowStatement(factory.createNewExpression(factory.createIdentifier("Error"), undefined, [factory.createStringLiteral(text4, quotePreference === 0)]))], true);
     }
     function setJsonCompilerOptionValues(changeTracker, configFile, options2) {
       const tsconfigObjectLiteral = getTsConfigObjectLiteralExpression(configFile);
@@ -229523,12 +229686,12 @@ ${newComment.split(`
         ...includeSymbol ? { symbol: symbol2 } : undefined
       };
     }
-    function generateIdentifierForArbitraryString(text3, languageVersion) {
+    function generateIdentifierForArbitraryString(text4, languageVersion) {
       let needsUnderscore = false;
       let identifier = "";
       let ch;
-      for (let i2 = 0;i2 < text3.length; i2 += ch !== undefined && ch >= 65536 ? 2 : 1) {
-        ch = text3.codePointAt(i2);
+      for (let i2 = 0;i2 < text4.length; i2 += ch !== undefined && ch >= 65536 ? 2 : 1) {
+        ch = text4.codePointAt(i2);
         if (ch !== undefined && (i2 === 0 ? isIdentifierStart(ch, languageVersion) : isIdentifierPart(ch, languageVersion))) {
           if (needsUnderscore)
             identifier += "_";
@@ -231441,8 +231604,8 @@ ${newComment.split(`
       }
       function isDotOfNumericLiteral(contextToken2) {
         if (contextToken2.kind === 9) {
-          const text3 = contextToken2.getFullText();
-          return text3.charAt(text3.length - 1) === ".";
+          const text4 = contextToken2.getFullText();
+          return text4.charAt(text4.length - 1) === ".";
         }
         return false;
       }
@@ -232477,9 +232640,9 @@ ${newComment.split(`
     function directoryResult(name3) {
       return nameAndKind(name3, "directory", undefined);
     }
-    function addReplacementSpans(text3, textStart, names) {
-      const span = getDirectoryFragmentTextSpan(text3, textStart);
-      const wholeSpan = text3.length === 0 ? undefined : createTextSpan(textStart, text3.length);
+    function addReplacementSpans(text4, textStart, names) {
+      const span = getDirectoryFragmentTextSpan(text4, textStart);
+      const wholeSpan = text4.length === 0 ? undefined : createTextSpan(textStart, text4.length);
       return names.map(({ name: name3, kind, extension }) => name3.includes(directorySeparator) || name3.includes(altDirectorySeparator) ? { name: name3, kind, extension, span: wholeSpan } : { name: name3, kind, extension, span });
     }
     function getStringLiteralCompletionsFromModuleNames(sourceFile, node, program, host, preferences) {
@@ -232890,8 +233053,8 @@ ${newComment.split(`
       if (!range) {
         return;
       }
-      const text3 = sourceFile.text.slice(range.pos, position);
-      const match2 = tripleSlashDirectiveFragmentRegex.exec(text3);
+      const text4 = sourceFile.text.slice(range.pos, position);
+      const match2 = tripleSlashDirectiveFragmentRegex.exec(text4);
       if (!match2) {
         return;
       }
@@ -232953,11 +233116,11 @@ ${newComment.split(`
       }
       return result;
     }
-    function getDirectoryFragmentTextSpan(text3, textStart) {
-      const index2 = Math.max(text3.lastIndexOf(directorySeparator), text3.lastIndexOf(altDirectorySeparator));
+    function getDirectoryFragmentTextSpan(text4, textStart) {
+      const index2 = Math.max(text4.lastIndexOf(directorySeparator), text4.lastIndexOf(altDirectorySeparator));
       const offset = index2 !== -1 ? index2 + 1 : 0;
-      const length2 = text3.length - offset;
-      return length2 === 0 || isIdentifierText(text3.substr(offset, length2), 99) ? undefined : createTextSpan(textStart + offset, length2);
+      const length2 = text4.length - offset;
+      return length2 === 0 || isIdentifierText(text4.substr(offset, length2), 99) ? undefined : createTextSpan(textStart + offset, length2);
     }
     function isPathRelativeToScript(path) {
       if (path && path.length >= 2 && path.charCodeAt(0) === 46) {
@@ -234285,12 +234448,12 @@ ${newComment.split(`
         }
         createSearch(location2, symbol2, comingFrom, searchOptions = {}) {
           const {
-            text: text3 = stripQuotes(symbolName(getLocalSymbolForExportDefault(symbol2) || getNonModuleSymbolOfMergedModuleSymbol(symbol2) || symbol2)),
+            text: text4 = stripQuotes(symbolName(getLocalSymbolForExportDefault(symbol2) || getNonModuleSymbolOfMergedModuleSymbol(symbol2) || symbol2)),
             allSearchSymbols = [symbol2]
           } = searchOptions;
-          const escapedText = escapeLeadingUnderscores(text3);
+          const escapedText = escapeLeadingUnderscores(text4);
           const parents = this.options.implementations && location2 ? getParentSymbolsOfPropertyAccess(location2, symbol2, this.checker) : undefined;
-          return { symbol: symbol2, comingFrom, text: text3, escapedText, parents, allSearchSymbols, includes: (sym) => contains2(allSearchSymbols, sym) };
+          return { symbol: symbol2, comingFrom, text: text4, escapedText, parents, allSearchSymbols, includes: (sym) => contains2(allSearchSymbols, sym) };
         }
         referenceAdder(searchSymbol) {
           const symbolId = getSymbolId(searchSymbol);
@@ -234511,18 +234674,18 @@ ${newComment.split(`
         if (!symbolName2 || !symbolName2.length) {
           return positions;
         }
-        const text3 = sourceFile.text;
-        const sourceLength = text3.length;
+        const text4 = sourceFile.text;
+        const sourceLength = text4.length;
         const symbolNameLength = symbolName2.length;
-        let position = text3.indexOf(symbolName2, container.pos);
+        let position = text4.indexOf(symbolName2, container.pos);
         while (position >= 0) {
           if (position > container.end)
             break;
           const endPosition = position + symbolNameLength;
-          if ((position === 0 || !isIdentifierPart(text3.charCodeAt(position - 1), 99)) && (endPosition === sourceLength || !isIdentifierPart(text3.charCodeAt(endPosition), 99))) {
+          if ((position === 0 || !isIdentifierPart(text4.charCodeAt(position - 1), 99)) && (endPosition === sourceLength || !isIdentifierPart(text4.charCodeAt(endPosition), 99))) {
             positions.push(position);
           }
-          position = text3.indexOf(symbolName2, position + symbolNameLength + 1);
+          position = text4.indexOf(symbolName2, position + symbolNameLength + 1);
         }
         return positions;
       }
@@ -235753,8 +235916,8 @@ ${newComment.split(`
       function isSignatureSupportingReturnAnnotation(node) {
         return isArrowFunction(node) || isFunctionExpression(node) || isFunctionDeclaration(node) || isMethodDeclaration(node) || isGetAccessorDeclaration(node);
       }
-      function addParameterHints(text3, parameter, position, isFirstVariadicArgument) {
-        let hintText = `${isFirstVariadicArgument ? "..." : ""}${text3}`;
+      function addParameterHints(text4, parameter, position, isFirstVariadicArgument) {
+        let hintText = `${isFirstVariadicArgument ? "..." : ""}${text4}`;
         let displayParts;
         if (shouldUseInteractiveInlayHints(preferences)) {
           displayParts = [getNodeDisplayPart(hintText, parameter), { text: ":" }];
@@ -235779,9 +235942,9 @@ ${newComment.split(`
           whitespaceBefore: true
         });
       }
-      function addEnumMemberValueHints(text3, position) {
+      function addEnumMemberValueHints(text4, position) {
         result.push({
-          text: `= ${text3}`,
+          text: `= ${text4}`,
           position,
           kind: "Enum",
           whitespaceBefore: true
@@ -236439,10 +236602,10 @@ ${newComment.split(`
         }
         return true;
       }
-      function getNodeDisplayPart(text3, node) {
+      function getNodeDisplayPart(text4, node) {
         const sourceFile = node.getSourceFile();
         return {
-          text: text3,
+          text: text4,
           span: createTextSpanFromNode(node, sourceFile),
           file: sourceFile.fileName
         };
@@ -236785,12 +236948,12 @@ ${newComment.split(`
       return { newText: openComment + closeComment, caretOffset: 3 };
     }
     function getIndentationStringAtPosition(sourceFile, position) {
-      const { text: text3 } = sourceFile;
+      const { text: text4 } = sourceFile;
       const lineStart = getLineStartPositionForPosition(position, sourceFile);
       let pos = lineStart;
-      for (;pos <= position && isWhiteSpaceSingleLine(text3.charCodeAt(pos)); pos++)
+      for (;pos <= position && isWhiteSpaceSingleLine(text4.charCodeAt(pos)); pos++)
         ;
-      return text3.slice(lineStart, pos);
+      return text4.slice(lineStart, pos);
     }
     function parameterDocComments(parameters, isJavaScriptFile, indentationStr, newLine) {
       return parameters.map(({ name: name3, dotDotDotToken }, i2) => {
@@ -239474,13 +239637,13 @@ ${content}
       TrailingTriviaOption2[TrailingTriviaOption2["Include"] = 2] = "Include";
       return TrailingTriviaOption2;
     })(TrailingTriviaOption || {});
-    function skipWhitespacesAndLineBreaks(text3, start) {
-      return skipTrivia(text3, start, false, true);
+    function skipWhitespacesAndLineBreaks(text4, start) {
+      return skipTrivia(text4, start, false, true);
     }
-    function hasCommentsBeforeLineBreak(text3, start) {
+    function hasCommentsBeforeLineBreak(text4, start) {
       let i2 = start;
-      while (i2 < text3.length) {
-        const ch = text3.charCodeAt(i2);
+      while (i2 < text4.length) {
+        const ch = text4.charCodeAt(i2);
         if (isWhiteSpaceSingleLine(ch)) {
           i2++;
           continue;
@@ -239654,8 +239817,8 @@ ${content}
       replaceNodeWithNodes(sourceFile, oldNode, newNodes, options2 = useNonAdjustedPositions) {
         this.replaceRangeWithNodes(sourceFile, getAdjustedRange(sourceFile, oldNode, oldNode, options2), newNodes, options2);
       }
-      replaceNodeWithText(sourceFile, oldNode, text3) {
-        this.replaceRangeWithText(sourceFile, getAdjustedRange(sourceFile, oldNode, oldNode, useNonAdjustedPositions), text3);
+      replaceNodeWithText(sourceFile, oldNode, text4) {
+        this.replaceRangeWithText(sourceFile, getAdjustedRange(sourceFile, oldNode, oldNode, useNonAdjustedPositions), text4);
       }
       replaceNodeRangeWithNodes(sourceFile, startNode2, endNode2, newNodes, options2 = useNonAdjustedPositions) {
         this.replaceRangeWithNodes(sourceFile, getAdjustedRange(sourceFile, startNode2, endNode2, options2), newNodes, options2);
@@ -239738,8 +239901,8 @@ ${content}
         const insertAtLineStart = isValidLocationToAddComment(sourceFile, startPosition);
         const token2 = getTouchingToken(sourceFile, insertAtLineStart ? startPosition : position);
         const indent3 = sourceFile.text.slice(lineStartPosition, startPosition);
-        const text3 = `${insertAtLineStart ? "" : this.newLineCharacter}//${commentText}${this.newLineCharacter}${indent3}`;
-        this.insertText(sourceFile, token2.getStart(sourceFile), text3);
+        const text4 = `${insertAtLineStart ? "" : this.newLineCharacter}//${commentText}${this.newLineCharacter}${indent3}`;
+        this.insertText(sourceFile, token2.getStart(sourceFile), text4);
       }
       insertJsdocCommentBefore(sourceFile, node, tag2) {
         const fnStart = node.getStart(sourceFile);
@@ -239777,11 +239940,11 @@ ${content}
       filterJSDocTags(sourceFile, parent2, predicate) {
         this.replaceJSDocComment(sourceFile, parent2, filter(flatMapToMutable(parent2.jsDoc, (j2) => j2.tags), predicate));
       }
-      replaceRangeWithText(sourceFile, range, text3) {
-        this.changes.push({ kind: 3, sourceFile, range, text: text3 });
+      replaceRangeWithText(sourceFile, range, text4) {
+        this.changes.push({ kind: 3, sourceFile, range, text: text4 });
       }
-      insertText(sourceFile, pos, text3) {
-        this.replaceRangeWithText(sourceFile, createRange(pos), text3);
+      insertText(sourceFile, pos, text4) {
+        this.replaceRangeWithText(sourceFile, createRange(pos), text4);
       }
       tryInsertTypeAnnotation(sourceFile, node, type) {
         let endNode2;
@@ -240167,8 +240330,8 @@ ${options2.prefix}` : `
       }
       changesToText2.getTextChangesFromChanges = getTextChangesFromChanges;
       function newFileChanges(fileName, insertions, newLineCharacter, formatContext) {
-        const text3 = newFileChangesWorker(getScriptKindFromFileName(fileName), insertions, newLineCharacter, formatContext);
-        return { fileName, textChanges: [createTextChange(createTextSpan(0, 0), text3)], isNewFile: true };
+        const text4 = newFileChangesWorker(getScriptKindFromFileName(fileName), insertions, newLineCharacter, formatContext);
+        return { fileName, textChanges: [createTextChange(createTextSpan(0, 0), text4)], isNewFile: true };
       }
       changesToText2.newFileChanges = newFileChanges;
       function newFileChangesWorker(scriptKind, insertions, newLineCharacter, formatContext) {
@@ -240188,27 +240351,27 @@ ${options2.prefix}` : `
         }
         const { options: options2 = {}, range: { pos } } = change;
         const format = (n2) => getFormattedTextOfNode(n2, targetSourceFile, sourceFile, pos, options2, newLineCharacter, formatContext, validate);
-        const text3 = change.kind === 2 ? change.nodes.map((n2) => removeSuffix(format(n2), newLineCharacter)).join(((_a7 = change.options) == null ? undefined : _a7.joiner) || newLineCharacter) : format(change.node);
-        const noIndent = options2.indentation !== undefined || getLineStartPositionForPosition(pos, targetSourceFile) === pos ? text3 : text3.replace(/^\s+/, "");
+        const text4 = change.kind === 2 ? change.nodes.map((n2) => removeSuffix(format(n2), newLineCharacter)).join(((_a7 = change.options) == null ? undefined : _a7.joiner) || newLineCharacter) : format(change.node);
+        const noIndent = options2.indentation !== undefined || getLineStartPositionForPosition(pos, targetSourceFile) === pos ? text4 : text4.replace(/^\s+/, "");
         return (options2.prefix || "") + noIndent + (!options2.suffix || endsWith2(noIndent, options2.suffix) ? "" : options2.suffix);
       }
       function getFormattedTextOfNode(nodeIn, targetSourceFile, sourceFile, pos, { indentation, prefix: prefix2, delta }, newLineCharacter, formatContext, validate) {
-        const { node, text: text3 } = getNonformattedText(nodeIn, targetSourceFile, newLineCharacter);
+        const { node, text: text4 } = getNonformattedText(nodeIn, targetSourceFile, newLineCharacter);
         if (validate)
-          validate(node, text3);
+          validate(node, text4);
         const formatOptions = getFormatCodeSettingsForWriting(formatContext, targetSourceFile);
         const initialIndentation = indentation !== undefined ? indentation : ts_formatting_exports.SmartIndenter.getIndentation(pos, sourceFile, formatOptions, prefix2 === newLineCharacter || getLineStartPositionForPosition(pos, targetSourceFile) === pos);
         if (delta === undefined) {
           delta = ts_formatting_exports.SmartIndenter.shouldIndentChildNode(formatOptions, nodeIn) ? formatOptions.indentSize || 0 : 0;
         }
         const file2 = {
-          text: text3,
+          text: text4,
           getLineAndCharacterOfPosition(pos2) {
             return getLineAndCharacterOfPosition(this, pos2);
           }
         };
         const changes = ts_formatting_exports.formatNodeGivenIndentation(node, file2, targetSourceFile.languageVariant, initialIndentation, delta, { ...formatContext, options: formatOptions });
-        return applyChanges(text3, changes);
+        return applyChanges(text4, changes);
       }
       function getNonformattedText(node, sourceFile, newLineCharacter) {
         const writer = createWriter(newLineCharacter);
@@ -240223,12 +240386,12 @@ ${options2.prefix}` : `
       }
       changesToText2.getNonformattedText = getNonformattedText;
     })(changesToText || (changesToText = {}));
-    function applyChanges(text3, changes) {
+    function applyChanges(text4, changes) {
       for (let i2 = changes.length - 1;i2 >= 0; i2--) {
         const { span, newText } = changes[i2];
-        text3 = `${text3.substring(0, span.start)}${newText}${text3.substring(textSpanEnd(span))}`;
+        text4 = `${text4.substring(0, span.start)}${newText}${text4.substring(textSpanEnd(span))}`;
       }
-      return text3;
+      return text4;
     }
     function isTrivia2(s3) {
       return skipTrivia(s3, 0) === s3.length;
@@ -240422,29 +240585,29 @@ ${options2.prefix}` : `
         }
       }
       let position = 0;
-      const text3 = sourceFile.text;
+      const text4 = sourceFile.text;
       if (lastPrologue) {
         position = lastPrologue.end;
         advancePastLineBreak();
         return position;
       }
-      const shebang = getShebang(text3);
+      const shebang = getShebang(text4);
       if (shebang !== undefined) {
         position = shebang.length;
         advancePastLineBreak();
       }
-      const ranges = getLeadingCommentRanges(text3, position);
+      const ranges = getLeadingCommentRanges(text4, position);
       if (!ranges)
         return position;
       let lastComment;
       let firstNodeLine;
       for (const range of ranges) {
         if (range.kind === 3) {
-          if (isPinnedComment(text3, range.pos)) {
+          if (isPinnedComment(text4, range.pos)) {
             lastComment = { range, pinnedOrTripleSlash: true };
             continue;
           }
-        } else if (isRecognizedTripleSlashComment(text3, range.pos, range.end)) {
+        } else if (isRecognizedTripleSlashComment(text4, range.pos, range.end)) {
           lastComment = { range, pinnedOrTripleSlash: true };
           continue;
         }
@@ -240471,11 +240634,11 @@ ${options2.prefix}` : `
       }
       return position;
       function advancePastLineBreak() {
-        if (position < text3.length) {
-          const charCode = text3.charCodeAt(position);
+        if (position < text4.length) {
+          const charCode = text4.charCodeAt(position);
           if (isLineBreak(charCode)) {
             position++;
-            if (position < text3.length && charCode === 13 && text3.charCodeAt(position) === 10) {
+            if (position < text4.length && charCode === 13 && text4.charCodeAt(position) === 10) {
               position++;
             }
           }
@@ -240726,9 +240889,9 @@ ${options2.prefix}` : `
     };
     var standardScanner = createScanner(99, false, 0);
     var jsxScanner = createScanner(99, false, 1);
-    function getFormattingScanner(text3, languageVariant, startPos, endPos, cb) {
+    function getFormattingScanner(text4, languageVariant, startPos, endPos, cb) {
       const scanner2 = languageVariant === 1 ? jsxScanner : standardScanner;
-      scanner2.setText(text3);
+      scanner2.setText(text4);
       scanner2.resetTokenState(startPos);
       let wasNewLine = true;
       let leadingTrivia;
@@ -242373,9 +242536,9 @@ ${options2.prefix}` : `
           edits.push(createTextChangeFromStartLength(start, len, newText));
         }
       }
-      function recordInsert(start, text3) {
-        if (text3) {
-          edits.push(createTextChangeFromStartLength(start, 0, text3));
+      function recordInsert(start, text4) {
+        if (text4) {
+          edits.push(createTextChangeFromStartLength(start, 0, text4));
         }
       }
       function applyRuleEdits(rule2, previousRange2, previousStartLine, currentRange, currentStartLine) {
@@ -246467,9 +246630,9 @@ ${options2.prefix}` : `
         return { line: line + 1, offset: character + 1 };
       }
       getFileTextAndSize(tempFileName) {
-        let text3;
+        let text4;
         const fileName = tempFileName || this.info.fileName;
-        const getText = () => text3 === undefined ? text3 = this.host.readFile(fileName) || "" : text3;
+        const getText = () => text4 === undefined ? text4 = this.host.readFile(fileName) || "" : text4;
         if (!hasTSFileExtension(this.info.fileName)) {
           const fileSize = this.host.getFileSize ? this.host.getFileSize(fileName) : getText().length;
           if (fileSize > maxFileSize) {
@@ -252030,14 +252193,14 @@ Dynamic files must always be opened with service's current directory or service 
     function formatDiagnosticToProtocol(diag2, includeFileName) {
       const start = diag2.file && convertToLocation(getLineAndCharacterOfPosition(diag2.file, diag2.start));
       const end = diag2.file && convertToLocation(getLineAndCharacterOfPosition(diag2.file, diag2.start + diag2.length));
-      const text3 = flattenDiagnosticMessageText(diag2.messageText, `
+      const text4 = flattenDiagnosticMessageText(diag2.messageText, `
 `);
       const { code, source } = diag2;
       const category = diagnosticCategoryName(diag2);
       const common = {
         start,
         end,
-        text: text3,
+        text: text4,
         code,
         category,
         reportsUnnecessary: diag2.reportsUnnecessary,
@@ -253025,10 +253188,10 @@ ${json3}${newLine}`;
               const { file: file2, project } = this.getFileAndProject(fileRequest);
               const scriptInfo = project.getScriptInfoForNormalizedPath(file2);
               if (scriptInfo) {
-                const text3 = getSnapshotText(scriptInfo.getSnapshot());
+                const text4 = getSnapshotText(scriptInfo.getSnapshot());
                 msg += `
 
-File text of ${fileRequest.file}:${indent2(text3)}
+File text of ${fileRequest.file}:${indent2(text4)}
 `;
               }
             } catch {}
@@ -253646,12 +253809,12 @@ Project '${project.projectName}' (${ProjectKind[project.projectKind]}) ${counter
           return {
             ...hint,
             position: scriptInfo.positionToLineOffset(position),
-            displayParts: displayParts == null ? undefined : displayParts.map(({ text: text3, span, file: file22 }) => {
+            displayParts: displayParts == null ? undefined : displayParts.map(({ text: text4, span, file: file22 }) => {
               if (span) {
                 Debug.assertIsDefined(file22, "Target file should be defined together with its span.");
                 const scriptInfo2 = this.projectService.getScriptInfo(file22);
                 return {
-                  text: text3,
+                  text: text4,
                   span: {
                     start: scriptInfo2.positionToLineOffset(span.start),
                     end: scriptInfo2.positionToLineOffset(span.start + span.length),
@@ -253659,7 +253822,7 @@ Project '${project.projectName}' (${ProjectKind[project.projectKind]}) ${counter
                   }
                 };
               } else {
-                return { text: text3 };
+                return { text: text4 };
               }
             })
           };
@@ -254851,17 +255014,17 @@ Additional information: BADCLIENT: Bad error code, ${badCode} not found in range
       const { line, character } = computeLineAndCharacterOfPosition(computeLineStarts(newText), renameLocation);
       return { line: line + 1, offset: character + 1 };
     }
-    function applyEdits(text3, textFilename, edits) {
+    function applyEdits(text4, textFilename, edits) {
       for (const { fileName, textChanges: textChanges2 } of edits) {
         if (fileName !== textFilename) {
           continue;
         }
         for (let i2 = textChanges2.length - 1;i2 >= 0; i2--) {
           const { newText, span: { start, length: length2 } } = textChanges2[i2];
-          text3 = text3.slice(0, start) + newText + text3.slice(start + length2);
+          text4 = text4.slice(0, start) + newText + text4.slice(start + length2);
         }
       }
-      return text3;
+      return text4;
     }
     function referenceEntryToReferencesResponseItem(projectService, { fileName, textSpan, contextSpan, isWriteAccess: isWriteAccess2, isDefinition }, { disableLineTextInReferences }) {
       const scriptInfo = Debug.checkDefined(projectService.getScriptInfo(fileName));
@@ -255316,17 +255479,17 @@ Additional information: BADCLIENT: Bad error code, ${badCode} not found in range
         }
         return this.buildTreeFromBottom(interiorNodes);
       }
-      static linesFromText(text3) {
-        const lineMap = computeLineStarts(text3);
+      static linesFromText(text4) {
+        const lineMap = computeLineStarts(text4);
         if (lineMap.length === 0) {
           return { lines: [], lineMap };
         }
         const lines = new Array(lineMap.length);
         const lc = lineMap.length - 1;
         for (let lmi = 0;lmi < lc; lmi++) {
-          lines[lmi] = text3.substring(lineMap[lmi], lineMap[lmi + 1]);
+          lines[lmi] = text4.substring(lineMap[lmi], lineMap[lmi + 1]);
         }
-        const endText = text3.substring(lineMap[lc]);
+        const endText = text4.substring(lineMap[lc]);
         if (endText.length > 0) {
           lines[lc] = endText;
         } else {
@@ -255550,8 +255713,8 @@ Additional information: BADCLIENT: Bad error code, ${badCode} not found in range
       }
     };
     var LineLeaf = class {
-      constructor(text3) {
-        this.text = text3;
+      constructor(text4) {
+        this.text = text4;
       }
       isLeaf() {
         return true;
@@ -256183,14 +256346,14 @@ async function readMcpCatalog(input) {
   }
   try {
     const response = await runtime.fetch(app.slug, new Request(`https://kit-worker.invalid${MCP_CATALOG_PATH}`));
-    const text3 = await response.text();
+    const text4 = await response.text();
     if (!response.ok)
-      throw new McpCatalogError(`apps/${app.slug}: the tool catalog could not be read (HTTP ${response.status}): ${text3.slice(0, 500)}`);
+      throw new McpCatalogError(`apps/${app.slug}: the tool catalog could not be read (HTTP ${response.status}): ${text4.slice(0, 500)}`);
     let body;
     try {
-      body = JSON.parse(text3);
+      body = JSON.parse(text4);
     } catch {
-      throw new McpCatalogError(`apps/${app.slug}: the tool catalog is not JSON: ${text3.slice(0, 200)}`);
+      throw new McpCatalogError(`apps/${app.slug}: the tool catalog is not JSON: ${text4.slice(0, 200)}`);
     }
     const parsed = mcpToolsCatalogSchema.safeParse({
       app: app.slug,
@@ -256901,10 +257064,10 @@ async function buildProject(options2) {
         throw new BuildError(error51.message);
       throw error51;
     }
-    const text3 = renderMcpCatalog(mcpTools);
+    const text4 = renderMcpCatalog(mcpTools);
     await mkdir12(join31(root, PROJECT_PATHS.generated), { recursive: true });
-    await writeFile14(join31(root, PROJECT_PATHS.mcpTools), text3);
-    await writeFile14(join31(dist, mcpToolsDistPath(mcp2.slug)), text3);
+    await writeFile14(join31(root, PROJECT_PATHS.mcpTools), text4);
+    await writeFile14(join31(dist, mcpToolsDistPath(mcp2.slug)), text4);
   }
   let index2;
   try {
@@ -256976,11 +257139,11 @@ function run(command, args, cwd, env) {
     child.stderr.on("data", (chunk) => output.push(chunk));
     child.on("error", (error51) => reject(new BuildError(`${command} could not be started: ${error51.message}`)));
     child.on("close", (code) => {
-      const text3 = Buffer.concat(output).toString("utf8").trim();
+      const text4 = Buffer.concat(output).toString("utf8").trim();
       if (code === 0)
-        return resolve3(text3);
+        return resolve3(text4);
       reject(new BuildError(`${[command, ...args].join(" ")} failed (exit ${code}):
-${text3}`));
+${text4}`));
     });
   });
 }
@@ -257068,8 +257231,8 @@ import { mkdir as mkdir13, readFile as readFile23, rm as rm14, writeFile as writ
 import { join as join32 } from "node:path";
 var fail5 = (message2) => new DbError(message2);
 var describe3 = (change) => `${change.kind} ${change.table}${change.column ? `.${change.column}` : ""}${change.index ? ` (${change.index})` : ""}`;
-function migrationSlug(text3) {
-  const slug = text3.toLowerCase().replace(/[^a-z0-9]+/g, "_").replace(/^_+|_+$/g, "").slice(0, 40).replace(/_+$/g, "");
+function migrationSlug(text4) {
+  const slug = text4.toLowerCase().replace(/[^a-z0-9]+/g, "_").replace(/^_+|_+$/g, "").slice(0, 40).replace(/_+$/g, "");
   return slug === "" ? "change" : slug;
 }
 async function readIfPresent(path) {
@@ -257988,7 +258151,7 @@ function createPreviewTraceHandler(options2, parse9, forward) {
     try {
       if (request.method !== "POST")
         return new Response(null, { status: 404 });
-      let text3 = "";
+      let text4 = "";
       const reader = request.body?.getReader();
       if (!reader)
         return new Response(null, { status: 400 });
@@ -258003,11 +258166,11 @@ function createPreviewTraceHandler(options2, parse9, forward) {
           await reader.cancel();
           return new Response(null, { status: 413 });
         }
-        text3 += decoder2.decode(item.value, { stream: true });
+        text4 += decoder2.decode(item.value, { stream: true });
       }
       let value2;
       try {
-        value2 = JSON.parse(text3);
+        value2 = JSON.parse(text4);
       } catch {
         return new Response(null, { status: 400 });
       }
@@ -260029,7 +260192,7 @@ async function mismatch(root, appSlug, commit) {
 }
 async function readPrebuiltWorker(root, appSlug) {
   const placed = join36(root, PREBUILT_DIR);
-  const commit = await readFile27(join36(placed, "commit"), "utf8").then((text3) => text3.trim(), () => null);
+  const commit = await readFile27(join36(placed, "commit"), "utf8").then((text4) => text4.trim(), () => null);
   const bytes3 = await readFile27(join36(placed, `${appSlug}.js`)).then((content) => new Uint8Array(content), () => null);
   if (!commit || !bytes3)
     return null;
@@ -261489,7 +261652,7 @@ async function tryExec(deps, command, args) {
     throw error51;
   }
 }
-var firstLine = (text3) => text3.trim().split(`
+var firstLine = (text4) => text4.trim().split(`
 `)[0] ?? "";
 var execCommand = (command, args) => new Promise((resolve3, reject) => {
   const child = spawn7(command, [...args], { stdio: ["ignore", "pipe", "pipe"] });
@@ -262099,9 +262262,9 @@ function createMcpClient(options2) {
         throw toolError(tool, textOf2(result));
       if (result.structuredContent !== undefined)
         return result.structuredContent;
-      const text3 = textOf2(result);
+      const text4 = textOf2(result);
       try {
-        return JSON.parse(text3);
+        return JSON.parse(text4);
       } catch (error51) {
         if (error51 instanceof SyntaxError)
           throw new Error(`${tool}: the result is not JSON`);
@@ -262111,10 +262274,10 @@ function createMcpClient(options2) {
   };
 }
 async function readMessage(response, tool) {
-  const text3 = await response.text();
+  const text4 = await response.text();
   const type = response.headers.get("content-type") ?? "";
-  const payload = type.includes("text/event-stream") ? text3.split(`
-`).filter((line) => line.startsWith("data:")).map((line) => line.slice(5).trim()).at(-1) : text3;
+  const payload = type.includes("text/event-stream") ? text4.split(`
+`).filter((line) => line.startsWith("data:")).map((line) => line.slice(5).trim()).at(-1) : text4;
   if (!payload)
     throw new Error(`${tool}: the response is empty`);
   try {
@@ -262129,8 +262292,8 @@ function textOf2(result) {
   const content = Array.isArray(result.content) ? result.content : [];
   return content.map((part) => typeof part === "object" && part !== null && ("text" in part) ? String(part.text) : "").join("");
 }
-function toolError(tool, text3) {
-  const body2 = text3.replace(/^Error executing tool [^:]+:\s*/, "");
+function toolError(tool, text4) {
+  const body2 = text4.replace(/^Error executing tool [^:]+:\s*/, "");
   try {
     const parsed = JSON.parse(body2);
     if (typeof parsed.error === "string") {
@@ -262230,18 +262393,18 @@ function createMcpProxy(deps) {
 }
 function loginRequired(message2, error51) {
   const reason = error51 instanceof Error ? error51.message : String(error51);
-  const text3 = `You need to log in to FDPocket: a browser window opened for it (${reason}). Approve it, then try again.`;
+  const text4 = `You need to log in to FDPocket: a browser window opened for it (${reason}). Approve it, then try again.`;
   if (message2.method === "tools/call") {
     return {
       jsonrpc: "2.0",
       id: message2.id,
-      result: { isError: true, content: [{ type: "text", text: text3 }] }
+      result: { isError: true, content: [{ type: "text", text: text4 }] }
     };
   }
-  return rpcError(message2, -32001, text3);
+  return rpcError(message2, -32001, text4);
 }
-function rpcError(message2, code, text3) {
-  return { jsonrpc: "2.0", id: message2.id, error: { code, message: text3 } };
+function rpcError(message2, code, text4) {
+  return { jsonrpc: "2.0", id: message2.id, error: { code, message: text4 } };
 }
 async function serveMcpStdio(proxy, io) {
   const pending = new Set;
@@ -262316,31 +262479,31 @@ async function newProject(options2) {
   const template = join42(options2.kitRoot, TEMPLATE_DIR);
   const files = [];
   const sources = await listFiles(template);
-  const put = async (target2, text3) => {
+  const put = async (target2, text4) => {
     await mkdir18(dirname13(join42(root, target2)), { recursive: true });
-    await writeFile20(join42(root, target2), text3);
+    await writeFile20(join42(root, target2), text4);
     files.push(target2);
   };
   for (const source of sources) {
     if (source.startsWith("apps/"))
       continue;
     const target2 = targetPath(source);
-    let text3 = fill(await readFile32(join42(template, source), "utf8"), { name: name3, title });
+    let text4 = fill(await readFile32(join42(template, source), "utf8"), { name: name3, title });
     if (target2 === PROJECT_PATHS.manifest) {
-      const document2 = $parseDocument(text3);
+      const document2 = $parseDocument(text4);
       const original = document2.toJS().apps;
       document2.set("apps", Object.fromEntries(declarations.map(({ slug, kind }) => [
         slug,
         kind === "web" ? original[slug === "admin" ? "admin" : "web"] : kind === "python" ? pythonManifestEntry(slug) : kind === "mcp" ? { kind, capabilities: { models: {} } } : { kind }
       ])));
-      text3 = document2.toString();
+      text4 = document2.toString();
     }
-    await put(target2, text3);
+    await put(target2, text4);
   }
   for (const { slug, kind } of declarations) {
     if (kind === "python") {
-      for (const [path, text3] of Object.entries(pythonAppFiles(slug)))
-        await put(path, text3);
+      for (const [path, text4] of Object.entries(pythonAppFiles(slug)))
+        await put(path, text4);
       continue;
     }
     if (kind !== "web") {
@@ -262375,16 +262538,16 @@ async function newProject(options2) {
     const prefix2 = `apps/${templateSlug}/`;
     for (const source of sources.filter((path) => path.startsWith(prefix2))) {
       const target2 = `apps/${slug}/${source.slice(prefix2.length)}`;
-      let text3 = fill(await readFile32(join42(template, source), "utf8"), { name: name3, title });
+      let text4 = fill(await readFile32(join42(template, source), "utf8"), { name: name3, title });
       if (target2.endsWith("/vite.config.ts"))
-        text3 = text3.replace(`createAppConfig("${templateSlug}"`, `createAppConfig("${slug}"`);
+        text4 = text4.replace(`createAppConfig("${templateSlug}"`, `createAppConfig("${slug}"`);
       if (target2.endsWith("/package.json")) {
-        const json4 = JSON.parse(text3);
+        const json4 = JSON.parse(text4);
         json4.name = slug;
-        text3 = `${JSON.stringify(json4, null, 2)}
+        text4 = `${JSON.stringify(json4, null, 2)}
 `;
       }
-      await put(target2, text3);
+      await put(target2, text4);
     }
   }
   const vendored = await placeVendoredPackages(root, options2.kitRoot);
@@ -262463,8 +262626,8 @@ function targetPath(source) {
   parts[parts.length - 1] = DOTFILES[last] ?? last;
   return parts.join("/");
 }
-function fill(text3, values) {
-  return text3.replaceAll("{{PROJECT_NAME}}", values.name).replaceAll("{{PROJECT_TITLE}}", values.title);
+function fill(text4, values) {
+  return text4.replaceAll("{{PROJECT_NAME}}", values.name).replaceAll("{{PROJECT_TITLE}}", values.title);
 }
 async function listFiles(root) {
   const files = [];
@@ -262488,8 +262651,8 @@ init_pack();
 class PulledError extends Error {
   name = "PulledError";
 }
-function parseReview(text3) {
-  const raw2 = JSON.parse(text3);
+function parseReview(text4) {
+  const raw2 = JSON.parse(text4);
   if (!isObject5(raw2) || !Array.isArray(raw2.bundles)) {
     throw new PulledError("--inputs must be the JSON get_proposal_inputs returned");
   }
@@ -262556,10 +262719,10 @@ function bundle(value2) {
     url: url2(value2.url, `bundle ${value2.seq}`)
   };
 }
-function parsePulled(text3) {
+function parsePulled(text4) {
   let raw2;
   try {
-    raw2 = JSON.parse(text3);
+    raw2 = JSON.parse(text4);
   } catch (error51) {
     throw new PulledError(`--bundles must be the JSON get_git_bundles returned (${String(error51)})`);
   }
@@ -262839,11 +263002,11 @@ function parsePages(spec, total) {
     throw new ReadError(`--pages: the file has ${total} pages`);
   return { first, last: total > 0 ? Math.min(last, total) : last };
 }
-function cut(text3, maxChars) {
-  if (text3.length <= maxChars)
-    return { body: text3, truncated: false, note: null };
-  const note = `text truncated to ${maxChars} of ${text3.length} characters`;
-  return { body: `${text3.slice(0, maxChars)}
+function cut(text4, maxChars) {
+  if (text4.length <= maxChars)
+    return { body: text4, truncated: false, note: null };
+  const note = `text truncated to ${maxChars} of ${text4.length} characters`;
+  return { body: `${text4.slice(0, maxChars)}
 
 [${note}]`, truncated: true, note };
 }
@@ -262854,12 +263017,12 @@ async function pdfText(file2, deps) {
   const pages = raw2.split("\f");
   if (pages.at(-1)?.trim() === "")
     pages.pop();
-  const text3 = pages.map((page, index2) => `## Page ${index2 + 1}
+  const text4 = pages.map((page, index2) => `## Page ${index2 + 1}
 
 ${page.trim()}`).join(`
 
 `);
-  return { text: text3, pages: pages.length };
+  return { text: text4, pages: pages.length };
 }
 async function pdfImages(file2, out, range, deps) {
   const directory = join43(out, "pages");
@@ -262898,10 +263061,10 @@ async function readDocument(options2, deps = realDeps) {
   const notes = [];
   let pageCount = null;
   let images = [];
-  let text3;
+  let text4;
   if (kind === "pdf") {
     const extracted = await pdfText(options2.file, deps);
-    text3 = extracted.text;
+    text4 = extracted.text;
     pageCount = extracted.pages;
     if (pageCount === 0)
       notes.push("no text could be extracted (a scanned PDF?); read the page images");
@@ -262911,11 +263074,11 @@ async function readDocument(options2, deps = realDeps) {
     if (drawn.note)
       notes.push(drawn.note);
   } else if (kind === "docx" || kind === "pptx" || kind === "xlsx") {
-    text3 = await officeText(options2.file, deps);
+    text4 = await officeText(options2.file, deps);
   } else {
-    text3 = (await readFile33(options2.file)).toString("utf8");
+    text4 = (await readFile33(options2.file)).toString("utf8");
   }
-  const kept = cut(text3, options2.maxChars ?? TEXT_MAX_CHARS);
+  const kept = cut(text4, options2.maxChars ?? TEXT_MAX_CHARS);
   if (kept.note)
     notes.push(kept.note);
   const textPath = join43(options2.out, "text.md");
@@ -263227,8 +263390,8 @@ var CAPTURE_VIEWPORTS = {
 };
 var UUID5 = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/;
 var PAGE_PATH = /^\/(?!\/)\S{0,199}$/;
-function parseCaptures(text3) {
-  const parsed = JSON.parse(text3);
+function parseCaptures(text4) {
+  const parsed = JSON.parse(text4);
   if (!Array.isArray(parsed))
     throw new Error("--captures must be a JSON array");
   return parsed.map((item) => {
@@ -263263,10 +263426,10 @@ init_src();
 init_src2();
 import { readFile as readFile36 } from "node:fs/promises";
 import { join as join47 } from "node:path";
-function parseExternalHistoryContext(text3) {
-  if (Buffer.byteLength(text3, "utf8") > 1024 * 1024)
+function parseExternalHistoryContext(text4) {
+  if (Buffer.byteLength(text4, "utf8") > 1024 * 1024)
     throw new Error("External history context is too large");
-  const value2 = JSON.parse(text3);
+  const value2 = JSON.parse(text4);
   if (!value2 || typeof value2 !== "object" || Array.isArray(value2))
     throw new Error("Invalid external history context");
   const record5 = value2;
@@ -263777,11 +263940,11 @@ function watchConsole(page, observation) {
   page.on("console", (message2) => {
     if (message2.type() !== "error")
       return;
-    const text3 = message2.text();
-    if (text3.startsWith(CSP_PREFIX))
-      observation.cspViolations.push(text3.slice(CSP_PREFIX.length));
-    else if (!text3.includes("net::ERR_BLOCKED_BY_CLIENT"))
-      observation.consoleErrors.push(text3);
+    const text4 = message2.text();
+    if (text4.startsWith(CSP_PREFIX))
+      observation.cspViolations.push(text4.slice(CSP_PREFIX.length));
+    else if (!text4.includes("net::ERR_BLOCKED_BY_CLIENT"))
+      observation.consoleErrors.push(text4);
   });
   page.on("pageerror", (error51) => observation.consoleErrors.push(`${error51.name}: ${error51.message}`));
 }
@@ -263888,10 +264051,10 @@ var REQUIRED2 = [
 var OPTIONAL = ["editor_url", "gateway_url"];
 var NULLABLE = ["base_commit_oid"];
 var LISTS = ["fetched_bundles"];
-function parseConfig(text3) {
+function parseConfig(text4) {
   let raw2;
   try {
-    raw2 = JSON.parse(text3);
+    raw2 = JSON.parse(text4);
   } catch (error51) {
     throw new ConfigError(`${CONFIG_FILE} is not JSON: ${String(error51)}`);
   }

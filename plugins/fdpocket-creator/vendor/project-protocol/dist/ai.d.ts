@@ -8,6 +8,25 @@ export declare const AI_ATTACHMENTS_MAX = 4;
 export declare const AI_ATTACHMENTS_MAX_BYTES: number;
 /** 1 ターンの本文（UTF-8） */
 export declare const AI_MESSAGE_MAX_BYTES: number;
+/**
+ * 埋め込み（`/v1/ai/openai/embeddings`。project-ai.md §3.7）。モデルを指定しなければ既定のモデルで、次元は 1536。
+ * 1 回の要求の上限は、OpenRouter への 1 往復で読み切れ、費用が大きく跳ねない大きさにしてある
+ */
+export declare const AI_EMBEDDING_MODEL_DEFAULT = "openai/text-embedding-3-small";
+export declare const AI_EMBEDDING_INPUTS_MAX = 64;
+export declare const AI_EMBEDDING_INPUT_CHARS_MAX = 32000;
+export declare const AI_EMBEDDING_TOTAL_CHARS_MAX = 200000;
+/** `dimensions` の上限（ベクトル検索の `@@platform.vector` は 1536 まで。search.md §3.4） */
+export declare const AI_EMBEDDING_DIMENSIONS_MAX = 3072;
+/** 埋め込みの応答（OpenAI の形。SDK が `encoding_format: 'float'` で読む） */
+export declare const aiEmbeddingsResponse: z.ZodObject<{
+    object: z.ZodLiteral<"list">;
+    data: z.ZodArray<z.ZodObject<{
+        index: z.ZodInt;
+        embedding: z.ZodArray<z.ZodNumber>;
+    }, z.core.$loose>>;
+    model: z.ZodString;
+}, z.core.$loose>;
 export declare const AI_ATTACHMENT_KINDS: readonly ["image", "file", "audio", "video"];
 export type AiAttachmentKind = (typeof AI_ATTACHMENT_KINDS)[number];
 /** Content-Type（付帯情報は無視）→ 添付の種類。扱わない種類は null */
