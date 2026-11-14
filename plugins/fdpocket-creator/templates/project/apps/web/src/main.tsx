@@ -17,9 +17,10 @@ declare module "@tanstack/react-router" {
   }
 }
 
-// スーパーアプリに埋め込まれているときは Host からトークンを受け取る（sdk.md §3.1）
-void client.auth.fromHost().catch((error: unknown) => {
-  console.error("could not receive the session from the host", error)
+// 埋め込まれているときは Host からトークンを受け取り、リンクを直接開いたときは入口へ進む（sdk.md §3.1）。
+// fromHost() だけだと、直接開いた公開アプリはセッションも Gateway の URL も無いまま DB が失敗する
+void client.auth.signInWithSuperApp().catch((error: unknown) => {
+  console.error("could not start the session", error)
 })
 
 createRoot(document.getElementById("root")!).render(

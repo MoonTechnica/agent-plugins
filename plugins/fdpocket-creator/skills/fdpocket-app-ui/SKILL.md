@@ -11,7 +11,7 @@ description: ミニアプリの画面を作る。shadcn の部品（packages/ui�
 
 - ルートは `apps/<slug>/src/routes/` のファイルベース（TanStack Router）。`routeTree.gen.ts` はプラグインが作る（手で書かない）。
   `/tasks` は `routes/tasks/index.tsx`、`/tasks/$taskId` は `routes/tasks/$taskId.tsx`。リンクは `<Link to="/tasks/$taskId" params={{ taskId: task.id }}>`。
-- `main.tsx` と `ProjectProvider`・`client.auth.fromHost()` はテンプレートのまま使う。
+- `main.tsx` と `ProjectProvider`・`client.auth.signInWithSuperApp()` はテンプレートのまま使う。
 - 部品は `@workspace/ui/components/*`（shadcn。button / card / input / label / textarea）。足りない部品は `packages/ui/src/components/` に
   shadcn の書き方で足し、**web と admin で共有**する。画面ごとにクラス文字列の定数をコピペしない。
 - 色はトークン（`bg-background` / `text-foreground` / `text-muted-foreground` / `bg-primary` / `border-border` / `text-destructive`）。

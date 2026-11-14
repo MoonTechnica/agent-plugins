@@ -279,8 +279,8 @@ import { client, schema, apiPath } from '@workspace/sdk' // client = createClien
 
 | API | 使い方 |
 |---|---|
-| `client.auth.fromHost()` | スーパーアプリに埋め込まれているとき、Host からトークンを受け取る（`main.tsx` で 1 回。テンプレートどおり）。埋め込まれていない・10 秒で届かなければ `HOST_UNAVAILABLE` |
-| `client.auth.signInWithSuperApp()` | 直接アクセス時、同じミニアプリオリジンのPlatform製入口へ進む。FDPocketアカウントが必要なことを説明し、本人が「続ける」を押してからログイン・アプリの既存同意へ移る。一回限りコードとstate/PKCEで元のオリジン・Appパスへ戻り、信頼されたwrapperからProject専用セッションを受け取る。埋め込み中は`fromHost()`を再利用し、認証済みなら移動しない。戻り値は`Promise<void>` |
+| `client.auth.fromHost()` | スーパーアプリに埋め込まれているとき、Host からトークンを受け取る（`signInWithSuperApp()` が埋め込み中に内部で呼ぶ。App が直接呼ぶ必要はない）。埋め込まれていない・10 秒で届かなければ `HOST_UNAVAILABLE` |
+| `client.auth.signInWithSuperApp()` | **`main.tsx` が起動時に 1 回呼ぶ（テンプレートどおり）。** 直接アクセス時、同じミニアプリオリジンのPlatform製入口へ進む。FDPocketアカウントが必要なことを説明し、本人が「続ける」を押してからログイン・アプリの既存同意へ移る。一回限りコードとstate/PKCEで元のオリジン・Appパスへ戻り、信頼されたwrapperからProject専用セッションを受け取る。埋め込み中は`fromHost()`を再利用し、認証済みなら移動しない。戻り値は`Promise<void>` |
 | `client.auth.session()` | 今の `Session`（無ければ null） |
 | `client.auth.onChange(listener)` | 受け取り・更新・失効で呼ぶ。戻り値で購読をやめる |
 | `client.auth.can(permission)` | **画面の出し分けだけ**に使う（ボタンを出す / 出さない）。認可は Gateway が毎回 DB で判定する。これを認可の代わりにしない |
