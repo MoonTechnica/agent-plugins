@@ -325651,6 +325651,19 @@ function loopbackAuthorize(openUrl) {
   });
 }
 
+// frontend/packages/miniapp-kit/src/logs-on-stderr.ts
+async function withLogsOnStderr(run3) {
+  const { log: log4, info } = console;
+  console.log = console.error;
+  console.info = console.error;
+  try {
+    return await run3();
+  } finally {
+    console.log = log4;
+    console.info = info;
+  }
+}
+
 // frontend/packages/miniapp-kit/src/mcp-client.ts
 class McpToolError extends Error {
   tool;
@@ -328111,12 +328124,12 @@ async function build(context, flags) {
     throw new CommandError(`pass --gateway-url (or set ${KIT_BUILD_ENV.gatewayUrl}, or run kit.mjs pull): the Project Gateway the apps call`);
   }
   const projectId = flags["project-id"] ?? process.env[KIT_BUILD_ENV.projectId] ?? (await readConfig(workdir)).project_id;
-  const result = await buildProject({
+  const result = await withLogsOnStderr(() => buildProject({
     root: sourceOf(workdir),
     kitRoot: context.kitRoot,
     projectId,
     gatewayUrl
-  });
+  }));
   print(context, {
     artifact_hash: result.artifactHash,
     schema_version: result.schemaVersion,
