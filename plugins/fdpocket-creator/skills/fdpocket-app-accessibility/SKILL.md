@@ -43,6 +43,7 @@ description: ミニアプリを誰でも使えるようにする。キーボー�
 ## 4. 見え方
 
 - 文字のコントラスト 4.5:1 以上、大きい文字（24px 以上か 18.66px 以上の太字）と操作の枠・アイコンは 3:1 以上。トークンの組（`text-foreground` on `bg-background`、`text-muted-foreground` on `bg-background`、`text-primary-foreground` on `bg-primary`）は満たす。**`text-muted-foreground` を `bg-muted` の上に置くなど、組を崩したときに落ちる**。透明度（`/50`）で文字を薄くしない。
+- **明と暗の両方で**同じ基準を満たす（`kit shot --theme dark` で撮って見る）。トークンの組は暗い画面でも満たすが、`dark:` で自分で書いた色・画像の上の文字は落ちやすい。
 - **色だけで意味を伝えない**（状態・エラー・グラフの系列）。文言・アイコン・形を添える。
 - 文字を 200% に拡大しても、はみ出さず読める（`rem` の単位・固定の高さを文字の箱に付けない）。
 - 本文 16px、下限 12px（`kit shot` の `smallTextCount`）。

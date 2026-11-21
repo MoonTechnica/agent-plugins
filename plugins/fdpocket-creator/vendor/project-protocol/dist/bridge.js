@@ -36,6 +36,8 @@ export const safeAreaInsets = contract((o) => o.object({
     left: z.number().min(0),
 }));
 export const LOCALES = ['ja', 'en'];
+/** 画面の明暗。Host（スーパーアプリ）の外観の設定を解決した値（「端末に合わせる」は Host が明か暗に直して送る） */
+export const COLOR_SCHEMES = ['light', 'dark'];
 /** Host が App に渡す起動の中身（`context` から `type` / `host` を除いたもの。ネイティブの Host も同じ形を運ぶ） */
 export const hostContext = contract((o) => o.object({
     /** Project アクセストークン（Supabase JWT ではない） */
@@ -45,6 +47,8 @@ export const hostContext = contract((o) => o.object({
     gatewayUrl: z.url(),
     locale: o.enum(LOCALES),
     safeArea: safeAreaInsets.in(o),
+    /** 無ければ App は端末の設定（`prefers-color-scheme`）に従う（これを送らない Host・ネイティブの版がある） */
+    colorScheme: o.enum(COLOR_SCHEMES).optional(),
 }));
 export const contextMessage = contract((o) => o.object({
     type: z.literal('context'),
@@ -57,6 +61,7 @@ export const contextUpdateMessage = contract((o) => o.object({
     expiresAt: z.iso.datetime().optional(),
     session: session.in(o).optional(),
     safeArea: safeAreaInsets.in(o).optional(),
+    colorScheme: o.enum(COLOR_SCHEMES).optional(),
 }));
 /** App 内のパス（同じオリジンの相対パスだけ。外部 URL で別サイトへ飛ばさせない） */
 const appPathSchema = z.string().max(2048).refine(isAppPath);

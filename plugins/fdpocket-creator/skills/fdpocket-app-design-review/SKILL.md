@@ -15,6 +15,7 @@ description: 画面を作り終えたあとの仕上げの見直し。kit shot �
 node <kit>/scripts/kit.mjs shot --out /tmp/fdpocket/shots --path /                 # トップ
 node <kit>/scripts/kit.mjs shot --out /tmp/fdpocket/shots --path /tasks/<id>       # 詳細（実在の id で）
 node <kit>/scripts/kit.mjs shot --out /tmp/fdpocket/shots --as admin --app admin --path /
+node <kit>/scripts/kit.mjs shot --out /tmp/fdpocket/shots --path / --theme dark    # 暗い画面
 ```
 
 - 撮るのは **いちばん多い操作で通る画面すべて**（一覧・詳細・作成フォーム）と、**空・エラーの状態**（`$fdpocket-app-visual` §7）。
@@ -31,7 +32,7 @@ node <kit>/scripts/kit.mjs shot --out /tmp/fdpocket/shots --as admin --app admin
 | **余白と整列** | 余白が 4px の倍数でそろう。左端がそろう。カードの入れ子が無い | 詰まりすぎ／スカスカ・中央揃えの多用・線で区切りすぎ |
 | **状態** | 読み込み中・空・エラー・送信中が作られ、空とエラーに次の操作がある | 空のときに真っ白・エラーが空の一覧に見える |
 | **文言** | 業務の言葉・具体的な動詞・内部の言葉が無い（`$fdpocket-app-ux-writing` §5） | 「データ」「送信」「pending」・en が崩れる |
-| **誰でも使える** | 44px・16px・コントラスト・キーボード・`aria-label`（`$fdpocket-app-accessibility` §7） | アイコンだけのボタン・薄い文字・`div` の onClick |
+| **誰でも使える** | 44px・16px・コントラスト（**明と暗の両方**）・キーボード・`aria-label`（`$fdpocket-app-accessibility` §7） | アイコンだけのボタン・薄い文字・`div` の onClick |
 
 **合格の線: 全観点 1 点以上かつ合計 11 点以上（14 点満点）**。下回ったら、点の低い観点から直して撮り直す（最大 3 回）。
 3 回で届かなければ、届かない理由（例: 依頼の内容が画面に収まらない）を結果に書く。

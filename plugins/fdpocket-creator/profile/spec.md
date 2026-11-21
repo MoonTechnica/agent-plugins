@@ -387,7 +387,7 @@ const create = hooks.task.useCreate()                      // 書き込みは関
 
 `ProjectProvider({ client, queryClient })` を根に置く（テンプレートどおり）。`useProjectClient()` は Provider の
 `ProjectClientCore`（`projectId` / `app` / `auth` / `storage` / `ui` / `gateway` / `fetch`。db は上のフックで使う）。
-`useSession()` は今の Session、`useSafeArea()` は Host のセーフエリア、`useLocale()` は Host のロケール文字列（接続前・単独起動はブラウザの言語タグ、取得不能なら`en`）。対応辞書への解決とフォールバックはAppの共通i18n処理で行う。`getQueryKey` は ZenStack の queryKey を作る
+`useSession()` は今の Session、`useSafeArea()` は Host のセーフエリア、`useColorScheme()` は画面の明暗（`AppShell` の `colorScheme` に渡す）、`useLocale()` は Host のロケール文字列（接続前・単独起動はブラウザの言語タグ、取得不能なら`en`）。対応辞書への解決とフォールバックはAppの共通i18n処理で行う。`getQueryKey` は ZenStack の queryKey を作る
 （手で invalidate するとき）。フックの `error` には `SdkError` が届く。`$transaction` のフックは型に出るが Gateway が受けない。
 
 ### 3.3 `client.storage` — ファイル
@@ -424,6 +424,7 @@ const files = await client.db.storageFile.findMany({ where: { bucket: 'attachmen
 | `client.ui.navigate({ app, path })` | 同じ Project の別 App へ（Host が開ける人か確かめる） |
 | `client.ui.openCredits()` | スーパーアプリのクレジット購入を開く（AI の `QUOTA_EXCEEDED` のとき。購入画面はミニアプリに作らない） |
 | `client.ui.safeArea()` / `client.ui.onSafeAreaChange(listener)` | セーフエリア（埋め込まれていなければ 0） |
+| `client.ui.colorScheme()` / `client.ui.onColorSchemeChange(listener)` | 画面の明暗（`'light'` / `'dark'`）。埋め込まれていればスーパーアプリの外観の設定、それ以外と明暗を送らない Host では端末の設定（`prefers-color-scheme`）。`html` の `.dark` はひな形の `AppShell` が付け外しする |
 
 埋め込まれていないときは no-op ではなく `HOST_UNAVAILABLE` を返す。`host()` を見て出し分ける。
 

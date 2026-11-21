@@ -1,5 +1,5 @@
 import { type QueryClient } from '@tanstack/react-query';
-import type { SafeAreaInsets, WireSession as Session } from '@workspace/project-protocol';
+import type { ColorScheme, SafeAreaInsets, WireSession as Session } from '@workspace/project-protocol';
 import { type ReactElement, type ReactNode } from 'react';
 import type { ProjectClient } from '../client.ts';
 /**
@@ -34,3 +34,5 @@ export declare function useSession(): Session | null;
 export declare function useLocale(): string;
 /** Host のセーフエリア（埋め込まれていなければ 0） */
 export declare function useSafeArea(): SafeAreaInsets;
+/** 画面の明暗（埋め込みならスーパーアプリの設定、それ以外は端末の設定）。`.dark` の付け外しに使う */
+export declare function useColorScheme(): ColorScheme;

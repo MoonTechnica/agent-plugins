@@ -33,6 +33,9 @@ export declare const safeAreaInsets: Contract<z.ZodObject<{
 }, z.core.$strip>>;
 export type SafeAreaInsets = z.output<typeof safeAreaInsets.exact>;
 export declare const LOCALES: readonly ["ja", "en"];
+/** 画面の明暗。Host（スーパーアプリ）の外観の設定を解決した値（「端末に合わせる」は Host が明か暗に直して送る） */
+export declare const COLOR_SCHEMES: readonly ["light", "dark"];
+export type ColorScheme = (typeof COLOR_SCHEMES)[number];
 /** Host が App に渡す起動の中身（`context` から `type` / `host` を除いたもの。ネイティブの Host も同じ形を運ぶ） */
 export declare const hostContext: Contract<z.ZodObject<{
     token: z.ZodString;
@@ -75,6 +78,10 @@ export declare const hostContext: Contract<z.ZodObject<{
         bottom: z.ZodNumber;
         left: z.ZodNumber;
     }, z.core.$strip>;
+    colorScheme: z.ZodOptional<z.ZodEnum<{
+        light: "light";
+        dark: "dark";
+    }>>;
 }, z.core.$strip>>;
 export type HostContext = z.output<typeof hostContext.exact>;
 export declare const contextMessage: Contract<z.ZodObject<{
@@ -118,6 +125,10 @@ export declare const contextMessage: Contract<z.ZodObject<{
         bottom: z.ZodNumber;
         left: z.ZodNumber;
     }, z.core.$strip>;
+    colorScheme: z.ZodOptional<z.ZodEnum<{
+        light: "light";
+        dark: "dark";
+    }>>;
     type: z.ZodLiteral<"context">;
     host: z.ZodEnum<{
         superapp: "superapp";
@@ -161,6 +172,10 @@ export declare const contextUpdateMessage: Contract<z.ZodObject<{
         bottom: z.ZodNumber;
         left: z.ZodNumber;
     }, z.core.$strip>>;
+    colorScheme: z.ZodOptional<z.ZodEnum<{
+        light: "light";
+        dark: "dark";
+    }>>;
 }, z.core.$strip>>;
 export type ContextUpdateMessage = z.output<typeof contextUpdateMessage.exact>;
 export declare const BRIDGE_OPS: readonly ["ui.openShare", "ui.close", "ui.navigate", "ui.openCredits", "connections.requestPermission", "notifications.requestPermission", "notifications.status", "notifications.openSettings", "safety.report"];

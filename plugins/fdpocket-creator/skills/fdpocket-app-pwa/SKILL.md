@@ -89,7 +89,7 @@ window.addEventListener("vite:preloadError", () => {
 - ホーム画面のアイコンと名前は**掲載情報**（`$fdpocket-app-listing`）から作られる。アイコンは小さく丸く切り抜かれても判別できる絵にし、細かい文字を入れない。
 - 名前はホーム画面で長いと切れる（目安は全角 6〜8 字・英字 12 字）。App の表示名は短く（「タスク帳」）。
 - `<title>` は画面ごとに「画面の名前 · アプリ名」に（タスクの切り替え・履歴で区別できる）。
-- テーマ色は Platform が白にしている。上の帯の色を変えたいときだけ、`index.html` に `<meta name="theme-color" content="…">` をヘッダーの背景と同じ色で書く。
+- テーマ色は Platform が白にしている。上の帯の色を変えたいときだけ、`index.html` に `<meta name="theme-color" content="…">` をヘッダーの背景と同じ色で書く。明と暗で 2 つ（`media="(prefers-color-scheme: light)"` / `dark`）書き、暗い画面で白い帯が残らないようにする。
 
 ## 8. 確かめる
 

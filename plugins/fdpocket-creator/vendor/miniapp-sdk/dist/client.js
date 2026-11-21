@@ -165,7 +165,7 @@ export function createClient(options) {
                                 const next = accept(context.data.token, context.data.expiresAt, context.data.session);
                                 clearTimeout(deadline);
                                 const connected = received;
-                                bridge.attach(connected, context.data.safeArea, context.data.locale);
+                                bridge.attach(connected, context.data.safeArea, context.data.locale, context.data.colorScheme);
                                 stopHost = () => {
                                     bridge.detach();
                                     connected.close();
@@ -182,6 +182,9 @@ export function createClient(options) {
                         const update = contextUpdateMessage.wire.safeParse(message.data);
                         if (update.success && held && update.data.safeArea) {
                             bridge.setSafeArea(update.data.safeArea);
+                        }
+                        if (update.success && held && update.data.colorScheme) {
+                            bridge.setColorScheme(update.data.colorScheme);
                         }
                         if (update.success && held && update.data.token && update.data.expiresAt) {
                             try {

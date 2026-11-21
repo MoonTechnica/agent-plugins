@@ -121,6 +121,10 @@ export declare const CONTRACTS: {
                 bottom: z.ZodNumber;
                 left: z.ZodNumber;
             }, z.core.$strip>;
+            colorScheme: z.ZodOptional<z.ZodEnum<{
+                light: "light";
+                dark: "dark";
+            }>>;
             type: z.ZodLiteral<"context">;
             host: z.ZodEnum<{
                 superapp: "superapp";
@@ -166,6 +170,10 @@ export declare const CONTRACTS: {
                 bottom: z.ZodNumber;
                 left: z.ZodNumber;
             }, z.core.$strip>>;
+            colorScheme: z.ZodOptional<z.ZodEnum<{
+                light: "light";
+                dark: "dark";
+            }>>;
         }, z.core.$strip>>;
         readonly direction: "read";
     };

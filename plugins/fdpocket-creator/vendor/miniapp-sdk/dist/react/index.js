@@ -51,3 +51,8 @@ export function useSafeArea() {
     const { ui } = useProjectClient();
     return useSyncExternalStore((onChange) => ui.onSafeAreaChange(onChange), () => ui.safeArea());
 }
+/** 画面の明暗（埋め込みならスーパーアプリの設定、それ以外は端末の設定）。`.dark` の付け外しに使う */
+export function useColorScheme() {
+    const { ui } = useProjectClient();
+    return useSyncExternalStore((onChange) => ui.onColorSchemeChange(onChange), () => ui.colorScheme());
+}

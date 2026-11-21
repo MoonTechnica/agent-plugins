@@ -1,4 +1,6 @@
-import { type BridgeOpName, type SafeAreaInsets } from '@workspace/project-protocol';
+import { type BridgeOpName, type ColorScheme, type SafeAreaInsets } from '@workspace/project-protocol';
+/** Host が送った値のうち、この SDK が知っている明暗だけを使う（知らない値は端末の設定に従う） */
+export declare function knownColorScheme(value: unknown): ColorScheme | null;
 export interface Ui {
     /** 埋め込み（Host と bridge がつながっている）か直接アクセスか */
     host(): 'superapp' | 'standalone';
@@ -25,14 +27,22 @@ export interface Ui {
     safeArea(): SafeAreaInsets;
     /** 値が変わったときだけ呼ぶ。戻り値で購読をやめる */
     onSafeAreaChange(listener: (insets: SafeAreaInsets) => void): () => void;
+    /**
+     * 画面の明暗。埋め込まれていればスーパーアプリの外観の設定、それ以外（ブラウザ・ホーム画面・
+     * 明暗を送らない Host）は端末の設定（`prefers-color-scheme`）
+     */
+    colorScheme(): ColorScheme;
+    /** 値が変わったときだけ呼ぶ。戻り値で購読をやめる */
+    onColorSchemeChange(listener: (scheme: ColorScheme) => void): () => void;
 }
 /** auth の bridge（MessagePort）と ui をつなぐ口。client.ts だけが使う */
 export interface UiBridge {
     readonly ui: Ui;
     /** Host への op（`ui` 以外の名前空間が使う。`client.safety.report` など）。reply の `result` を返す */
     request(op: BridgeOpName, payload?: unknown): Promise<unknown>;
-    attach(port: MessagePort, safeArea: SafeAreaInsets, locale: string): void;
+    attach(port: MessagePort, safeArea: SafeAreaInsets, locale: string, colorScheme?: string | undefined): void;
     setSafeArea(insets: SafeAreaInsets): void;
+    setColorScheme(scheme: string): void;
     /** port に届いたメッセージのうち reply を受ける。reply だったら true */
     receive(data: unknown): boolean;
     /** bridge が切れた。返事待ちは HOST_UNAVAILABLE で終える */

@@ -1,5 +1,6 @@
 import { cn } from 'cn'
 import * as React from 'react'
+import { applyColorScheme, type ColorScheme } from '../lib/color-scheme'
 
 const WIDTHS = {
   // 利用者向け（スマホが主）。本文は読みやすい幅に。
@@ -24,16 +25,24 @@ function useHostSafeArea(insets: SafeAreaInsets | undefined) {
   }, [insets])
 }
 
+/** 明暗が変わったら html の `.dark` を付け外す（`$app-visual` §8） */
+function useColorSchemeClass(scheme: ColorScheme | undefined) {
+  React.useEffect(() => {
+    if (scheme) applyColorScheme(scheme)
+  }, [scheme])
+}
+
 /**
  * アプリの骨格: 上に固定のヘッダー、本文は幅を決めて中央に。セーフエリアの余白もここで取る（`$app-pwa` §2）。
  * 各 App のルート（`__root.tsx`）で 1 回だけ使う。画面ごとに外枠を作り直さない（`$app-visual` §4）。
- * `safeArea` には `useSafeArea()`（`@workspace/miniapp-sdk/react`）を渡す。
+ * `safeArea` には `useSafeArea()`、`colorScheme` には `useColorScheme()`（どちらも `@workspace/miniapp-sdk/react`）を渡す。
  */
 function AppShell({
   title,
   actions,
   width = 'narrow',
   safeArea,
+  colorScheme,
   children,
   className,
 }: {
@@ -41,10 +50,12 @@ function AppShell({
   actions?: React.ReactNode
   width?: keyof typeof WIDTHS
   safeArea?: SafeAreaInsets
+  colorScheme?: ColorScheme
   children: React.ReactNode
   className?: string
 }) {
   useHostSafeArea(safeArea)
+  useColorSchemeClass(colorScheme)
   return (
     <div data-slot="app-shell" className="min-h-dvh bg-background text-foreground">
       <header className="sticky top-0 z-10 border-b bg-background/85 pt-[var(--safe-top)] backdrop-blur supports-[backdrop-filter]:bg-background/70">

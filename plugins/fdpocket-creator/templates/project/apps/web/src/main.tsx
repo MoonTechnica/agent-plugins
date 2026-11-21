@@ -5,8 +5,12 @@ import { createRouter, RouterProvider } from "@tanstack/react-router"
 import { ProjectProvider } from "@workspace/miniapp-sdk/react"
 import { client } from "@workspace/sdk"
 
+import { applyColorScheme } from "@workspace/ui/lib/color-scheme"
 import "@workspace/ui/globals.css"
 import { routeTree } from "./routeTree.gen"
+
+// 最初の描画の前に明暗を決める（白い画面が一瞬出ないように）。埋め込みなら接続後に Host の設定へ合わせ直す
+applyColorScheme(client.ui.colorScheme())
 
 const queryClient = new QueryClient()
 const router = createRouter({ routeTree, basepath: import.meta.env.BASE_URL })

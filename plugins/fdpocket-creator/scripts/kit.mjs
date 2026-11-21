@@ -17143,7 +17143,7 @@ var init_token = __esm(() => {
 });
 
 // frontend/packages/project-protocol/src/bridge.ts
-var nonceSchema, initMessage, helloMessage, safeAreaInsets, LOCALES, hostContext, contextMessage, contextUpdateMessage, appPathSchema, BRIDGE_OPS, bridgeOpName, none, BRIDGE_OP_PAYLOADS, bridgeOpMessage, replyMessage;
+var nonceSchema, initMessage, helloMessage, safeAreaInsets, LOCALES, COLOR_SCHEMES, hostContext, contextMessage, contextUpdateMessage, appPathSchema, BRIDGE_OPS, bridgeOpName, none, BRIDGE_OP_PAYLOADS, bridgeOpMessage, replyMessage;
 var init_bridge = __esm(() => {
   init_zod();
   init_connections();
@@ -17169,13 +17169,15 @@ var init_bridge = __esm(() => {
     left: exports_external.number().min(0)
   }));
   LOCALES = ["ja", "en"];
+  COLOR_SCHEMES = ["light", "dark"];
   hostContext = contract((o) => o.object({
     token: exports_external.string().min(1),
     expiresAt: exports_external.iso.datetime(),
     session: session.in(o),
     gatewayUrl: exports_external.url(),
     locale: o.enum(LOCALES),
-    safeArea: safeAreaInsets.in(o)
+    safeArea: safeAreaInsets.in(o),
+    colorScheme: o.enum(COLOR_SCHEMES).optional()
   }));
   contextMessage = contract((o) => o.object({
     type: exports_external.literal("context"),
@@ -17187,7 +17189,8 @@ var init_bridge = __esm(() => {
     token: exports_external.string().min(1).optional(),
     expiresAt: exports_external.iso.datetime().optional(),
     session: session.in(o).optional(),
-    safeArea: safeAreaInsets.in(o).optional()
+    safeArea: safeAreaInsets.in(o).optional(),
+    colorScheme: o.enum(COLOR_SCHEMES).optional()
   }));
   appPathSchema = exports_external.string().max(2048).refine(isAppPath);
   BRIDGE_OPS = [
@@ -305235,7 +305238,7 @@ var COMMANDS = {
   assets: { actions: ["add"], required: ["url", "sha256", "path"], optional: [] },
   open: { required: ["url"], optional: [] },
   read: { required: ["file", "out"], optional: ["pages", "max-chars"] },
-  shot: { required: ["out"], optional: ["host", "app", "as", "path", "widths", "locale"] },
+  shot: { required: ["out"], optional: ["host", "app", "as", "path", "widths", "locale", "theme"] },
   "codex-config": { required: [], optional: [], switches: ["write"] }
 };
 var USAGE = `usage: node <kit>/scripts/kit.mjs <command> [--flag value]…
@@ -321890,6 +321893,9 @@ const requestedLocale = params.get('locale')
 const locale = requestedLocale === 'ja' || requestedLocale === 'en' ? requestedLocale : navigator.language.toLowerCase().startsWith('ja') ? 'ja' : 'en'
 const messages = ${scriptJson(hostMessages)}
 const t = messages[locale]
+// スーパーアプリの外観の設定の代わり（kit shot --theme）。無ければ、この画面を開いた端末の設定
+const requestedTheme = params.get('theme')
+const colorScheme = requestedTheme === 'light' || requestedTheme === 'dark' ? requestedTheme : matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light'
 document.documentElement.lang = locale
 for (const element of document.querySelectorAll('[data-i18n]')) element.textContent = t[element.dataset.i18n]
 for (const element of document.querySelectorAll('[data-i18n-label]')) element.setAttribute('aria-label', t[element.dataset.i18nLabel])
@@ -322075,7 +322081,7 @@ function connectApp(launch) {
         port.postMessage({
           type:'context', token:launch.session.token, expiresAt:launch.session.expiresAt,
           session:launch.session.session, gatewayUrl:config.appGatewayUrl ?? config.gatewayUrl,
-          host:'superapp', locale, safeArea:{top:0,right:0,bottom:0,left:0},
+          host:'superapp', locale, colorScheme, safeArea:{top:0,right:0,bottom:0,left:0},
         })
         traceMark('sdk_ready')
         if (config.live) notifyStudio({type:'kit-live',event:'ready'})
@@ -326722,11 +326728,15 @@ function hostPageUrl(options2) {
   if (!/^\/(?!\/)/.test(options2.path)) {
     throw new ShotError('--path must start with a single "/" (a path inside the app)');
   }
+  if (options2.theme !== undefined && options2.theme !== "light" && options2.theme !== "dark") {
+    throw new ShotError("--theme must be light or dark");
+  }
   host.search = new URLSearchParams({
     app: options2.app,
     as: options2.as,
     path: options2.path,
     locale: options2.locale,
+    ...options2.theme ? { theme: options2.theme } : {},
     chrome: "none"
   }).toString();
   return host.href;
@@ -326815,7 +326825,7 @@ async function takeShots(options2, launch = launchChromium) {
         const inspected = await frame2.evaluate(inspectPage, limits2);
         const height = Math.min(MAX_HEIGHT, Math.max(MIN_HEIGHT, inspected.height));
         await page.setViewportSize({ width, height });
-        const file6 = join46(options2.out, `${options2.app}-${width}.png`);
+        const file6 = join46(options2.out, `${options2.app}-${width}${options2.theme ? `-${options2.theme}` : ""}.png`);
         await page.screenshot({ path: file6, type: "png" });
         shots.push({
           width,
@@ -328526,7 +328536,8 @@ async function shotCommand(context, flags) {
     path: flags.path ?? "/",
     widths: parseWidths(flags.widths),
     out: resolve4(context.cwd, flags.out),
-    locale: flags.locale ?? "ja"
+    locale: flags.locale ?? "ja",
+    ...flags.theme ? { theme: flags.theme } : {}
   });
   print(context, result);
 }

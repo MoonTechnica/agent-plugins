@@ -57,6 +57,14 @@ python3 <kit>/skills/fdpocket-ui-ux-pro-max/scripts/search.py "list row badge" -
 - 生の色（`bg-zinc-900`・`text-white`・`#fff`）を書かない。必ずトークン（`bg-primary` / `text-muted-foreground` / `border-border` …）。ダークモードが壊れる。
 - 色だけで意味を伝えない（アイコン・文言を添える）。文字のコントラストは 4.5:1 以上（トークンはそれを満たす）。
 
+**明暗（ダークモード）**: 明と暗の両方で使えるようにする。切り替えはひな形が済ませている。
+
+- `html` の `.dark` クラスで切り替わる（`globals.css` の `.dark {}` のトークンと `dark:`）。付け外しは `AppShell` の `colorScheme={useColorScheme()}`（ひな形の `__root.tsx`）。スーパーアプリの中ならその外観の設定、ブラウザ・ホーム画面なら端末の設定に従う。
+- **自分で `.dark` を付け外ししない・明暗の切り替えボタンを作らない**（スーパーアプリの設定とずれる）。`prefers-color-scheme` を CSS や JS で直接見ない（スーパーアプリの中で設定と食い違う）。
+- 色はトークンだけで書けば、暗い画面は何もしなくても正しくなる。`dark:` を書くのは、トークンで表せない所（画像の上の文字・グラフの線の濃さ）だけ。
+- 画像・ロゴは暗い背景でも見えるか確かめる（透過 PNG の黒い線が消える）。必要なら背景付きの枠に入れる。
+- 影は暗い画面ではほぼ見えない。まとまりは影ではなく枠（`border`）と背景（`bg-card`）の差で見せる。
+
 ## 4. 骨格と部品（ひな形にある。なければ足す）
 
 `@workspace/ui/components/*`: `app-shell`・`page-header`・`empty-state`・`card`・`button`・`input`・`textarea`・`label`・`badge`・`skeleton`・`separator`・`tabs`・`switch`・`avatar`・`dialog`・`sheet`。
@@ -118,7 +126,7 @@ node <kit>/scripts/kit.mjs shot --out /tmp/fdpocket/shots --path /          # �
 node <kit>/scripts/kit.mjs shot --out /tmp/fdpocket/shots --as admin --app admin --path /   # 管理画面
 ```
 
-- 既定は 390px（スマホ）と 1280px（PC）の 2 枚。画像（`/tmp/fdpocket/shots/<app>-<幅>.png`）を**開いて見る**。
+- 既定は 390px（スマホ）と 1280px（PC）の 2 枚。**暗い画面も 1 回は撮る**（`--theme dark`。画像は `<app>-<幅>-dark.png`）。画像（`/tmp/fdpocket/shots/<app>-<幅>.png`）を**開いて見る**。
 - JSON の `checks` も読む: `horizontalOverflow: true`（横にはみ出している）・`smallTargets`（44px 未満の操作）・`smallTextCount`（12px 未満の文字）・`consoleErrors`（コンソールエラー。画像の参照切れも）。**どれも 0 / false になるまで直す。**
 - 空・読み込み中・エラーの状態も撮って見る（`seed.ts` を空にする・存在しない `--path` を開くなど）。
 - 見た画像で次を確かめる: 主役が 1 つに見えるか／余白がそろっているか／文字が読めるか／押せそうな所が押せそうに見えるか／色が 1 色に絞られているか。
@@ -129,6 +137,7 @@ node <kit>/scripts/kit.mjs shot --out /tmp/fdpocket/shots --as admin --app admin
 - 無彩色のまま（ひな形の `--brand-hue` を用途に合わせないまま）にする。
 - 画面の中央に 1 枚の `Card` だけを置く。外枠を自作する。カードを入れ子にする。
 - 生の色・外部 CDN のフォント・絵文字のアイコン・ランディングページ風の hero を使う。
+- 明暗の切り替えを自作する・暗い画面を撮らずに終える。
 - 色だけで状態を伝える。操作が 44px 未満のまま出す。入力欄の文字を 16px 未満にする。
 - ひな形の部品と違う見た目のボタン・入力欄を画面ごとに手書きする。
 - `kit shot` を撮らず、撮っても見ずに終える。
