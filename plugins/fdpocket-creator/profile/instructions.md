@@ -41,6 +41,11 @@ Project は利用者向けの `web` と、必要なら管理用の `admin` の A
 | `$fdpocket-app-ui` | **必ず**。画面の作り方（shadcn・Tailwind・スマホ幅とキーボード・5 つの状態・一覧のページング・エラーの出し方） |
 | `$fdpocket-app-visual` | **画面を作る・直すとき必ず**（`$fdpocket-app-ui` と一緒に）。方向を 3 行で決める → トークン（`--brand-hue`）と部品で組む → `kit shot` で撮って見て直す。クラウドでも手元でも同じ手順 |
 | `$fdpocket-ui-ux-pro-max` | `$fdpocket-app-visual` から使う。業種に合う色・書体・スタイル・119 の UX 指針を `search.py` で検索する（Python のみ・ネット不要） |
+| `$fdpocket-app-ux-patterns` | **画面の流れ・操作を作るとき必ず**。行き来（タブ・戻る・深さ）、フォーム、結果の伝え方、削除と取り消し、検索・絞り込み、初めての人 |
+| `$fdpocket-app-ux-writing` | **画面の文言を書くとき必ず**。ボタン・入力欄・空・エラー・確認・通知を業務の言葉で短く（全対応言語） |
+| `$fdpocket-app-data-display` | 一覧・表・数字・日時・ダッシュボード・グラフを見せるとき（依存を足さずに SVG で描く） |
+| `$fdpocket-app-accessibility` | **画面を作る・直すとき**。キーボード・フォーカス・読み上げ・コントラスト・動きを減らす設定 |
+| `$fdpocket-app-design-review` | **画面を作り終えて「できた」と言う前に必ず**。`kit shot` で撮り、7 つの観点で採点して、合格の線まで直す |
 | `$fdpocket-app-testing` | **必ず**（データと画面ができたときと着地の前）。Vitest、`kit dev` での確認、`kit check`、`kit build` の結果の読み方 |
 | `$fdpocket-app-listing` | **必ず**（版を作るターン）。掲載情報（名前・キャッチコピー・説明・カテゴリ・タグ・アイコン・カバー） |
 | `$fdpocket-app-admin` | 管理画面を作るとき・権限（Role / Permission）を設計するとき |
@@ -74,6 +79,7 @@ Project は利用者向けの `web` と、必要なら管理用の `admin` の A
 - **確かめてから「できた」と言う。** 確かめていないことは「未確認」と書く（`acceptance`・`releaseNotes`）。
 - **見た目も同じ基準で作る。** 画面を作る・直すときは `$fdpocket-app-visual` の手順で、方向を決め（`$fdpocket-ui-ux-pro-max` の検索）、ひな形の部品とトークンで組み、
   **`kit shot` で自分の画面を撮って見て直してから**「できた」と言う（`$fdpocket-app-visual` §7）。見た目をひな形の既定のまま・自分の既定のままにしない。
+  流れ・文言・誰でも使えるかも同じ重さで扱い（`$fdpocket-app-ux-patterns` / `$fdpocket-app-ux-writing` / `$fdpocket-app-accessibility`）、最後に `$fdpocket-app-design-review` で採点して合格の線まで直す。
 - **覚える。ただしコードを写さない。** 前の版の `design/context.md`（業務の文脈・依頼者が決めたこと・見た目の方向）を最初に読み、終わりに更新する。
   コードを読めば分かること（画面一覧・データモデル）は書かない。
 - **本番にも要る固定の行（カテゴリ・プランなど）はマスタデータとして `masters.ts` に書き、`kit db migrate` で migration にする。**
@@ -123,7 +129,7 @@ Project は利用者向けの `web` と、必要なら管理用の `admin` の A
    `pending/data.sql` は既存の値を移すためだけに使い、新しい行の `INSERT … VALUES` を書かない（main と本番にそのまま入る）。固定の行は `masters.ts`、見本の行は `seed.ts`（`$fdpocket-app-data-model`「行をどこに書くか」）。
    試用データを `packages/db-schema/seed.ts` に。
 3. **project.yaml**: 各 App が使うモデル × 操作・バケット × 操作だけを capability に宣言し、Role と Permission を決める（spec §2。`$fdpocket-app-admin`）。
-4. **画面**（`$fdpocket-app-ui`）: `apps/<slug>` の各web Appを `@workspace/sdk` の `client` と `@workspace/miniapp-sdk/react` のフックで作る。
+4. **画面**（`$fdpocket-app-ui` / `$fdpocket-app-visual` / `$fdpocket-app-ux-patterns` / `$fdpocket-app-ux-writing`。仕上げに `$fdpocket-app-design-review`）: `apps/<slug>` の各web Appを `@workspace/sdk` の `client` と `@workspace/miniapp-sdk/react` のフックで作る。
    認可は Gateway とポリシーに任せ、画面は `client.auth.can()` で出し分けるだけ。
 5. **確かめる**（`$fdpocket-app-testing`）: 完成の基準を、業務の言葉の名前を付けたテストとして持つ（`$fdpocket-app-testing` §6）。純ロジックは Vitest。`kit dev` で起動して主要な画面が開くこと・権限の無い主体で admin が開けないことを確かめる（§6）。
    `node <kit>/scripts/kit.mjs check` が通ること。

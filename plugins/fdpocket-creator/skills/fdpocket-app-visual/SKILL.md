@@ -8,6 +8,7 @@ description: ミニアプリの画面を「用途に合った、整った見た�
 目的は、**どのアプリも同じ素っ気ない灰色の画面にならず、用途に合った整った画面にすること**。
 個別の知識は `$fdpocket-ui-ux-pro-max`（色・書体・スタイル・UX 指針の検索）に任せ、ここでは**このプラットフォームでの手順と約束**を決める。
 `$fdpocket-app-ui`（技術的な約束）と一緒に使う。
+操作の流れは `$fdpocket-app-ux-patterns`、文言は `$fdpocket-app-ux-writing`、表・数字・グラフは `$fdpocket-app-data-display`、誰でも使えるかは `$fdpocket-app-accessibility`、仕上げの採点は `$fdpocket-app-design-review`。
 
 ## 1. 方向を 3 行で決める（作る前に）
 
