@@ -93,7 +93,7 @@ function TaskList({ workspaceId }: { workspaceId: string }) {
 - 入力には意味に合った属性: `type="email"` `autoComplete="email"` / `inputMode="numeric"` / `enterKeyHint="send"` など。
 - キーボードが画面の半分を覆う。送信ボタンを画面下に固定するなら、入力中も届くこと（フォームの直下に置くのが確実）。
 - タップできる要素は 44×44px 以上（小さいアイコンも padding で広げる）。破壊的な操作（削除）を主要な操作の隣に置かず、確認を挟む。
-- 埋め込み時はセーフエリアを `useSafeArea()` で取り、画面の端に固定するバーに padding として足す。
+- セーフエリアは開き方で取り方が違う。画面の端に接する要素は `globals.css` の `--safe-*` で余白を取る（`AppShell` に `safeArea={useSafeArea()}` を渡す。`env()` を直接書かない。`$fdpocket-app-pwa` §2）。
 - モーダルはスマホ幅では下から出るシートにする。
 
 ## 5. 権限による出し分け

@@ -45,6 +45,7 @@ Project は利用者向けの `web` と、必要なら管理用の `admin` の A
 | `$fdpocket-app-ux-writing` | **画面の文言を書くとき必ず**。ボタン・入力欄・空・エラー・確認・通知を業務の言葉で短く（全対応言語） |
 | `$fdpocket-app-data-display` | 一覧・表・数字・日時・ダッシュボード・グラフを見せるとき（依存を足さずに SVG で描く） |
 | `$fdpocket-app-accessibility` | **画面を作る・直すとき**。キーボード・フォーカス・読み上げ・コントラスト・動きを減らす設定 |
+| `$fdpocket-app-pwa` | **画面の端に接する要素（ヘッダー・下のバー）・戻る導線・オフラインを作るとき必ず**。スーパーアプリの中・ブラウザ・ホーム画面のどれで開いても崩さない（セーフエリアは `--safe-*`） |
 | `$fdpocket-app-design-review` | **画面を作り終えて「できた」と言う前に必ず**。`kit shot` で撮り、7 つの観点で採点して、合格の線まで直す |
 | `$fdpocket-app-testing` | **必ず**（データと画面ができたときと着地の前）。Vitest、`kit dev` での確認、`kit check`、`kit build` の結果の読み方 |
 | `$fdpocket-app-listing` | **必ず**（版を作るターン）。掲載情報（名前・キャッチコピー・説明・カテゴリ・タグ・アイコン・カバー） |
@@ -129,7 +130,7 @@ Project は利用者向けの `web` と、必要なら管理用の `admin` の A
    `pending/data.sql` は既存の値を移すためだけに使い、新しい行の `INSERT … VALUES` を書かない（main と本番にそのまま入る）。固定の行は `masters.ts`、見本の行は `seed.ts`（`$fdpocket-app-data-model`「行をどこに書くか」）。
    試用データを `packages/db-schema/seed.ts` に。
 3. **project.yaml**: 各 App が使うモデル × 操作・バケット × 操作だけを capability に宣言し、Role と Permission を決める（spec §2。`$fdpocket-app-admin`）。
-4. **画面**（`$fdpocket-app-ui` / `$fdpocket-app-visual` / `$fdpocket-app-ux-patterns` / `$fdpocket-app-ux-writing`。仕上げに `$fdpocket-app-design-review`）: `apps/<slug>` の各web Appを `@workspace/sdk` の `client` と `@workspace/miniapp-sdk/react` のフックで作る。
+4. **画面**（`$fdpocket-app-ui` / `$fdpocket-app-visual` / `$fdpocket-app-ux-patterns` / `$fdpocket-app-ux-writing` / `$fdpocket-app-pwa`。仕上げに `$fdpocket-app-design-review`）: `apps/<slug>` の各web Appを `@workspace/sdk` の `client` と `@workspace/miniapp-sdk/react` のフックで作る。
    認可は Gateway とポリシーに任せ、画面は `client.auth.can()` で出し分けるだけ。
 5. **確かめる**（`$fdpocket-app-testing`）: 完成の基準を、業務の言葉の名前を付けたテストとして持つ（`$fdpocket-app-testing` §6）。純ロジックは Vitest。`kit dev` で起動して主要な画面が開くこと・権限の無い主体で admin が開けないことを確かめる（§6）。
    `node <kit>/scripts/kit.mjs check` が通ること。

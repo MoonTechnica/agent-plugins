@@ -4,6 +4,8 @@
 @import "@fontsource-variable/geist";
 
 @custom-variant dark (&:is(.dark *));
+/* ホーム画面から全画面で開いたとき（PWA）だけ効かせる: `standalone:flex`（`$app-pwa` §1） */
+@custom-variant standalone (@media (display-mode: standalone));
 @source "../../../apps/**/*.{ts,tsx}";
 @source "../../../components/**/*.{ts,tsx}";
 @source "../**/*.{ts,tsx}";
@@ -67,6 +69,16 @@
  * ほかのトークンの名前は変えない（部品が参照している）。ダークモードも同じ `--brand-hue` に従う。
  */
 :root {
+    /*
+     * セーフエリア（ノッチ・ホームバー・角の丸み）。開き方で取り方が違うので、ここで 1 つにまとめる（`$app-pwa` §2）。
+     *   スーパーアプリの中: Host が渡す値（`AppShell` が `--host-safe-*` に入れる。中では env() が 0 になる）
+     *   ホーム画面（PWA）・ブラウザ: env()（index.html の `viewport-fit=cover` で値が入る）
+     * 大きい方を使う。画面の端に接する要素は env() や固定の px ではなく、必ずこの変数で余白を取る。
+     */
+    --safe-top: max(var(--host-safe-top, 0px), env(safe-area-inset-top, 0px));
+    --safe-right: max(var(--host-safe-right, 0px), env(safe-area-inset-right, 0px));
+    --safe-bottom: max(var(--host-safe-bottom, 0px), env(safe-area-inset-bottom, 0px));
+    --safe-left: max(var(--host-safe-left, 0px), env(safe-area-inset-left, 0px));
     --brand-hue: 258;
     --background: oklch(0.985 0.004 var(--brand-hue));
     --foreground: oklch(0.2 0.02 var(--brand-hue));
@@ -152,6 +164,8 @@
   * {
     @apply border-border outline-ring/50;
     }
+  /* 端まで引っ張ったとき（バウンス）に見える色も背景と同じに */
+  html { @apply bg-background; }
   body {
     @apply bg-background text-foreground antialiased;
     /* 日本語は欧文より行間を広げると読みやすい */
