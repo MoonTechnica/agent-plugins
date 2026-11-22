@@ -1,0 +1,256 @@
+<!doctype html>
+<!--
+  レイヤーで付ける二次運動 (髪・服・リボン・マント・旗) の型。手順は layer-rig.md。
+
+  書き換えるのは 3 か所だけ:
+    1. root の data-composition-id / data-width / data-height / data-duration
+    2. 素材の img (data-rig-part = rig.parts の並びの番号) を parts の数だけ。
+       html の data-composition-variables にも同じ数だけ宣言を並べる (id を揃える)
+    3. data-rig の JSON に rig_parts.py --json の出力を貼る
+  3D のカードに貼る (キャラが何人もいる) ときは、root から 2 つの script までを
+  frames/rig-<名前>.html の template に入れる。手順は layer-rig.md の 7。
+  動きの式 (place) は触らない。揺れ方を変えるなら rig の値 (amp / speed / lag / drift) を直す。
+  このコメントにタグを書かない (貼り込みの置換がコメントの中で効いて root が壊れる)。
+
+  守っていること:
+    - 描くのは hf-seek を受けたときだけ。入力は時刻 t だけ (前のフレームから積み上げない)
+    - 素材の img は表示しない。PixiJS は自分で作った Image に crossOrigin を付けて読み直す
+      (WebGL のテクスチャは CORS が要る。プレビューの audio / video に crossorigin を
+      付けてはいけない規則とは別物で、自前で作った要素にだけ付ける)
+    - 素材は最初の hf-seek で読み始め、終わるまで waitUntil で撮影を待たせる
+      (変数が img に差し込まれるのは script の実行より後)
+    - id を使わない。同じ型がシーンに何体あっても、script はまだ誰も受け持っていない
+      canvas を 1 つずつ受け持ち、探すのは自分の root の中だけ。時刻は全体の時刻なので、
+      root とその親たちの data-start の和を引いてから動かす
+-->
+<html
+  lang="ja"
+  data-composition-variables='[{"id":"rigPart0","type":"string","label":"rig part 0","default":""},{"id":"rigPart1","type":"string","label":"rig part 1","default":""},{"id":"rigPart2","type":"string","label":"rig part 2","default":""}]'
+>
+  <head>
+    <meta charset="UTF-8" />
+    <style>
+      html,
+      body {
+        margin: 0;
+        overflow: hidden;
+        background: transparent;
+      }
+      [data-rig-root] {
+        position: relative;
+        width: 100%;
+        height: 100%;
+        overflow: hidden;
+      }
+      canvas[data-rig-stage] {
+        position: absolute;
+        inset: 0;
+        width: 100%;
+        height: 100%;
+        display: block;
+      }
+      img[data-rig-part] {
+        display: none;
+      }
+    </style>
+  </head>
+  <body>
+    <div
+      data-rig-root
+      data-composition-id="rig"
+      data-start="0"
+      data-width="720"
+      data-height="1080"
+      data-duration="8"
+      data-no-timeline
+    >
+      <canvas data-rig-stage></canvas>
+      <img data-rig-part="0" data-var-src="rigPart0" alt="" />
+      <img data-rig-part="1" data-var-src="rigPart1" alt="" />
+      <img data-rig-part="2" data-var-src="rigPart2" alt="" />
+      <script type="application/json" data-rig>
+        {"width": 1024, "height": 1536, "parts": [], "wind": {"base": 1, "gust": 0, "rise": [0, 0], "fall": [0, 0], "dir": -1}}
+      </script>
+    </div>
+
+    <script type="module">
+      import {
+        Application,
+        Container,
+        MeshPlane,
+        Sprite,
+        Texture,
+      } from 'https://cdn.jsdelivr.net/npm/pixi.js@8.22.0/dist/pixi.min.mjs'
+
+      // この script が受け持つ型 (最初の hf-seek で、まだ誰も受け持っていない canvas を取る)
+      let stage = null
+      let root = null
+      let RIG = null
+      let W = 0
+      let H = 0
+      let SCALE = 1
+      let START = 0
+      function claim() {
+        stage = document.querySelector('canvas[data-rig-stage]:not([data-rig-claimed])')
+        if (!stage) throw new Error('rig: no canvas left for this script')
+        stage.setAttribute('data-rig-claimed', '')
+        root = stage.closest('[data-composition-id]')
+        RIG = JSON.parse(root.querySelector('script[data-rig]').textContent)
+        W = Number(root.dataset.width)
+        H = Number(root.dataset.height)
+        // 絵 (レイヤーの座標系) を画面に収める
+        SCALE = Math.min(W / RIG.width, H / RIG.height)
+        // hf-seek は全体の時刻。root とその親たちの data-start を引く
+        for (let node = root; node; node = node.parentElement) {
+          const raw = node.getAttribute('data-start')
+          if (raw === null || raw.trim() === '') continue
+          const value = Number(raw)
+          if (!Number.isFinite(value)) throw new Error(`rig: data-start="${raw}" (use seconds)`)
+          START += value
+        }
+      }
+
+      const smooth = (a, b, x) => {
+        if (b <= a) return 0
+        const u = Math.min(1, Math.max(0, (x - a) / (b - a)))
+        return u * u * (3 - 2 * u)
+      }
+      const gustAt = (t) =>
+        RIG.wind.gust * smooth(RIG.wind.rise[0], RIG.wind.rise[1], t) *
+        (1 - smooth(RIG.wind.fall[0], RIG.wind.fall[1], t))
+
+      // 支点から軸方向へどれだけ離れているか (0 = 支点の辺、1 = 反対の辺)
+      const AXES = {
+        down: { along: (x, y, p) => y - p.y, len: (w, h) => h, dir: [0, 1] },
+        up: { along: (x, y, p) => p.y - y, len: (w, h) => h, dir: [0, -1] },
+        right: { along: (x, y, p) => x - p.x, len: (w, h) => w, dir: [1, 0] },
+        left: { along: (x, y, p) => p.x - x, len: (w, h) => w, dir: [-1, 0] },
+      }
+
+      /** 頂点 1 つを時刻 t の位置へ。rig の値と t だけで決まる */
+      function place(part, x, y, t) {
+        const r = part.rig
+        const axis = AXES[r.axis]
+        const len = axis.len(part.w, part.h)
+        const k = Math.min(1, Math.max(0, axis.along(x, y, r.pin) / len))
+        if (k <= 0.001) return [x, y]
+        const g = gustAt(t)
+        const reach = k ** r.curve
+        const wave =
+          Math.sin(t * r.speed - k * r.lag + r.phase) +
+          0.3 * Math.sin(t * r.speed * 2.13 - k * r.lag * 1.8 + r.phase * 1.7)
+        const amount = (r.amp * (RIG.wind.base + g) * wave + RIG.wind.dir * r.drift * g) * reach
+        // amount が正なら先端は画面の右 (横向きの軸なら上) へ。wind.dir も同じ向き
+        if (r.mode === 'swing') {
+          const dx = x - r.pin.x
+          const dy = y - r.pin.y
+          const c = Math.cos(-amount)
+          const s = Math.sin(-amount)
+          return [r.pin.x + dx * c - dy * s, r.pin.y + dx * s + dy * c]
+        }
+        // shear / wave: 軸に垂直な方向へずらす (wave は lag が大きく布が波打つ)
+        const [ax, ay] = axis.dir
+        const off = amount * len
+        return [x + ay * off, y - ax * off]
+      }
+
+      // 網の頂点は画像の画素で並ぶ。rig の座標 (pin / w / h) は bounding box の画素なので
+      // sx / sy で行き来する (layerize は小さいパーツを bounding box より高い解像度で返す)
+      function deform(part, t) {
+        const { rest, data, buffer, sx, sy } = part.mesh
+        for (let i = 0; i < rest.length; i += 2) {
+          const [nx, ny] = place(part, rest[i] * sx, rest[i + 1] * sy, t)
+          data[i] = nx / sx
+          data[i + 1] = ny / sy
+        }
+        buffer.update()
+      }
+
+      function loadImage(el) {
+        return new Promise((resolve, reject) => {
+          const img = new Image()
+          img.crossOrigin = 'anonymous'
+          img.onload = () => resolve(img)
+          img.onerror = () => reject(new Error(`rig: could not load ${el.getAttribute('src')}`))
+          img.src = el.getAttribute('src')
+        })
+      }
+
+      const app = new Application()
+      // 素材は最初の hf-seek で読み始める。ランタイムが変数 (data-var-src) を img に
+      // 差し込むのはこの script が走った後なので、読み込み時に src を見ると空 (実測: GET /null)
+      let ready = null
+      const build = async () => {
+        claim()
+        await app.init({
+          canvas: stage,
+          width: W,
+          height: H,
+          autoStart: false,
+          sharedTicker: false,
+          antialias: true,
+          resolution: 1,
+          backgroundAlpha: 0,
+          preference: 'webgl',
+          preserveDrawingBuffer: true,
+        })
+        const figure = new Container()
+        figure.scale.set(SCALE)
+        figure.position.set((W - RIG.width * SCALE) / 2, (H - RIG.height * SCALE) / 2)
+        app.stage.addChild(figure)
+
+        // querySelector に `${}` を使うと公式バンドラの CSS パーサが落ちる (lint の error)
+        const sources = new Map(
+          [...root.querySelectorAll('img[data-rig-part]')].map((el) => [
+            Number(el.dataset.rigPart),
+            el,
+          ]),
+        )
+        const parts = []
+        for (const [n, part] of RIG.parts.entries()) {
+          const el = sources.get(n)
+          if (!el) throw new Error(`rig: no <img data-rig-part="${n}"> for ${part.layer}`)
+          const texture = Texture.from(await loadImage(el))
+          if (!part.rig) {
+            const sprite = new Sprite(texture)
+            sprite.position.set(part.x, part.y)
+            sprite.width = part.w
+            sprite.height = part.h
+            figure.addChild(sprite)
+            parts.push(part)
+            continue
+          }
+          const [vx, vy] = part.rig.grid
+          const plane = new MeshPlane({ texture, verticesX: vx, verticesY: vy })
+          plane.position.set(part.x, part.y)
+          // 画像の寸法ではなく bounding box の寸法で置く
+          const sx = part.w / texture.width
+          const sy = part.h / texture.height
+          plane.scale.set(sx, sy)
+          figure.addChild(plane)
+          const { buffer } = plane.geometry.getAttribute('aPosition')
+          const rest = Float32Array.from(buffer.data)
+          parts.push({ ...part, mesh: { buffer, data: buffer.data, rest, sx, sy } })
+        }
+        return parts.filter((p) => p.rig)
+      }
+      const ensure = () => {
+        ready ??= build().catch((error) => {
+          console.error(error)
+          throw error
+        })
+        return ready
+      }
+
+      function renderAt(moving, t) {
+        for (const part of moving) deform(part, t)
+        app.renderer.render(app.stage)
+      }
+
+      window.addEventListener('hf-seek', (event) => {
+        const { time, waitUntil } = event.detail
+        waitUntil(ensure().then((moving) => renderAt(moving, Math.max(0, time - START))))
+      })
+    </script>
+  </body>
+</html>

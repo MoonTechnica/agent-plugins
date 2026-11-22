@@ -16,6 +16,11 @@
       "name": "fdpocket-creator",
       "source": "./plugins/fdpocket-creator",
       "description": "ミニアプリ（web と admin の App・データ・ファイル）を手元の Coding Agent で作る Creator Kit（Skills・SDK・Kit の CLI・Platform MCP）"
+    },
+    {
+      "name": "opusia-creator",
+      "source": "./plugins/opusia-creator",
+      "description": "Make short films, animation and music videos with your own coding agent through Opusia: script, design sheets, storyboards, video, audio and the final render."
     }
   ]
 }

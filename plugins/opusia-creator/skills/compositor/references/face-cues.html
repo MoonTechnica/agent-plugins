@@ -1,0 +1,92 @@
+<!doctype html>
+<!--
+  まばたき・口パクの型 (差分の絵を時刻で 1 枚だけ見せる)。手順は motion-scene.md §3。
+
+  書き換えるのは 3 か所だけ:
+    1. root の data-width / data-height / data-duration (尺は face_cues.py の --duration と同じ)
+    2. 差分の img。顔の土台 (目を開けて口を閉じた顔) 1 枚、目を閉じた顔 1 枚、口を開けた顔を
+       話者の数だけ (data-mouth に face_cues.py の口の名前)。html の data-composition-variables に
+       同じ数・同じ id の宣言を並べる
+    3. id="face-cues" の JSON を face_cues.py --json の出力に差し替える
+  差分は同じ寸法・同じ構図で作ったもの (art-director の references/motion-stills.md §5)。
+  ほかの動き (カメラ・揺れ) と同じ composition に入れるときは、下の addFaceCues を
+  その composition の timeline に掛ける (timeline は 1 本)。
+  このコメントにタグを書かない (貼り込みの置換がコメントの中で効く)。
+-->
+<html
+  lang="ja"
+  data-composition-variables='[{"id":"faceBase","type":"string","label":"face base","default":""},{"id":"faceEyesClosed","type":"string","label":"eyes closed","default":""},{"id":"faceMouthOpenA","type":"string","label":"mouth open A","default":""}]'
+>
+  <head>
+    <meta charset="UTF-8" />
+    <style>
+      html,
+      body {
+        margin: 0;
+        overflow: hidden;
+        background: transparent;
+      }
+      #root {
+        position: relative;
+        width: 100%;
+        height: 100%;
+        overflow: hidden;
+      }
+      .face {
+        position: absolute;
+        inset: 0;
+        width: 100%;
+        height: 100%;
+        object-fit: contain;
+      }
+      .eyes-closed,
+      .mouth-open {
+        visibility: hidden;
+      }
+    </style>
+  </head>
+  <body>
+    <div
+      id="root"
+      data-composition-id="face"
+      data-start="0"
+      data-width="1080"
+      data-height="1920"
+      data-duration="8"
+    >
+      <img class="face" data-var-src="faceBase" alt="" />
+      <img class="face eyes-closed" data-var-src="faceEyesClosed" alt="" />
+      <img class="face mouth-open" data-mouth="A" data-var-src="faceMouthOpenA" alt="" />
+    </div>
+
+    <script type="application/json" id="face-cues">
+      {"duration": 8, "blinks": [], "mouths": {}}
+    </script>
+
+    <script src="https://cdn.jsdelivr.net/npm/gsap@3.14.2/dist/gsap.min.js"></script>
+    <script>
+      const CUES = JSON.parse(document.getElementById('face-cues').textContent)
+
+      // 区間の頭で見せ、終わりで隠す。フェードさせない (差分は一瞬で切り替える)
+      function showDuring(tl, el, spans) {
+        for (const [from, to] of spans) {
+          tl.set(el, { visibility: 'visible' }, from).set(el, { visibility: 'hidden' }, to)
+        }
+      }
+
+      function addFaceCues(tl) {
+        showDuring(tl, document.querySelector('.eyes-closed'), CUES.blinks)
+        // querySelector に `${}` を使わない (公式バンドラの CSS パーサが落ちる)
+        for (const el of document.querySelectorAll('.mouth-open')) {
+          showDuring(tl, el, CUES.mouths[el.dataset.mouth] || [])
+        }
+        return tl
+      }
+
+      const tl = addFaceCues(gsap.timeline({ paused: true }))
+      tl.set({}, {}, CUES.duration) // 最後の切り替えより後も尺いっぱい続ける
+      window.__timelines = window.__timelines || {}
+      window.__timelines.face = tl
+    </script>
+  </body>
+</html>

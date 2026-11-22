@@ -1,0 +1,18 @@
+{
+  "name": "opusia-creator",
+  "displayName": "Opusia",
+  "version": "1.0.d93bad75",
+  "description": "Make short films, animation and music videos with your own coding agent through Opusia: script, design sheets, storyboards, video, audio and the final render.",
+  "author": {
+    "name": "Moon Technica"
+  },
+  "homepage": "https://opusia.app",
+  "repository": "https://github.com/MoonTechnica/agent-plugins",
+  "license": "MIT-0",
+  "keywords": [
+    "opusia",
+    "video",
+    "animation",
+    "film"
+  ]
+}

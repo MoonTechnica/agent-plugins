@@ -1,0 +1,11 @@
+{
+  "mcpServers": {
+    "opusia": {
+      "type": "http",
+      "url": "${OPUSIA_MCP_URL:-https://opusia.app/mcp}",
+      "oauth": {
+        "callbackPort": 43126
+      }
+    }
+  }
+}
