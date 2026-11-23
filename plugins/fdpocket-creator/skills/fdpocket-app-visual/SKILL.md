@@ -126,7 +126,7 @@ node <kit>/scripts/kit.mjs shot --out /tmp/fdpocket/shots --path /          # �
 node <kit>/scripts/kit.mjs shot --out /tmp/fdpocket/shots --as admin --app admin --path /   # 管理画面
 ```
 
-- 既定は 390px（スマホ）と 1280px（PC）の 2 枚。**暗い画面も 1 回は撮る**（`--theme dark`。画像は `<app>-<幅>-dark.png`）。画像（`/tmp/fdpocket/shots/<app>-<幅>.png`）を**開いて見る**。
+- 既定は 390px（スマホ）と 1280px（PC）の 2 枚。**暗い画面も 1 回は撮る**（`--theme dark`。画像は `<app>-<幅>-dark.png`）。画面の端に固定したバー・シートがあるなら、ノッチとホームバーを重ねた 1 枚も撮る（`--safe-area iphone`。`$fdpocket-app-pwa` §2）。画像（`/tmp/fdpocket/shots/<app>-<幅>.png`）を**開いて見る**。
 - JSON の `checks` も読む: `horizontalOverflow: true`（横にはみ出している）・`smallTargets`（44px 未満の操作）・`smallTextCount`（12px 未満の文字）・`consoleErrors`（コンソールエラー。画像の参照切れも）。**どれも 0 / false になるまで直す。**
 - 空・読み込み中・エラーの状態も撮って見る（`seed.ts` を空にする・存在しない `--path` を開くなど）。
 - 見た画像で次を確かめる: 主役が 1 つに見えるか／余白がそろっているか／文字が読めるか／押せそうな所が押せそうに見えるか／色が 1 色に絞られているか。

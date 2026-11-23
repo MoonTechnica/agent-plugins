@@ -25,7 +25,7 @@ function SheetContent({
       <SheetPrimitive.Content
         data-slot="sheet-content"
         className={cn(
-          'fixed inset-x-0 bottom-0 z-50 mx-auto flex max-h-[90dvh] w-full max-w-2xl flex-col gap-4 overflow-y-auto rounded-t-3xl border-t bg-popover p-5 pb-[max(1.25rem,var(--safe-bottom))] text-popover-foreground shadow-lg outline-none data-[state=closed]:animate-out data-[state=closed]:slide-out-to-bottom data-[state=open]:animate-in data-[state=open]:slide-in-from-bottom motion-reduce:animate-none',
+          'fixed inset-x-0 bottom-0 z-50 mx-auto flex max-h-[calc(100dvh_-_var(--safe-top)_-_2rem)] w-full max-w-2xl flex-col gap-4 overflow-y-auto overscroll-contain rounded-t-3xl border-t bg-popover p-5 pr-[max(1.25rem,var(--safe-right))] pb-[max(1.25rem,var(--safe-bottom))] pl-[max(1.25rem,var(--safe-left))] text-popover-foreground shadow-lg outline-none data-[state=closed]:animate-out data-[state=closed]:slide-out-to-bottom data-[state=open]:animate-in data-[state=open]:slide-in-from-bottom motion-reduce:animate-none',
           className
         )}
         {...props}

@@ -16,6 +16,7 @@ node <kit>/scripts/kit.mjs shot --out /tmp/fdpocket/shots --path /              
 node <kit>/scripts/kit.mjs shot --out /tmp/fdpocket/shots --path /tasks/<id>       # 詳細（実在の id で）
 node <kit>/scripts/kit.mjs shot --out /tmp/fdpocket/shots --as admin --app admin --path /
 node <kit>/scripts/kit.mjs shot --out /tmp/fdpocket/shots --path / --theme dark    # 暗い画面
+node <kit>/scripts/kit.mjs shot --out /tmp/fdpocket/shots --path / --widths 390 --safe-area iphone    # ノッチ・ホームバー（$fdpocket-app-pwa §2）
 ```
 
 - 撮るのは **いちばん多い操作で通る画面すべて**（一覧・詳細・作成フォーム）と、**空・エラーの状態**（`$fdpocket-app-visual` §7）。

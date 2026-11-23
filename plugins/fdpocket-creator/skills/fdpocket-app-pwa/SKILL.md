@@ -42,6 +42,11 @@ description: ミニアプリをホーム画面に置いて全画面で開いた�
 - 二重に足さない: 親が余白を取ったら、子でまた足さない（ノッチの分だけ空白が 2 倍になる）。
 - 高さは `h-dvh` / `min-h-dvh`。`h-screen`（`100vh`）は iOS で下が切れる。
 - 横向き・タブレット幅でも、左右の余白と `max-w-*` で本文が端に張り付かないこと。
+- 自作のモーダル・固定パネルも高さは `max-h-[calc(100dvh_-_var(--safe-top)_-_var(--safe-bottom)_-_2rem)]` と `overflow-y-auto overscroll-contain`（ひな形の `Dialog` / `Sheet` と同じ）。中身が長くても閉じるボタンがノッチの下に隠れない。
+- ホーム画面で引っ張ったときに画面全体が伸びないよう、ひな形の `globals.css` が `display-mode: standalone` のときだけ `overscroll-behavior-y: none` にしている。消さない。
+- 上の帯は Platform が `apple-mobile-web-app-status-bar-style: default`（状態バーの下から画面が始まる）にしている。iOS のホーム画面では `--safe-top` が 0 になることがあるが、それで正しい。
+
+公式の指針: [WebKit: Designing websites for iPhone X](https://webkit.org/blog/7929/designing-websites-for-iphone-x/)（`viewport-fit=cover` と `max(余白, env())`）・[Chrome: edge-to-edge](https://developer.chrome.com/docs/css-ui/edge-to-edge)・[web.dev: app-like PWAs](https://web.dev/learn/pwa/app-design)（`display-mode`・`overscroll-behavior`・theme-color の明暗）。
 
 ## 3. ブラウザのボタンが無い前提で作る
 
@@ -93,6 +98,7 @@ window.addEventListener("vite:preloadError", () => {
 
 ## 8. 確かめる
 
-1. `kit shot` で幅 390 の画面を撮り、上のヘッダー・下のバーが端に張り付いていないか見る。
-2. コードを読んで: `env(safe-area-inset-` を直接書いていない／`fixed bottom-0` の要素に `--safe-bottom` がある／詳細の画面すべてに戻る導線がある／`location.href` で別のオリジンへ移っていない／Service Worker・manifest を書いていない。
-3. 実機のホーム画面では確かめられないので、確かめられなかったことを結果に書く（ノッチのある端末での見え方など）。
+1. `kit shot --safe-area iphone --widths 390` で、ノッチ（上 59px）とホームバー（下 34px）を赤い縞で重ねて撮る。縞の上に文字・ボタンが乗っていないか、下のバーの背景が縞の下まで伸びているかを見る（`--safe-area 上,右,下,左` で横向きなども再現できる）。
+2. `kit check` の警告 `SAFE_AREA_*`（`h-screen`・`env()` の直書き・安全領域の無い端の固定バー）が出ていたら直す。
+3. コードを読んで: `env(safe-area-inset-` を直接書いていない／`fixed bottom-0` の要素に `--safe-bottom` がある／詳細の画面すべてに戻る導線がある／`location.href` で別のオリジンへ移っていない／Service Worker・manifest を書いていない。
+4. 実機のホーム画面では確かめられないので、確かめられなかったことを結果に書く（ノッチのある端末での見え方など）。

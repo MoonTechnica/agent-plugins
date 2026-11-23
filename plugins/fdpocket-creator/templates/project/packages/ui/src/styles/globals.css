@@ -172,6 +172,14 @@
     line-height: 1.65;
     }
   /* 見出しは字間を少し詰める。数字は桁をそろえる（金額・件数・時刻） */
+  /*
+   * ホーム画面（PWA）で開いたときだけ、アプリらしい挙動にする（web.dev「Make it feel like an app」）。
+   * 端まで引っ張っても画面全体が跳ねたり、Chrome Android の引っ張って更新が走ったりしないようにする。
+   * ブラウザで開いたときは利用者の更新操作を奪わない。
+   */
+  @media (display-mode: standalone) {
+    html, body { overscroll-behavior-y: none; }
+  }
   h1, h2, h3 { letter-spacing: -0.01em; }
   .tabular { font-variant-numeric: tabular-nums; }
 }
