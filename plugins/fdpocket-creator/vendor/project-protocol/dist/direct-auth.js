@@ -72,6 +72,31 @@ export const directAuthResultSchema = tokenExchangeResponse.exact.extend({
     projectId: z.uuid(),
     app: appSlugSchema,
 });
+/**
+ * Long-lived resume session behind the origin's `__Host-` HttpOnly cookie
+ * (share-and-direct-access.md §3.3). Only origin Worker ↔ Gateway carry the secret; it never
+ * reaches page script.
+ */
+export const DIRECT_SESSION_COOKIE = '__Host-fdp_session';
+export const DIRECT_AUTH_RESUME_PATH = '/_platform/auth/resume';
+export const DIRECT_AUTH_SIGNOUT_PATH = '/_platform/auth/signout';
+export const directSessionSchema = z.strictObject({
+    secret: directAuthOpaqueSchema,
+    absoluteExpiresAt: z.iso.datetime({ offset: true }),
+});
+/** Gateway → origin Worker only. The Worker moves `session` into the cookie and strips it. */
+export const directAuthExchangeResultSchema = directAuthResultSchema.extend({
+    session: directSessionSchema,
+});
+export const directAuthResumeSchema = z.strictObject({
+    secret: directAuthOpaqueSchema,
+    origin: directAuthOriginSchema,
+    path: directAuthPathSchema,
+});
+export const directAuthRevokeSchema = z.strictObject({
+    secret: directAuthOpaqueSchema,
+    origin: directAuthOriginSchema,
+});
 export async function pkceChallenge(verifier) {
     const digest = new Uint8Array(await crypto.subtle.digest('SHA-256', new TextEncoder().encode(verifier)));
     return btoa(String.fromCharCode(...digest))

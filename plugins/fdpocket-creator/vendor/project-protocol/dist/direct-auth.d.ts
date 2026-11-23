@@ -102,5 +102,74 @@ export declare const directAuthResultSchema: z.ZodObject<{
     app: z.ZodString;
 }, z.core.$strip>;
 export type DirectAuthResult = z.infer<typeof directAuthResultSchema>;
+/**
+ * Long-lived resume session behind the origin's `__Host-` HttpOnly cookie
+ * (share-and-direct-access.md §3.3). Only origin Worker ↔ Gateway carry the secret; it never
+ * reaches page script.
+ */
+export declare const DIRECT_SESSION_COOKIE = "__Host-fdp_session";
+export declare const DIRECT_AUTH_RESUME_PATH = "/_platform/auth/resume";
+export declare const DIRECT_AUTH_SIGNOUT_PATH = "/_platform/auth/signout";
+export declare const directSessionSchema: z.ZodObject<{
+    secret: z.ZodString;
+    absoluteExpiresAt: z.ZodISODateTime;
+}, z.core.$strict>;
+export type DirectSession = z.infer<typeof directSessionSchema>;
+/** Gateway → origin Worker only. The Worker moves `session` into the cookie and strips it. */
+export declare const directAuthExchangeResultSchema: z.ZodObject<{
+    token: z.ZodString;
+    expiresAt: z.ZodISODateTime;
+    delivery: z.ZodObject<{
+        token: z.ZodString;
+        expiresAt: z.ZodISODateTime;
+    }, z.core.$strict>;
+    deliveryLaunch: z.ZodObject<{
+        token: z.ZodString;
+        expiresAt: z.ZodISODateTime;
+        session: z.ZodObject<{
+            userId: z.ZodString;
+            globalUserId: z.ZodString;
+            displayName: z.ZodNullable<z.ZodString>;
+            isAnonymous: z.ZodBoolean;
+            permissions: z.ZodArray<z.ZodString>;
+            expiresAt: z.ZodISODateTime;
+            apps: z.ZodArray<z.ZodObject<{
+                slug: z.ZodString;
+                kind: z.ZodEnum<{
+                    web: "web";
+                    api: "api";
+                    jobs: "jobs";
+                    python: "python";
+                    mcp: "mcp";
+                }>;
+                access: z.ZodEnum<{
+                    public: "public";
+                    restricted: "restricted";
+                }>;
+                displayName: z.ZodNullable<z.ZodObject<{
+                    ja: z.ZodString;
+                    en: z.ZodString;
+                }, z.core.$strict>>;
+                canOpen: z.ZodBoolean;
+            }, z.core.$strip>>;
+        }, z.core.$strip>;
+    }, z.core.$strip>;
+    path: z.ZodString;
+    projectId: z.ZodUUID;
+    app: z.ZodString;
+    session: z.ZodObject<{
+        secret: z.ZodString;
+        absoluteExpiresAt: z.ZodISODateTime;
+    }, z.core.$strict>;
+}, z.core.$strip>;
+export declare const directAuthResumeSchema: z.ZodObject<{
+    secret: z.ZodString;
+    origin: z.ZodString;
+    path: z.ZodString;
+}, z.core.$strict>;
+export declare const directAuthRevokeSchema: z.ZodObject<{
+    secret: z.ZodString;
+    origin: z.ZodString;
+}, z.core.$strict>;
 export declare function pkceChallenge(verifier: string): Promise<string>;
 export declare function directAuthRandom(): string;

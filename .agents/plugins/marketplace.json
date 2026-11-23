@@ -17,10 +17,10 @@
       "category": "Productivity"
     },
     {
-      "name": "fdpocket-creator",
+      "name": "opusia-creator",
       "source": {
         "source": "local",
-        "path": "./plugins/fdpocket-creator"
+        "path": "./plugins/opusia-creator"
       },
       "policy": {
         "installation": "AVAILABLE",
@@ -29,10 +29,10 @@
       "category": "Productivity"
     },
     {
-      "name": "opusia-creator",
+      "name": "fdpocket-creator",
       "source": {
         "source": "local",
-        "path": "./plugins/opusia-creator"
+        "path": "./plugins/fdpocket-creator"
       },
       "policy": {
         "installation": "AVAILABLE",
