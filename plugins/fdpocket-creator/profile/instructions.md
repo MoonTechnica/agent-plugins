@@ -354,9 +354,30 @@ DB（`packages/db-schema`）・権限（`project.yaml` の権限に関わるキ�
 `kit.mjs pull` → `git merge refs/remotes/fdpocket/heads/main` → 衝突を解く → `kit.mjs check` → commit → `kit.mjs push`（`ready` を待つ）→ チェックをやり直してから呼び直す。
 取り込むと main の配備が始まる。公開はしない。
 
+**取り込んだら main の配備を必ず見届ける**（配備の結果を見ないまま終わらない）:
+1. `get_project` を 10 秒ごとに見て、`app_links.review` の `latest_version_id` が取り込んだ `version_id` で、
+   `status` が `ready`（完了）か `failed`（失敗）になるまで待つ。`deploying` / `paused` は配備中（`step` が今の段）。
+   15 分を過ぎても終わらなければ、状況を利用者に伝える。
+2. `failed` → `error_code`・`error_detail` と `failed_validation[].report_url`（落ちた検証の報告 JSON）を読み、原因を利用者に伝えて直す:
+   チャットのブランチで直して commit → `kit.mjs push`（`ready` を待つ）→ 必須チェックをやり直して `adopt_branch` → また見届ける。
+   ソースで直せない Platform 側の失敗（`WORKERS_UNAVAILABLE`・`PLATFORM_SERVICE_CREDENTIAL` など）は直そうとせず、そう伝えて `editor_url` を示す。
+3. `ready` → 配備の完了を報告し、`can_open` なら `apps[].url`（確認用のリンク）を画面 App ごとに示す。
+
+**環境の状況は推測せず `inspect_environment` で読む**（配備・定期実行・ジョブ・Python・AI の失敗と状態）:
+- `environment: main` は編集者（write 以上）、`prod` はオーナーと管理者だけ。それ以外は `NOT_FOUND`（別の Project は読めない）。
+- まず `section: overview`（環境の状態・現在と最新の配備・定期実行・直近 24 時間の件数）、次に `deployments` / `jobs` / `python` / `ai` を `nextCursor` で読む。
+- 業務データ・会話は返らない。Python の `error_message` は管理者だけ（`can_read_messages`）。
+- api / jobs / mcp の console 出力と例外は `read_environment_logs`（オーナーと管理者だけ。main / prod、直近 7 日）で読む。`levels`・`search` で絞り、続きは `cursor`。個人情報が含まれうるので、引用は原因に要る行だけにする。画面（ブラウザ）と Python のログは含まれない。
+- 原因を利用者に伝えてから、チャットのブランチで直す → 取り込む → 公開し直す。
+
+リンクは MCP が返す `app_links` を**そのまま**使う。ホスト名や URL を推測・組み立てしない。
+- `app_links.review` = main（確認用の環境）の配備の現在地（`status`・`step`・失敗の理由）。編集者に返る。
+  `apps[].url` は各画面 App の起動リンクで、開けるのは `can_open` のオーナーと管理者だけ（それ以外は空）。
+- `app_links.live.apps[].url` = 公開中の版の各画面 App の起動リンク（共有にも使う）。未公開なら `live: null`。
+
 #### `publish_project` の前の必須チェック
 
-1. 公開する版が main にあり、main（確認用の環境。公開中とは別のデータ）で確かめた: 各画面 App を `--{app}--main` のホストで開き、取り込みの前と同じ流れを通した。
+1. 公開する版が main にあり、main（確認用の環境。公開中とは別のデータ）で確かめた: `get_project` の `app_links.review.apps[].url` で各画面 App を開き、取り込みの前と同じ流れを通した（リンクは利用者にも示す）。
 2. `get_project` の `listing.missing` が空。年齢区分・審査の条件を満たす（`get_publication` の `compatibility.reasons` に止める理由が無い。`REVIEW_REQUIRED` はサーバーが公開の途中で行う）。
 3. 公開範囲 `app_access`（`public` = だれでも / `restricted` = メンバーと招待した人だけ）を利用者に明示的に聞いた。**確認なしに `public` にしない**。
 4. データ削除の確認など人の判断が要るものは MCP で決めない。`publish_url`（制作画面の公開）を示して止める。
@@ -364,6 +385,7 @@ DB（`packages/db-schema`）・権限（`project.yaml` の権限に関わるキ�
 
 `publish_project({ project_id, app_access? })` は main の版を、掲載情報を変えずに公開を依頼する（`version_id` で過去のリリースへの切り戻しもできる）。
 呼んだあとは `get_publication({ project_id })` を数秒おきに見て、`ended: true` まで待ち、結果を利用者に伝える（`failed` / `stopped` は `error_code` と `error_detail`）。
+`succeeded` なら `app_links.live.apps[].url`（本番のリンク）を画面 App ごとに必ず利用者に示す。
 `needs_person: true`（`awaiting_review`。データ削除の確認）は MCP では決めず、`publish_url` を示して利用者の判断を待つ。
 
 | エラー | すること |

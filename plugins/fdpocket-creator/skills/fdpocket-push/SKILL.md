@@ -11,21 +11,24 @@ user-invocable: false
 
 1. **貢献のブランチなら規約を確かめる**: `get_contribution_policy({ project_id })`（`project_id` は `.fdpocket.json` の `project_id`）で最新の禁止事項・
    ガイドラインを読み、依頼と差分全体が守っているか確かめる。抵触するなら該当規約と理由を述べて送らない。取得に失敗したら送らない。
-   守っているなら、返った `revision` を 3. の `--policy-revision` に渡す。
-2. `source/` の変更を `git commit` する（未 commit の変更があると断られる。作者は `kit.mjs clone` が設定した本人のまま）。
+   守っているなら、返った `revision` を 4. の `--policy-revision` に渡す。
+2. **掲載情報を用意する**: `$fdpocket-app-listing` で `listing/` を整える。最初の push・`get_project` の `listing.missing` に項目があるとき・
+   アイコンが未設定のときは、頼まれていなくても**利用者に聞かずに**用途に合う名前・URL 名（`repositoryName`）・アイコン・カバーを作る
+   （利用者が手で直した項目は変えない）。
+3. `source/` の変更を `git commit` する（未 commit の変更があると断られる。作者は `kit.mjs clone` が設定した本人のまま）。
    `outputs/build-report.json` には申告（`notes`・`listingRequested`・`stage`）だけを書けばよい。`project`・`apps`・`schemaVersion`・
    `migrations` は `kit push` が build の結果から書く（spec §11）。
-3. `node <kit>/scripts/kit.mjs push --message "<利用者向けの 1 行の説明>"`（貢献のブランチは `--policy-revision <revision>`、
+4. `node <kit>/scripts/kit.mjs push --message "<利用者向けの 1 行の説明>"`（貢献のブランチは `--policy-revision <revision>`、
    この会話で最初の送信なら `--open`）。build → pack → check → begin_build → アップロード → submit_build →
    `ready` / `failed` / `cancelled` まで待つ（10 分で打ち切り）→ `ready` なら取り込み直す、までを 1 回で行う。
-   - 検査（check）で落ちたら終了コード 2 と理由が出る。直して commit し、3. をやり直す。
+   - 検査（check）で落ちたら終了コード 2 と理由が出る。直して commit し、4. をやり直す。
    - Platform が断ったら、コード（`STALE_BASE`・`CONTRIBUTION_POLICY_CHANGED` など）と次の手順がエラーに出る。そのとおりにする（§8.4・§8.5）。
-4. 結果の JSON:
+5. 結果の JSON:
    - `status: "ready"` → **`editor_url` を返事の最後に目立つ形で毎回示す**（例: 「▶ 制作画面で試す: <editor_url>」）。
      `opened` は `--open` で制作画面を開けたか。`pulled` は取り込み直した結果（次の push の base）。
-   - `status: "failed"` → `reports[].report_url` を取得して読み、直して commit し、3. をやり直す。
+   - `status: "failed"` → `reports[].report_url` を取得して読み、直して commit し、4. をやり直す。
    - `status: "timed_out"` → 利用者に伝え、後で `get_build({ job_id })` を見る。
    - `kit_update` があれば Kit が古い。結果を伝えたあとに更新を勧める（`kit_update.update` の手順）。
-5. main への取り込みと公開は `$fdpocket-release`（取り込みは編集者、公開はオーナーと管理者。必須チェックのあとで）。投稿は制作画面で利用者が行う。
+6. main への取り込みと公開は `$fdpocket-release`（取り込みは編集者、公開はオーナーと管理者。必須チェックのあとで）。投稿は制作画面で利用者が行う。
 
 MCP の `begin_build` / `submit_build` / `get_build` を直接呼ぶ手順（§8.3 の詳細）も残っているが、普段は `kit push` を使う。

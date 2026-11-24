@@ -32,16 +32,49 @@ user-invocable: false
 `adopt_branch({ project_id, session_id })`（`.fdpocket.json` の値）。いまの main とチャットの head を使う。
 
 - `merged` / `already_merged` → `version_id`（main の版）と、main の配備が始まったことを伝える。公開はまだしない。
+  続けて下の「配備を見届ける」を必ず行う。
 - `MERGE_CONFLICTS` → 取り込まれていない。`conflicts` のファイルをチャットのブランチで直す:
   `kit.mjs pull` → `git merge refs/remotes/fdpocket/heads/main` → 衝突を解く → `kit.mjs check` → commit → `kit.mjs push`（`ready` を待つ）→ チェック 1〜4 をやり直して呼び直す。
 - `REVISION_CONFLICT` → 確かめたあとで main か head が進んだ。`get_project` で取り直し、確かめ直す。
+
+## 配備を見届ける（取り込んだあと）
+
+**取り込んだら main の配備を必ず見届ける**（配備の結果を見ないまま終わらない）:
+1. `get_project` を 10 秒ごとに見て、`app_links.review` の `latest_version_id` が取り込んだ `version_id` で、
+   `status` が `ready`（完了）か `failed`（失敗）になるまで待つ。`deploying` / `paused` は配備中（`step` が今の段）。
+   15 分を過ぎても終わらなければ、状況を利用者に伝える。
+2. `failed` → `error_code`・`error_detail` と `failed_validation[].report_url`（落ちた検証の報告 JSON）を読み、原因を利用者に伝えて直す:
+   チャットのブランチで直して commit → `kit.mjs push`（`ready` を待つ）→ 必須チェックをやり直して `adopt_branch` → また見届ける。
+   ソースで直せない Platform 側の失敗（`WORKERS_UNAVAILABLE`・`PLATFORM_SERVICE_CREDENTIAL` など）は直そうとせず、そう伝えて `editor_url` を示す。
+3. `ready` → 配備の完了を報告し、`can_open` なら `apps[].url`（確認用のリンク）を画面 App ごとに示す。
+
+## 環境の状況を調べる（`inspect_environment`）
+
+配備・公開のあとの失敗や、動いているアプリの不具合（「通知が来ない」「定期処理が動かない」など）は、
+推測で直す前に `inspect_environment` で環境の状況を読む。読めるのは**その Project のその環境だけ**。
+- `environment: "main"`（確認用）は編集者（write 以上）、`"prod"`（本番）はオーナーと管理者だけ。権限が無いと `NOT_FOUND`。
+- まず `section: "overview"`（環境の状態・最新の配備と失敗の理由・定期実行の `last_error`・直近 24 時間の失敗数）。
+  失敗があれば `deployments` / `jobs` / `python` / `ai` で新しい順に読む（続きは返された `nextCursor` だけを渡す）。
+- 業務データ・会話は返らない。Python の `error_message` は管理者だけに返る（`can_read_messages`）。
+- api / jobs / mcp の **console 出力と例外**は `read_environment_logs` で読む（**オーナーと管理者だけ**。main / prod、直近 7 日まで）。
+  `since_minutes`・`levels`（`error` など）・`search` で絞り、続きは返された `cursor` だけを渡す。
+  ログには利用者の個人情報が含まれうる。原因の特定に要る行だけを引用し、まとめて貼り付けない。
+  配信中の画面（ブラウザ）と Python のログは含まれない。
+- 読んだ理由（`error_code`・`last_error`）を利用者に伝えてから直す。本番を直すときも、チャットのブランチで直して取り込み、公開し直す。
+
+## リンクの扱い
+
+リンクは MCP が返す `app_links` を**そのまま**使う。ホスト名や URL を推測・組み立てしない。
+- `app_links.review` = main（確認用の環境）の配備の現在地（`status`・`step`・失敗の理由）。編集者に返る。
+  `apps[].url` は各画面 App の起動リンクで、開けるのは `can_open` のオーナーと管理者だけ（それ以外は空）。
+- `app_links.live.apps[].url` = 公開中の版の各画面 App の起動リンク（共有にも使う）。未公開なら `live: null`。
 
 ## B. 公開する（`publish_project`）
 
 ### 必須チェック（呼ぶ前に全部）
 
 1. 公開する版が **main にある**（A が終わっている）。main（確認用の環境。公開中とは別のデータ）で確かめた:
-   各画面 App を `--{app}--main` のホストで開き、A と同じ流れを通した。
+   `get_project` の `app_links.review.apps[].url` で各画面 App を開き、A と同じ流れを通した（リンクは利用者にも示す）。
 2. `get_project` の `listing.missing` が空。`get_publication` の `compatibility.reasons` に止める理由が無い（年齢区分・審査の条件。`REVIEW_REQUIRED` はサーバーが公開の途中で行う）。
 3. 公開範囲 `app_access` を利用者に**明示的に聞いた**: `public`（だれでも）/ `restricted`（メンバーと招待した人だけ）。**確認なしに `public` にしない。**
 4. データ削除の確認など人の判断が要るものは MCP で決めない。`publish_url` を示して止める。
@@ -53,6 +86,6 @@ user-invocable: false
 
 その後 `get_publication({ project_id })` を数秒おきに見て `ended: true` まで待ち、結果を伝える:
 
-- `succeeded` → 公開できた。
+- `succeeded` → 公開できた。返った `app_links.live.apps[].url`（本番のリンク）を画面 App ごとに**必ず利用者に示す**。
 - `failed` / `stopped` → `error_code` と `error_detail` を伝える。直せるものは直して、チェックからやり直す。
 - `needs_person: true`（`awaiting_review`。データ削除の確認）→ MCP では決めない。`publish_url` を利用者に示し、画面で判断してもらう。

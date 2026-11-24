@@ -14,7 +14,8 @@ user-invocable: false
 
 1. **持ち主を決める**: `whoami()` の `accounts` がチームを含むなら、どのアカウント（個人かチーム）のアプリにするかを利用者に聞く。
    個人なら `owner_account_id` は省く。
-2. **Project を作る**: `create_project({ title, owner_account_id? })` → `project_id` / `session_id` / `editor_url`。`title` は依頼から短く付ける。
+2. **Project を作る**: `create_project({ title, owner_account_id? })` → `project_id` / `session_id` / `editor_url`。`title` は依頼から用途に合う短い表示名（30 文字まで）を**利用者に聞かずに**決める。
+   URL 名（`repositoryName`）・アイコン・カバーは最初の push の `listing/` から入るので、頼まれていなくても `$fdpocket-app-listing` で全部用意する。
 3. **作業ディレクトリを作る**: 今のディレクトリの下に、題名を英数字にした新しいディレクトリを作って移り、
    `node <kit>/scripts/kit.mjs clone --project-id <project_id> --session-id <session_id>`
    （Kit が `get_git_bundles` を呼ぶ。最初の一度だけブラウザでログインの許可を求められる。
