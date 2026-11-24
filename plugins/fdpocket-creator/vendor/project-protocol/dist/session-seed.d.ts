@@ -50,8 +50,8 @@ export declare const sessionSeedPlanSchema: z.ZodObject<{
 export type SessionSeedPlan = z.infer<typeof sessionSeedPlanSchema>;
 export declare const sessionAiPromptsSchema: z.ZodArray<z.ZodObject<{
     kind: z.ZodEnum<{
-        schema: "schema";
         instructions: "instructions";
+        schema: "schema";
     }>;
     key: z.ZodString;
     content: z.ZodString;
@@ -62,8 +62,8 @@ export declare const sessionSeedBundleSchema: z.ZodObject<{
     schemaJson: z.ZodString;
     aiPrompts: z.ZodDefault<z.ZodOptional<z.ZodArray<z.ZodObject<{
         kind: z.ZodEnum<{
-            schema: "schema";
             instructions: "instructions";
+            schema: "schema";
         }>;
         key: z.ZodString;
         content: z.ZodString;
