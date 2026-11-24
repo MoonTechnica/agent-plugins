@@ -78,7 +78,7 @@ user-invocable: false
 2. `get_project` の `listing.missing` が空。`get_publication` の `compatibility.reasons` に止める理由が無い（年齢区分・審査の条件。`REVIEW_REQUIRED` はサーバーが公開の途中で行う）。
 3. 公開範囲 `app_access` を利用者に**明示的に聞いた**: `public`（だれでも）/ `restricted`（メンバーと招待した人だけ）。**確認なしに `public` にしない。**
 4. データ削除の確認など人の判断が要るものは MCP で決めない。`publish_url` を示して止める。
-5. 何を・だれに公開するかを示し、会話で明示的に了承を得た。
+5. 何を・だれに公開するかを示し、会話で明示的に了承を得た。専用認証を使う場合は `$fdpocket-app-auth` を読み、各 App の許可方式と自己登録の可否も伝える。
 
 ### 呼ぶ
 
@@ -86,6 +86,6 @@ user-invocable: false
 
 その後 `get_publication({ project_id })` を数秒おきに見て `ended: true` まで待ち、結果を伝える:
 
-- `succeeded` → 公開できた。返った `app_links.live.apps[].url`（本番のリンク）を画面 App ごとに**必ず利用者に示す**。
+- `succeeded` → 公開できた。返った `app_links.live.apps[].url`（本番のリンク）を画面 App ごとに**必ず利用者に示す**。 専用認証がある場合は、公開版の認証入口と登録・回復を確認した範囲を伝える。
 - `failed` / `stopped` → `error_code` と `error_detail` を伝える。直せるものは直して、チェックからやり直す。
 - `needs_person: true`（`awaiting_review`。データ削除の確認）→ MCP では決めない。`publish_url` を利用者に示し、画面で判断してもらう。

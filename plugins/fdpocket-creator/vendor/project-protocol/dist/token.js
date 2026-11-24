@@ -16,6 +16,7 @@ export const testIdentitySlotSchema = z.string().regex(/^[a-z][a-z0-9_-]{0,31}$/
 export const appSlugSchema = z.string().regex(APP_SLUG_PATTERN);
 /** Project トークンの発行者（`iss`） */
 export const PROJECT_TOKEN_ISSUER = 'project-gateway';
+export const PROJECT_AUTH_GID_PREFIX = 'project-auth:';
 /**
  * Gateway が発行する Project アクセストークンの claims（gateway.md §3.2）。
  * Gateway は自分が署名したものを `exact` で読み返す（Supabase JWT の claim が混ざったトークンは通らない）。
@@ -27,7 +28,7 @@ export const projectTokenClaims = contract((o) => o.invariant(o
     iss: z.literal(PROJECT_TOKEN_ISSUER),
     /** Project 内の User.id。サービストークンは `service:{projectId}:{app}`（P1） */
     sub: z.string().min(1).max(255),
-    /** `{Supabase iss}:{Supabase sub}` */
+    /** Stable Project-scoped identity key, sourced from platform, project authentication, or testing. */
     gid: z.string().min(1).max(512),
     aud: z.uuid(),
     app: appSlugSchema,
@@ -36,8 +37,10 @@ export const projectTokenClaims = contract((o) => o.invariant(o
     cv: z.int().min(1),
     /** Concrete physical environment, including main and prod. */
     envId: z.uuid(),
-    /** Real Platform principal; gid may be a session-local synthetic identity. */
+    /** Identity in the registry selected by authProvider. */
     actorId: z.uuid(),
+    authProvider: z.literal('project').optional(),
+    deliveryOnly: z.literal(true).optional(),
     testIdentity: testIdentitySlotSchema.optional(),
     testGrantId: z.uuid().optional(),
     anon: z.boolean(),
@@ -46,6 +49,19 @@ export const projectTokenClaims = contract((o) => o.invariant(o
     exp: z.int().positive(),
 })
     .superRefine((c, ctx) => {
+    if (c.gid.startsWith(PROJECT_AUTH_GID_PREFIX) !== (c.authProvider === 'project') ||
+        (c.deliveryOnly && c.authProvider !== 'project') ||
+        (c.authProvider === 'project' &&
+            (c.gid !== `${PROJECT_AUTH_GID_PREFIX}${c.actorId}` ||
+                c.anon ||
+                c.testIdentity !== undefined ||
+                c.testGrantId !== undefined))) {
+        ctx.addIssue({
+            code: 'custom',
+            path: ['authProvider'],
+            message: 'project authentication identity mismatch',
+        });
+    }
     if (c.gid.startsWith('test:') && c.testIdentity === undefined)
         ctx.addIssue({
             code: 'custom',

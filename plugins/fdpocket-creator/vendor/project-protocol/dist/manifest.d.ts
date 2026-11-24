@@ -66,7 +66,7 @@ export type BucketOperation = (typeof BUCKET_OPERATIONS)[number];
  */
 export declare const FORBIDDEN_MODEL_OPERATIONS: Readonly<Record<string, readonly ModelOperation[]>>;
 /** 取り込みを止めずに作者・Agent へ返す注意 */
-export type ProjectManifestIssueCode = 'invalid_network_mock' | 'invalid_slug' | 'reserved_slug' | 'invalid_bucket_name' | 'invalid_role_name' | 'invalid_model_name' | 'required' | 'not_allowed' | 'too_many_buckets' | 'unknown_bucket' | 'unknown_role' | 'reserved_permission' | 'forbidden_operation' | 'anonymous_write_without_access' | 'duplicate' | 'invalid_template_key' | 'invalid_notification_path' | 'undeclared_notification_param' | 'unknown_notification_template' | 'notification_params_mismatch' | 'invalid_trigger_value' | 'invalid_host' | 'invalid_origin' | 'ip_literal' | 'internal_host' | 'platform_host' | 'invalid_secret_name' | 'reserved_secret_name' | 'invalid_task_name' | 'unknown_python_task' | 'unknown_finish_target' | 'missing_permission';
+export type ProjectManifestIssueCode = 'invalid_network_mock' | 'invalid_slug' | 'reserved_slug' | 'invalid_bucket_name' | 'invalid_role_name' | 'invalid_model_name' | 'required' | 'not_allowed' | 'too_many_buckets' | 'unknown_bucket' | 'unknown_role' | 'reserved_permission' | 'forbidden_operation' | 'anonymous_write_without_access' | 'invalid_auth_registration' | 'duplicate' | 'invalid_template_key' | 'invalid_notification_path' | 'undeclared_notification_param' | 'unknown_notification_template' | 'notification_params_mismatch' | 'invalid_trigger_value' | 'invalid_host' | 'invalid_origin' | 'ip_literal' | 'internal_host' | 'platform_host' | 'invalid_secret_name' | 'reserved_secret_name' | 'invalid_task_name' | 'unknown_python_task' | 'unknown_finish_target' | 'missing_permission';
 export type ProjectManifestWarningCode = 'anonymous_write' | 'sensitive_notification_param';
 /** App の表示名（Platform が返すときは長さを問わない。宣言の検証は appSchema が持つ） */
 export declare const localizedNameSchema: z.ZodObject<{
@@ -173,6 +173,16 @@ declare const baseSchema: z.ZodObject<{
         anonymous: z.ZodOptional<z.ZodObject<{
             allowed: z.ZodBoolean;
             write: z.ZodBoolean;
+        }, z.core.$strict>>;
+        auth: z.ZodOptional<z.ZodObject<{
+            providers: z.ZodArray<z.ZodEnum<{
+                fdpocket: "fdpocket";
+                project: "project";
+            }>>;
+            registration: z.ZodOptional<z.ZodEnum<{
+                self: "self";
+                closed: "closed";
+            }>>;
         }, z.core.$strict>>;
         network: z.ZodOptional<z.ZodObject<{
             egress: z.ZodOptional<z.ZodArray<z.ZodString>>;
@@ -380,6 +390,16 @@ export declare const projectManifestSchema: z.ZodObject<{
             allowed: z.ZodBoolean;
             write: z.ZodBoolean;
         }, z.core.$strict>>;
+        auth: z.ZodOptional<z.ZodObject<{
+            providers: z.ZodArray<z.ZodEnum<{
+                fdpocket: "fdpocket";
+                project: "project";
+            }>>;
+            registration: z.ZodOptional<z.ZodEnum<{
+                self: "self";
+                closed: "closed";
+            }>>;
+        }, z.core.$strict>>;
         network: z.ZodOptional<z.ZodObject<{
             egress: z.ZodOptional<z.ZodArray<z.ZodString>>;
             browser: z.ZodOptional<z.ZodArray<z.ZodString>>;
@@ -580,6 +600,10 @@ export interface NormalizedProjectApp {
     entry: string;
     requiredPermission: string | null;
     capabilities: NormalizedAppCapabilities;
+    auth?: {
+        providers: ('fdpocket' | 'project')[];
+        registration: 'self' | 'closed';
+    };
     anonymous: {
         allowed: boolean;
         write: boolean;

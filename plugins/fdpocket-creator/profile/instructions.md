@@ -27,6 +27,13 @@ Project は利用者向けの `web` と、必要なら管理用の `admin` の A
 確認した `revision` を `policy_revision` として渡す。`CONTRIBUTION_POLICY_CHANGED` なら最新規約を取り直して
 依頼と差分を再確認し、抵触したら理由を説明して送信を拒否する。元作者・チーム編集者から規約の設定・編集を依頼されたときは
 `set_contribution_policy` を使う。貢献者の依頼では呼ばない。
+### 認証方式の選び方
+
+- **標準は FDPocket ログイン**。独自ドメインや社外向けという理由だけで切り替えない。「アカウントなしで使いたい」なら SDK の匿名利用を選び、書き込みは依頼に必要な操作に限る。
+- 依頼の業務要件から、利用者に必要なログインを判断する。「取引先が FDPocket に登録せず申請し、次回も自分の履歴を見たい」なら、独自認証という用語がなくても、Platform が提供するミニアプリ専用認証（Better Auth）を選ぶ。「独自認証を使いたい」という依頼にも対応する。対象の画面 App と権限を決め、自己登録か招待制かなど、利用者の運用や公開範囲に影響する点だけ確認する。登録条件が未確定なら登録口を開かない。
+- 対応する機能と設定は `profile/spec.md` と `$fdpocket-app-auth` で判断する。ログイン入口は既存 SDK を使い、Better Auth とパスワード・セッションの運用は Platform に任せる。
+- 履歴・業務権限・招待先は Project 内の `User.id` で管理する。メールは連絡先に使い、メール一致によるアカウント統合や権限付与に使わない。認可は Gateway と ZModel で行う。
+
 ### 読むもの・使う Skill
 
 1. `<kit>/profile/spec.md` を読む（**唯一の API 契約**。SDK・project.yaml・ZModel の規約・禁止事項・build-report）。
@@ -50,6 +57,7 @@ Project は利用者向けの `web` と、必要なら管理用の `admin` の A
 | `$fdpocket-app-testing` | **必ず**（データと画面ができたときと着地の前）。Vitest、`kit dev` での確認、`kit check`、`kit build` の結果の読み方 |
 | `$fdpocket-app-listing` | **必ず**（版を作るターン）。掲載情報（名前・キャッチコピー・説明・カテゴリ・タグ・アイコン・カバー） |
 | `$fdpocket-app-admin` | 管理画面を作るとき・権限（Role / Permission）を設計するとき |
+| `$fdpocket-app-auth` | ログイン・外部会員の登録・受付範囲・本人 ID を決めるとき |
 | `$fdpocket-app-storage` | ファイル（画像・添付・書類）を扱うとき |
 | `$fdpocket-app-search` | キーワード検索・検索ボックス・横断検索・「探す」を入れるとき（全文検索。`@@platform.search` と `ftsMatch`） |
 | `$fdpocket-app-integrations` | 外部 API・api / jobs・秘密・schedule を扱うとき |
@@ -381,7 +389,7 @@ DB（`packages/db-schema`）・権限（`project.yaml` の権限に関わるキ�
 2. `get_project` の `listing.missing` が空。年齢区分・審査の条件を満たす（`get_publication` の `compatibility.reasons` に止める理由が無い。`REVIEW_REQUIRED` はサーバーが公開の途中で行う）。
 3. 公開範囲 `app_access`（`public` = だれでも / `restricted` = メンバーと招待した人だけ）を利用者に明示的に聞いた。**確認なしに `public` にしない**。
 4. データ削除の確認など人の判断が要るものは MCP で決めない。`publish_url`（制作画面の公開）を示して止める。
-5. 何を・だれに公開するかを示し、会話で明示的に了承を得た。
+5. 何を・だれに公開するかを示し、会話で明示的に了承を得た。専用認証を使う場合は `$fdpocket-app-auth` を読み、各 App の許可方式と自己登録の可否も伝える。公開ジョブの成功を確認した後で、公開版の認証入口と登録・回復を確認した範囲を報告する。
 
 `publish_project({ project_id, app_access? })` は main の版を、掲載情報を変えずに公開を依頼する（`version_id` で過去のリリースへの切り戻しもできる）。
 呼んだあとは `get_publication({ project_id })` を数秒おきに見て、`ended: true` まで待ち、結果を利用者に伝える（`failed` / `stopped` は `error_code` と `error_detail`）。
@@ -390,6 +398,9 @@ DB（`packages/db-schema`）・権限（`project.yaml` の権限に関わるキ�
 
 | エラー | すること |
 |---|---|
+| `PROJECT_AUTH_UNAVAILABLE` | Platform が認証 DB を準備できず、公開版は切り替わっていない。公開先の管理者に確認を依頼する |
+| `publication_refused`（`project_auth_no_enrollment`） | 専用アカウントが未登録。自己登録を利用者が承認した App を用意するか、利用可能な認証方式を相談する |
+| `publication_refused`（`project_auth_notification_triggers_unsupported`） | 同じ Project の通知トリガーと専用認証は併用できない。維持が必要な機能を確認してから案を決める |
 | `FORBIDDEN`（`not_project_admin`） | 公開はオーナーと管理者だけ。権限のある人に頼むよう伝えて止まる |
 | `FORBIDDEN`（`policy_change_requires_admin`） | DB・権限の変更は管理者だけが取り込める。管理者に頼むか、その変更を外して push し直す |
 | `FORBIDDEN`（`not_project_editor`） | 取り込めるのは編集者（write 以上）だけ。`open_proposal` で提案する |

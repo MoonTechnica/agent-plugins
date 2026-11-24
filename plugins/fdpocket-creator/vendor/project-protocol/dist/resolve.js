@@ -217,6 +217,8 @@ export const originResolveResultSchema = z.discriminatedUnion('status', [
             entry: z.string().min(1),
             /** Only public production Apps permit unauthenticated static delivery. */
             deliveryPublic: z.boolean().default(false),
+            /** Present only on production Apps that opt in. False means both providers. */
+            dedicatedOnly: z.boolean().optional(),
             browserOrigins: z.array(z.string()).optional(),
         })),
     }),

@@ -6,6 +6,12 @@ import { appSlugSchema, environmentSchema, tokenExchangeResponse } from "./token
 export const DIRECT_AUTH_TTL_SECONDS = 120;
 export const DIRECT_AUTH_START_PATH = '/_platform/auth/start';
 export const DIRECT_AUTH_CALLBACK_PATH = '/_platform/auth/callback';
+export const PROJECT_AUTH_CALLBACK_PATH = '/_platform/auth/project/callback';
+export const PROJECT_AUTH_EXCHANGE_PATH = '/_platform/auth/project/exchange';
+export const PROJECT_AUTH_PENDING_KEY = 'fdpocket.project-auth';
+export function projectAuthOrigin(environmentId, domain) {
+    return `https://e${z.uuid().parse(environmentId).replaceAll('-', '').toLowerCase()}.${domain}`;
+}
 export const directAuthOpaqueSchema = z
     .string()
     .length(43)
@@ -110,3 +116,7 @@ export function directAuthRandom() {
         .replaceAll('/', '_')
         .replaceAll('=', '');
 }
+/** Private Gateway response. The origin bootstrap uses the validated path after exchange. */
+export const projectAuthExchangeResponseSchema = tokenExchangeResponse.exact.extend({
+    path: directAuthPathSchema,
+});

@@ -133,6 +133,12 @@ const appSchema = z.strictObject({
     })
         .optional(),
     anonymous: z.strictObject({ allowed: z.boolean(), write: z.boolean() }).optional(),
+    auth: z
+        .strictObject({
+        providers: uniqueList(z.enum(['fdpocket', 'project'])),
+        registration: z.enum(['self', 'closed']).optional(),
+    })
+        .optional(),
     /** 外向き通信（integrations.md §3.1・§3.3）。egress はサーバーの App、browser は web */
     network: z
         .strictObject({
@@ -510,6 +516,10 @@ function refineManifest(m, ctx) {
             report(ctx, path, 'undeclared_notification_param', 'every {{name}} must be declared in params');
         }
     }
+    if (m.notifications?.triggers?.length &&
+        Object.values(m.apps).some((app) => app.auth?.providers.includes('project'))) {
+        report(ctx, ['notifications', 'triggers'], 'not_allowed', 'notification triggers cannot be used in a project with dedicated authentication');
+    }
     for (const [i, trigger] of (m.notifications?.triggers ?? []).entries()) {
         const path = ['notifications', 'triggers', i];
         const template = m.notifications?.templates[trigger.template];
@@ -547,6 +557,14 @@ function refineManifest(m, ctx) {
             report(ctx, ['apps', slug], 'reserved_slug', 'api is reserved for the API namespace; use another web App slug');
         }
         refineServerFields(ctx, slug, app);
+        if (app.auth) {
+            if (app.kind !== 'web') {
+                report(ctx, ['apps', slug, 'auth'], 'not_allowed', 'only web apps declare auth');
+            }
+            else if (app.auth.providers.includes('project') !== (app.auth.registration !== undefined)) {
+                report(ctx, ['apps', slug, 'auth', 'registration'], 'invalid_auth_registration', 'specify self or closed registration exactly when project authentication is enabled');
+            }
+        }
         if (usesAi(app))
             aiUsed = true;
         if (app.access === 'restricted' && !app.requiredPermission) {
@@ -703,6 +721,9 @@ export function normalizeProjectManifest(manifest) {
                     ? { python: sortedRecord(app.capabilities.python, sorted) }
                     : {}),
             },
+            ...(app.auth?.registration
+                ? { auth: { providers: sorted(app.auth.providers), registration: app.auth.registration } }
+                : {}),
             anonymous: app.anonymous ?? { allowed: false, write: false },
             network: {
                 egress: sorted(app.network?.egress),

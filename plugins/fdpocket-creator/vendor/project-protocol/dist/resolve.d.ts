@@ -427,6 +427,7 @@ export declare const originResolveResultSchema: z.ZodDiscriminatedUnion<[z.ZodOb
         kind: z.ZodLiteral<"web">;
         entry: z.ZodString;
         deliveryPublic: z.ZodDefault<z.ZodBoolean>;
+        dedicatedOnly: z.ZodOptional<z.ZodBoolean>;
         browserOrigins: z.ZodOptional<z.ZodArray<z.ZodString>>;
     }, z.core.$strict>>;
 }, z.core.$strict>, z.ZodObject<{

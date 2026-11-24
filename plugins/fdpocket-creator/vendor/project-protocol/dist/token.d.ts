@@ -19,6 +19,7 @@ export type TestIdentitySlot = z.infer<typeof testIdentitySlotSchema>;
 export declare const appSlugSchema: z.ZodString;
 /** Project トークンの発行者（`iss`） */
 export declare const PROJECT_TOKEN_ISSUER = "project-gateway";
+export declare const PROJECT_AUTH_GID_PREFIX = "project-auth:";
 /**
  * Gateway が発行する Project アクセストークンの claims（gateway.md §3.2）。
  * Gateway は自分が署名したものを `exact` で読み返す（Supabase JWT の claim が混ざったトークンは通らない）。
@@ -39,6 +40,8 @@ export declare const projectTokenClaims: import("./contract.ts").Contract<z.ZodO
     cv: z.ZodInt;
     envId: z.ZodUUID;
     actorId: z.ZodUUID;
+    authProvider: z.ZodOptional<z.ZodLiteral<"project">>;
+    deliveryOnly: z.ZodOptional<z.ZodLiteral<true>>;
     testIdentity: z.ZodOptional<z.ZodString>;
     testGrantId: z.ZodOptional<z.ZodUUID>;
     anon: z.ZodBoolean;

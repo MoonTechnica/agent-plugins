@@ -100,6 +100,7 @@ ownerBootstrap: [admin]                  # Project の作者に付く
 | capability | **App が使うモデル × 操作・バケット × 操作だけ**を宣言する。宣言していない操作は Gateway がポリシーより先に `FORBIDDEN` にする。広すぎる宣言は審査で指摘される |
 | 宣言できない操作 | `user` の create、`storageFile` の create / update、`auditEvent` の create / update / delete（Platform だけが書く） |
 | バケット | 10 個まで。名前は `[a-z][a-z0-9-]{1,31}` |
+| ログイン | 画面 App は FDPocket ログインが標準。外部の利用者に専用アカウントが要る場合は `auth: { providers: [fdpocket, project], registration: self }`。専用アカウントだけで提供する場合は `providers: [project]`。`registration: closed` は自己登録を閉じる。専用認証は外部に開いた公開版の Web App で使い、Platform のログイン画面・メール確認・回復を利用する。 |
 | 匿名 | `anonymous.allowed` が false の App は匿名の利用者を開かない。`write: true` は `allowed: true` が要る |
 | Role | Permission の付与は Role 経由だけ。Role を変えると次のリクエストから両方の App に効く |
 
@@ -280,7 +281,7 @@ import { client, schema, apiPath } from '@workspace/sdk' // client = createClien
 | API | 使い方 |
 |---|---|
 | `client.auth.fromHost()` | スーパーアプリに埋め込まれているとき、Host からトークンを受け取る（`signInWithSuperApp()` が埋め込み中に内部で呼ぶ。App が直接呼ぶ必要はない）。埋め込まれていない・10 秒で届かなければ `HOST_UNAVAILABLE` |
-| `client.auth.signInWithSuperApp()` | **`main.tsx` が起動時に 1 回呼ぶ（テンプレートどおり）。** 直接アクセス時、同じミニアプリオリジンのPlatform製入口へ進む。FDPocketアカウントが必要なことを説明し、本人が「続ける」を押してからログイン・アプリの既存同意へ移る。一回限りコードとstate/PKCEで元のオリジン・Appパスへ戻り、信頼されたwrapperからProject専用セッションを受け取る。埋め込み中は`fromHost()`を再利用し、認証済みなら移動しない。戻り値は`Promise<void>` |
+| `client.auth.signInWithSuperApp()` | **`main.tsx` が起動時に 1 回呼ぶ（テンプレートどおり）。** 直接アクセス時、同じミニアプリオリジンの Platform 製入口へ進む。入口に公開版で許可されたログイン方式が出る。ログイン後は一回限りのコードと state / PKCE で元のオリジン・App パスへ戻り、信頼された wrapper から Project セッションを受け取る。埋め込み中は `fromHost()` を再利用し、認証済みなら移動しない。戻り値は `Promise<void>` |
 | `client.auth.session()` | 今の `Session`（無ければ null） |
 | `client.auth.onChange(listener)` | 受け取り・更新・失効で呼ぶ。戻り値で購読をやめる |
 | `client.auth.can(permission)` | **画面の出し分けだけ**に使う（ボタンを出す / 出さない）。認可は Gateway が毎回 DB で判定する。これを認可の代わりにしない |

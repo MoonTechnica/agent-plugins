@@ -17,6 +17,8 @@ export declare const storageDownloadClaimsSchema: z.ZodObject<{
         cv: z.ZodInt;
         envId: z.ZodUUID;
         actorId: z.ZodUUID;
+        authProvider: z.ZodOptional<z.ZodLiteral<"project">>;
+        deliveryOnly: z.ZodOptional<z.ZodLiteral<true>>;
         testIdentity: z.ZodOptional<z.ZodString>;
         testGrantId: z.ZodOptional<z.ZodUUID>;
         anon: z.ZodBoolean;

@@ -3,6 +3,10 @@ import { z } from 'zod';
 export declare const DIRECT_AUTH_TTL_SECONDS = 120;
 export declare const DIRECT_AUTH_START_PATH = "/_platform/auth/start";
 export declare const DIRECT_AUTH_CALLBACK_PATH = "/_platform/auth/callback";
+export declare const PROJECT_AUTH_CALLBACK_PATH = "/_platform/auth/project/callback";
+export declare const PROJECT_AUTH_EXCHANGE_PATH = "/_platform/auth/project/exchange";
+export declare const PROJECT_AUTH_PENDING_KEY = "fdpocket.project-auth";
+export declare function projectAuthOrigin(environmentId: string, domain: string): string;
 export declare const directAuthOpaqueSchema: z.ZodString;
 export declare const directAuthVerifierSchema: z.ZodString;
 export declare const directAuthOriginSchema: z.ZodString;
@@ -173,3 +177,36 @@ export declare const directAuthRevokeSchema: z.ZodObject<{
 }, z.core.$strict>;
 export declare function pkceChallenge(verifier: string): Promise<string>;
 export declare function directAuthRandom(): string;
+/** Private Gateway response. The origin bootstrap uses the validated path after exchange. */
+export declare const projectAuthExchangeResponseSchema: z.ZodObject<{
+    token: z.ZodString;
+    expiresAt: z.ZodISODateTime;
+    session: z.ZodObject<{
+        userId: z.ZodString;
+        globalUserId: z.ZodString;
+        displayName: z.ZodNullable<z.ZodString>;
+        isAnonymous: z.ZodBoolean;
+        permissions: z.ZodArray<z.ZodString>;
+        expiresAt: z.ZodISODateTime;
+        apps: z.ZodArray<z.ZodObject<{
+            slug: z.ZodString;
+            kind: z.ZodEnum<{
+                web: "web";
+                api: "api";
+                jobs: "jobs";
+                python: "python";
+                mcp: "mcp";
+            }>;
+            access: z.ZodEnum<{
+                public: "public";
+                restricted: "restricted";
+            }>;
+            displayName: z.ZodNullable<z.ZodObject<{
+                ja: z.ZodString;
+                en: z.ZodString;
+            }, z.core.$strict>>;
+            canOpen: z.ZodBoolean;
+        }, z.core.$strip>>;
+    }, z.core.$strip>;
+    path: z.ZodString;
+}, z.core.$strip>;

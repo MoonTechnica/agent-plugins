@@ -199,6 +199,16 @@ export declare const reportSchema: z.ZodObject<{
                 allowed: z.ZodBoolean;
                 write: z.ZodBoolean;
             }, z.core.$strict>>;
+            auth: z.ZodOptional<z.ZodObject<{
+                providers: z.ZodArray<z.ZodEnum<{
+                    fdpocket: "fdpocket";
+                    project: "project";
+                }>>;
+                registration: z.ZodOptional<z.ZodEnum<{
+                    self: "self";
+                    closed: "closed";
+                }>>;
+            }, z.core.$strict>>;
             network: z.ZodOptional<z.ZodObject<{
                 egress: z.ZodOptional<z.ZodArray<z.ZodString>>;
                 browser: z.ZodOptional<z.ZodArray<z.ZodString>>;
