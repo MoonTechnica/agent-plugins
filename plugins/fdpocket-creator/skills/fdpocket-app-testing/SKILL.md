@@ -52,6 +52,7 @@ description: ミニアプリが動くことを確かめる。Vitest で書くテ
 |---|---|
 | 計算・変換・入力の検証 | Vitest |
 | 画面の表示・主要な操作・権限の無い主体で admin が開けないこと | 通常のローカル `kit dev` |
+| 画像や行のバックグラウンド処理 | 通常のローカル `kit dev` で、許可された依頼、別の主体や Workspace のデータへの拒否、画面を開き直した後の状態表示を確かめる。実際の Gateway の認可やタスク配送はテスト主体でセッションを使う |
 | 本物の Gateway のポリシー、Worker の外部 API、Realtime、Python GPU、Storage の署名 URL・R2 Multipart | 本物の live に対する E2E |
 
 本物で実行する前に `design/test-plan.md` を書く。必要な観測、ローカルでは確かめられない理由、App・テスト主体、

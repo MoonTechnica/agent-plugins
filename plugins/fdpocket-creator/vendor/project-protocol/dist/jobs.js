@@ -27,3 +27,4 @@ export const jobCancelResponse = contract((o) => o.object({ cancelled: z.boolean
  * 払う人。tasks/0537・python-backend.md §5）
  */
 export const RUN_CONTEXT_HEADER = 'x-fdpocket-run';
+export const JOB_LEASE_HEADER = 'x-fdpocket-job-lease';

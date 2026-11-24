@@ -43,7 +43,7 @@ export declare const WORKER_APP_KINDS: readonly ["api", "jobs", "mcp"];
 export type WorkerAppKind = (typeof WORKER_APP_KINDS)[number];
 export declare function isWorkerAppKind(kind: AppKind): kind is WorkerAppKind;
 /** サーバーの App のサービストークンに付けられる権限（gateway.md §3.4。`notifications.send` は tasks/0476） */
-export declare const SERVICE_PERMISSIONS: readonly ["notifications.send", "jobs.schedule", "jobs.consume", "ai.chat", "python.run"];
+export declare const SERVICE_PERMISSIONS: readonly ["notifications.send", "jobs.schedule", "jobs.consume", "jobs.data", "ai.chat", "python.run"];
 export type ServicePermission = (typeof SERVICE_PERMISSIONS)[number];
 /** secret の名前（`env.<NAME>`）。Worker の binding の名前になる */
 export declare const SECRET_NAME_PATTERN: RegExp;
@@ -206,6 +206,7 @@ declare const baseSchema: z.ZodObject<{
             "notifications.send": "notifications.send";
             "jobs.schedule": "jobs.schedule";
             "jobs.consume": "jobs.consume";
+            "jobs.data": "jobs.data";
             "ai.chat": "ai.chat";
             "python.run": "python.run";
         }>>>;
@@ -422,6 +423,7 @@ export declare const projectManifestSchema: z.ZodObject<{
             "notifications.send": "notifications.send";
             "jobs.schedule": "jobs.schedule";
             "jobs.consume": "jobs.consume";
+            "jobs.data": "jobs.data";
             "ai.chat": "ai.chat";
             "python.run": "python.run";
         }>>>;

@@ -1,21 +1,49 @@
 # ミニアプリの仕様（SDK・Project・禁止事項）
 
-この文書が**唯一の API 契約**である。ここに無い API・グローバル変数・外部 URL は存在しない。
-書いても取り込みの静的検証と実行時の Gateway・CSP が落とすので、作り直しになる。
+この文書が**FDPocket が提供する API の契約**である。Platform の API・グローバル変数・外部 URL を推測して実装しない。
+端末機能は標準 Web API を使い（§3.4a）、外部への通信は §2 と §9 の宣言と制限に従う。
 型の正本は Kit が置くビルド済みの SDK（`packages/miniapp-sdk/`。`.d.ts` 付き）で、迷ったら型を読む。
+
+## 0. 利用者の要望から機能を選ぶ
+
+利用者の言葉を手掛かりに、必要な機能を組み合わせる。選んだ機能の節と Skill を読み、実行する App、誰の権限で動くか、
+必要な宣言・同意・利用料、確かめられる環境を確認して実装する。既存アプリではその版の SDK と `infra/project.yaml` も照合する。
+
+| App の種類 | どんなときに使うか | 実装手順 |
+|---|---|---|
+| `kind: web` | 利用画面・管理画面を作る。管理画面は `access: restricted` と必要な Permission で守る | §2・`$fdpocket-app-ui`・`$fdpocket-app-admin` |
+| `kind: api` | ボタンからサーバー処理を呼ぶ、応答後に短い補助処理を続ける、秘密が必要な外部 API や Webhook を扱う | §2・§3.2a・`$fdpocket-app-integrations` |
+| `kind: jobs` | 予約した処理・UTC の定期処理・完了イベントを扱う。ジョブの実行主体で使える API は §3.2a を参照 | §2・§3.2a・`$fdpocket-app-integrations` |
+| `kind: python` | 画面を閉じた後も利用者のデータを処理する。CPU タスク、GPU タスク、ASGI サーバーを用途に応じて選ぶ | §2・§3.9・`$fdpocket-app-python` |
+| `kind: mcp` | 外部の AI から本人の権限でアプリ内の操作を呼べるようにする | §2・§3.11・`$fdpocket-app-mcp` |
+
+| 利用者がしたいこと | 使う機能 | 実装手順 |
+|---|---|---|
+| 誰が使っているかを知る、プロフィールを表示する | `client.auth`・`client.profile` | §3.1・§3.1a |
+| 記録を残す、一覧や集計、文字・意味で検索する | `client.db`・`client.idempotent`、全文検索・ベクトル検索 | §3.2・§5・`$fdpocket-app-data-model`・`$fdpocket-app-search` |
+| 家族・チームで共有する、利用者を招く | `client.workspaces`・`client.users`、Workspace のポリシーと Role | §3.7・§3.7a・`$fdpocket-app-admin` |
+| 写真・資料を添付・表示する | `client.storage`、バケットとファイルのアクセス規則 | §3.3・`$fdpocket-app-storage` |
+| 他の人の変更をすぐ表示する、参加中の人を表示する | `client.realtime`、行の変更購読・Broadcast・Presence | Realtime 節 |
+| 共有する、別画面へ移動する、言語や外観を合わせる | `client.ui`、埋め込み時と直接開いたときで利用できる操作が異なる | §3.4・`$fdpocket-app-pwa` |
+| 写真を撮る、声を録る、現在地を入力する | カメラ・マイク・現在地の標準 Web API。利用環境と本人の許可に応じて使う | §3.4a |
+| 利用者の投稿を通報する、相手をブロックする | `client.safety` と非表示のデータポリシー | §3.5 |
+| 更新や締切を知らせる | `client.notifications` で許可を扱い、トリガーまたはサーバー SDK と通知テンプレートで送る | §3.6・`$fdpocket-app-notifications` |
+| 要約、下書き、画像の読み取り、意味検索用の変換をする | `client.ai` または実行場所に合うサーバー SDK。利用料とデータアクセスを確認する | §3.8・`$fdpocket-app-ai` |
+| 頼んだ処理の進み具合や結果を開き直して見る | `client.python` と保存した実行 ID、依頼者の権限での状態取得 | §3.9・`$fdpocket-app-python` |
+| 接続したカレンダー、メール、ファイルなどを読む | `client.connections`、サービスの利用可否と利用者の許可を確認する | §3.10・`$fdpocket-app-integrations` |
+| 画面から自分のアプリの API を呼ぶ | `client.fetch` と `apiPath`。API はそのリクエストの利用者を引き継げる | §3・§3.2a・`$fdpocket-app-integrations` |
+
+`client.projectId`・`client.app` は現在の Project と App の識別子、`client.gateway` は SDK が使う Gateway の URL（§3）。
+アプリ内の利用者が添付するファイルは §3.3、制作の依頼に添付された資料は `$fdpocket-app-documents` で扱う。
+対応範囲や利用条件を説明するときは、SDK の名前を選ばせず、何ができるか、設定が必要か、誰に見えるか、費用がかかるかを伝える。
 
 ## 1. 作るもの
 
 **Project**（1 つのモノレポ）を作る。Project は複数の **App** を持ち、同じ Project の App は
 **データベース・ユーザー・権限・ファイルを共有**する。App ごとの違いは `infra/project.yaml` の capability で表す。
 
-| kind | 中身 |
-|---|---|
-| web | 利用者・管理者の画面（Vite + React SPA）。権限はAppごとに宣言 |
-| api | 外部API・Webhookを扱うWorker |
-| jobs | UTC scheduleで実行するWorker |
-
-Appは任意名で1〜16個。同kindを複数持て、webを持たない構成もよい。web/adminは命名例。画面Appのslug apiはAPIルーティング用に予約する。
+App の種類は §0。画面 App は Vite + React の SPA で、`admin` は管理画面用の `web` App の命名例。
+`web` を持たない構成も作れる。App の名前・個数・予約語は §2。
 
 画面の App は **App ごとのオリジン**（`https://{project}--{slug}.{apps-domain}`。main・プレビューは末尾に環境の印が付く）で配られ、
 どの App もそのオリジンの `/` に置かれる。同じ Project の別の App とはオリジンが違うので、localStorage・IndexedDB・Cookie・
@@ -96,7 +124,7 @@ ownerBootstrap: [admin]                  # Project の作者に付く
 
 | 規則 | 内容 |
 |---|---|
-| App | 1〜16個、任意slug（2〜32 文字。英小文字で始め、英小文字・数字を 1 つの `-` でつなぐ: `[a-z][a-z0-9]*(-[a-z0-9]+)*`。`--`・末尾の `-` は不可。`main` と `s-` + 16 進 12 桁は環境の印なので不可）。kindはweb/api/jobs、同kindも複数可。画面Appのapi slugは予約 |
+| App | 1〜16個、任意slug（2〜32 文字。英小文字で始め、英小文字・数字を 1 つの `-` でつなぐ: `[a-z][a-z0-9]*(-[a-z0-9]+)*`。`--`・末尾の `-` は不可。`main` と `s-` + 16 進 12 桁は環境の印なので不可）。kind は §0。mcp は 1 Project に 1 つまで。他の kind は複数可。画面Appのapi slugは予約 |
 | capability | **App が使うモデル × 操作・バケット × 操作だけ**を宣言する。宣言していない操作は Gateway がポリシーより先に `FORBIDDEN` にする。広すぎる宣言は審査で指摘される |
 | 宣言できない操作 | `user` の create、`storageFile` の create / update、`auditEvent` の create / update / delete（Platform だけが書く） |
 | バケット | 10 個まで。名前は `[a-z][a-z0-9-]{1,31}` |
@@ -138,7 +166,7 @@ apps:
       egress: [hooks.slack.com]
     secrets:
       - name: SLACK_WEBHOOK_URL
-    servicePermissions: [notifications.send, jobs.consume]
+    servicePermissions: [notifications.send, jobs.consume, jobs.data]
 notifications:
   templates:
     order_shipped:                           # キーは [a-z][a-z0-9_]
@@ -160,10 +188,10 @@ ai:                                          # ミニアプリ内 AI を使う P
 | 規則 | 内容 |
 |---|---|
 | api / jobs | `access`（public 以外）・`capabilities`・`anonymous`・`requiredPermission`・`displayName` を書けない。利用者の代わりに呼ぶときは `asUser` で、その利用者の web App の capability で判定される |
-| `network.egress` | api / jobs / python だけ。ホスト名（小文字・2 ラベル以上。先頭に `*.` を 1 つ）を 50 個まで。IP 直指定・`localhost`・`.local` / `.internal` などの内部名・Platform のホスト（Supabase / Turso / R2）は書けない。実行時も http・既定以外のポート・URL の資格情報を拒否し、リダイレクトを追わない |
+| `network.egress` | api / jobs / python / mcp だけ。ホスト名（小文字・2 ラベル以上。先頭に `*.` を 1 つ）を 50 個まで。IP 直指定・`localhost`・`.local` / `.internal` などの内部名・Platform のホスト（Supabase / Turso / R2）は書けない。実行時も http・既定以外のポート・URL の資格情報を拒否し、リダイレクトを追わない |
 | `network.browser` | web だけ。`https://host` の形（パス・ポート・末尾の `/` なし）。秘密が要る API は書かず api 経由にする |
-| `secrets` | api / jobs / python だけ。名前は `[A-Z][A-Z0-9_]` で 50 個まで。`GATEWAY_URL` と `PLATFORM_` で始まる名前は予約。値はコード・manifest・`listing/` に書かない（取り込みの検証が落とす） |
-| `servicePermissions` | api / jobs / python だけ。`notifications.send`（通知を送る）・`jobs.schedule`（jobs へ仕事を予約する）・`jobs.consume`（予約を受ける jobs 側）・`ai.chat`（api は利用者として、jobs は実行中のジョブとして AI を呼ぶ。§3.8）・`python.run`（python の App のタスクを依頼する） |
+| `secrets` | api / jobs / python / mcp だけ。名前は `[A-Z][A-Z0-9_]{0,63}` で、App ごとに 50 個まで。`GATEWAY_URL` と `PLATFORM_` で始まる名前は予約。値はコード・manifest・`listing/` に書かない（取り込みの検証が落とす） |
+| `servicePermissions` | api / jobs / python / mcp だけ。`notifications.send`（通知を送る）・`jobs.schedule`（jobs へ仕事を予約する）・`jobs.consume`（予約を受ける jobs 側）・`jobs.data`（`jobs.consume` を持つ jobs App が、実行中の利用者ジョブとして DB・Storage を使う。§3.2a）・`ai.chat`（§3.8）・`python.run`（python タスクを依頼する） |
 | `ai` | AI を使う版だけ書く（書くと利用者の初回の同意に「AI の利用」が加わり、既に同意した人にも出し直す）。`instructions` / `schemas` は宣言した名前のファイルだけが版に固定される（実行時にファイルを読み直さない） |
 | `schedules` | jobs だけ。UTC の 5 フィールドの cron と handler 名。main / prod は時刻実行、本人のセッションは開発者パネルから手動実行する |
 | `routes` | api だけ。`["/api/*"]` だけ |
@@ -176,11 +204,12 @@ GPU で AI の処理（深層学習の推論・学習・埋め込み・画像や
 | | api / jobs（TypeScript） | python |
 |---|---|---|
 | 動く場所 | Cloudflare Workers（`nodejs_compat`。常駐プロセス・ネイティブモジュールは無い） | Modal の Sandbox（Linux。GPU は任意） |
-| 向いている処理 | 普段の API・Webhook・定期処理・外部 API の呼び出し・集計 | GPU の推論・学習、PyTorch・transformers など Python にしかないライブラリ |
+| 向いている処理 | 普段の API・Webhook・定期処理・外部 API の呼び出し | 利用者のデータを扱うバックグラウンド処理、GPU の推論・学習、Python 専用ライブラリ |
 | 起動 | すぐ | 止まっていると数十秒（初回の Image は数分） |
 | 費用 | 利用者のクレジットを使わない | Modal の実費（タスクは依頼した人、サーバーは持ち主） |
 
-- 迷ったら api / jobs。python は GPU か Python のライブラリが要るときだけ足す。
+- まず必要な完了条件で選ぶ。短い補助処理は API Worker の `ctx.waitUntil` で応答の後に回せる。実行を記録して後で処理する・
+  再試行するなら jobs の配送時間と権限を確認する（§3.2a）。外部 AI の応答を待つだけの処理には、通常の AI 呼び出しや API Worker を使う。
 - **呼ぶ向き**: 画面・api・jobs → python は `python.run`（§3.9）。python → jobs は、タスクの終わりを受ける `onFinish`
   （下の表。失敗・時間切れ・キャンセルも届く）と、タスクの途中から渡す `ctx.jobs.schedule`。どちらも python の App に
   `jobs.schedule`、宛先の jobs に `jobs.consume`。**python から api の App は呼べない**（必要なデータは python から
@@ -391,6 +420,43 @@ const create = hooks.task.useCreate()                      // 書き込みは関
 `useSession()` は今の Session、`useSafeArea()` は Host のセーフエリア、`useColorScheme()` は画面の明暗（`AppShell` の `colorScheme` に渡す）、`useLocale()` は Host のロケール文字列（接続前・単独起動はブラウザの言語タグ、取得不能なら`en`）。対応辞書への解決とフォールバックはAppの共通i18n処理で行う。`getQueryKey` は ZenStack の queryKey を作る
 （手で invalidate するとき）。フックの `error` には `SdkError` が届く。`$transaction` のフックは型に出るが Gateway が受けない。
 
+### 3.2a API・バックグラウンド処理のデータアクセス
+
+Worker の SDK は `@workspace/miniapp-sdk/server` の `createServerClient` を使う。
+**サービストークンだけでは DB・Storage にアクセスできない**。接続先が同じ Project でも、Gateway は利用者の認証を要求する。
+`PlatformBindings` の `GATEWAY_URL` と `PLATFORM_SERVICE_CREDENTIAL` は Platform が Worker に渡す。
+`ServerDataClient` は `db`・`storage`・`idempotent` の型。実行時にデータへアクセスするには下表の認証が必要。
+
+| 実行する場所 | 認可と使い方 |
+|---|---|
+| api のリクエスト中 | `asUser(request)` でリクエストの利用者を引き継ぐ。その利用者の画面 App の capability と現在のデータポリシーで DB・Storage を判定する |
+| jobs の `queue` | `forJob(event)` で AI・Python を使う。本人として予約し `jobs.data` を宣言した場合は DB・Storage にもアクセスできる。元の画面 App の現在の capability と利用者のポリシーが適用される。配送中だけ有効 |
+| jobs の `scheduled` / サーバーとして予約したジョブ | 利用者の DB・Storage 権限は引き継がれない。ジョブに利用者のトークンを保存・転送しない |
+| Python タスクの実行中 | `ctx.db` と `ctx.storage` は、実行を依頼した利用者の権限と Python App の capability で判定される（§3.9） |
+
+API Worker の `fetch(request, env, ctx)` で `ctx.waitUntil` に Promise を渡すと、短い補助処理を残して応答を返せる。
+Cloudflare の HTTP Worker では応答送信または切断後の猶予は最大 30 秒。自動の再試行や進捗の記録が必要なら、応答前に
+ジョブの予約またはタスクの依頼を確定する。結果が応答の内容を決める処理は応答前に待つ。
+受付後に独立して進める仕事は所要時間を問わず `jobs.schedule` を使う。Platform の Cloudflare Queue 配送は 1 回最大 120 秒。
+既存の HTTP 配送と定期実行は 15 秒。ジョブの受理と実行完了を区別し、結果の状態は対象データに保存する。
+
+仕事の登録は payload に入れた ID の所有者やアクセス権を検査しない。受付で利用者として対象レコードとファイルへのアクセスを確かめ、
+個人や Workspace の範囲はデータポリシーで制限する。ID や `workspaceId` はクエリの絞り込みに使う。
+Python タスクを使う場合、タスクはファイルを読む権限と結果を書き込む権限を実行時に Gateway で検査する。
+依頼 ID は利用者が読める DB の行に保存し、画面は再表示時に状態を読み直す（`$fdpocket-app-integrations`）。
+
+| サーバー SDK のジョブ契約 | 内容 |
+|---|---|
+| `JobScheduleRequest` | `jobs.schedule` に渡す `app`・`handler`・`payload`（JSON、64 KiB まで）・`idempotencyKey`・任意の `runAt`（UTC、最大 30 日先）。呼び出し元に `jobs.schedule`、宛先の jobs App に `jobs.consume` が必要 |
+| `JobScheduleResponse` | ジョブの `id` と `status`（`pending` / `running` / `done` / `failed` / `cancelled`） |
+| `JobCancelResponse` | `jobs.cancel` の結果 `{ cancelled }`。取り消せるのは実行開始前 |
+| `JobDelivery` | `queue` が受け取る `id`・`handler`・`payload`・`attempt`・`scheduledTime`・`noRetry`。再配送に備えて副作用を冪等にする |
+| `JobRun` | `forJob` に渡すイベント。キューの `leaseToken` は Platform が渡す配送資格。イベントをそのまま渡し、資格をログやデータに保存しない。定期実行は `id` と `cron` を持つ。同じ予定時刻の再試行では `id` と `scheduledTime` が同じ |
+
+Worker で利用者のファイルの中身を読むときは `forJob(event).storage.download(fileId)` の `Response` を使う。
+AI へ渡すだけなら §3.8 の `fdpocket-file:<fileId>` を使う。
+| `PythonRunFinished` / `pythonRunFinished` | Python タスクの `onFinish` で届く payload の型と検証用の契約（`pythonRunFinished.wire`）。詳細は §3.9 と `$fdpocket-app-python` |
+
 ### 3.3 `client.storage` — ファイル
 
 ```ts
@@ -428,6 +494,13 @@ const files = await client.db.storageFile.findMany({ where: { bucket: 'attachmen
 | `client.ui.colorScheme()` / `client.ui.onColorSchemeChange(listener)` | 画面の明暗（`'light'` / `'dark'`）。埋め込まれていればスーパーアプリの外観の設定、それ以外と明暗を送らない Host では端末の設定（`prefers-color-scheme`）。`html` の `.dark` はひな形の `AppShell` が付け外しする |
 
 埋め込まれていないときは no-op ではなく `HOST_UNAVAILABLE` を返す。`host()` を見て出し分ける。
+
+### 3.4a 端末の機能
+
+Web の埋め込み画面は `camera`、`microphone`、`geolocation`、`fullscreen`、`clipboard-write`、`screen-wake-lock` を
+iframe に委譲する。ミニアプリは標準 Web API を使う。OS・ブラウザ・WebView の対応や利用者の許可によって利用の可否は変わる。
+操作の目的を示して必要なときに許可を求め、録音・撮影を始めたら使用中と停止操作を見せる。許可を得られないときは
+画像のファイル選択や住所の手入力など、用件に合う方法を出す。利用する環境で許可と拒否の双方を確かめる。
 
 ### 3.5 `client.safety` — 利用者の投稿の通報とブロック（`Safety`）
 
@@ -542,7 +615,8 @@ notifications:
   （`servicePermissions: [jobs.consume, ai.chat]`）。払うのは、`asUser(request).jobs.schedule(...)` で**利用者として登録した
   ジョブならその利用者**、project.yaml の **cron なら Project の持ち主**、python のタスクが `ctx.jobs` で登録したジョブなら
   **そのタスクの払う人**。サーバーとして（`asUser` 無しで）登録したジョブは
-  払う人がいないので `FORBIDDEN`。呼べるのは配送中の間だけ。jobs では `fdpocket-file:` を使えない（Storage から読んで data URL で渡す）。
+  払う人がいないので `FORBIDDEN`。呼べるのは配送中の間だけ。利用者として予約された `queue` の jobs App に `jobs.data` があれば
+  `fdpocket-file:` を使える。Gateway が元の App と利用者の読み取り権限を確かめてから渡す（§3.2a）。
 
 `openai()` の要点（`model` は `auto`＝Jev Router か、project.yaml の `ai.model` / 許可一覧の ID）:
 
@@ -599,6 +673,7 @@ def caption(ctx, input):
   `FORBIDDEN`。実行が終わると使えない。
 - `ctx.client` は python の App のサービスとしての `notifications`（利用者のデータは読めない）。`ctx.ai.openai` は Platform の AI
   （`OpenAI(**ctx.ai.openai())`・LangChain の `ChatOpenAI` に渡す）、`ctx.python` は別のタスクの依頼で、どちらも払うのはこのタスクの払う人。
+- `PythonRun` の `startedAt` と `finishedAt` は開始時刻と終了時刻で、まだ到達していない時刻は `null`。
 - **終わりを TypeScript で受ける**: タスクに `onFinish` を宣言する（§2）。成功も失敗も、タスクのコードが落ちても届く。
   api / jobs で `wait()` し続けない（GPU の処理は数分〜数時間かかり、Worker の時間を使い切る）。
 - **途中から続きを渡す**: `ctx.jobs.schedule`（引数は `app`・`handler`・`payload` と、キーワードの `idempotency_key`・`run_at`）。
@@ -863,7 +938,7 @@ key はモデル内で安定した名前で、data には ID を書かない。�
 |---|---|
 | ブラウザ（web App）から Gateway と `network.browser` 以外への `fetch` / `XMLHttpRequest` / `WebSocket` / `EventSource` | データは `client.db`、ファイルは `client.storage`。秘密が要る外部サービスは api / jobs から `network.egress` と `secrets` を宣言して呼ぶ（§2・`$fdpocket-app-integrations`） |
 | 秘密の値をコード・manifest・`.kit/dev.vars` 以外のファイルに書く・web に渡す | 名前を `secrets` に宣言し、api / jobs の `env.<名前>` で読む。値は作者がアプリ管理画面で入れる |
-| サーバーの資格情報（`env.PLATFORM_SERVICE_CREDENTIAL`）をブラウザへ返す・利用者の認可を迂回して `db` を使う | 利用者の操作は `asUser(request)` で、サーバー自身の処理だけをサービスの client で行う |
+| サーバーの資格情報（`env.PLATFORM_SERVICE_CREDENTIAL`）をブラウザへ返す・利用者の認可を迂回して DB・Storage を使う | API リクエスト中は `asUser(request)`、利用者のジョブ中は届けられたイベントを `forJob` に渡す（§3.2a） |
 | `localStorage` / `sessionStorage` / `indexedDB` / Cookie にトークン・個人情報を置く | トークンは SDK がメモリに持つ。画面の好み（並び順など）だけは置いてよい |
 | 外部 CDN の `<script>` / フォント / 画像の URL | npm の依存か、`apps/<slug>/public/` に同梱する |
 | `eval` / `new Function` | 素直に書く |

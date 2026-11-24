@@ -1,5 +1,5 @@
 import "../zod-jitless.js";
-import { ACT_AS_HEADER, notificationSendRequestSchema, notificationSendResponse, RUN_CONTEXT_HEADER, SERVICE_CREDENTIAL_PATTERN, serviceTokenResponse, } from '@workspace/project-protocol';
+import { ACT_AS_HEADER, JOB_LEASE_HEADER, notificationSendRequestSchema, notificationSendResponse, RUN_CONTEXT_HEADER, SERVICE_CREDENTIAL_PATTERN, serviceTokenResponse, } from '@workspace/project-protocol';
 import { createAi } from "../ai/client.js";
 import { createConnectionReader } from "../connections/client.js";
 import { createDbClient } from "../db/client.js";
@@ -45,24 +45,29 @@ export function createServerClient(options) {
         return pending;
     }
     /** サービストークンで送る。`extra` は利用者（X-Act-As）・実行中のジョブ（x-fdpocket-run） */
-    function serviceTransport(extra = {}) {
+    function serviceTransport(extra = {}, token = serviceToken) {
+        const leased = JOB_LEASE_HEADER in extra;
         return createTransport({
             gateway: base,
-            token: serviceToken,
+            token,
             fetch: (input, init) => {
+                if (leased) {
+                    const url = new URL(input instanceof Request ? input.url : input);
+                    if (!url.href.startsWith(`${base}/`)) {
+                        throw new SdkError('FORBIDDEN', 'job credentials may only be sent to the Gateway');
+                    }
+                }
                 const headers = new Headers(init?.headers);
                 for (const [name, value] of Object.entries(extra))
                     headers.set(name, value);
-                return fetchImpl(input, { ...init, headers });
+                return fetchImpl(input, { ...init, headers, ...(leased ? { redirect: 'manual' } : {}) });
             },
             onUnauthenticated: () => {
                 held = null;
             },
         });
     }
-    const transportFor = (userToken) => serviceTransport(userToken ? { [ACT_AS_HEADER]: userToken } : {});
-    function dataClient(userToken) {
-        const transport = transportFor(userToken);
+    function dataClient(transport = serviceTransport()) {
         return {
             db: createDbClient(transport),
             storage: createStorage(transport, fetchImpl, base),
@@ -94,9 +99,9 @@ export function createServerClient(options) {
                 : /^Bearer\s+(\S+)$/i.exec(input.headers.get('authorization') ?? '')?.[1];
             if (!token || /\s/.test(token))
                 throw new SdkError('UNAUTHENTICATED', 'missing user token');
-            const transport = transportFor(token);
+            const transport = serviceTransport({ [ACT_AS_HEADER]: token });
             return {
-                ...dataClient(token),
+                ...dataClient(transport),
                 connections: createConnectionReader(transport),
                 ai: createAi(transport, base),
                 jobs: createJobs((path, body) => transport.send(path, { method: 'POST', body })),
@@ -105,12 +110,25 @@ export function createServerClient(options) {
         },
         forJob(event) {
             const run = `${event.cron === undefined ? 'queue' : 'schedule'}:${event.id}`;
-            const transport = serviceTransport({ [RUN_CONTEXT_HEADER]: run });
+            const lease = event.cron === undefined ? event.leaseToken : undefined;
+            const transport = serviceTransport({
+                [RUN_CONTEXT_HEADER]: run,
+                ...(lease ? { [JOB_LEASE_HEADER]: lease } : {}),
+            });
+            const dataTransport = lease
+                ? transport
+                : serviceTransport({}, async () => {
+                    throw new SdkError('FORBIDDEN', 'job data access requires an active queue delivery');
+                });
+            const { openai, embed } = createAi(transport, base);
+            const data = dataClient(dataTransport);
             return {
-                ai: {
-                    openai: () => createAi(transport, base).openai(),
-                    embed: (input, options) => createAi(transport, base).embed(input, options),
+                ...data,
+                storage: {
+                    ...data.storage,
+                    download: (fileId, options) => dataTransport.fetch(`${base}/v1/storage/files/${encodeURIComponent(fileId)}/job-content`, { signal: options?.signal }),
                 },
+                ai: { openai, embed },
                 python: createPython(transport),
             };
         },

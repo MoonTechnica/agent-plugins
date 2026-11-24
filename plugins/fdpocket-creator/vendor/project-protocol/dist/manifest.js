@@ -60,6 +60,7 @@ export const SERVICE_PERMISSIONS = [
     'notifications.send',
     'jobs.schedule',
     'jobs.consume',
+    'jobs.data',
     /** ミニアプリ内 AI を呼ぶ（api は利用者として、jobs・python は実行の払う人として。project-ai.md §3.3・§3.6） */
     'ai.chat',
     /** python の App のタスクを依頼する（python-backend.md §5） */
@@ -310,6 +311,10 @@ function pythonDataOnly(app) {
 function refineServerFields(ctx, slug, app) {
     const server = SERVER_APP_KINDS.includes(app.kind);
     const path = ['apps', slug];
+    if (app.servicePermissions?.includes('jobs.data') &&
+        (app.kind !== 'jobs' || !app.servicePermissions.includes('jobs.consume'))) {
+        report(ctx, [...path, 'servicePermissions'], 'not_allowed', 'jobs.data requires jobs.consume');
+    }
     if (app.network?.mocks) {
         if (!server)
             report(ctx, [...path, 'network', 'mocks'], 'not_allowed', 'only server apps declare egress mocks');

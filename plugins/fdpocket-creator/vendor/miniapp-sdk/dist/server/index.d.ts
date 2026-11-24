@@ -29,9 +29,16 @@ export interface ServerClient<S extends SchemaDef = SchemaDef> extends ServerDat
      * jobs の App の queue / scheduled のイベントを渡す。今配送中の実行として AI を呼ぶ（tasks/0537）。
      * 払うのは、`asUser(...).jobs.schedule` で登録したジョブならその利用者、project.yaml の cron なら
      * Project の持ち主、python のタスクが `ctx.jobs` で登録したジョブならそのタスクの払う人。
-     * 利用者の無い `jobs.schedule`（サーバーとしての登録）のジョブは AI を使えない
+     * 利用者の無い `jobs.schedule`（サーバーとしての登録）のジョブは AI を使えない。
+     * DB と Storage は配送中の queue イベントを渡し、`jobs.data` を宣言している場合に利用できる。
      */
-    forJob(event: JobRun): {
+    forJob(event: JobRun): ServerDataClient<S> & {
+        readonly storage: Storage & {
+            /** Authenticated stream of a file readable during this delivery. */
+            download(fileId: string, options?: {
+                signal?: AbortSignal;
+            }): Promise<Response>;
+        };
         readonly ai: Pick<Ai, 'openai' | 'embed'>;
         /** python の App のタスクを依頼する（払うのはこのジョブの払う人。python-backend.md §5） */
         readonly python: Python;
@@ -41,6 +48,8 @@ export interface ServerClient<S extends SchemaDef = SchemaDef> extends ServerDat
 export interface JobRun {
     readonly id: string;
     readonly cron?: string;
+    /** Platform が queue に渡す実行中の配送の資格情報。ログやデータに保存しない。 */
+    readonly leaseToken?: string;
 }
 export interface ServerUserClient<S extends SchemaDef = SchemaDef> extends ServerDataClient<S> {
     readonly connections: Pick<Connections, 'read'>;

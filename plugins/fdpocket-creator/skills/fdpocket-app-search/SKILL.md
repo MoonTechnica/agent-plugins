@@ -121,7 +121,7 @@ model Article with PlatformSearch, PlatformVector {
 **`client.ai.embed(...)`（Platform の AI。`$fdpocket-app-ai` §3b）で作る。** 費用は使った本人のクレジット。
 
 ```ts
-// api の App（利用者のリクエストを受けたとき）。jobs なら forJob(event).ai.embed(...)
+// api の App（利用者のリクエストを受けたとき）
 const user = createServerClient<SchemaType>({ env }).asUser(request)
 const { embeddings, model } = await user.ai.embed(article.body, { model: EMBEDDING_MODEL, dimensions: 1536 })
 await user.db.article.update({
@@ -135,13 +135,14 @@ await user.db.article.update({
 - 埋め込みは**モデルごとに別の空間**のベクトルで、次元数が同じでも混ぜて比べられない（比べても距離は意味を持たず、結果が静かに悪くなる）。
   だから保存した行に `embeddingModel` を残し、**検索する文の埋め込みも同じモデルで作る**。
 - モデルを変えるときは、**全行を作り直す**（古い行と新しい行を混ぜたまま運用しない）。作り直す行は
-  `where: { OR: [{ embeddingModel: null }, { embeddingModel: { not: EMBEDDING_MODEL } }] }` で見つかる。jobs で分けて作り直し、
+  `where: { OR: [{ embeddingModel: null }, { embeddingModel: { not: EMBEDDING_MODEL } }] }` で見つかる。権限のある利用者としてページ単位で作り直し、
   終わるまでは古いモデルのまま検索する（切り替えは全行が終わってから `EMBEDDING_MODEL` を変える）。
 - `embed` が返す `model` は提供元が実際に使ったモデル名。`model` を指定しなければ Platform の既定になり、既定が変わると混ざる。**必ず `model` を明示する。**
 
 - `dimensions` は `@@platform.vector` の `dims` と同じにする（既定のモデルは 1536 次元）。
 - 記事を作る・更新する処理の中で、本文から埋め込みを作り直して書く（本文を変えたのに古い埋め込みを残さない）。
-  既存の大量のデータは jobs で分けて作る（1 回 64 件まで）。
+  既存の大量のデータは、利用者として API で 64 件以下ずつ読み書きする。画面を閉じた後も処理が続く要件では、利用者として
+  データを読み書きできる Python タスクで、対応する埋め込みモデルを使う（spec §3.2a）。
 - 自前のモデルで作りたいとき（画像・音声の埋め込み、多言語の専用モデル）は python の App（`$fdpocket-app-python`）や、
   api から外部の API（`$fdpocket-app-integrations`）でもよい。
 
@@ -214,6 +215,6 @@ const { data } = hooks.article.useFindMany({
 ## 7. 守ること
 
 - 検索の列を増やしすぎない。`body` のような長い列は、本当に探すときだけ。
-- 埋め込みは本文を変えるたびに作り直す。作り直すときはモデル名（`embeddingModel`）も更新する。作り直しは重いので、保存の処理（api / jobs）に寄せ、画面から毎回作らない。
+- 埋め込みは本文を変えるたびに作り直す。作り直すときはモデル名（`embeddingModel`）も更新する。作り直しは保存処理にまとめる。
 - 全件を検索結果に出さない。`take` は 20 前後で、必ずページングする。
 - 検索のテストは「別の Workspace の行が結果に出ない」ことを必ず入れる（`$fdpocket-app-testing`）。

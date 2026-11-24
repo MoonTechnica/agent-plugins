@@ -1,8 +1,8 @@
 {
   "$schema": "https://agent-plugins.org/schemas/1.0.0/plugin.schema.json",
   "name": "fdpocket-creator",
-  "version": "3.5.5cac3c45",
-  "description": "ミニアプリ（web と admin の App・データ・ファイル）を手元の Coding Agent で作る Creator Kit（Skills・SDK・Kit の CLI・Platform MCP）",
+  "version": "3.5.828afabf",
+  "description": "FDPocket のミニアプリを手元の Coding Agent で作る Creator Kit。画面・データ管理・外部連携・バックグラウンド処理・AI を組み合わせるための Skills・SDK・CLI・Platform MCP。",
   "author": {
     "name": "Moon Technica"
   },

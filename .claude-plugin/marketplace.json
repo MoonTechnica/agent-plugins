@@ -20,7 +20,7 @@
     {
       "name": "fdpocket-creator",
       "source": "./plugins/fdpocket-creator",
-      "description": "ミニアプリ（web と admin の App・データ・ファイル）を手元の Coding Agent で作る Creator Kit（Skills・SDK・Kit の CLI・Platform MCP）"
+      "description": "FDPocket のミニアプリを手元の Coding Agent で作る Creator Kit。画面・データ管理・外部連携・バックグラウンド処理・AI を組み合わせるための Skills・SDK・CLI・Platform MCP。"
     }
   ]
 }

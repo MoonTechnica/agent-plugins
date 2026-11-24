@@ -231,6 +231,7 @@ export declare const reportSchema: z.ZodObject<{
                 "notifications.send": "notifications.send";
                 "jobs.schedule": "jobs.schedule";
                 "jobs.consume": "jobs.consume";
+                "jobs.data": "jobs.data";
                 "ai.chat": "ai.chat";
                 "python.run": "python.run";
             }>>>;

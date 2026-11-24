@@ -31,6 +31,8 @@ export interface JobDelivery {
     readonly payload: JobScheduleRequest['payload'];
     readonly attempt: number;
     readonly scheduledTime: number;
+    /** Capability for this delivery attempt. Pass the event to forJob; keep it out of payloads and logs. */
+    readonly leaseToken?: string;
     noRetry(): void;
 }
 /**
@@ -39,3 +41,4 @@ export interface JobDelivery {
  * 払う人。tasks/0537・python-backend.md §5）
  */
 export declare const RUN_CONTEXT_HEADER = "x-fdpocket-run";
+export declare const JOB_LEASE_HEADER = "x-fdpocket-job-lease";

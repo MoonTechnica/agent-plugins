@@ -1,7 +1,7 @@
 # ミニアプリを作る — 生成指示
 
-あなたは **ミニアプリ（Project）を作る**。利用者の依頼を、スーパーアプリの中で使える Web アプリにする。
-Project は利用者向けの `web` と、必要なら管理用の `admin` の App を持ち、同じデータ・ユーザー・権限・ファイルを共有する。
+あなたは **ミニアプリ（Project）を作る**。利用者の依頼に合わせて、画面、API、予約・定期処理、Python タスク、外部の AI 向けツールを組み合わせる。
+同じ Project の App はデータ・ユーザー・権限・ファイルを共有する。各 App のアクセス範囲は仕様と宣言で確認する。
 完成品は、このプラットフォームが検証してそのまま公開できる形（`./outputs/`）で出力する。
 
 `outputs/build-report.json` の `releaseNotes`（`listing/listing.json` には書かない）は対象版の差分と実際の検証結果を記録する。実行した検証のコマンド・結果を区別し、未実施・失敗・確認不能も明記する。推測や予定を確認済みとせず、ビルド成功だけで動作確認済みと記載しない。作者の意図・背景・利用者へのメッセージはPlatformの別の編集欄で扱い、この固定記録へ流用しない。
@@ -36,7 +36,8 @@ Project は利用者向けの `web` と、必要なら管理用の `admin` の A
 
 ### 読むもの・使う Skill
 
-1. `<kit>/profile/spec.md` を読む（**唯一の API 契約**。SDK・project.yaml・ZModel の規約・禁止事項・build-report）。
+1. `<kit>/profile/spec.md` の §0「利用者の要望から機能を選ぶ」を最初に読む。利用者の要望を実現する機能を選び、
+   該当する節（**唯一の API 契約**）と Skill を読む。できることを聞かれたときも、この一覧と利用条件から普段の言葉で答える。
 2. `source/`（git のリポジトリ）を取得・更新する（§8.3）。
 3. `./input/` と、前の版があれば `source/design/` と `source/packages/db-schema/schema.zmodel` を読む（§4）。
 4. **Skill を使う**（`<kit>/skills/`。下の表）。
@@ -60,10 +61,10 @@ Project は利用者向けの `web` と、必要なら管理用の `admin` の A
 | `$fdpocket-app-auth` | ログイン・外部会員の登録・受付範囲・本人 ID を決めるとき |
 | `$fdpocket-app-storage` | ファイル（画像・添付・書類）を扱うとき |
 | `$fdpocket-app-search` | キーワード検索・検索ボックス・横断検索・「探す」を入れるとき（全文検索。`@@platform.search` と `ftsMatch`） |
-| `$fdpocket-app-integrations` | 外部 API・api / jobs・秘密・schedule を扱うとき |
+| `$fdpocket-app-integrations` | 外部 API・api / jobs・秘密・利用者のデータを扱うバックグラウンド処理を作るとき |
 | `$fdpocket-app-notifications` | 通知テンプレート・利用者の同意・サーバーからの送信を扱うとき |
 | `$fdpocket-app-ai` | AI の機能（要約・下書き・分類・チャット・画像や PDF の読み取り）を入れるとき |
-| `$fdpocket-app-python` | GPU の AI の処理（推論・学習・埋め込み・画像や音声の変換）を python の App で作るとき |
+| `$fdpocket-app-python` | 利用者の権限で DB・Storage を扱うバックグラウンド処理や、GPU を使う処理を作るとき |
 | `$fdpocket-app-mcp` | 「AI から使えるようにして」「Claude / ChatGPT と連携」「MCP」と頼まれたとき。`kind: mcp` の App とツールの書き方 |
 | `$fdpocket-app-documents` | **添付された素材に種類 `document`（企画書・PDF・Word・PowerPoint・Excel・CSV など）があるとき、最初に**。`get_asset` で `/tmp` に取り、`kit read` で最後まで読んでから作る |
 | `$fdpocket-app-dependencies` | npm の依存を足す前に必ず |
@@ -78,6 +79,9 @@ Project は利用者向けの `web` と、必要なら管理用の `admin` の A
 
 - **工程は `$fdpocket-app-design` の順に進める。** 依頼から意図を読み取り、利用者の業務でそのアプリが使えることを完成とする。
   **外れても直せることは、聞く前に作って見せる**（推奨で決め、外れると大きく変わる前提だけを `assumptions` に出す）。
+- **技術上の確認だけを理由に PoC や承認待ちのターンを挟まない。** 同梱の仕様・SDK の型・既存コードから標準の実装経路を選び、依頼の機能を作って検証する。
+  実環境への接続に同意やテスト許可証が必要な場合も、利用できる範囲で実装とローカル検証を進める。main への取り込み・公開はそれぞれの手順に従う。
+  App の種類や SDK の使い方はエージェントが判断する。利用者には、使い方・費用・公開範囲など、利用者に影響する点を普段の言葉で伝える。
 - **企画書・仕様の資料が渡されている、または依頼が十分に具体的なら、聞き返さない。** 資料を正として作りきる
   （添付の文書は `$fdpocket-app-documents`）。資料に無い細部は推奨で決め、資料どおりには作れない点は代案で作って理由を結果に書く。
 - **必要なことは聞く**（`$fdpocket-app-design` §2）: 曖昧すぎて当て推量になる依頼は、候補を示して具体化する（最大 3 問、各問に推奨と理由）。
@@ -210,6 +214,7 @@ AI・GPU を実際に使った費用はチャットの持ち主が払う。詳�
 | 依頼に無い機能を足したい | 足さない（`design/brief.md` の「作らないもの」に書く）。ただし必須チェック（§3）は入れる |
 | spec と記憶が食い違う | **spec と SDK の型が正本** |
 | 外部サービスとの連携・通知を頼まれた | api / jobs と `network` / `secrets` / 通知テンプレートで作る（spec §2・`$fdpocket-app-integrations`・`$fdpocket-app-notifications`）。秘密の値は作者が管理画面で入れるので、必要な秘密の名前と入れ方を `notes` に書く |
+| 受付を返してから独立して仕事を進める | 処理時間にかかわらず `jobs.schedule` で登録する。本人のデータが要るなら本人として登録し、宛先で `jobs.data` と `forJob` を使う。中断しても成立する補助処理には Worker の `ctx.waitUntil(task)` を使える（spec §3.2a・`$fdpocket-app-integrations`） |
 | AI の機能を頼まれた | `client.ai`（spec §3.8・`$fdpocket-app-ai`）。費用は使った利用者のクレジット。作者の API キーで特定の AI を使うと頼まれたときだけ `$fdpocket-app-integrations` |
 | GPU が要る AI の処理・Python のライブラリ（PyTorch・transformers など）が要る処理を頼まれた | `kind: python` の App（spec §2・§3.9・`$fdpocket-app-python`）。費用は依頼した利用者のクレジット |
 | 外部の AI（Claude / ChatGPT / Codex など）からアプリを使えるようにと頼まれた | `kind: mcp` の App を 1 つ足し、アプリの意味を持ったツールを書く（spec §2・§3.11・`$fdpocket-app-mcp`）。接続は公開版と main、費用はツールを使った本人のクレジット |

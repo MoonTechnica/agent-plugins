@@ -1,6 +1,6 @@
 ---
 name: fdpocket-app-python
-description: GPU が要る AI の処理（深層学習の推論・学習・埋め込み・画像や音声の変換）や、PyTorch・transformers など Python のライブラリが要る処理を、python の App として作るときに使う。費用は依頼した利用者のクレジット。
+description: 利用者の権限で DB・Storage を扱うバックグラウンド処理、GPU や Python ライブラリが要る処理を python の App として作るときに使う。
 ---
 
 # python の App（GPU の AI 処理）
@@ -15,7 +15,8 @@ description: GPU が要る AI の処理（深層学習の推論・学習・埋�
 | 画像の生成・変換、音声の文字起こし・合成、埋め込み、分類・検出のモデル、小さな学習（LoRA など） | python の App の**タスク**（§3） |
 | 何度も呼ぶ推論で、モデルを読み込んだまま待たせたい（チャットの応答を流す・続けて速く返す） | python の App の **server**（§4）。待っている間も持ち主に費用がかかるので、タスクで足りるならタスク |
 | 文章の要約・下書き・分類・チャット | `client.ai`（`$fdpocket-app-ai`）。GPU を自分で動かさない |
-| JS で書ける処理・軽い集計 | api / jobs（`$fdpocket-app-integrations`）。python の App を足さない |
+| 画面を閉じた後も、Platform AI の応答を待って利用者のデータを読み書きする | FDPocket の jobs を使う（spec §3.2a）。Python のライブラリや GPU が必要な処理は python タスク |
+| API の応答までに終わる処理・外部サービスとの連携 | api / jobs（`$fdpocket-app-integrations`） |
 | GPU の結果を受けて、外部 API・通知・集計など TypeScript の処理を続ける | タスクに `onFinish` を宣言して jobs で受ける（§5） |
 
 api / jobs（TypeScript の Worker）と python は 1 つの Project に一緒に置け、DB・Storage を共有する。**呼べる向きは決まっている**:

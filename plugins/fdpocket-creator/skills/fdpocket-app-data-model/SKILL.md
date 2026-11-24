@@ -79,7 +79,7 @@ model Task {
   管理画面の `requiredPermission`（例: `app.access.admin`）もこの中の Permission。
 - 基底の Permission: `workspace.create`（Workspace を作れる）/ `roles.manage`（Role を編集）/ `users.manage`（人に Role を付ける）/ `audit.read`（監査を読む）。業務 admin が顧客を招くアプリは `users.invite`（`client.users.invite`。spec.md §3.7a。App の `capabilities.users.invite: true` も要る）。
 - Workspace の中の役割（owner / admin / editor / viewer）は `Membership.role` で、Project 全体の Role とは別。
-- **共有（家族・チーム）を作るなら**: Workspace の作成・招待・受諾は `client.workspaces`（spec.md §3.6）を使う。
+- **共有（家族・チーム）を作るなら**: Workspace の作成・招待・受諾は `client.workspaces`（spec.md §3.7）を使う。
   `client.db.workspace.create` / `client.db.membership.create` では最初の owner を入れられない。`defaultRoles` の Role に
   `workspace.create` を入れ、画面には「スペースを作る」「招待する（名指し）」「届いた招待（参加する / 断る）」を置く。
   招待リンクを配る形は作らない（Platform に無い）。

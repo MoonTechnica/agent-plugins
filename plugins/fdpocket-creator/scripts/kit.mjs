@@ -21362,6 +21362,9 @@ function pythonDataOnly(app) {
 function refineServerFields(ctx, slug, app) {
   const server2 = SERVER_APP_KINDS.includes(app.kind);
   const path = ["apps", slug];
+  if (app.servicePermissions?.includes("jobs.data") && (app.kind !== "jobs" || !app.servicePermissions.includes("jobs.consume"))) {
+    report(ctx, [...path, "servicePermissions"], "not_allowed", "jobs.data requires jobs.consume");
+  }
   if (app.network?.mocks) {
     if (!server2)
       report(ctx, [...path, "network", "mocks"], "not_allowed", "only server apps declare egress mocks");
@@ -21825,6 +21828,7 @@ var init_manifest = __esm(() => {
     "notifications.send",
     "jobs.schedule",
     "jobs.consume",
+    "jobs.data",
     "ai.chat",
     "python.run"
   ];
@@ -22669,7 +22673,7 @@ var init_intent = __esm(() => {
 });
 
 // frontend/packages/project-protocol/src/jobs.ts
-var jobScheduleRequestSchema, jobScheduleResponse, jobCancelRequestSchema, jobCancelResponse, RUN_CONTEXT_HEADER = "x-fdpocket-run";
+var jobScheduleRequestSchema, jobScheduleResponse, jobCancelRequestSchema, jobCancelResponse, RUN_CONTEXT_HEADER = "x-fdpocket-run", JOB_LEASE_HEADER = "x-fdpocket-job-lease";
 var init_jobs = __esm(() => {
   init_zod();
   init_contract();
@@ -80547,6 +80551,102 @@ var init_turso_connector = __esm(() => {
   CACHE_MS = 25 * 60 * 1000;
 });
 
+// frontend/packages/project-gateway/src/ai/app-history.ts
+async function prepare(db) {
+  await db.execute(`CREATE TABLE IF NOT EXISTS _platform_ai_history (
+    actor TEXT NOT NULL, key TEXT NOT NULL, revision TEXT NOT NULL,
+    exchanges TEXT NOT NULL, expires_at INTEGER NOT NULL,
+    PRIMARY KEY (actor, key)
+  )`);
+  await db.execute("CREATE INDEX IF NOT EXISTS _platform_ai_history_expiry ON _platform_ai_history(expires_at)");
+}
+async function openAppHistory(db, actor, key) {
+  await prepare(db);
+  const now = Date.now();
+  await db.execute({
+    sql: "DELETE FROM _platform_ai_history WHERE rowid IN (SELECT rowid FROM _platform_ai_history WHERE expires_at<=? ORDER BY expires_at LIMIT 100)",
+    args: [now]
+  });
+  const initialized = await db.execute({
+    sql: `INSERT INTO _platform_ai_history (actor,key,revision,exchanges,expires_at) VALUES(?,?,?,'[]',?)
+      ON CONFLICT(actor,key) DO UPDATE SET
+        revision=CASE WHEN expires_at<=? THEN excluded.revision ELSE revision END,
+        exchanges=CASE WHEN expires_at<=? THEN '[]' ELSE exchanges END,
+        expires_at=excluded.expires_at
+      RETURNING revision, exchanges`,
+    args: [actor, key, crypto.randomUUID(), now + TTL_MS, now, now]
+  });
+  const row = initialized.rows[0];
+  if (!row)
+    throw new Error("App conversation unavailable");
+  const revision = String(row.revision);
+  const exchanges = historySchema.parse(JSON.parse(String(row.exchanges)));
+  return {
+    messages: exchanges.flatMap(({ user, assistant }) => [
+      { role: "user", content: user },
+      { role: "assistant", content: assistant }
+    ]),
+    async append(exchange) {
+      const tx = await db.transaction("write");
+      try {
+        const current = await tx.execute({
+          sql: "SELECT exchanges FROM _platform_ai_history WHERE actor=? AND key=? AND revision=? AND expires_at>?",
+          args: [actor, key, revision, Date.now()]
+        });
+        const history2 = current.rows[0];
+        if (history2) {
+          const next = [
+            ...historySchema.parse(JSON.parse(String(history2.exchanges))),
+            exchange
+          ].slice(-40);
+          let bytes3 = 0;
+          let start = next.length - 1;
+          for (let index = next.length - 1;index >= 0; index--) {
+            const entry = next[index];
+            if (!entry)
+              continue;
+            bytes3 += encode8.encode(entry.user).length + encode8.encode(entry.assistant).length;
+            if (index !== next.length - 1 && bytes3 > 32768)
+              break;
+            start = index;
+          }
+          await tx.execute({
+            sql: "UPDATE _platform_ai_history SET exchanges=?,expires_at=? WHERE actor=? AND key=? AND revision=?",
+            args: [JSON.stringify(next.slice(start)), Date.now() + TTL_MS, actor, key, revision]
+          });
+        }
+        await tx.commit();
+      } finally {
+        tx.close();
+      }
+    }
+  };
+}
+async function resetAppHistory(db, actor, key) {
+  await prepare(db);
+  await db.execute({
+    sql: "DELETE FROM _platform_ai_history WHERE actor=? AND key=?",
+    args: [actor, key]
+  });
+}
+async function hasAppHistory(db) {
+  const { rows } = await db.execute("SELECT 1 FROM sqlite_master WHERE type='table' AND name='_platform_ai_history'");
+  return rows.length > 0;
+}
+async function eraseAppHistory(db, actor) {
+  if (!await hasAppHistory(db))
+    return;
+  await db.execute({ sql: "DELETE FROM _platform_ai_history WHERE actor=?", args: [actor] });
+}
+var TTL_MS, encode8, exchangeSchema, historySchema;
+var init_app_history = __esm(() => {
+  init_zod3();
+  TTL_MS = 24 * 60 * 60000;
+  encode8 = new TextEncoder;
+  exchangeSchema = exports_external3.object({ user: exports_external3.string(), assistant: exports_external3.string() });
+  historySchema = exports_external3.array(exchangeSchema);
+});
+
 // frontend/packages/project-gateway/src/internal/retention.ts
 async function plans(db, schema) {
   const found = [];
@@ -80770,6 +80870,8 @@ var init_erase = __esm(() => {
 
 // frontend/packages/project-gateway/src/erase/erase.ts
 async function eraseProjectUser(db, input2, removeObject) {
+  if (input2.platformUserId)
+    await eraseAppHistory(db, input2.platformUserId);
   const userIds = await findErasableUsers(db, {
     globalUserId: input2.globalUserId ?? "",
     projectUserIds: input2.projectUserIds
@@ -80804,6 +80906,7 @@ async function eraseProjectUser(db, input2, removeObject) {
 }
 var ERASE_FILE_BATCH = 100;
 var init_erase2 = __esm(() => {
+  init_app_history();
   init_errors6();
   init_erase();
 });
@@ -81150,13 +81253,46 @@ async function verifyProjectToken(c, adapters, config4, cost, options2 = {}) {
   if (run !== undefined && c.req.header(ACT_AS_HEADER) === undefined) {
     if (!(options2.actAs ?? true))
       throw new GatewayError("FORBIDDEN", "act-as is not allowed here");
-    const claims2 = await runClaimsOf(c, adapters, run);
+    const claims2 = options2.jobData && run.startsWith("queue:") ? await jobClaimsOf(c, adapters, run) : await runClaimsOf(c, adapters, run);
     c.set("contract", claims2.cv);
     return resolveProjectClaims(c, adapters, config4, cost, claims2, { ...options2, launch: false });
   }
   const claims = await userClaimsOf(c, adapters, options2.actAs ?? true);
   c.set("contract", claims.cv);
   return resolveProjectClaims(c, adapters, config4, cost, claims, options2);
+}
+async function jobClaimsOf(c, adapters, run) {
+  const jobId = QUEUE_RUN.exec(run)?.[1];
+  const leaseToken = c.req.header(JOB_LEASE_HEADER);
+  if (!jobId || !leaseToken || !LEASE.test(leaseToken) || c.req.header("origin") !== undefined) {
+    throw new GatewayError("FORBIDDEN", "active job delivery required");
+  }
+  const service = await adapters.signer.verifyService(bearerOf(c));
+  const current = await currentServiceOf(adapters, service);
+  if (!adapters.jobs?.runPrincipal || !service.permissions.includes("jobs.data") || !current.servicePermissions.includes("jobs.data"))
+    throw new GatewayError("FORBIDDEN", "job data permission required");
+  const principal = await adapters.jobs.runPrincipal(service.cid, jobId, leaseToken);
+  const db = await adapters.turso.connect(current.db);
+  const user = await findProjectUser(db, principal.projectUserId);
+  if (!user || (principal.testIdentity ? user.globalUserId !== `test:${service.envId}:${principal.testIdentity}` : platformUserIdOf(user.globalUserId) !== principal.userId))
+    throw new GatewayError("UNAUTHENTICATED", "job user does not match the project user");
+  return {
+    iss: service.iss,
+    sub: user.id,
+    gid: user.globalUserId,
+    aud: service.aud,
+    app: principal.appSlug,
+    env: service.env,
+    envId: service.envId,
+    cv: service.cv,
+    actorId: principal.userId,
+    ...principal.testIdentity ? { testIdentity: principal.testIdentity } : {},
+    ...principal.testGrantId ? { testGrantId: principal.testGrantId } : {},
+    anon: false,
+    jti: service.jti,
+    iat: service.iat,
+    exp: service.exp
+  };
 }
 async function runClaimsOf(c, adapters, run) {
   const runId = PYTHON_RUN.exec(run)?.[1];
@@ -81286,7 +81422,7 @@ function projectResolveInput(claims, cost) {
     cost
   };
 }
-var PYTHON_RUN;
+var PYTHON_RUN, QUEUE_RUN, LEASE;
 var init_session = __esm(() => {
   init_src();
   init_app();
@@ -81294,6 +81430,8 @@ var init_session = __esm(() => {
   init_project_users();
   init_gateway_port();
   PYTHON_RUN = /^python:([0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12})$/;
+  QUEUE_RUN = /^queue:([0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12})$/;
+  LEASE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/;
 });
 
 // frontend/packages/project-gateway/src/ai/completion.ts
@@ -81791,8 +81929,8 @@ var init_access = __esm(() => {
 });
 
 // frontend/packages/project-gateway/src/ai/conversation-scope.ts
-function conversationScope(environmentId, testIdentity, conversation) {
-  return sha256Hex2(new TextEncoder().encode(JSON.stringify([environmentId, testIdentity ?? null, conversation])));
+function conversationScope(environmentId, appSlug, testIdentity, conversation) {
+  return sha256Hex2(new TextEncoder().encode(JSON.stringify(["app-v1", environmentId, appSlug, testIdentity ?? null, conversation])));
 }
 var init_conversation_scope = __esm(() => {
   init_src();
@@ -81808,6 +81946,7 @@ function registerAiRoutes(app, adapters, config4, runtime, logger) {
       throw new GatewayError("VALIDATION_FAILED", "invalid ai turn request");
     const request = parsed.data;
     const attachments = await loadAttachments(db, claims, resolved, request.attachments ?? []);
+    const history2 = await openAppHistory(db, claims.actorId, await conversationScope(claims.envId, claims.app, claims.testIdentity, request.conversation));
     const turnId = crypto.randomUUID();
     const plan = await ai2.platform.begin({
       turnId,
@@ -81817,7 +81956,6 @@ function registerAiRoutes(app, adapters, config4, runtime, logger) {
       environmentId: claims.envId,
       appSlug: claims.app,
       userId: claims.actorId,
-      conversation: await conversationScope(claims.envId, claims.testIdentity, request.conversation),
       model: request.model ?? null,
       instructions: request.instructions ?? null,
       schema: request.schema ?? null
@@ -81829,7 +81967,7 @@ function registerAiRoutes(app, adapters, config4, runtime, logger) {
     const upstream = await startCompletion(ai2, { ...plan, userId: claims.actorId }, {
       messages: [
         ...plan.instructions ? [{ role: "system", content: plan.instructions }] : [],
-        ...plan.history,
+        ...history2.messages,
         {
           role: "user",
           content: [{ type: "text", text: request.message }, ...attachments.map(contentPartOf)]
@@ -81846,8 +81984,16 @@ function registerAiRoutes(app, adapters, config4, runtime, logger) {
       turnId,
       plan,
       upstream,
-      message: request.message,
-      attachments,
+      saveHistory: async (assistant) => {
+        try {
+          await history2.append({ user: request.message, assistant });
+        } catch (error162) {
+          logger.log("error", "ai_history_write_failed", {
+            turn_id: turnId,
+            error_name: error162 instanceof Error ? error162.name : "unknown"
+          });
+        }
+      },
       schema: request.schema
     });
     waitUntilOf(c)?.(turn.done.catch(() => {
@@ -81891,27 +82037,24 @@ function registerAiRoutes(app, adapters, config4, runtime, logger) {
     });
   });
   app.post("/v1/ai/conversations/:conversation/reset", async (c) => {
-    const { claims, ai: ai2 } = await open2(c);
+    const { claims, db } = await open2(c);
     const conversation = c.req.param("conversation");
     if (!/^[A-Za-z0-9_.:-]{1,64}$/.test(conversation))
       throw new GatewayError("VALIDATION_FAILED", "invalid conversation");
-    await ai2.platform.reset({
-      projectId: claims.aud,
-      environment: claims.env,
-      userId: claims.actorId,
-      conversation: await conversationScope(claims.envId, claims.testIdentity, conversation)
-    });
+    await resetAppHistory(db, claims.actorId, await conversationScope(claims.envId, claims.app, claims.testIdentity, conversation));
     return c.json({ conversation });
   });
 }
 function createAiAccess(adapters, config4, runtime) {
-  async function open2(c) {
+  async function open2(c, jobData = false) {
     if (c.req.header(ACT_AS_HEADER) !== undefined) {
+      if (jobData)
+        throw new GatewayError("FORBIDDEN", "cannot act as a user during a job");
       const service = await adapters.signer.verifyService(bearerOf(c));
       if (!service.permissions.includes("ai.chat"))
         throw new GatewayError("FORBIDDEN", "ai.chat is not granted to this service");
     }
-    const { claims, resolved } = await verifyProjectToken(c, adapters, config4, AI_COST);
+    const { claims, resolved } = await verifyProjectToken(c, adapters, config4, AI_COST, { jobData });
     if (claims.anon)
       throw new GatewayError("FORBIDDEN", "anonymous_user");
     const ai2 = adapters.ai;
@@ -81974,11 +82117,9 @@ function createTurn(platform, input2) {
       generationId: completion.id,
       modelUsed: model,
       usage: completion.usage,
-      costUsd: cost,
-      userContent: input2.message,
-      userAttachments: input2.attachments.map(({ fileId, kind }) => ({ fileId, kind })),
-      assistant: text4
+      costUsd: cost
     });
+    await input2.saveHistory(text4);
     return {
       text: text4,
       finishReason,
@@ -82021,6 +82162,7 @@ var init_routes = __esm(() => {
   init_project_users();
   init_session();
   init_access();
+  init_app_history();
   init_completion();
   init_conversation_scope();
 });
@@ -82037,25 +82179,29 @@ function registerAiOpenAiRoutes(app, adapters, config4, runtime, logger) {
       if (!/^(queue|schedule|python):[0-9a-f-]{36}$/i.test(run)) {
         throw new GatewayError("VALIDATION_FAILED", "invalid run");
       }
-      if (request2.messages.some((message2) => fileRefsOf(message2).length > 0)) {
-        throw new GatewayError("VALIDATION_FAILED", "file references need a user");
+      const refs2 = [...new Set(request2.messages.flatMap(fileRefsOf))];
+      let messages2 = request2.messages;
+      if (refs2.length) {
+        if (!run.startsWith("queue:"))
+          throw new GatewayError("VALIDATION_FAILED", "file references need a user");
+        const { claims: claims2, resolved: resolved2, db: db2 } = await open2(c, true);
+        messages2 = await messagesWithFiles(messages2, refs2, db2, claims2, resolved2);
       }
       const plan2 = await job.ai.platform.beginJob({
         turnId,
         credentialId: job.credentialId,
         run: run.toLowerCase(),
+        ...adapters.jobs?.runtimeContext ? {
+          context: await adapters.jobs.runtimeContext(job.credentialId, run, c.req.header(JOB_LEASE_HEADER))
+        } : {},
         model: request2.model ?? null
       });
-      return complete(c, job.ai, turnId, plan2, request2, request2.messages);
+      return complete(c, job.ai, turnId, plan2, request2, messages2);
     }
     const { claims, resolved, ai: ai2, db } = await open2(c);
     const request = await parseRequest(c);
     const refs = [...new Set(request.messages.flatMap(fileRefsOf))];
-    if (refs.length > AI_ATTACHMENTS_MAX * 4) {
-      throw new GatewayError("VALIDATION_FAILED", "too many files");
-    }
-    const files = new Map((await loadAttachments(db, claims, resolved, refs.map((fileId) => ({ fileId })))).map((file4) => [file4.fileId, file4]));
-    const messages = request.messages.map((message2) => inlineFiles(message2, files));
+    const messages = await messagesWithFiles(request.messages, refs, db, claims, resolved);
     const plan = await ai2.platform.beginRequest({
       turnId,
       projectId: claims.aud,
@@ -82068,6 +82214,13 @@ function registerAiOpenAiRoutes(app, adapters, config4, runtime, logger) {
     });
     return complete(c, ai2, turnId, plan, request, messages);
   });
+  async function messagesWithFiles(messages, refs, db, claims, resolved) {
+    if (refs.length > AI_ATTACHMENTS_MAX * 4) {
+      throw new GatewayError("VALIDATION_FAILED", "too many files");
+    }
+    const files = new Map((await loadAttachments(db, claims, resolved, refs.map((fileId) => ({ fileId })))).map((file4) => [file4.fileId, file4]));
+    return messages.map((message2) => inlineFiles(message2, files));
+  }
   app.post("/v1/ai/openai/embeddings", async (c) => {
     const run = c.req.header(RUN_CONTEXT_HEADER);
     const turnId = crypto.randomUUID();
@@ -82081,6 +82234,9 @@ function registerAiOpenAiRoutes(app, adapters, config4, runtime, logger) {
         turnId,
         credentialId: job.credentialId,
         run: run.toLowerCase(),
+        ...adapters.jobs?.runtimeContext ? {
+          context: await adapters.jobs.runtimeContext(job.credentialId, run, c.req.header(JOB_LEASE_HEADER))
+        } : {},
         model: embeddingModelOf(request2)
       });
       return embed(c, job.ai, turnId, plan2, request2);
@@ -86214,6 +86370,84 @@ var init_replay = __esm(() => {
   COUNT_ONLY = new Set(["createMany", "updateMany", "deleteMany"]);
 });
 
+// frontend/packages/project-gateway/src/db/turso-idempotency.ts
+function receiptOf(hash4, claim2, expectedHash = hash4) {
+  if (hash4 !== expectedHash || claim2?.state === "mismatch")
+    throw new GatewayError("VALIDATION_FAILED", "idempotency key reused with a different request");
+  if (claim2?.state === "in_progress")
+    throw new GatewayError("CONFLICT", "request with the same idempotency key is in progress");
+  return claim2?.state === "replay" ? { status: claim2.status, body: claim2.body } : null;
+}
+async function findReceipt(db, key) {
+  const { rows } = await db.execute({
+    sql: "SELECT hash, status, body FROM _platform_db_idempotency WHERE subject=? AND key=? AND expires_at>?",
+    args: [key.subject, key.key, Date.now()]
+  });
+  const row = rows[0];
+  if (!row)
+    return null;
+  return receiptOf(String(row.hash), {
+    state: "replay",
+    status: Number(row.status),
+    body: JSON.parse(String(row.body))
+  }, key.requestHash);
+}
+async function runIdempotentWrite(input2) {
+  await input2.db.execute(`CREATE TABLE IF NOT EXISTS _platform_db_idempotency (
+    subject TEXT NOT NULL, key TEXT NOT NULL, hash TEXT NOT NULL,
+    status INTEGER NOT NULL, body TEXT NOT NULL, expires_at INTEGER NOT NULL,
+    PRIMARY KEY (subject, key)
+  )`);
+  await input2.db.execute("CREATE INDEX IF NOT EXISTS _platform_db_idempotency_expiry ON _platform_db_idempotency(expires_at)");
+  const saved = await findReceipt(input2.db, input2.key);
+  if (saved)
+    return { ...saved, replay: true };
+  const legacy = await input2.registry.lookupIdempotency?.(input2.key);
+  const prior = receiptOf(input2.key.requestHash, legacy ?? null);
+  if (prior)
+    return { ...prior, replay: true };
+  return input2.client.$transaction(async (client) => {
+    const transaction = input2.transaction();
+    const concurrent = await findReceipt(transaction, input2.key);
+    if (concurrent)
+      return { ...concurrent, replay: true };
+    let result;
+    try {
+      result = await input2.mutate(client);
+    } catch (error162) {
+      if (!(input2.keepCommittedErrors && error162 instanceof GatewayError && error162.committed))
+        throw error162;
+      result = {
+        status: statusOf(error162.code),
+        body: errorBody(error162, input2.requestId),
+        committedError: error162
+      };
+    }
+    const now = Date.now();
+    await transaction.execute({
+      sql: "DELETE FROM _platform_db_idempotency WHERE rowid IN (SELECT rowid FROM _platform_db_idempotency WHERE expires_at<=? ORDER BY expires_at LIMIT 100)",
+      args: [now]
+    });
+    await transaction.execute({
+      sql: "INSERT INTO _platform_db_idempotency(subject,key,hash,status,body,expires_at) VALUES(?,?,?,?,?,?) ON CONFLICT(subject,key) DO UPDATE SET hash=excluded.hash,status=excluded.status,body=excluded.body,expires_at=excluded.expires_at",
+      args: [
+        input2.key.subject,
+        input2.key.key,
+        input2.key.requestHash,
+        result.status,
+        JSON.stringify(result.body),
+        now + TTL_MS2
+      ]
+    });
+    return { ...result, replay: false };
+  });
+}
+var TTL_MS2;
+var init_turso_idempotency = __esm(() => {
+  init_errors6();
+  TTL_MS2 = 10 * 60000;
+});
+
 // frontend/packages/project-gateway/src/db/batch.ts
 function registerBatchRoute(app, adapters, config5, logger, runtime) {
   app.post("/v1/db/batch", async (c) => {
@@ -86227,7 +86461,7 @@ function registerBatchRoute(app, adapters, config5, logger, runtime) {
     const parsed = dbBatchRequestSchema.safeParse(body);
     if (!parsed.success)
       throw new GatewayError("VALIDATION_FAILED", "invalid batch");
-    const { claims, resolved } = await verifyProjectToken(c, adapters, config5, parsed.data.operations.length, { allowProjectAuth: true });
+    const { claims, resolved } = await verifyProjectToken(c, adapters, config5, parsed.data.operations.length, { allowProjectAuth: true, jobData: true });
     const requestId = c.get("requestId");
     const db = await adapters.turso.connect(resolved.db);
     const schema = await runtime.schemaOf(resolved);
@@ -86270,53 +86504,23 @@ function registerBatchRoute(app, adapters, config5, logger, runtime) {
       throw new GatewayError("UNAUTHENTICATED", "project user not found");
     assertAppAccess(resolved, actor.permissions);
     const idempotency = await idempotencyOf(c, claims.aud, await idempotencySubject(claims), rawBody, idempotencyAuthorization(actor, resolved));
-    if (idempotency) {
-      const claimed = await adapters.registry.claimIdempotency(idempotency);
-      if (claimed.state === "replay") {
-        if (claimed.status < 400) {
-          const responses = claimed.body?.results;
-          if (!Array.isArray(responses) || responses.length !== operations.length)
-            throw new GatewayError("FORBIDDEN", "saved response is no longer readable", {
-              committed: true
-            });
-          const client = await runtime.policyClient({
-            schema,
-            db,
-            actor,
-            appSlug: claims.app,
-            isAnonymous: claims.anon
-          });
-          const handler = await runtime.rpcHandler(schema);
-          for (const [index2, operation] of operations.entries()) {
-            await assertReplayReadable({
-              ...operation,
-              schema,
-              body: responses[index2],
-              client,
-              handler
-            });
-          }
-        }
-        return c.json(claimed.body, claimed.status);
-      }
-      if (claimed.state === "in_progress")
-        throw new GatewayError("CONFLICT", "request with the same idempotency key is in progress");
-      if (claimed.state === "mismatch")
-        throw new GatewayError("VALIDATION_FAILED", "idempotency key reused with a different request");
-    }
     try {
       const recorders = operations.map((input2, index2) => {
         const recorder = createMutationRecorder(input2.model, true);
         recorder.plugin.id = `notification-batch-${index2}`;
         return recorder;
       });
+      let transaction;
       const client = await runtime.policyClient({
         schema,
         db,
         actor,
         appSlug: claims.app,
         isAnonymous: claims.anon,
-        plugins: recorders.map((r) => r.plugin)
+        plugins: recorders.map((r) => r.plugin),
+        observeTransaction: (tx) => {
+          transaction = tx;
+        }
       });
       const handler = await runtime.rpcHandler(schema);
       const started = performance.now();
@@ -86324,7 +86528,7 @@ function registerBatchRoute(app, adapters, config5, logger, runtime) {
         if (performance.now() - started >= DB_BATCH_DEADLINE_MS)
           throw new GatewayError("CONFLICT", "batch deadline exceeded");
       };
-      const responses = await client.$transaction(async (tx) => {
+      const mutate = async (tx) => {
         const results = [];
         for (const [index2, input2] of operations.entries()) {
           assertDeadline();
@@ -86353,8 +86557,48 @@ function registerBatchRoute(app, adapters, config5, logger, runtime) {
             throw new GatewayError("PAYLOAD_TOO_LARGE", "response too large", { committed: false });
         }
         assertDeadline();
-        return { results };
-      });
+        return { status: 200, body: { results } };
+      };
+      const outcome = idempotency ? await runIdempotentWrite({
+        db,
+        registry: adapters.registry,
+        key: idempotency,
+        client,
+        mutate,
+        requestId,
+        transaction: () => {
+          if (!transaction)
+            throw new Error("missing Turso write transaction");
+          return transaction;
+        }
+      }) : { ...await client.$transaction((tx) => mutate(tx)), replay: false };
+      if (outcome.replay) {
+        if (outcome.status < 400) {
+          const responses = outcome.body?.results;
+          if (!Array.isArray(responses) || responses.length !== operations.length)
+            throw new GatewayError("FORBIDDEN", "saved response is no longer readable", {
+              committed: true
+            });
+          const client2 = await runtime.policyClient({
+            schema,
+            db,
+            actor,
+            appSlug: claims.app,
+            isAnonymous: claims.anon
+          });
+          const handler2 = await runtime.rpcHandler(schema);
+          for (const [index2, operation] of operations.entries()) {
+            await assertReplayReadable({
+              ...operation,
+              schema,
+              body: responses[index2],
+              client: client2,
+              handler: handler2
+            });
+          }
+        }
+        return c.json(outcome.body, outcome.status);
+      }
       await writeAuditEventSafely(db, logger, audit("allow", null));
       for (const [index2, input2] of operations.entries())
         await fireTriggers({
@@ -86368,26 +86612,10 @@ function registerBatchRoute(app, adapters, config5, logger, runtime) {
           logger,
           requestId
         });
-      if (idempotency)
-        await adapters.registry.completeIdempotency({
-          ...idempotency,
-          status: 200,
-          body: responses
-        });
-      return c.json(responses);
+      return c.json(outcome.body);
     } catch (error162) {
       if (error162 instanceof GatewayError && error162.code === "FORBIDDEN")
         await writeAuditEventSafely(db, logger, audit("deny", "policy"));
-      if (idempotency) {
-        if (error162 instanceof GatewayError)
-          await adapters.registry.completeIdempotency({
-            ...idempotency,
-            status: statusOf(error162.code),
-            body: errorBody(error162, requestId)
-          });
-        else
-          await adapters.registry.releaseIdempotency(idempotency);
-      }
       throw error162;
     }
   });
@@ -86403,6 +86631,7 @@ var init_batch = __esm(() => {
   init_args();
   init_replay();
   init_rpc();
+  init_turso_idempotency();
 });
 
 // frontend/packages/project-gateway/src/db/routes.ts
@@ -86411,7 +86640,8 @@ function registerDbRoutes(app, adapters, config5, logger, runtime) {
   app.on(["GET", "POST", "PUT", "PATCH", "DELETE"], "/v1/db/:model/:op", async (c) => {
     const rawBody = await readBody(c);
     const { claims, resolved } = await verifyProjectToken(c, adapters, config5, DB_COST, {
-      allowProjectAuth: true
+      allowProjectAuth: true,
+      jobData: true
     });
     const requestId = c.get("requestId");
     const modelParam = c.req.param("model");
@@ -86453,114 +86683,106 @@ function registerDbRoutes(app, adapters, config5, logger, runtime) {
       throw new GatewayError("UNAUTHENTICATED", "project user not found");
     assertAppAccess(resolved, actor.permissions);
     const idempotency = isWrite ? await idempotencyOf(c, claims.aud, await idempotencySubject(claims), rawBody, idempotencyAuthorization(actor, resolved)) : null;
-    if (idempotency) {
-      const claimed = await adapters.registry.claimIdempotency(idempotency);
-      if (claimed.state === "replay") {
-        if (claimed.status < 400) {
-          await assertReplayReadable({
-            schema,
-            model,
-            op,
-            args: inspected.args,
-            body: claimed.body,
-            client: await runtime.policyClient({
-              schema,
-              db,
-              actor,
-              appSlug: claims.app,
-              isAnonymous: claims.anon
-            }),
-            handler: await runtime.rpcHandler(schema)
-          });
-        }
-        return c.json(claimed.body, claimed.status);
+    const triggers = matchingTriggers(resolved.notificationTriggers ?? [], model, op);
+    const recorder = triggers.length > 0 ? createMutationRecorder(model) : null;
+    let transaction;
+    const client = await runtime.policyClient({
+      schema,
+      db,
+      actor,
+      appSlug: claims.app,
+      isAnonymous: claims.anon,
+      plugins: recorder ? [recorder.plugin] : [],
+      observeTransaction: (tx) => {
+        transaction = tx;
       }
-      if (claimed.state === "in_progress") {
-        throw new GatewayError("CONFLICT", "request with the same idempotency key is in progress");
-      }
-      if (claimed.state === "mismatch") {
-        throw new GatewayError("VALIDATION_FAILED", "idempotency key reused with a different request");
-      }
-    }
-    try {
-      const result = await execute(actor);
-      if (idempotency)
-        await adapters.registry.completeIdempotency({ ...idempotency, ...result });
-      return c.json(result.body, result.status);
-    } catch (error162) {
-      if (idempotency) {
-        if (error162 instanceof GatewayError) {
-          await adapters.registry.completeIdempotency({
-            ...idempotency,
-            status: statusOf(error162.code),
-            body: errorBody(error162, requestId)
-          });
-        } else {
-          await adapters.registry.releaseIdempotency(idempotency);
-        }
-      }
-      throw error162;
-    }
-    async function execute(actor2) {
-      const triggers = matchingTriggers(resolved.notificationTriggers ?? [], model, op);
-      const recorder = triggers.length > 0 ? createMutationRecorder(model) : null;
+    });
+    const handler = await runtime.rpcHandler(schema);
+    async function mutate(policyClient) {
       const captured = {};
-      const client = await runtime.policyClient({
-        schema,
-        db,
-        actor: actor2,
-        appSlug: claims.app,
-        isAnonymous: claims.anon,
-        plugins: recorder ? [recorder.plugin] : []
-      });
-      const handler = await runtime.rpcHandler(schema);
       const response = await handler.handleRequest({
-        client: capturingErrors(client, captured),
+        client: capturingErrors(policyClient, captured),
         method: c.req.method,
         path: `/${model}/${op}`,
         query: fromQuery ? toQuery(inspected.args) : {},
         requestBody: fromQuery ? undefined : withMeta(inspected.args)
       });
-      if (response.status >= 400) {
-        const error162 = toGatewayError(captured.error, response, isWrite);
-        if (error162.code === "POST_WRITE_READ_DENIED") {
-          await writeAuditEventSafely(db, logger, auditOf("allow", "cannot_read_back"));
-        } else if (error162.code === "FORBIDDEN") {
-          await writeAuditEventSafely(db, logger, auditOf("deny", "policy"));
-        }
-        throw error162;
-      }
+      if (response.status >= 400)
+        throw toGatewayError(captured.error, response, isWrite);
       const size = encoder3.encode(JSON.stringify(response.body)).byteLength;
       if (size > RESPONSE_BODY_MAX_BYTES) {
         throw new GatewayError("PAYLOAD_TOO_LARGE", "response too large", {
           ...isWrite ? { committed: true } : {}
         });
       }
-      if (isWrite)
-        await writeAuditEventSafely(db, logger, auditOf("allow", null));
-      if (recorder) {
-        await fireTriggers({
-          triggers,
-          mutations: recorder.mutations,
-          op,
-          claims,
-          actor: actor2,
-          db,
-          notifications: adapters.notifications,
-          logger,
-          requestId
-        });
-      }
-      logger.log("info", "db", {
-        request_id: requestId,
-        project_id: claims.aud,
-        app: claims.app,
-        actor: claims.sub,
-        policy_version: resolved.policyVersion,
-        action: action2
-      });
       return { status: response.status, body: response.body };
     }
+    const outcome = await (async () => {
+      try {
+        return idempotency ? await runIdempotentWrite({
+          db,
+          registry: adapters.registry,
+          key: idempotency,
+          client,
+          mutate,
+          requestId,
+          keepCommittedErrors: true,
+          transaction: () => {
+            if (!transaction)
+              throw new Error("missing Turso write transaction");
+            return transaction;
+          }
+        }) : { ...await mutate(client), replay: false };
+      } catch (error162) {
+        if (error162 instanceof GatewayError && error162.code === "POST_WRITE_READ_DENIED")
+          await writeAuditEventSafely(db, logger, auditOf("allow", "cannot_read_back"));
+        else if (error162 instanceof GatewayError && error162.code === "FORBIDDEN")
+          await writeAuditEventSafely(db, logger, auditOf("deny", "policy"));
+        throw error162;
+      }
+    })();
+    if (outcome.replay) {
+      if (outcome.status < 400)
+        await assertReplayReadable({
+          schema,
+          model,
+          op,
+          args: inspected.args,
+          body: outcome.body,
+          client,
+          handler
+        });
+      return c.json(outcome.body, outcome.status);
+    }
+    if ("committedError" in outcome && outcome.committedError) {
+      if (outcome.committedError.code === "POST_WRITE_READ_DENIED")
+        await writeAuditEventSafely(db, logger, auditOf("allow", "cannot_read_back"));
+      throw outcome.committedError;
+    }
+    if (isWrite)
+      await writeAuditEventSafely(db, logger, auditOf("allow", null));
+    if (recorder) {
+      await fireTriggers({
+        triggers,
+        mutations: recorder.mutations,
+        op,
+        claims,
+        actor,
+        db,
+        notifications: adapters.notifications,
+        logger,
+        requestId
+      });
+    }
+    logger.log("info", "db", {
+      request_id: requestId,
+      project_id: claims.aud,
+      app: claims.app,
+      actor: claims.sub,
+      policy_version: resolved.policyVersion,
+      action: action2
+    });
+    return c.json(outcome.body, outcome.status);
     function auditOf(decision, reason) {
       return {
         requestId,
@@ -86588,6 +86810,7 @@ var init_routes4 = __esm(() => {
   init_batch();
   init_replay();
   init_rpc();
+  init_turso_idempotency();
   encoder3 = new TextEncoder;
 });
 
@@ -111030,7 +111253,8 @@ function createDbRuntime(adapters) {
       appSlug,
       isAnonymous,
       plugins = [],
-      skipMetadata = false
+      skipMetadata = false,
+      observeTransaction
     }) {
       if (!skipMetadata)
         await ensureRoleGrantMetadata(db, []);
@@ -111041,6 +111265,7 @@ function createDbRuntime(adapters) {
           client: db,
           observeTransaction: (tx) => {
             transaction = tx;
+            observeTransaction?.(tx);
           }
         }),
         computedFields: await searchComputedFields(schema2)
@@ -111847,6 +112072,7 @@ function registerEraseRoutes(app, adapters, options2) {
     }
     const result = await eraseProjectUser(db, {
       globalUserId: `${options2.issuer}:${input2.userId}`,
+      platformUserId: input2.userId,
       projectUserIds: input2.projectUserIds,
       requestId: input2.jobId,
       at: adapters.clock(),
@@ -111909,15 +112135,22 @@ function registerJobRoutes(app, adapters) {
       const userId = actor?.actorId ?? null;
       if (!adapters.jobs)
         throw new GatewayError("GATEWAY_UNAVAILABLE", "jobs unavailable");
-      const raw2 = await adapters.jobs.call(action2, claims.cid, parsed.data, userId, run, actor?.testIdentity ?? null, actor?.testGrantId ?? null);
-      const refusal = exports_external3.object({ error: exports_external3.enum(["FORBIDDEN", "VALIDATION_FAILED", "RATE_LIMITED"]) }).safeParse(raw2);
+      const raw2 = await adapters.jobs.call(action2, claims.cid, parsed.data, userId, run, actor?.testIdentity ?? null, actor?.testGrantId ?? null, actor && !actor.anon ? { appSlug: actor.app, projectUserId: actor.sub } : null);
+      const refusal = exports_external3.object({
+        error: exports_external3.enum([
+          "FORBIDDEN",
+          "VALIDATION_FAILED",
+          "RATE_LIMITED",
+          "GATEWAY_UNAVAILABLE"
+        ])
+      }).safeParse(raw2);
       if (refusal.success)
         throw new GatewayError(refusal.data.error, "job refused");
       return c2.json((action2 === "schedule" ? jobScheduleResponse.exact : jobCancelResponse.exact).parse(raw2));
     });
   }
 }
-var PYTHON_RUN_CONTEXT_PATTERN;
+var jobPrincipalSchema, PYTHON_RUN_CONTEXT_PATTERN;
 var init_jobs2 = __esm(() => {
   init_src();
   init_body_limit();
@@ -111925,6 +112158,13 @@ var init_jobs2 = __esm(() => {
   init_errors6();
   init_session();
   init_supabase_rpc();
+  jobPrincipalSchema = exports_external3.object({
+    userId: exports_external3.uuid(),
+    projectUserId: exports_external3.string().min(1),
+    appSlug: exports_external3.string().min(1),
+    testIdentity: exports_external3.string().nullable(),
+    testGrantId: exports_external3.uuid().nullable()
+  });
   PYTHON_RUN_CONTEXT_PATTERN = /^python:[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/;
 });
 
@@ -112090,7 +112330,7 @@ function registerProjectAuthRoutes(app, adapters, config5, key) {
       throw new GatewayError("FORBIDDEN", "project authentication exchange requires a trusted server");
     if (!await authorized(c2.req.header("authorization") ?? null))
       throw new GatewayError("UNAUTHENTICATED", "invalid internal key");
-    const parsed = exchangeSchema.safeParse(await jsonBody(c2));
+    const parsed = exchangeSchema2.safeParse(await jsonBody(c2));
     if (!parsed.success)
       throw new GatewayError("VALIDATION_FAILED", "invalid project auth exchange");
     const { delivery: withDelivery, ...request } = parsed.data;
@@ -112176,7 +112416,7 @@ function registerProjectAuthRoutes(app, adapters, config5, key) {
     }
   });
 }
-var exchangeSchema;
+var exchangeSchema2;
 var init_routes12 = __esm(() => {
   init_src();
   init_zod3();
@@ -112185,7 +112425,7 @@ var init_routes12 = __esm(() => {
   init_session();
   init_routes6();
   init_gateway_port();
-  exchangeSchema = directAuthExchangeSchema.extend({
+  exchangeSchema2 = directAuthExchangeSchema.extend({
     projectId: exports_external3.uuid(),
     environment: exports_external3.literal("prod"),
     environmentId: exports_external3.uuid(),
@@ -112346,6 +112586,9 @@ function registerPythonRoutes(app, adapters, config5) {
       const accepted2 = await python2.requestRun({
         credentialId: service.cid,
         run,
+        ...adapters.jobs?.runtimeContext ? {
+          context: await adapters.jobs.runtimeContext(service.cid, run, c2.req.header(JOB_LEASE_HEADER))
+        } : {},
         app: request2.app,
         task: request2.task,
         input: request2.input,
@@ -114252,6 +114495,35 @@ function registerStorageRoutes(app, adapters, config5, runtime) {
     }, session2);
     return c2.json(response);
   });
+  app.get("/v1/storage/files/:fileId/job-content", async (c2) => {
+    if (!c2.req.header(RUN_CONTEXT_HEADER)?.startsWith("queue:") || c2.req.header(ACT_AS_HEADER) !== undefined)
+      throw new GatewayError("FORBIDDEN", "active job delivery required");
+    const { session: session2, db, resolved, claims, schema: schema2 } = await open2(c2, true);
+    const file4 = await findReadableFile(runtime, {
+      db,
+      claims,
+      resolved,
+      schema: schema2,
+      fileId: c2.req.param("fileId")
+    });
+    if (!file4 || file4.status !== "active")
+      throw new GatewayError("NOT_FOUND", "file not found");
+    const upstream = await adapters.storage.get({ tier: tierOf(claims.env), area: "private", key: file4.objectKey }, { signal: c2.req.raw.signal });
+    if (!upstream)
+      throw new GatewayError("NOT_FOUND", "file not found");
+    if (!upstream.ok || !upstream.body) {
+      await upstream.body?.cancel();
+      throw new GatewayError("GATEWAY_UNAVAILABLE", "invalid storage response");
+    }
+    await auditStorage(db, session2, "storage.download.granted", file4.id);
+    return c2.newResponse(upstream.body, {
+      headers: {
+        "Cache-Control": "private, no-store",
+        "Content-Type": file4.contentType ?? "application/octet-stream",
+        "X-Content-Type-Options": "nosniff"
+      }
+    });
+  });
   app.get("/v1/storage/files/:fileId/download", async (c2) => {
     const { session: session2, db, resolved, claims, schema: schema2 } = await open2(c2, true);
     const file4 = await findReadableFile(runtime, {
@@ -114265,6 +114537,8 @@ function registerStorageRoutes(app, adapters, config5, runtime) {
       throw new GatewayError("NOT_FOUND", "file not found");
     const tier = tierOf(claims.env);
     if (resolved.storage.buckets[file4.bucket]?.delivery === "proxy") {
+      if (c2.req.header(RUN_CONTEXT_HEADER)?.startsWith("queue:"))
+        throw new GatewayError("FORBIDDEN", "use the authenticated job download");
       const iat = Math.floor(session2.at.getTime() / 1000);
       const exp2 = Math.min(claims.exp, iat + STORAGE_DOWNLOAD_URL_TTL_MAX_SECONDS);
       const ticket = await adapters.signer.signStorageDownload({
@@ -114491,7 +114765,7 @@ function registerStorageRoutes(app, adapters, config5, runtime) {
     await adapters.storage.completeMultipart(to, uploadId, parts);
   }
   async function open2(c2, withSchema = false, verified) {
-    const { claims, resolved } = verified ?? await verifyProjectToken(c2, adapters, config5, STORAGE_COST);
+    const { claims, resolved } = verified ?? await verifyProjectToken(c2, adapters, config5, STORAGE_COST, { jobData: true });
     const db = await adapters.turso.connect(resolved.db);
     if (resolved.app.access === "restricted") {
       const actor = await loadProjectActor(db, claims.sub, [], resolved.user.bootstrap);
@@ -116949,9 +117223,6 @@ import { existsSync as existsSync10 } from "node:fs";
 import { readFile as readFile10 } from "node:fs/promises";
 import { join as join14 } from "node:path";
 function createDevAi(options2) {
-  const conversations = new Map;
-  const pending = new Map;
-  const keyOf4 = (userId, conversation) => `${userId}\x00${conversation}`;
   async function prompt(kind, key) {
     if (key === null)
       return null;
@@ -116976,35 +117247,18 @@ function createDevAi(options2) {
   return {
     platform: {
       async begin(input2) {
-        const key = keyOf4(input2.userId, input2.conversation);
-        pending.set(input2.turnId, key);
         return {
           turnId: input2.turnId,
           model: modelOf2(input2.model),
           maxOutputTokens: options2.manifest.ai?.maxOutputTokens ?? AI_MAX_OUTPUT_TOKENS_DEFAULT,
           instructions: await prompt("instructions", input2.instructions),
-          schema: await prompt("schema", input2.schema),
-          history: [...conversations.get(key) ?? []]
+          schema: await prompt("schema", input2.schema)
         };
       },
-      async finish(input2) {
-        const key = pending.get(input2.turnId);
-        pending.delete(input2.turnId);
-        if (key) {
-          conversations.set(key, [
-            ...conversations.get(key) ?? [],
-            { role: "user", content: input2.userContent },
-            { role: "assistant", content: input2.assistant }
-          ]);
-        }
+      async finish() {
         return { credits: 0 };
       },
-      async fail(turnId) {
-        pending.delete(turnId);
-      },
-      async reset(input2) {
-        conversations.delete(keyOf4(input2.userId, input2.conversation));
-      },
+      async fail() {},
       async beginRequest(input2) {
         return {
           turnId: input2.turnId,
@@ -117146,6 +117400,7 @@ function createDevJobs(input2) {
       }
       row.status = "running";
       row.attempt++;
+      row.leaseToken = crypto.randomUUID();
       try {
         const response = await dispatch(row.app, new Request("https://kit-worker.invalid/__platform/queue", {
           method: "POST",
@@ -117154,7 +117409,8 @@ function createDevJobs(input2) {
             handler: row.handler,
             payload: row.payload,
             attempt: row.attempt,
-            scheduledTime: row.due
+            scheduledTime: row.due,
+            leaseToken: row.leaseToken
           })
         }));
         row.status = response.ok ? "done" : response.status === 422 || row.attempt >= 5 ? "failed" : "pending";
@@ -117173,6 +117429,7 @@ function createDevJobs(input2) {
         });
         row.status = row.attempt >= 5 ? "failed" : "pending";
       }
+      row.leaseToken = null;
       if (row.status === "pending") {
         row.due = Date.now() + 60000 * 2 ** (row.attempt - 1);
         arm(row);
@@ -117182,7 +117439,7 @@ function createDevJobs(input2) {
     timers.add(timer);
   }
   const port = {
-    async call(action2, credentialId, raw2) {
+    async call(action2, credentialId, raw2, userId, _run, testIdentity = null, testGrantId = null, actor) {
       const source = await input2.source(credentialId);
       if (!source)
         return { error: "FORBIDDEN" };
@@ -117200,9 +117457,10 @@ function createDevJobs(input2) {
         return { error: "FORBIDDEN" };
       const key = `${source}:${parsed.idempotencyKey}`;
       const hash6 = JSON.stringify(parsed);
+      const principal = actor && userId ? { ...actor, userId, testIdentity, testGrantId } : null;
       const existing = rows.get(key);
       if (existing)
-        return existing.hash === hash6 ? { id: existing.id, status: existing.status } : { error: "VALIDATION_FAILED" };
+        return existing.hash === hash6 && JSON.stringify(existing.actor) === JSON.stringify(principal) ? { id: existing.id, status: existing.status } : { error: "VALIDATION_FAILED" };
       const due = parsed.runAt ? Date.parse(parsed.runAt) : Date.now();
       if (due < Date.now() - 60000 || due > Date.now() + 30 * 86400000 || [...rows.values()].filter((r2) => ["pending", "running"].includes(r2.status)).length >= 1000)
         return { error: "VALIDATION_FAILED" };
@@ -117215,11 +117473,20 @@ function createDevJobs(input2) {
         hash: hash6,
         status: "pending",
         due,
-        attempt: 0
+        attempt: 0,
+        leaseToken: null,
+        actor: principal
       };
       rows.set(key, row);
       arm(row);
       return { id: row.id, status: row.status };
+    },
+    async runPrincipal(credentialId, jobId, leaseToken) {
+      const app = await input2.source(credentialId);
+      const row = [...rows.values()].find((job) => job.id === jobId);
+      if (!row || row.app !== app || row.status !== "running" || row.leaseToken !== leaseToken || !row.actor)
+        throw new GatewayError("FORBIDDEN", "job delivery is not active");
+      return row.actor;
     }
   };
   return {
@@ -117235,6 +117502,7 @@ function createDevJobs(input2) {
   };
 }
 var init_jobs3 = __esm(() => {
+  init_src3();
   init_src();
 });
 
@@ -118486,7 +118754,7 @@ function createDevUserInvitations(input2) {
         return { status: "already_invited" };
       const now2 = input2.clock();
       const invitationId = crypto.randomUUID();
-      const expiresAt = new Date(now2.getTime() + TTL_MS).toISOString();
+      const expiresAt = new Date(now2.getTime() + TTL_MS3).toISOString();
       invitations.push({
         invitationId,
         projectId: request.projectId,
@@ -118513,9 +118781,9 @@ function createDevUserInvitations(input2) {
     }
   };
 }
-var TTL_MS, EMAIL, maskEmail = (email7) => `${email7.slice(0, 1)}***${email7.slice(email7.indexOf("@"))}`;
+var TTL_MS3, EMAIL, maskEmail = (email7) => `${email7.slice(0, 1)}***${email7.slice(email7.indexOf("@"))}`;
 var init_user_invitations2 = __esm(() => {
-  TTL_MS = 7 * 24 * 60 * 60 * 1000;
+  TTL_MS3 = 7 * 24 * 60 * 60 * 1000;
   EMAIL = /^[^@\s]+@[^@\s]+\.[^@\s]+$/;
 });
 
@@ -118535,7 +118803,7 @@ function createDevWorkspaceInvitations(input2) {
       if (duplicate)
         return { status: "already_invited" };
       const invitationId = crypto.randomUUID();
-      const expiresAt = new Date(input2.clock().getTime() + TTL_MS2).toISOString();
+      const expiresAt = new Date(input2.clock().getTime() + TTL_MS4).toISOString();
       invitations.set(invitationId, {
         invitationId,
         projectId: request.projectId,
@@ -118581,9 +118849,9 @@ function createDevWorkspaceInvitations(input2) {
     }
   };
 }
-var TTL_MS2;
+var TTL_MS4;
 var init_workspace_invitations = __esm(() => {
-  TTL_MS2 = 7 * 24 * 60 * 60 * 1000;
+  TTL_MS4 = 7 * 24 * 60 * 60 * 1000;
 });
 
 // frontend/packages/miniapp-kit/src/db/diff.ts
@@ -291132,7 +291400,10 @@ export default {
       let failed = false;
       const waitUntil = promise => pending.push(Promise.resolve(promise).catch(()=>{failed=true}));
       try {
-        waitUntil(Promise.resolve().then(()=>worker.queue({...input,noRetry(){terminal=true}},env,{...ctx,waitUntil})));
+        const { leaseToken, ...delivery } = input;
+        const event = {...delivery,noRetry(){terminal=true}};
+        if (typeof leaseToken === 'string') Object.defineProperty(event,'leaseToken',{value:leaseToken});
+        waitUntil(Promise.resolve().then(()=>worker.queue(event,env,{...ctx,waitUntil})));
         while(pending.length) await Promise.all(pending.splice(0));
         if(failed) throw new Error('queue handler failed');
         return Response.json({ok:true});
@@ -291760,7 +292031,7 @@ __export(exports_external4, {
   enum: () => _enum8,
   endsWith: () => _endsWith4,
   encodeAsync: () => encodeAsync8,
-  encode: () => encode9,
+  encode: () => encode10,
   emoji: () => emoji8,
   email: () => email8,
   e164: () => e1648,
@@ -291907,7 +292178,7 @@ __export(exports_core8, {
   finalize: () => finalize4,
   extractDefs: () => extractDefs4,
   encodeAsync: () => encodeAsync7,
-  encode: () => encode8,
+  encode: () => encode9,
   describe: () => describe7,
   decodeAsync: () => decodeAsync7,
   decode: () => decode8,
@@ -293118,7 +293389,7 @@ var _encode5 = (_Err) => (schema2, value2, _ctx) => {
   const ctx = _ctx ? { ..._ctx, direction: "backward" } : { direction: "backward" };
   return _parse5(_Err)(schema2, value2, ctx);
 };
-var encode8 = /* @__PURE__ */ _encode5($ZodRealError4);
+var encode9 = /* @__PURE__ */ _encode5($ZodRealError4);
 var _decode5 = (_Err) => (schema2, value2, _ctx) => {
   return _parse5(_Err)(schema2, value2, _ctx);
 };
@@ -304093,7 +304364,7 @@ var parse19 = /* @__PURE__ */ _parse5(ZodRealError4);
 var parseAsync8 = /* @__PURE__ */ _parseAsync5(ZodRealError4);
 var safeParse8 = /* @__PURE__ */ _safeParse4(ZodRealError4);
 var safeParseAsync8 = /* @__PURE__ */ _safeParseAsync4(ZodRealError4);
-var encode9 = /* @__PURE__ */ _encode5(ZodRealError4);
+var encode10 = /* @__PURE__ */ _encode5(ZodRealError4);
 var decode9 = /* @__PURE__ */ _decode5(ZodRealError4);
 var encodeAsync8 = /* @__PURE__ */ _encodeAsync5(ZodRealError4);
 var decodeAsync8 = /* @__PURE__ */ _decodeAsync5(ZodRealError4);
@@ -304157,7 +304428,7 @@ var ZodType5 = /* @__PURE__ */ $constructor4("ZodType", (inst, def) => {
   inst.parseAsync = async (data, params) => parseAsync8(inst, data, params, { callee: inst.parseAsync });
   inst.safeParseAsync = async (data, params) => safeParseAsync8(inst, data, params);
   inst.spa = inst.safeParseAsync;
-  inst.encode = (data, params) => encode9(inst, data, params);
+  inst.encode = (data, params) => encode10(inst, data, params);
   inst.decode = (data, params) => decode9(inst, data, params);
   inst.encodeAsync = async (data, params) => encodeAsync8(inst, data, params);
   inst.decodeAsync = async (data, params) => decodeAsync8(inst, data, params);
@@ -309884,7 +310155,7 @@ async function startSessionWatcher(options2) {
   const request2 = options2.fetch ?? fetch;
   const transport = createSessionSyncTransport(url5, key, request2, lifecycle.signal);
   let observedInitialization;
-  const prepare = async (changes2, signal) => {
+  const prepare2 = async (changes2, signal) => {
     const baseline = await transport.context();
     if (baseline.initializationId !== undefined) {
       if (observedInitialization !== undefined && observedInitialization !== baseline.initializationId) {
@@ -309963,7 +310234,7 @@ async function startSessionWatcher(options2) {
         current.schema = true;
       changes = { schema: false, samples: false, allWorkers: false, apps: new Set };
       try {
-        const prepared = await prepare(current, lifecycle.signal);
+        const prepared = await prepare2(current, lifecycle.signal);
         if (closed)
           return;
         const descriptor = prepared.find((event) => event.notification.kind === "schema");
@@ -313423,13 +313694,13 @@ function agentsMd(kitRoot) {
   return [
     "# ミニアプリの制作（Creator Kit）",
     "",
-    "このディレクトリは、**スーパーアプリの中で使えるミニアプリ（web と、必要なら admin の App が同じデータ・ユーザー・権限・ファイルを共有する Project）を作り、Platform に送る**ための作業場所です。",
+    "このディレクトリは、**FDPocket のミニアプリを作り、Platform に送る**ための作業場所です。要望に応じて利用画面・管理画面、API、予約・定期処理、Python タスク、外部の AI 向けツールを組み合わせます。",
     "",
     "## 目的と範囲",
     "",
     "- ここでの仕事はミニアプリを作ることだけ。作業ディレクトリの外のファイルは触らない。",
     "- ほかのホスティングへのデプロイ・ネイティブアプリ・Platform の外で動くサーバーは作らない（ミニアプリは Platform の Gateway の中だけで動く）。",
-    "  使える API は `<kit>/profile/spec.md` にあるものだけ。npm の依存は `$fdpocket-app-dependencies` の基準で調べてから足す。",
+    "  `<kit>/profile/spec.md` の §0 で利用者の要望に合う機能を探し、該当する契約と Skill を読む。npm の依存は `$fdpocket-app-dependencies` の基準で調べてから足す。",
     "- main への取り込み（`adopt_branch`）と公開（`publish_project`）は MCP からできる（取り込みは編集者 = write 以上、公開はオーナーと管理者だけ）。呼ぶ前に `$fdpocket-release` の必須チェックをすべて行い、結果を報告して利用者の明示的な了承を得る（省略しない）。",
     "- 投稿・削除・クレジット・チーム・通報の操作は利用者がアプリで行う（ここからはできない）。",
     "",

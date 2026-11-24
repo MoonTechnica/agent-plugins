@@ -1,9 +1,39 @@
 ---
 name: fdpocket-app-integrations
-description: api / jobs の外部 API、秘密の名前、サーバー SDK、開発用モックを実装するときに使う。
+description: api / jobs、利用者のデータを扱うバックグラウンド処理、外部 API、秘密、開発用モックを実装するときに使う。
 ---
 
-# 外部サービス
+# API・バックグラウンド処理・外部サービス
+
+## 完了条件で処理を選ぶ
+
+| 必要な動き | 使う機能 |
+|---|---|
+| 画面から依頼し、API の応答までに利用者のデータを処理する | api の `asUser(request)` で DB・Storage・AI を使う |
+| 補助的な計測など、短い処理を応答後に続ける | 同じ API Worker の `ctx.waitUntil(task)` に処理の Promise を渡す。HTTP Worker の猶予は最大 30 秒。中断しても主要な操作が成立する処理に使う |
+| 受付後も独立して処理する、画面を閉じても続ける、再試行や予約が要る | FDPocket の `jobs.schedule` と `queue`。利用者として登録し、保存データに触れる jobs App に `jobs.data` を宣言する |
+| 決まった時刻に定期実行する | `schedules` と `scheduled`（UTC cron） |
+| GPU や Python のライブラリが必要な処理を依頼する | Python タスクを使う（`$fdpocket-app-python`）。必要なら本人の権限で `ctx.db` / `ctx.storage` を使い、保存した `runId` で状態を取得する |
+
+次の操作に処理結果が要らないときは、受付が済んだら利用者が先に進めるようにする。実行方式は、画面を閉じた後に続ける必要や、
+進捗の保存・再試行の要否で選ぶ。重い処理を待つ画面では、結果に依存する箇所だけで進捗を示す。
+
+処理時間で一律に決めず、受付から切り離して引き受けるべき仕事は `jobs` に回す。名刺や書類の取り込み、要約、翻訳、分類、
+外部サービスへの送信などに使える。キューの設定・配送は Platform が担当する。業務データと利用者に見せる処理結果はミニアプリの DB に置く。
+外部 AI の待ち時間だけを理由に Modal を追加しない。
+
+1. API で `asUser(request)` を使い、利用者の権限で対象を確かめる。対象の ID と安定した `idempotencyKey` を渡して
+   `jobs.schedule` を待つ。受付済みの ID を対象とひもづけ、利用者にはその時点で受付を返す。
+2. jobs で `createServerClient({ env }).forJob(job)` を使う。本人の資料を AI に渡すなら `fdpocket-file:<fileId>`、
+   ファイルの内容が必要なら `storage.download`、状態や結果には `db` を使う。元の画面 App の宣言と本人の現在の権限が適用される。
+   再試行では `job.id` に対応する保存済みの結果を確認する。同じ仕事が届いても更新先が一意になるように DB の一意キーを使い、
+   送信先が提供する冪等キーにも `job.id` を含める。複数の副作用があるなら操作ごとにキーを分ける。
+3. 画面では対象ごとに受付・処理中・結果・失敗を表示する。次の取り込みはすぐに続けられ、終わったものから確認できる。
+   遅い処理中にも別の操作ができること、別の利用者の資料が拒否されること、再配送しても保存が重複しないことを確かめる。
+
+毎週の集計や毎朝の取り込みは `project.yaml` の `schedules` と `scheduled(event, env, ctx)` を使う。
+同じ回の再試行で結果や通知が重複しないように、`event.scheduledTime` と処理名に対応する一意キーを使う。
+利用者との会話では「何を何時に行うか」と結果をどこで確認できるかを伝える。
 
 ## 外部アカウントのデータを使う場合
 
@@ -13,7 +43,9 @@ Google/Microsoft・Slack・Notion・Dropbox・Box・Salesforce・HubSpotの本�
 
 `infra/project.yaml` の api / jobs に `network.egress`（HTTPS のホスト名）、`secrets`（名前・説明・required）を宣言する。値は作者がアプリ管理画面で設定する。秘密をコードや manifest に書かない。ブラウザで使ってよい公開 API だけ web の `network.browser` に HTTPS オリジンを宣言する。
 
-api は `src/index.ts` で `export default { fetch(request, env, ctx) {} }`（Worker は `nodejs_compat` で動き、`node:async_hooks`・`node:crypto` などの Node の組み込みも使える。動的 import も 1 ファイルにまとまる）、jobs は `export default { scheduled(controller, env, ctx) {} }` を公開する。jobs の `schedules` は UTC cron と handler 名を持つ。
+api は `src/index.ts` で `export default { fetch(request, env, ctx) {} }` を公開する。Worker は `nodejs_compat` で動き、
+`node:async_hooks`・`node:crypto` などの Node の組み込みも使える。動的 import も 1 ファイルにまとまる。
+jobs は用途に応じて `queue` や `scheduled` を default export のオブジェクトに置く。定期実行の `schedules` は UTC cron と handler 名を持つ。
 
 jobs の scheduled は `controller.handler` で manifest の handler 名を選ぶ。非同期処理は return / await するか `ctx.waitUntil()` に渡す。再試行しても復旧しない失敗だけ `controller.noRetry()` で止める。
 
@@ -29,22 +61,9 @@ export default {
 `job` は `{ id, handler, payload, attempt, scheduledTime, noRetry() }`。jobs の App に `servicePermissions: [jobs.consume]`
 を宣言する。失敗（例外）は最大 5 回まで再試行されるので、副作用は冪等にする（`job.id` を相手の冪等キーにする）。
 
-```ts
-import { createServerClient } from '@workspace/miniapp-sdk/server'
-import type { SchemaType } from '@workspace/sdk'
-
-export default {
-  async queue(job, env, ctx) {
-    const server = createServerClient<SchemaType>({ env })
-    if (job.handler === 'afterCaption') {
-      const caption = await server.db.caption.findUnique({ where: { id: job.payload.captionId } })
-      // AI・python はこのジョブの払う人で呼ぶ（登録した利用者・python のタスクの払う人。サーバーとしての登録では使えない）
-      const ai = server.forJob(job).ai.openai()
-      // …外部 API に送る・通知する
-    }
-  },
-}
-```
+ジョブの `forJob(event)` は実行中のジョブとして API を呼ぶために使う。DB・Storage には、本人として登録したジョブ、
+宛先の `jobs.data`、Platform が渡した現在の配送資格が要る。予約の時点で payload 内の ID へのアクセスも確認する。
+ユーザートークンを payload に入れず、配送資格はログ・DB に残さない。Workspace はクエリで絞り、Gateway のポリシーで守る。
 
 登録は api なら `server.asUser(request).jobs.schedule({ app, handler, payload, idempotencyKey, runAt? })`
 （その利用者が払う。`asUser` 無しの `server.jobs.schedule` は払う人がいないので、ジョブから AI・python を使えない）、
