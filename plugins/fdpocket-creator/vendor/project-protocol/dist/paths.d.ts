@@ -15,6 +15,7 @@ export declare const PROJECT_PATHS: {
     /** Agent が書くマスタデータ（master-data.md。`kit db migrate` が migration の SQL にして全環境へ届く） */
     readonly masters: "packages/db-schema/masters.ts";
     /** Agent が書く消去のテスト（lifecycle.md §3.3。動的検証が seed の後の DB で 1 人を消して流す） */
+    readonly eraseTest: "packages/db-schema/erase.test.ts";
     readonly generated: ".kit/generated";
     /** `kit build` が mcp の App のツールの目録を書く（miniapp-mcp.md §14.3。`kit check` が読む。commit しない） */
     readonly mcpTools: ".kit/generated/mcp-tools.json";

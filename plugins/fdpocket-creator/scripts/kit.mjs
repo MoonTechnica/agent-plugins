@@ -18105,6 +18105,7 @@ var init_paths = __esm(() => {
     pending: "packages/db-schema/pending",
     seed: "packages/db-schema/seed.ts",
     masters: "packages/db-schema/masters.ts",
+    eraseTest: "packages/db-schema/erase.test.ts",
     generated: ".kit/generated",
     mcpTools: ".kit/generated/mcp-tools.json"
   };
