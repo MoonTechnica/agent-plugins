@@ -306310,20 +306310,57 @@ function projectZModelLoader(root) {
     return await loadDocument(entry2, [], mergeImports, true);
   };
 }
+function adminFindings(manifest2) {
+  const admin = manifest2?.apps.admin;
+  if (admin === undefined || admin.access === "restricted")
+    return [];
+  return [
+    {
+      code: "ADMIN_NOT_RESTRICTED",
+      path: PROJECT_PATHS.manifest,
+      message: "the admin app opens for every member; declare it access: restricted with a requiredPermission"
+    }
+  ];
+}
+function reachableAdvisories(client) {
+  const state = { client, unreachable: false };
+  state.client = {
+    async vulnerabilities(packages) {
+      try {
+        return await client.vulnerabilities(packages);
+      } catch (error212) {
+        console.error("kit check: OSV advisory lookup failed", error212);
+        state.unreachable = true;
+        return new Map;
+      }
+    }
+  };
+  return state;
+}
 async function checkProject(options2) {
   const { root, kitRoot } = options2;
   const skipped = [];
   const changed = await changedMigrations(options2);
+  const advisories = reachableAdvisories(options2.advisories ?? httpAdvisoryClient());
   const source = await validateSource({
     root,
     kitRoot,
     changedMigrations: changed.skipped === undefined ? changed.changed : { skipped: changed.skipped },
     loadZModel: options2.loadZModel ?? projectZModelLoader(root),
-    mcpCatalog: (slug) => extractMcpCatalog(root, slug)
+    mcpCatalog: (slug) => extractMcpCatalog(root, slug),
+    advisories: advisories.client
   });
   skipped.push(...source.skipped);
   const findings = [...source.errors];
   const warnings = [...source.warnings];
+  if (advisories.unreachable) {
+    warnings.push({
+      code: "VULNERABILITIES_NOT_CHECKED",
+      path: "bun.lock",
+      message: "could not reach OSV; known vulnerabilities were not checked"
+    });
+  }
+  findings.push(...adminFindings(source.manifest));
   if (findings.length > 0) {
     skipped.push({ check: "schema_current", reason: "fix the problems above first" });
   } else {

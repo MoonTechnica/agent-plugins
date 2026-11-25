@@ -147,6 +147,9 @@
    認可は Gateway とポリシーに任せ、画面は `client.auth.can()` で出し分けるだけ。
 5. **確かめる**（`$fdpocket-app-testing`）: 完成の基準を、業務の言葉の名前を付けたテストとして持つ（`$fdpocket-app-testing` §6）。純ロジックは Vitest。`kit dev` で起動して主要な画面が開くこと・権限の無い主体で admin が開けないことを確かめる（§6）。
    `node <kit>/scripts/kit.mjs check` が通ること。
+   **push の前に、あなたが止める**（Platform の公開・配備は migration・dist・「動くか」しか見ない）: 依存（lockfile・既知の脆弱性）、
+   外部への送信、管理画面の制限は `kit check` が見る。権限の表（主体ごとに見えるもの・できること）と、権限の無い主体で admin が開けないことは
+   `kit dev` で主体を切り替えて確かめる。通らないまま commit・push しない。
 6. **掲載**（`$fdpocket-app-listing`）: アプリができてから `listing/` を書く。
 7. **着地**: §2。
 
