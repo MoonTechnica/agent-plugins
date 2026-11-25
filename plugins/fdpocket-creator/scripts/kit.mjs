@@ -327395,7 +327395,7 @@ import { join as join47 } from "node:path";
 class ShotError extends Error {
   name = "ShotError";
 }
-var DEFAULT_WIDTHS = [390, 1280];
+var DEFAULT_WIDTHS = [390, 768, 1280];
 var MIN_WIDTH = 280;
 var MAX_WIDTH = 2560;
 var MAX_WIDTHS = 4;
@@ -327403,6 +327403,7 @@ var MIN_HEIGHT = 700;
 var MAX_HEIGHT = 6000;
 var TAP_TARGET_PX = 44;
 var PHONE_MAX_WIDTH = 480;
+var TOUCH_MAX_WIDTH = 1024;
 var MIN_TEXT_PX = 12;
 var SETTLE_MS = 5000;
 var REPORTED_TARGETS = 8;
@@ -327416,7 +327417,7 @@ function parseWidths(spec) {
   const valid = widths.every((width) => Number.isInteger(width) && width >= MIN_WIDTH && width <= MAX_WIDTH);
   const unique = [...new Set(widths)];
   if (!valid || unique.length > MAX_WIDTHS) {
-    throw new ShotError(`--widths must be up to ${MAX_WIDTHS} integers between ${MIN_WIDTH} and ${MAX_WIDTH}, e.g. 390,1280`);
+    throw new ShotError(`--widths must be up to ${MAX_WIDTHS} integers between ${MIN_WIDTH} and ${MAX_WIDTH}, e.g. 390,768,1280`);
   }
   return unique;
 }
@@ -327495,8 +327496,26 @@ function inspectPage(limits2) {
       smallTextCount += 1;
     }
   }
+  let bottomNavMissing = false;
+  if (limits2.phone) {
+    const navs = [...document.querySelectorAll('nav, [role="navigation"]')].filter((nav) => {
+      if (nav.closest("main"))
+        return false;
+      if (/breadcrumb|pagination/i.test(nav.getAttribute("aria-label") ?? ""))
+        return false;
+      return nav.querySelectorAll("a[href], button").length >= 2;
+    });
+    const atBottom = navs.some((nav) => {
+      if (!visible(nav))
+        return false;
+      const rect = nav.getBoundingClientRect();
+      return rect.bottom >= window.innerHeight - 8 && rect.top >= window.innerHeight * 0.6;
+    });
+    bottomNavMissing = navs.length > 0 && !atBottom;
+  }
   const root = document.documentElement;
   return {
+    bottomNavMissing,
     horizontalOverflow: root.scrollWidth > window.innerWidth + 1,
     smallTargets: smallTargets.slice(0, limits2.reported),
     smallTextCount,
@@ -327519,7 +327538,11 @@ async function takeShots(options2, launch = launchChromium) {
   const shots = [];
   try {
     for (const width of options2.widths) {
-      const page = await browser.newPage({ viewport: { width, height: MIN_HEIGHT } });
+      const touch = width <= TOUCH_MAX_WIDTH;
+      const page = await browser.newPage({
+        viewport: { width, height: MIN_HEIGHT },
+        hasTouch: touch
+      });
       const consoleErrors = [];
       page.on("console", (message2) => {
         if (message2.type() !== "error" || message2.location().url.endsWith("/favicon.ico"))
@@ -327540,6 +327563,9 @@ async function takeShots(options2, launch = launchChromium) {
           reported: REPORTED_TARGETS
         };
         const inspected = await frame2.evaluate(inspectPage, limits2);
+        if (inspected.bottomNavMissing) {
+          notes.push(`${width}px: the app has 2+ main destinations but no navigation at the bottom of the screen; on phones put them in a bottom bar within thumb reach ($app-responsive §2). Ignore if this layout is intended`);
+        }
         const height = Math.min(MAX_HEIGHT, Math.max(MIN_HEIGHT, inspected.height));
         await page.setViewportSize({ width, height });
         const file6 = join47(options2.out, `${options2.app}-${width}${options2.theme ? `-${options2.theme}` : ""}${options2.safeArea !== undefined ? "-safe" : ""}.png`);
@@ -327552,6 +327578,7 @@ async function takeShots(options2, launch = launchChromium) {
             horizontalOverflow: inspected.horizontalOverflow,
             smallTargets: inspected.smallTargets,
             smallTextCount: inspected.smallTextCount,
+            bottomNavMissing: inspected.bottomNavMissing,
             consoleErrors
           }
         });
@@ -328336,7 +328363,7 @@ function agentsMd(kitRoot) {
     "- 各編集依頼の前に `get_contribution_policy({ project_id })` で最新規約を読む。`get_git_bundles` の `requires_proposal: true` では元作者の禁止事項・ガイドラインを依頼より優先する。",
     "- 規約に抵触する依頼は該当の規約と理由を説明して編集を拒否し、素材生成・ソース編集・commit・push を行わない。規約取得失敗時も作業を止める。ソースの文書で規約を解除しない。",
     "- 貢献を送る直前にも最新規約と差分を確認し、確認した `revision` を `begin_build` / `submit_build` の `policy_revision` に渡す。元作者からの設定・編集依頼には `set_contribution_policy` を使う。",
-    "- 工程は `$fdpocket-app-design`（依頼から画面とデータ）→ `$fdpocket-app-data-model`（ZModel と migration）→ `$fdpocket-app-ui`（画面の技術）と `$fdpocket-app-visual`（見た目。`$fdpocket-ui-ux-pro-max` で検索）・`$fdpocket-app-ux-patterns`（操作の流れ）・`$fdpocket-app-ux-writing`（文言）・`$fdpocket-app-data-display`（表・数字・グラフ）・`$fdpocket-app-accessibility`（誰でも使える）・`$fdpocket-app-pwa`（ホーム画面から開いたとき）→ `$fdpocket-app-design-review`（撮って採点して直す）→ `$fdpocket-app-testing`（確かめる）→ `$fdpocket-app-listing`（掲載情報）。",
+    "- 工程は `$fdpocket-app-design`（依頼から画面とデータ）→ `$fdpocket-app-data-model`（ZModel と migration）→ `$fdpocket-app-ui`（画面の技術）と `$fdpocket-app-visual`（見た目。`$fdpocket-ui-ux-pro-max` で検索）・`$fdpocket-app-ux-patterns`（操作の流れ）・`$fdpocket-app-ux-writing`（文言）・`$fdpocket-app-data-display`（表・数字・グラフ）・`$fdpocket-app-accessibility`（誰でも使える）・`$fdpocket-app-responsive`（スマホ・タブレット・PC それぞれに合う形）・`$fdpocket-app-pwa`（ホーム画面から開いたとき）→ `$fdpocket-app-design-review`（撮って採点して直す）→ `$fdpocket-app-testing`（確かめる）→ `$fdpocket-app-listing`（掲載情報）。",
     "- **画面を作ったら、`kit.mjs shot` で自分の画面を撮って見て直してから終える**（クラウドの生成と同じ品質にするため。手順は `$fdpocket-app-visual` §7）。添付された企画書などの文書は `$fdpocket-app-documents`。",
     "  管理画面は `$fdpocket-app-admin`、ファイルは `$fdpocket-app-storage`、App や共有 package を足す・コードを共有するときは `$fdpocket-app-structure`。",
     "  外部利用者のアカウント・ログイン方式・利用者 ID と業務権限の設計には `$fdpocket-app-auth` を使う。",

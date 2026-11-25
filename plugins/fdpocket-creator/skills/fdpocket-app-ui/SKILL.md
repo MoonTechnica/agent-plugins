@@ -5,7 +5,7 @@ description: ミニアプリの画面を作る。shadcn の部品（packages/ui�
 
 # 画面を作る
 
-*この Skill は技術的な約束（ルート・データ・状態・スマホ幅）。**見た目**（色・余白・画面の型・自分の画面の確認）は `$fdpocket-app-visual`。画面を作る・直すときは両方を使う。*
+*この Skill は技術的な約束（ルート・データ・状態・スマホ幅）。幅ごとの形（タブレット・PC）は `$fdpocket-app-responsive`。**見た目**（色・余白・画面の型・自分の画面の確認）は `$fdpocket-app-visual`。画面を作る・直すときは両方を使う。*
 
 ## 1. 構成
 
@@ -88,13 +88,13 @@ function TaskList({ workspaceId }: { workspaceId: string }) {
 
 ## 4. スマホ幅
 
-- 最初に 360〜430px の幅で組み、広い画面は `md:` で足す。横スクロールを出さない。
+- 最初に 360〜430px の幅で組み、`md:`（タブレット）・`lg:`（PC）で**形を変える**（引き伸ばすだけにしない。`$fdpocket-app-responsive`）。320px でも横スクロールを出さない。
 - **入力欄の文字は 16px 以上**（`text-base`。shadcn の `Input` / `Textarea` はそうなっている。`text-sm` で上書きしない）。iOS で拡大されないため。
 - 入力には意味に合った属性: `type="email"` `autoComplete="email"` / `inputMode="numeric"` / `enterKeyHint="send"` など。
 - キーボードが画面の半分を覆う。送信ボタンを画面下に固定するなら、入力中も届くこと（フォームの直下に置くのが確実）。
 - タップできる要素は 44×44px 以上（小さいアイコンも padding で広げる）。破壊的な操作（削除）を主要な操作の隣に置かず、確認を挟む。
 - セーフエリアは開き方で取り方が違う。画面の端に接する要素は `globals.css` の `--safe-*` で余白を取る（`AppShell` に `safeArea={useSafeArea()}` を渡す。`env()` を直接書かない。`$fdpocket-app-pwa` §2）。
-- モーダルはスマホ幅では下から出るシートにする。
+- 入力の多いモーダルは `Sheet`（スマホ幅は下から出るシート、`md` 以上は中央のダイアログに自動で変わる）。
 
 ## 5. 権限による出し分け
 

@@ -49,12 +49,13 @@
 | `$fdpocket-app-ui` | **必ず**。画面の作り方（shadcn・Tailwind・スマホ幅とキーボード・5 つの状態・一覧のページング・エラーの出し方） |
 | `$fdpocket-app-visual` | **画面を作る・直すとき必ず**（`$fdpocket-app-ui` と一緒に）。方向を 3 行で決める → トークン（`--brand-hue`）と部品で組む → `kit shot` で撮って見て直す。クラウドでも手元でも同じ手順 |
 | `$fdpocket-ui-ux-pro-max` | `$fdpocket-app-visual` から使う。業種に合う色・書体・スタイル・119 の UX 指針を `search.py` で検索する（Python のみ・ネット不要） |
+| `$fdpocket-app-responsive` | **画面を作る・直すとき必ず**。スマホ・タブレット・PC のどれでもその端末らしく: 幅のクラスと `md:` `lg:`、ナビ（下のタブ → レール → サイドバー）、シート ↔ ダイアログ、一覧と詳細、指とマウス（hover・pointer）、キーボードの近道・右クリック・ツールチップ、`kit shot` の 3 つの幅 |
 | `$fdpocket-app-ux-patterns` | **画面の流れ・操作を作るとき必ず**。行き来（タブ・戻る・深さ）、フォーム、結果の伝え方、削除と取り消し、検索・絞り込み、初めての人 |
 | `$fdpocket-app-ux-writing` | **画面の文言を書くとき必ず**。ボタン・入力欄・空・エラー・確認・通知を業務の言葉で短く（全対応言語） |
 | `$fdpocket-app-data-display` | 一覧・表・数字・日時・ダッシュボード・グラフを見せるとき（依存を足さずに SVG で描く） |
 | `$fdpocket-app-accessibility` | **画面を作る・直すとき**。キーボード・フォーカス・読み上げ・コントラスト・動きを減らす設定 |
 | `$fdpocket-app-pwa` | **画面の端に接する要素（ヘッダー・下のバー）・戻る導線・オフラインを作るとき必ず**。スーパーアプリの中・ブラウザ・ホーム画面のどれで開いても崩さない（セーフエリアは `--safe-*`） |
-| `$fdpocket-app-design-review` | **画面を作り終えて「できた」と言う前に必ず**。`kit shot` で撮り、7 つの観点で採点して、合格の線まで直す |
+| `$fdpocket-app-design-review` | **画面を作り終えて「できた」と言う前に必ず**。`kit shot` で撮り、11 の観点で採点して、合格の線まで直す |
 | `$fdpocket-app-testing` | **必ず**（データと画面ができたときと着地の前）。Vitest、`kit dev` での確認、`kit check`、`kit build` の結果の読み方 |
 | `$fdpocket-app-listing` | **必ず**（版を作るターン）。掲載情報（名前・キャッチコピー・説明・カテゴリ・タグ・アイコン・カバー） |
 | `$fdpocket-app-admin` | 管理画面を作るとき・権限（Role / Permission）を設計するとき |
