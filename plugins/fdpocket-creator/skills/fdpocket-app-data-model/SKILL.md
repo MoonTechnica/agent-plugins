@@ -1,6 +1,6 @@
 ---
 name: fdpocket-app-data-model
-description: ミニアプリのデータを ZModel（packages/db-schema/schema.zmodel）で設計する。deny by default のポリシー、所有者と Workspace の分け方、保護する列の post-update の対、Role と Permission、一覧の index、利用者の削除の方針（onDelete・@@platform.retain・erase.test.ts）、migration（kit generate → kit db migrate → migrations/、破壊的な変更の pending/intent.yaml と data.sql）、マスタデータ（masters.ts）と seed.ts の書き方。モデルを足す・変えるときに使う。
+description: ミニアプリのデータを ZModel（packages/db-schema/schema.zmodel）で設計する。deny by default のポリシー、所有者と Workspace の分け方、保護する列の post-update の対、Role と Permission、一覧の index、利用者の削除の方針（onDelete・@@platform.retain）、migration（kit generate → kit db migrate → migrations/、破壊的な変更の pending/intent.yaml と data.sql）、マスタデータ（masters.ts）と seed.ts の書き方。モデルを足す・変えるときに使う。
 ---
 
 # データモデルと migration
@@ -109,28 +109,12 @@ model Task {
 - 本人のファイル（`StorageFile`）は消去で必ず消える。共有のファイルとして残したいなら、所有者を Workspace に移す設計にする。
 - Workspace への relation（`onDelete: Cascade` が普通）は利用者の削除とは別に決めてよい。
 
-### 消去のテスト（`packages/db-schema/erase.test.ts`）
+### 消去の確認（Platform が行う）
 
-`kit check`（毎ターン）と公開前の動的検証が、`seed.ts` を流した新しい DB でこのテストを流す。`erase(userId)` は Platform の消去そのもの。`kit check` で落ちたら、そのターンのうちに直す（公開まで持ち越さない）。
-モデルを足したら、そのモデルの「本人の行が残らない・他人の行が壊れない」を書き足す。失敗したら投げる（検証は `ERASE_TEST_FAILED`）。
-
-```ts
-import type { ClientContract } from '@zenstackhq/orm'
-import type { SchemaType } from '@workspace/sdk'
-
-export default async function eraseTest({ db, erase }: {
-  db: ClientContract<SchemaType>
-  erase: (userId: string) => Promise<void>
-}) {
-  const alice = await db.user.findFirstOrThrow({ where: { globalUserId: { endsWith: ':alice' } } })
-  const bob = await db.user.findFirstOrThrow({ where: { globalUserId: { endsWith: ':bob' } } })
-  await erase(alice.id)
-  if ((await db.task.count({ where: { ownerId: alice.id } })) !== 0) throw new Error("alice's tasks remain")
-  if ((await db.task.count({ where: { ownerId: bob.id } })) === 0) throw new Error("bob's tasks are gone")
-}
-```
-
-- テストが無いと検証は `ERASE_TEST_MISSING` の警告を出す。seed に権限の違う利用者を 2 人以上入れておく（片方を消し、もう片方で壊れていないことを見る）。
+消去のテストは書かない。`kit check`（毎ターン）と公開前の動的検証が、`seed.ts` を流した新しい DB で seed の利用者を
+1 人ずつ Platform の消去で消し、止まらないこと・本人が消えること・ほかの利用者が残ること・外部キーが壊れないことを確かめる
+（失敗は `ERASE_FAILED`。User への relation の onDelete を `Cascade` か `SetNull` にする）。何を消し何を残すかは上の
+onDelete と `@@platform.retain` で決まる。seed には権限の違う利用者を 2 人以上入れておく。
 
 ## 7. migration の流れ
 

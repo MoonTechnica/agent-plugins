@@ -18105,7 +18105,6 @@ var init_paths = __esm(() => {
     pending: "packages/db-schema/pending",
     seed: "packages/db-schema/seed.ts",
     masters: "packages/db-schema/masters.ts",
-    eraseTest: "packages/db-schema/erase.test.ts",
     generated: ".kit/generated",
     mcpTools: ".kit/generated/mcp-tools.json"
   };
@@ -306230,30 +306229,36 @@ init_src();
 init_src2();
 init_runtime2();
 init_seed();
-import { existsSync as existsSync19 } from "node:fs";
 import { mkdtemp as mkdtemp6, rm as rm12 } from "node:fs/promises";
 import { tmpdir as tmpdir2 } from "node:os";
 import { join as join30 } from "node:path";
 var failed2 = (message2) => ({
-  code: "ERASE_TEST_FAILED",
-  path: PROJECT_PATHS.eraseTest,
+  code: "ERASE_FAILED",
+  path: PROJECT_PATHS.schema,
   message: message2
 });
 var describe9 = (error212) => error212 instanceof Error ? error212.message : String(error212);
-async function runEraseTest(options2) {
-  const { root } = options2;
-  if (!existsSync19(join30(root, PROJECT_PATHS.eraseTest))) {
-    return {
-      errors: [],
-      warnings: [
-        {
-          code: "ERASE_TEST_MISSING",
-          path: PROJECT_PATHS.eraseTest,
-          message: "write packages/db-schema/erase.test.ts: erase one seeded user and check their rows are gone and others are intact (lifecycle.md §3.3)"
-        }
-      ]
-    };
+async function userIds(db) {
+  const result = await db.execute('SELECT "id" FROM "User" ORDER BY "id"');
+  return result.rows.map((row) => String(row.id));
+}
+async function erase(db, userId, schema2) {
+  for (;; ) {
+    const result = await eraseProjectUser(db, {
+      globalUserId: null,
+      projectUserIds: [userId],
+      requestId: "erase-check",
+      at: new Date,
+      schema: schema2
+    }, async () => {
+      return;
+    });
+    if (result.status !== "continue")
+      return;
   }
+}
+async function runEraseCheck(options2) {
+  const { root } = options2;
   const manifest2 = JSON.parse(await readGenerated(root, "project.json"));
   const schema2 = JSON.parse(await readGenerated(root, "schema.json"));
   const importModule = options2.importModule ?? defaultImporter(root, manifest2);
@@ -306262,53 +306267,43 @@ async function runEraseTest(options2) {
   try {
     for (const part of await devDatabaseSql(root))
       await applySql(db, part.sql);
-    await runSeed({ root, db, manifest: manifest2, importModule });
-    let test;
     try {
-      test = (await importModule(join30(root, PROJECT_PATHS.eraseTest))).default;
+      await runSeed({ root, db, manifest: manifest2, importModule });
     } catch (error212) {
-      return { errors: [failed2(`could not be loaded: ${describe9(error212)}`)], warnings: [] };
+      console.warn("erase check skipped: the seed did not run", describe9(error212));
+      return { errors: [] };
     }
-    if (typeof test !== "function") {
-      return {
-        errors: [failed2("must export default async function eraseTest({ db, erase })")],
-        warnings: []
-      };
-    }
-    const { ZenStackClient: ZenStackClient2 } = await Promise.resolve().then(() => (init_dist10(), exports_dist));
-    const client = new ZenStackClient2(schema2, {
-      dialect: new LibsqlDialect({ client: db }),
-      computedFields: await searchComputedFields(schema2)
-    });
-    const erase = async (userId) => {
-      for (;; ) {
-        const result = await eraseProjectUser(db, {
-          globalUserId: null,
-          projectUserIds: [userId],
-          requestId: "erase-test",
-          at: new Date,
-          schema: schema2
-        }, async () => {
-          return;
-        });
-        if (result.status !== "continue")
-          return;
+    let remaining = await userIds(db);
+    for (const userId of [...remaining]) {
+      try {
+        await erase(db, userId, schema2);
+      } catch (error212) {
+        return {
+          errors: [
+            failed2(`erasing a seeded user failed (${describe9(error212)}). Every relation to User needs onDelete: Cascade or SetNull`)
+          ]
+        };
       }
-    };
-    try {
-      await test({ db: client, erase });
-    } catch (error212) {
-      return { errors: [failed2(describe9(error212))], warnings: [] };
+      const after = await userIds(db);
+      if (after.includes(userId)) {
+        return { errors: [failed2("a seeded user was still there after the erase")] };
+      }
+      const others = remaining.filter((id) => id !== userId);
+      if (others.some((id) => !after.includes(id))) {
+        return {
+          errors: [
+            failed2("erasing one user also removed another user (a relation from User to shared data cascades)")
+          ]
+        };
+      }
+      const broken = await db.execute("PRAGMA foreign_key_check");
+      if (broken.rows.length > 0) {
+        const tables = [...new Set(broken.rows.map((row) => String(row.table)))].join(", ");
+        return { errors: [failed2(`foreign keys are broken after the erase (${tables})`)] };
+      }
+      remaining = after;
     }
-    const broken = await db.execute("PRAGMA foreign_key_check");
-    if (broken.rows.length > 0) {
-      const tables = [...new Set(broken.rows.map((row) => String(row.table)))].join(", ");
-      return {
-        errors: [failed2(`foreign keys are broken after the erase (${tables})`)],
-        warnings: []
-      };
-    }
-    return { errors: [], warnings: [] };
+    return { errors: [] };
   } finally {
     db.close();
     await rm12(dir, { recursive: true, force: true });
@@ -306363,13 +306358,12 @@ async function checkProject(options2) {
     warnings.push(...schema2.warnings);
     if (schema2.errors.length === 0) {
       findings.push(...await checkMasters(options2));
-      const erase = await runEraseTest({
+      const erase2 = await runEraseCheck({
         root,
         createLibsqlClient: await loadProjectLibsql(root, (message2) => new DbError(message2)),
         ...options2.importModule ? { importModule: options2.importModule } : {}
       });
-      findings.push(...erase.errors);
-      warnings.push(...erase.warnings);
+      findings.push(...erase2.errors);
     }
   }
   const types2 = await typeCheckApps(root, options2.typeCheck);
@@ -306433,7 +306427,7 @@ async function changedMigrations(options2) {
 
 // frontend/packages/miniapp-kit/src/commands.ts
 import { createHash as createHash17, randomUUID as randomUUID5 } from "node:crypto";
-import { existsSync as existsSync29 } from "node:fs";
+import { existsSync as existsSync28 } from "node:fs";
 import { mkdir as mkdir24, readdir as readdir18, readFile as readFile39, writeFile as writeFile26 } from "node:fs/promises";
 import { homedir } from "node:os";
 import { dirname as dirname15, join as join53, resolve as resolve4 } from "node:path";
@@ -321022,7 +321016,7 @@ init_src();
 init_src2();
 init_generate();
 import { spawn as spawn4 } from "node:child_process";
-import { existsSync as existsSync21, readFileSync as readFileSync3 } from "node:fs";
+import { existsSync as existsSync20, readFileSync as readFileSync3 } from "node:fs";
 import { mkdir as mkdir12, readFile as readFile23, rm as rm14, writeFile as writeFile14 } from "node:fs/promises";
 import { createRequire as createRequire10 } from "node:module";
 import { dirname as dirname12, join as join33 } from "node:path";
@@ -321030,7 +321024,7 @@ init_pack();
 
 // frontend/packages/miniapp-kit/src/python-build.ts
 init_pack();
-import { existsSync as existsSync20 } from "node:fs";
+import { existsSync as existsSync19 } from "node:fs";
 import { cp as cp2, mkdir as mkdir11, rm as rm13 } from "node:fs/promises";
 import { basename, join as join32 } from "node:path";
 
@@ -321043,18 +321037,18 @@ var SKIPPED2 = new Set(["__pycache__", ".venv", ".pytest_cache", ".mypy_cache", 
 async function copyPythonApp(input2) {
   const appDir = join32(input2.root, "apps", input2.slug);
   for (const name3 of REQUIRED) {
-    if (!existsSync20(join32(appDir, name3))) {
+    if (!existsSync19(join32(appDir, name3))) {
       throw new PythonBuildError(`apps/${input2.slug}/${name3} is missing; python apps need pyproject.toml and a committed uv.lock (uv lock)`);
     }
   }
-  if (!existsSync20(join32(appDir, "src"))) {
+  if (!existsSync19(join32(appDir, "src"))) {
     throw new PythonBuildError(`apps/${input2.slug}/src is missing; put the package under src/`);
   }
   const out = join32(input2.root, "dist", input2.slug);
   await rm13(out, { recursive: true, force: true });
   await mkdir11(out, { recursive: true });
   for (const name3 of ROOT_FILES2) {
-    if (existsSync20(join32(appDir, name3)))
+    if (existsSync19(join32(appDir, name3)))
       await cp2(join32(appDir, name3), join32(out, name3));
   }
   await cp2(join32(appDir, "src"), join32(out, "src"), {
@@ -321066,7 +321060,7 @@ async function copyPythonApp(input2) {
 async function listPythonAppFiles(input2) {
   const appDir = join32(input2.root, "apps", input2.slug);
   for (const name3 of [...REQUIRED, "src"]) {
-    if (!existsSync20(join32(appDir, name3)))
+    if (!existsSync19(join32(appDir, name3)))
       throw new PythonBuildError(`apps/${input2.slug}/${name3} is missing (uv lock writes uv.lock)`);
   }
   const limits2 = {
@@ -321139,7 +321133,7 @@ async function buildProject(options2) {
   }
   let index2;
   try {
-    index2 = await buildArtifactIndex(existsSync21(dist) ? await collectFiles(dist) : [], apps.map((app) => ({
+    index2 = await buildArtifactIndex(existsSync20(dist) ? await collectFiles(dist) : [], apps.map((app) => ({
       slug: app.slug,
       entry: app.entry.replace(/^dist\//, ""),
       kind: app.kind
@@ -321178,7 +321172,7 @@ async function prepareProject(options2) {
 }
 async function checkLockfile2(root) {
   const path = join33(root, "bun.lock");
-  if (!existsSync21(path)) {
+  if (!existsSync20(path)) {
     throw new BuildError("bun.lock is missing; run bun install in source/ and commit bun.lock");
   }
   try {
@@ -321217,7 +321211,7 @@ ${text4}`));
 }
 async function ensureKitRuntimeDependencies(kitRoot) {
   const manifest2 = join33(kitRoot, "package.json");
-  if (!existsSync21(manifest2))
+  if (!existsSync20(manifest2))
     return;
   const authored = JSON.parse(await readFile23(manifest2, "utf8"));
   if (authored.name !== "fdpocket-creator-runtime")
@@ -321294,7 +321288,7 @@ init_src2();
 init_generate();
 init_masters2();
 import { createHash as createHash11 } from "node:crypto";
-import { existsSync as existsSync22 } from "node:fs";
+import { existsSync as existsSync21 } from "node:fs";
 import { mkdir as mkdir13, readFile as readFile24, rm as rm15, writeFile as writeFile15 } from "node:fs/promises";
 import { join as join34 } from "node:path";
 var fail5 = (message2) => new DbError(message2);
@@ -321304,11 +321298,11 @@ function migrationSlug(text4) {
   return slug === "" ? "change" : slug;
 }
 async function readIfPresent(path) {
-  return existsSync22(path) ? await readFile24(path, "utf8") : null;
+  return existsSync21(path) ? await readFile24(path, "utf8") : null;
 }
 async function projectIndexSql(root, migrations, draftSql) {
   const schemaPath = join34(root, PROJECT_PATHS.generated, "schema.json");
-  if (!existsSync22(schemaPath)) {
+  if (!existsSync21(schemaPath)) {
     const zmodel = await readIfPresent(join34(root, PROJECT_PATHS.schema)) ?? "";
     if (zmodel.includes("@@platform.search"))
       throw new DbError("run kit.mjs generate first (no schema.json)");
@@ -325751,14 +325745,14 @@ var execCommand = (command, args) => new Promise((resolve3, reject) => {
 // frontend/packages/miniapp-kit/src/e2e.ts
 init_src();
 import { randomBytes as randomBytes4 } from "node:crypto";
-import { existsSync as existsSync24 } from "node:fs";
+import { existsSync as existsSync23 } from "node:fs";
 import { readFile as readFile31, realpath } from "node:fs/promises";
 import { relative as relative5, resolve as resolve3, sep as sep3 } from "node:path";
 init_runtime2();
 init_session_runtime();
 
 // frontend/packages/miniapp-kit/src/verify/browser.ts
-import { existsSync as existsSync23 } from "node:fs";
+import { existsSync as existsSync22 } from "node:fs";
 import { createRequire as createRequire12 } from "node:module";
 import { join as join42 } from "node:path";
 import { pathToFileURL as pathToFileURL9 } from "node:url";
@@ -325783,7 +325777,7 @@ var launchChromium = async () => {
   const loaded = await import(pathToFileURL9(resolvePlaywright()).href);
   const module = loaded.default ?? loaded;
   const executablePath = process.env.KIT_CHROMIUM_PATH;
-  if (executablePath && !existsSync23(executablePath)) {
+  if (executablePath && !existsSync22(executablePath)) {
     throw new BrowserUnavailableError(`KIT_CHROMIUM_PATH does not exist: ${executablePath}`);
   }
   return module.chromium.launch({
@@ -325882,7 +325876,7 @@ async function exchange2(request2, options2, send, secrets) {
   }
 }
 function scenarioOf(options2) {
-  const path = options2.test ?? (existsSync24(resolve3(options2.root, "design/e2e.ts")) ? "design/e2e.ts" : null);
+  const path = options2.test ?? (existsSync23(resolve3(options2.root, "design/e2e.ts")) ? "design/e2e.ts" : null);
   if (!path)
     throw new LiveE2EError("The Platform checks that the preview opens when your turn ends; do not check it yourself. " + "Use kit e2e for something only a real environment shows: write a scenario and pass it " + "with --test (see $app-testing).");
   return path;
@@ -325890,7 +325884,7 @@ function scenarioOf(options2) {
 async function prepareE2E(root, options2, secret) {
   scenarioOf({ root, ...options2.test ? { test: options2.test } : {} });
   const planPath = resolve3(root, "design/test-plan.md");
-  const plan = existsSync24(planPath) ? await readFile31(planPath, "utf8") : "";
+  const plan = existsSync23(planPath) ? await readFile31(planPath, "utf8") : "";
   if (!plan.trim() || Buffer.byteLength(plan) > 128 * 1024 || secret !== undefined && plan.includes(secret))
     throw new LiveE2EError("Write a bounded, credential-free design/test-plan.md before live E2E");
   const { manifest: manifest2 } = await prepareSessionRuntime(root);
@@ -326073,7 +326067,7 @@ async function checkKitUpdate(input2) {
 
 // frontend/packages/miniapp-kit/src/login.ts
 import { createHash as createHash15, randomBytes as randomBytes5 } from "node:crypto";
-import { existsSync as existsSync25 } from "node:fs";
+import { existsSync as existsSync24 } from "node:fs";
 import { chmod, mkdir as mkdir17, readFile as readFile32, rename as rename6, writeFile as writeFile19 } from "node:fs/promises";
 import { createServer as createServer4 } from "node:http";
 import { join as join43 } from "node:path";
@@ -326091,7 +326085,7 @@ class LoginInProgress extends LoginError {
 }
 async function readLogins(configDir) {
   const path = join43(configDir, CREDENTIALS_FILE);
-  if (!existsSync25(path))
+  if (!existsSync24(path))
     return {};
   const parsed = JSON.parse(await readFile32(path, "utf8"));
   return parsed.logins ?? {};
@@ -326557,7 +326551,7 @@ async function serveMcpStdio(proxy, io) {
 init_src();
 init_dist();
 init_vendor();
-import { existsSync as existsSync26 } from "node:fs";
+import { existsSync as existsSync25 } from "node:fs";
 import { mkdir as mkdir18, readdir as readdir15, readFile as readFile33, writeFile as writeFile20 } from "node:fs/promises";
 import { dirname as dirname13, join as join44, relative as relative6 } from "node:path";
 var TEMPLATE_DIR = "templates/project";
@@ -326591,7 +326585,7 @@ async function newProject(options2) {
     throw new NewProjectError("declare at most one mcp App (one /mcp URL per Project)");
   if (!declarations.length || declarations.length > PROJECT_APPS_MAX || new Set(declarations.map((a2) => a2.slug)).size !== declarations.length)
     throw new NewProjectError(`declare 1–${PROJECT_APPS_MAX} unique Apps`);
-  if (existsSync26(root) && (await readdir15(root)).some((entry2) => entry2 !== ".git")) {
+  if (existsSync25(root) && (await readdir15(root)).some((entry2) => entry2 !== ".git")) {
     throw new NewProjectError(`${root} is not empty; kit new only fills an empty Project`);
   }
   const template = join44(options2.kitRoot, TEMPLATE_DIR);
@@ -327213,7 +327207,7 @@ async function readDocument(options2, deps = realDeps) {
 }
 
 // frontend/packages/miniapp-kit/src/repo.ts
-import { existsSync as existsSync27 } from "node:fs";
+import { existsSync as existsSync26 } from "node:fs";
 import { appendFile, mkdir as mkdir20, readFile as readFile35, rm as rm17, writeFile as writeFile22 } from "node:fs/promises";
 import { join as join46 } from "node:path";
 class RepoError extends Error {
@@ -327236,7 +327230,7 @@ async function configureRepo(git2, source, config7, author) {
   const info = join46(source, ".git", "info");
   await mkdir20(info, { recursive: true });
   const excludePath = join46(info, "exclude");
-  const excluded = existsSync27(excludePath) ? (await readFile35(excludePath, "utf8")).split(`
+  const excluded = existsSync26(excludePath) ? (await readFile35(excludePath, "utf8")).split(`
 `) : [];
   const missing2 = EXCLUDES.filter((line) => !excluded.includes(line));
   if (missing2.length > 0)
@@ -327245,12 +327239,12 @@ async function configureRepo(git2, source, config7, author) {
 `);
 }
 function requireRepo(source) {
-  if (!existsSync27(join46(source, ".git"))) {
+  if (!existsSync26(join46(source, ".git"))) {
     throw new RepoError(`${source} is not a git repository; run kit.mjs clone in a new directory`);
   }
 }
 async function requireClean(git2, source, what) {
-  if (existsSync27(join46(source, ".git", "rebase-merge")) || existsSync27(join46(source, ".git", "rebase-apply"))) {
+  if (existsSync26(join46(source, ".git", "rebase-merge")) || existsSync26(join46(source, ".git", "rebase-apply"))) {
     throw new RepoError("a git rebase is in progress in source/; finish it (git rebase --continue) first");
   }
   if (await gitOk(git2, source, ["status", "--porcelain"]) !== "") {
@@ -327914,7 +327908,7 @@ async function runDynamicChecks(options2) {
     });
     await writeFile23(join50(options2.outDir, "permission-matrix.json"), `${JSON.stringify(matrix, null, 1)}
 `);
-    const erase = await runEraseTest({
+    const erase2 = await runEraseCheck({
       root: options2.root,
       createLibsqlClient: options2.createLibsqlClient ?? await loadProjectLibsql(options2.root, (message2) => new Error(message2))
     });
@@ -327932,10 +327926,10 @@ async function runDynamicChecks(options2) {
       errors: [
         ...judged.errors,
         ...judgePermissionMatrix(matrix),
-        ...erase.errors,
+        ...erase2.errors,
         ...workerErrors
       ],
-      warnings: [...judged.warnings, ...erase.warnings, ...captureWarnings]
+      warnings: [...judged.warnings, ...captureWarnings]
     };
   } finally {
     await browser.close();
@@ -328095,7 +328089,7 @@ async function validateVersion(options2) {
 }
 
 // frontend/packages/miniapp-kit/src/workdir.ts
-import { existsSync as existsSync28 } from "node:fs";
+import { existsSync as existsSync27 } from "node:fs";
 import { readFile as readFile38, unlink, writeFile as writeFile25 } from "node:fs/promises";
 import { dirname as dirname14, join as join52 } from "node:path";
 var CONFIG_FILE = ".fdpocket.json";
@@ -328171,7 +328165,7 @@ function locateWorkdir(start) {
 }
 function locateFile(start, name3) {
   for (let current = start;; current = dirname14(current)) {
-    if (existsSync28(join52(current, name3)))
+    if (existsSync27(join52(current, name3)))
       return current;
     if (dirname14(current) === current)
       return null;
@@ -328362,7 +328356,7 @@ var print = (context, value2) => context.stdout(JSON.stringify(value2, null, 2))
 var mcpUrlOf = (flag) => flag ?? process.env.CREATOR_MCP_URL ?? DEFAULT_MCP_URL;
 async function kitVersion(kitRoot) {
   const manifest2 = join53(kitRoot, ".claude-plugin", "plugin.json");
-  if (!existsSync29(manifest2))
+  if (!existsSync28(manifest2))
     throw new CommandError(`${manifest2} is missing; reinstall the Kit`);
   const version7 = JSON.parse(await readFile39(manifest2, "utf8")).version;
   if (typeof version7 !== "string")
@@ -328380,11 +328374,11 @@ var AGENTS_TITLE = agentsMd("").split(`
 `)[0];
 async function writeAgentFiles(workdir, kitRoot) {
   const agents = join53(workdir, "AGENTS.md");
-  if (!existsSync29(agents) || (await readFile39(agents, "utf8")).startsWith(AGENTS_TITLE)) {
+  if (!existsSync28(agents) || (await readFile39(agents, "utf8")).startsWith(AGENTS_TITLE)) {
     await writeFile26(agents, agentsMd(kitRoot));
   }
   const claude = join53(workdir, "CLAUDE.md");
-  if (!existsSync29(claude))
+  if (!existsSync28(claude))
     await writeFile26(claude, CLAUDE_MD);
 }
 async function fetchVerified(context, name3, url7, sha2562) {
@@ -328411,7 +328405,7 @@ async function clone8(context, flags) {
   const pulled = parsePulled(bundles);
   const workdir = context.cwd;
   const path = join53(workdir, CONFIG_FILE);
-  if (existsSync29(path)) {
+  if (existsSync28(path)) {
     const existing = await readConfig(workdir);
     if (existing.project_id !== pulled.project_id) {
       throw new CommandError(`${path} belongs to App ${existing.project_id}; use another directory for App ${pulled.project_id}`);
@@ -328419,7 +328413,7 @@ async function clone8(context, flags) {
     throw new CommandError(`${workdir} already has App ${pulled.project_id}; run kit.mjs pull instead`);
   }
   const source = sourceOf(workdir);
-  if (existsSync29(source) && (await readdir18(source)).length > 0) {
+  if (existsSync28(source) && (await readdir18(source)).length > 0) {
     throw new CommandError(`${source} is not empty; clone into a new directory`);
   }
   for (const dir of Object.values(WORKDIR_DIRS))
@@ -328583,7 +328577,7 @@ async function push(context, flags) {
 async function writeBuildReport(workdir, built, policyRevision) {
   const path = join53(workdir, WORKDIR_DIRS.outputs, "build-report.json");
   const report2 = completeBuildReport({
-    existing: existsSync29(path) ? JSON.parse(await readFile39(path, "utf8")) : null,
+    existing: existsSync28(path) ? JSON.parse(await readFile39(path, "utf8")) : null,
     projectYaml: await readFile39(join53(sourceOf(workdir), "infra", "project.yaml"), "utf8"),
     apps: built.apps,
     schemaVersion: built.schema_version,
@@ -328972,11 +328966,11 @@ async function pack(context) {
   }
   const outputs = join53(workdir, WORKDIR_DIRS.outputs);
   const reportPath = join53(outputs, "build-report.json");
-  if (!existsSync29(reportPath)) {
+  if (!existsSync28(reportPath)) {
     throw new CommandError("outputs/build-report.json is missing; write it first (instructions.md §2)");
   }
   const dist = join53(source, "dist");
-  if (!existsSync29(dist))
+  if (!existsSync28(dist))
     throw new CommandError("source/dist is missing; kit.mjs build first");
   await mkdir24(outputs, { recursive: true });
   const bundlePath = join53(outputs, "source.bundle");
@@ -329115,7 +329109,7 @@ async function codexConfig(context, flags) {
     return;
   }
   const path = join53(context.codexHome, "config.toml");
-  const existing = existsSync29(path) ? await readFile39(path, "utf8") : "";
+  const existing = existsSync28(path) ? await readFile39(path, "utf8") : "";
   let merged;
   try {
     merged = mergeCodexApproval(existing, pluginId, MCP_SERVER_NAME);

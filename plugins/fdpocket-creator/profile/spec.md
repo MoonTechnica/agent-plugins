@@ -57,7 +57,7 @@ App の種類は §0。画面 App は Vite + React の SPA で、`admin` は管�
 │   ├── web/                 # src/main.tsx, src/routes/（ファイルベースのルート）, vite.config.ts
 │   └── admin/               # 任意
 ├── packages/
-│   ├── db-schema/           # schema.zmodel（編集する）, platform.zmodel（Kit が置く）, migrations/, masters.ts, seed.ts, erase.test.ts
+│   ├── db-schema/           # schema.zmodel（編集する）, platform.zmodel（Kit が置く）, migrations/, masters.ts, seed.ts
 │   ├── sdk/                 # src/index.ts（client と schema）+ src/zenstack/（kit generate の生成物）。編集しない。commit する
 │   ├── ui/                  # shadcn の部品と globals.css
 │   ├── <name>/              # 共有 package（任意。複数の App で使うコード。@workspace/<name>。足し方は $fdpocket-app-structure）
@@ -840,7 +840,6 @@ SDK は失敗を `null` / `[]` で隠さず `SdkError` を投げる。メンバ�
 | `pending/migration-policy.json` | Agent（任意） | 本番の値の変更の宣言。`migrate` が取り込んで消す |
 | `masters.ts` | Agent（任意） | **マスタデータ**（カテゴリ・プラン・都道府県など、アプリが前提にする固定の行）。`kit db migrate` が migration の SQL にするので、セッション・main・本番のすべてに届く |
 | `seed.ts` | Agent | `kit dev` などの試用データ（本番では流れない） |
-| `erase.test.ts` | Agent | 消去のテスト。`kit check` と動的検証が seed の後の新しい DB で流す（seed の利用者を 1 人 `erase` して、本人のデータが残らず他人のデータが壊れないこと） |
 
 ZModel を変えたら `kit generate` → `kit db migrate --slug <slug>` → `migrations/` と `packages/sdk/src/zenstack/` を commit
 （普通の開発の `prisma migrate dev` と同じ。`kit db diff` は差分を見るだけで何も書かない）。

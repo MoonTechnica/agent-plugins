@@ -8,7 +8,6 @@
     "noEmit": true
   },
   "include": [
-    "seed.ts",
-    "erase.test.ts"
+    "seed.ts"
   ]
 }
