@@ -17915,151 +17915,6 @@ var init_origin_listing = __esm(() => {
   }).nullable();
 });
 
-// frontend/packages/project-protocol/src/paths.ts
-var PROJECT_PATHS;
-var init_paths = __esm(() => {
-  PROJECT_PATHS = {
-    manifest: "infra/project.yaml",
-    schema: "packages/db-schema/schema.zmodel",
-    platform: "packages/db-schema/platform.zmodel",
-    sdk: "packages/sdk/src/zenstack",
-    migrations: "packages/db-schema/migrations",
-    pending: "packages/db-schema/pending",
-    seed: "packages/db-schema/seed.ts",
-    masters: "packages/db-schema/masters.ts",
-    eraseTest: "packages/db-schema/erase.test.ts",
-    generated: ".kit/generated",
-    mcpTools: ".kit/generated/mcp-tools.json"
-  };
-});
-
-// frontend/packages/project-protocol/src/platform-dispatch.ts
-function isUserWorkerName(name3) {
-  return WORKER_NAME_PATTERN.test(name3);
-}
-function userWorkerApp(name3) {
-  const match = WORKER_NAME_PATTERN.exec(name3);
-  return match?.[1] ?? match?.[2] ?? null;
-}
-function workerStorageScope(worker) {
-  if (!isUserWorkerName(worker))
-    return null;
-  const match = new RegExp(`^p-(${UUID})-(main|prod)-`).exec(worker);
-  if (!match)
-    return null;
-  return {
-    namespace: `projects/${match[1]}/${match[2]}`,
-    tier: match[2] === "prod" ? "prod" : "dev"
-  };
-}
-function isWorkerStorageScope(worker, value) {
-  if (typeof value !== "object" || value === null)
-    return false;
-  const actual = value;
-  const session2 = /^p-s-([0-9a-f]{12})-/.exec(worker);
-  if (session2 && isUserWorkerName(worker)) {
-    if (actual.tier !== "dev" || typeof actual.namespace !== "string")
-      return false;
-    const scope = new RegExp(`^projects/(${UUID})/environments/(${UUID})$`).exec(actual.namespace);
-    return scope !== null && scope[2].replaceAll("-", "").slice(0, 12) === session2[1];
-  }
-  const expected = workerStorageScope(worker);
-  return expected !== null && expected.namespace === actual.namespace && expected.tier === actual.tier;
-}
-function base64UrlToBytes(value) {
-  if (!/^[A-Za-z0-9_-]+$/.test(value))
-    return null;
-  const binary = atob(value.replaceAll("-", "+").replaceAll("_", "/"));
-  return Uint8Array.from(binary, (c) => c.charCodeAt(0));
-}
-function toHex(buffer) {
-  return [...new Uint8Array(buffer)].map((b2) => b2.toString(16).padStart(2, "0")).join("");
-}
-async function sha256Hex2(body) {
-  return toHex(await crypto.subtle.digest("SHA-256", body));
-}
-async function hmacKey(secret, usage) {
-  if (secret.length < DISPATCH_SECRET_MIN_LENGTH)
-    throw new Error("dispatch secret is too short");
-  return crypto.subtle.importKey("raw", encoder.encode(secret), { name: "HMAC", hash: "SHA-256" }, false, [usage]);
-}
-function pathOf(url2) {
-  const parsed = new URL(url2);
-  return `${parsed.pathname}${parsed.search}`;
-}
-function dispatchHeadersFit(encoded, signature) {
-  return encoder.encode(encoded).byteLength + encoder.encode(signature).byteLength + DISPATCH_HEADER.length + DISPATCH_SIGNATURE_HEADER.length + 8 <= DISPATCH_HEADERS_MAX_BYTES;
-}
-function parseEnvelope(encoded) {
-  try {
-    const value = JSON.parse(new TextDecoder().decode(Uint8Array.from(atob(encoded), (c) => c.charCodeAt(0))));
-    if (typeof value !== "object" || value === null)
-      return null;
-    const e = value;
-    const limits = e.limits;
-    const valid = e.v === 1 && typeof e.worker === "string" && isUserWorkerName(e.worker) && typeof e.method === "string" && typeof e.path === "string" && e.path.startsWith("/") && Number.isInteger(e.ts) && typeof e.bodySha256 === "string" && /^[0-9a-f]{64}$/.test(e.bodySha256) && isWorkerOutboundPolicy(e.worker, e.policy) && Array.isArray(e.egress) && e.egress.every((host) => typeof host === "string") && (e.storage === undefined || isWorkerStorageScope(e.worker, e.storage)) && (limits === undefined || Number.isInteger(limits.cpuMs) && Number.isInteger(limits.subRequests));
-    return valid ? value : null;
-  } catch {
-    return null;
-  }
-}
-async function verifyDispatch(input) {
-  const encoded = input.headers.get(DISPATCH_HEADER);
-  const signature = input.headers.get(DISPATCH_SIGNATURE_HEADER);
-  if (!encoded || !signature)
-    return { ok: false, reason: "missing" };
-  if (!dispatchHeadersFit(encoded, signature))
-    return { ok: false, reason: "malformed" };
-  const signatureBytes = base64UrlToBytes(signature);
-  if (!signatureBytes)
-    return { ok: false, reason: "malformed" };
-  const key = await hmacKey(input.secret, "verify");
-  const valid = await crypto.subtle.verify("HMAC", key, signatureBytes, encoder.encode(encoded));
-  if (!valid)
-    return { ok: false, reason: "signature" };
-  const envelope = parseEnvelope(encoded);
-  if (!envelope)
-    return { ok: false, reason: "malformed" };
-  const now = Math.floor((input.now ?? new Date).getTime() / 1000);
-  if (Math.abs(now - envelope.ts) > DISPATCH_MAX_SKEW_SECONDS)
-    return { ok: false, reason: "expired" };
-  if (envelope.method !== input.method.toUpperCase() || envelope.path !== pathOf(input.url)) {
-    return { ok: false, reason: "request" };
-  }
-  if (envelope.bodySha256 !== await sha256Hex2(input.body))
-    return { ok: false, reason: "body" };
-  return { ok: true, envelope };
-}
-function isWorkerOutboundPolicy(worker, value) {
-  if (!isUserWorkerName(worker))
-    return false;
-  const parsed = outboundPolicySchema.safeParse(value);
-  if (!parsed.success)
-    return false;
-  const generation = /^p-s-([a-f0-9]{12})-/.exec(worker);
-  return generation ? parsed.data.resourceGeneration !== null && parsed.data.resourceGeneration.replaceAll("-", "").slice(0, 12) === generation[1] : parsed.data.mode === "real" && parsed.data.resourceGeneration === null;
-}
-var API_EXECUTION_MODE_HEADER = "x-platform-execution-mode", DISPATCH_HEADER = "x-platform-dispatch", DISPATCH_SIGNATURE_HEADER = "x-platform-signature", DISPATCH_HEADERS_MAX_BYTES, DISPATCH_MAX_SKEW_SECONDS = 60, DISPATCH_SECRET_MIN_LENGTH = 32, UUID = "[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}", USER_WORKER_SLUG = "[a-z][a-z0-9]*(?:-[a-z0-9]+)*", EXACT_UUID, EXACT_SLUG, WORKER_NAME_PATTERN, encoder;
-var init_platform_dispatch = __esm(() => {
-  init_network_mocks();
-  DISPATCH_HEADERS_MAX_BYTES = 64 * 1024;
-  EXACT_UUID = new RegExp(`^${UUID}$`);
-  EXACT_SLUG = new RegExp(`^${USER_WORKER_SLUG}$`);
-  WORKER_NAME_PATTERN = new RegExp(`^(?:p-${UUID}-(?:main|prod)-(${USER_WORKER_SLUG})|p-s-[0-9a-f]{12}-(${USER_WORKER_SLUG}|[0-9a-f]{32}))$`);
-  encoder = new TextEncoder;
-});
-
-// frontend/packages/project-protocol/src/profile.ts
-var platformProfile, platformProfileResponse;
-var init_profile = __esm(() => {
-  init_zod();
-  init_contract();
-  platformProfile = contract((o) => o.object({
-    displayName: exports_external.string().nullable(),
-    avatarUrl: exports_external.url().nullable()
-  }));
-  platformProfileResponse = contract((o) => platformProfile.in(o).nullable());
-});
 // frontend/packages/project-protocol/src/resolve.ts
 function errorCodeForResolveStatus(status) {
   switch (status) {
@@ -18216,6 +18071,173 @@ var init_resolve = __esm(() => {
   ]);
 });
 
+// frontend/packages/project-protocol/src/origin-worker.ts
+function originWorkerName(label) {
+  const parsed = parseOriginLabel(label);
+  if (parsed === null || parsed.environment.kind === "session")
+    return null;
+  const app = parsed.app === null ? "" : `--${parsed.app}`;
+  const environment = parsed.environment.kind === "main" ? "--main" : "";
+  return `o-${parsed.originId}${app}${environment}`;
+}
+var originWorkerMetaSchema;
+var init_origin_worker = __esm(() => {
+  init_zod();
+  init_origin();
+  init_origin_listing();
+  init_resolve();
+  originWorkerMetaSchema = exports_external.strictObject({
+    label: exports_external.string().refine((label) => originWorkerName(label) !== null, "invalid origin label"),
+    resolved: originResolveResultSchema,
+    listing: originListingSchema
+  });
+});
+
+// frontend/packages/project-protocol/src/paths.ts
+var PROJECT_PATHS;
+var init_paths = __esm(() => {
+  PROJECT_PATHS = {
+    manifest: "infra/project.yaml",
+    schema: "packages/db-schema/schema.zmodel",
+    platform: "packages/db-schema/platform.zmodel",
+    sdk: "packages/sdk/src/zenstack",
+    migrations: "packages/db-schema/migrations",
+    pending: "packages/db-schema/pending",
+    seed: "packages/db-schema/seed.ts",
+    masters: "packages/db-schema/masters.ts",
+    eraseTest: "packages/db-schema/erase.test.ts",
+    generated: ".kit/generated",
+    mcpTools: ".kit/generated/mcp-tools.json"
+  };
+});
+
+// frontend/packages/project-protocol/src/platform-dispatch.ts
+function isUserWorkerName(name3) {
+  return WORKER_NAME_PATTERN.test(name3);
+}
+function userWorkerApp(name3) {
+  const match = WORKER_NAME_PATTERN.exec(name3);
+  return match?.[1] ?? match?.[2] ?? null;
+}
+function workerStorageScope(worker) {
+  if (!isUserWorkerName(worker))
+    return null;
+  const match = new RegExp(`^p-(${UUID})-(main|prod)-`).exec(worker);
+  if (!match)
+    return null;
+  return {
+    namespace: `projects/${match[1]}/${match[2]}`,
+    tier: match[2] === "prod" ? "prod" : "dev"
+  };
+}
+function isWorkerStorageScope(worker, value) {
+  if (typeof value !== "object" || value === null)
+    return false;
+  const actual = value;
+  const session2 = /^p-s-([0-9a-f]{12})-/.exec(worker);
+  if (session2 && isUserWorkerName(worker)) {
+    if (actual.tier !== "dev" || typeof actual.namespace !== "string")
+      return false;
+    const scope = new RegExp(`^projects/(${UUID})/environments/(${UUID})$`).exec(actual.namespace);
+    return scope !== null && scope[2].replaceAll("-", "").slice(0, 12) === session2[1];
+  }
+  const expected = workerStorageScope(worker);
+  return expected !== null && expected.namespace === actual.namespace && expected.tier === actual.tier;
+}
+function base64UrlToBytes(value) {
+  if (!/^[A-Za-z0-9_-]+$/.test(value))
+    return null;
+  const binary = atob(value.replaceAll("-", "+").replaceAll("_", "/"));
+  return Uint8Array.from(binary, (c) => c.charCodeAt(0));
+}
+function toHex(buffer) {
+  return [...new Uint8Array(buffer)].map((b2) => b2.toString(16).padStart(2, "0")).join("");
+}
+async function sha256Hex2(body) {
+  return toHex(await crypto.subtle.digest("SHA-256", body));
+}
+async function hmacKey(secret, usage) {
+  if (secret.length < DISPATCH_SECRET_MIN_LENGTH)
+    throw new Error("dispatch secret is too short");
+  return crypto.subtle.importKey("raw", encoder.encode(secret), { name: "HMAC", hash: "SHA-256" }, false, [usage]);
+}
+function pathOf(url2) {
+  const parsed = new URL(url2);
+  return `${parsed.pathname}${parsed.search}`;
+}
+function dispatchHeadersFit(encoded, signature) {
+  return encoder.encode(encoded).byteLength + encoder.encode(signature).byteLength + DISPATCH_HEADER.length + DISPATCH_SIGNATURE_HEADER.length + 8 <= DISPATCH_HEADERS_MAX_BYTES;
+}
+function parseEnvelope(encoded) {
+  try {
+    const value = JSON.parse(new TextDecoder().decode(Uint8Array.from(atob(encoded), (c) => c.charCodeAt(0))));
+    if (typeof value !== "object" || value === null)
+      return null;
+    const e = value;
+    const limits = e.limits;
+    const valid = e.v === 1 && typeof e.worker === "string" && isUserWorkerName(e.worker) && typeof e.method === "string" && typeof e.path === "string" && e.path.startsWith("/") && Number.isInteger(e.ts) && typeof e.bodySha256 === "string" && /^[0-9a-f]{64}$/.test(e.bodySha256) && isWorkerOutboundPolicy(e.worker, e.policy) && Array.isArray(e.egress) && e.egress.every((host) => typeof host === "string") && (e.storage === undefined || isWorkerStorageScope(e.worker, e.storage)) && (limits === undefined || Number.isInteger(limits.cpuMs) && Number.isInteger(limits.subRequests));
+    return valid ? value : null;
+  } catch {
+    return null;
+  }
+}
+async function verifyDispatch(input) {
+  const encoded = input.headers.get(DISPATCH_HEADER);
+  const signature = input.headers.get(DISPATCH_SIGNATURE_HEADER);
+  if (!encoded || !signature)
+    return { ok: false, reason: "missing" };
+  if (!dispatchHeadersFit(encoded, signature))
+    return { ok: false, reason: "malformed" };
+  const signatureBytes = base64UrlToBytes(signature);
+  if (!signatureBytes)
+    return { ok: false, reason: "malformed" };
+  const key = await hmacKey(input.secret, "verify");
+  const valid = await crypto.subtle.verify("HMAC", key, signatureBytes, encoder.encode(encoded));
+  if (!valid)
+    return { ok: false, reason: "signature" };
+  const envelope = parseEnvelope(encoded);
+  if (!envelope)
+    return { ok: false, reason: "malformed" };
+  const now = Math.floor((input.now ?? new Date).getTime() / 1000);
+  if (Math.abs(now - envelope.ts) > DISPATCH_MAX_SKEW_SECONDS)
+    return { ok: false, reason: "expired" };
+  if (envelope.method !== input.method.toUpperCase() || envelope.path !== pathOf(input.url)) {
+    return { ok: false, reason: "request" };
+  }
+  if (envelope.bodySha256 !== await sha256Hex2(input.body))
+    return { ok: false, reason: "body" };
+  return { ok: true, envelope };
+}
+function isWorkerOutboundPolicy(worker, value) {
+  if (!isUserWorkerName(worker))
+    return false;
+  const parsed = outboundPolicySchema.safeParse(value);
+  if (!parsed.success)
+    return false;
+  const generation = /^p-s-([a-f0-9]{12})-/.exec(worker);
+  return generation ? parsed.data.resourceGeneration !== null && parsed.data.resourceGeneration.replaceAll("-", "").slice(0, 12) === generation[1] : parsed.data.mode === "real" && parsed.data.resourceGeneration === null;
+}
+var API_EXECUTION_MODE_HEADER = "x-platform-execution-mode", DISPATCH_HEADER = "x-platform-dispatch", DISPATCH_SIGNATURE_HEADER = "x-platform-signature", DISPATCH_HEADERS_MAX_BYTES, DISPATCH_MAX_SKEW_SECONDS = 60, DISPATCH_SECRET_MIN_LENGTH = 32, UUID = "[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}", USER_WORKER_SLUG = "[a-z][a-z0-9]*(?:-[a-z0-9]+)*", EXACT_UUID, EXACT_SLUG, WORKER_NAME_PATTERN, encoder;
+var init_platform_dispatch = __esm(() => {
+  init_network_mocks();
+  DISPATCH_HEADERS_MAX_BYTES = 64 * 1024;
+  EXACT_UUID = new RegExp(`^${UUID}$`);
+  EXACT_SLUG = new RegExp(`^${USER_WORKER_SLUG}$`);
+  WORKER_NAME_PATTERN = new RegExp(`^(?:p-${UUID}-(?:main|prod)-(${USER_WORKER_SLUG})|p-s-[0-9a-f]{12}-(${USER_WORKER_SLUG}|[0-9a-f]{32}))$`);
+  encoder = new TextEncoder;
+});
+
+// frontend/packages/project-protocol/src/profile.ts
+var platformProfile, platformProfileResponse;
+var init_profile = __esm(() => {
+  init_zod();
+  init_contract();
+  platformProfile = contract((o) => o.object({
+    displayName: exports_external.string().nullable(),
+    avatarUrl: exports_external.url().nullable()
+  }));
+  platformProfileResponse = contract((o) => platformProfile.in(o).nullable());
+});
 // frontend/packages/project-protocol/src/sandbox-dispatch.ts
 var sandboxDispatchSchema;
 var init_sandbox_dispatch = __esm(() => {
@@ -18935,6 +18957,7 @@ var init_src = __esm(() => {
   init_notifications();
   init_origin();
   init_origin_listing();
+  init_origin_worker();
   init_paths();
   init_platform_dispatch();
   init_profile();

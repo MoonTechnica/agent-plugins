@@ -28,6 +28,7 @@ export * from "./network-mocks.js";
 export * from "./notifications.js";
 export * from "./origin.js";
 export * from "./origin-listing.js";
+export * from "./origin-worker.js";
 export * from "./paths.js";
 export * from "./platform-dispatch.js";
 export * from "./profile.js";

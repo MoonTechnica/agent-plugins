@@ -28,6 +28,7 @@ export * from './network-mocks.ts';
 export * from './notifications.ts';
 export * from './origin.ts';
 export * from './origin-listing.ts';
+export * from './origin-worker.ts';
 export * from './paths.ts';
 export * from './platform-dispatch.ts';
 export * from './profile.ts';
