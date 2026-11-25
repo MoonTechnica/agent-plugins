@@ -1,10 +1,9 @@
-import { z } from 'zod';
-/** Reserved build-time prefix replaced by the authenticated origin, never by the app. */
+/**
+ * Build-time base baked into every mini-app build (frozen artifacts keep it). The origin replaces it
+ * when serving: with {@link APP_FRAME_BASE} for an App running inside a Host frame, with `/` for a
+ * public production App opened directly. Static files are not credentials; data is protected by the
+ * Project access token at the Gateway.
+ */
 export declare const DELIVERY_BUILD_BASE = "/_platform/delivery/__SESSION__/";
-export declare const DELIVERY_PATH = "/_platform/delivery/";
-export declare const deliveryTokenSchema: z.ZodString;
-export declare const deliveryResponseSchema: z.ZodObject<{
-    token: z.ZodString;
-    expiresAt: z.ZodISODateTime;
-}, z.core.$strict>;
-export declare function deliveryBase(token: string): string;
+/** Where a Host (the superapp or the origin's own sign-in page) frames the App */
+export declare const APP_FRAME_BASE = "/_platform/app/";

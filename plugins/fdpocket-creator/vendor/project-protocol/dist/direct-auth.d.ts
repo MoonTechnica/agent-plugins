@@ -66,41 +66,6 @@ export declare const directAuthResultSchema: z.ZodObject<{
             canOpen: z.ZodBoolean;
         }, z.core.$strip>>;
     }, z.core.$strip>;
-    delivery: z.ZodObject<{
-        token: z.ZodString;
-        expiresAt: z.ZodISODateTime;
-    }, z.core.$strict>;
-    deliveryLaunch: z.ZodObject<{
-        token: z.ZodString;
-        expiresAt: z.ZodISODateTime;
-        session: z.ZodObject<{
-            userId: z.ZodString;
-            globalUserId: z.ZodString;
-            displayName: z.ZodNullable<z.ZodString>;
-            isAnonymous: z.ZodBoolean;
-            permissions: z.ZodArray<z.ZodString>;
-            expiresAt: z.ZodISODateTime;
-            apps: z.ZodArray<z.ZodObject<{
-                slug: z.ZodString;
-                kind: z.ZodEnum<{
-                    web: "web";
-                    api: "api";
-                    jobs: "jobs";
-                    python: "python";
-                    mcp: "mcp";
-                }>;
-                access: z.ZodEnum<{
-                    public: "public";
-                    restricted: "restricted";
-                }>;
-                displayName: z.ZodNullable<z.ZodObject<{
-                    ja: z.ZodString;
-                    en: z.ZodString;
-                }, z.core.$strict>>;
-                canOpen: z.ZodBoolean;
-            }, z.core.$strip>>;
-        }, z.core.$strip>;
-    }, z.core.$strip>;
     path: z.ZodString;
     projectId: z.ZodUUID;
     app: z.ZodString;
@@ -119,66 +84,8 @@ export declare const directSessionSchema: z.ZodObject<{
     absoluteExpiresAt: z.ZodISODateTime;
 }, z.core.$strict>;
 export type DirectSession = z.infer<typeof directSessionSchema>;
-/** Gateway → origin Worker only. The Worker moves `session` into the cookie and strips it. */
+/** Gateway → origin Worker only. The Worker moves `device` into the cookie and strips it. */
 export declare const directAuthExchangeResultSchema: z.ZodObject<{
-    token: z.ZodString;
-    expiresAt: z.ZodISODateTime;
-    delivery: z.ZodObject<{
-        token: z.ZodString;
-        expiresAt: z.ZodISODateTime;
-    }, z.core.$strict>;
-    deliveryLaunch: z.ZodObject<{
-        token: z.ZodString;
-        expiresAt: z.ZodISODateTime;
-        session: z.ZodObject<{
-            userId: z.ZodString;
-            globalUserId: z.ZodString;
-            displayName: z.ZodNullable<z.ZodString>;
-            isAnonymous: z.ZodBoolean;
-            permissions: z.ZodArray<z.ZodString>;
-            expiresAt: z.ZodISODateTime;
-            apps: z.ZodArray<z.ZodObject<{
-                slug: z.ZodString;
-                kind: z.ZodEnum<{
-                    web: "web";
-                    api: "api";
-                    jobs: "jobs";
-                    python: "python";
-                    mcp: "mcp";
-                }>;
-                access: z.ZodEnum<{
-                    public: "public";
-                    restricted: "restricted";
-                }>;
-                displayName: z.ZodNullable<z.ZodObject<{
-                    ja: z.ZodString;
-                    en: z.ZodString;
-                }, z.core.$strict>>;
-                canOpen: z.ZodBoolean;
-            }, z.core.$strip>>;
-        }, z.core.$strip>;
-    }, z.core.$strip>;
-    path: z.ZodString;
-    projectId: z.ZodUUID;
-    app: z.ZodString;
-    session: z.ZodObject<{
-        secret: z.ZodString;
-        absoluteExpiresAt: z.ZodISODateTime;
-    }, z.core.$strict>;
-}, z.core.$strip>;
-export declare const directAuthResumeSchema: z.ZodObject<{
-    secret: z.ZodString;
-    origin: z.ZodString;
-    path: z.ZodString;
-}, z.core.$strict>;
-export declare const directAuthRevokeSchema: z.ZodObject<{
-    secret: z.ZodString;
-    origin: z.ZodString;
-}, z.core.$strict>;
-export declare function pkceChallenge(verifier: string): Promise<string>;
-export declare function directAuthRandom(): string;
-/** Private Gateway response. The origin bootstrap uses the validated path after exchange. */
-export declare const projectAuthExchangeResponseSchema: z.ZodObject<{
     token: z.ZodString;
     expiresAt: z.ZodISODateTime;
     session: z.ZodObject<{
@@ -209,4 +116,21 @@ export declare const projectAuthExchangeResponseSchema: z.ZodObject<{
         }, z.core.$strip>>;
     }, z.core.$strip>;
     path: z.ZodString;
+    projectId: z.ZodUUID;
+    app: z.ZodString;
+    device: z.ZodObject<{
+        secret: z.ZodString;
+        absoluteExpiresAt: z.ZodISODateTime;
+    }, z.core.$strict>;
 }, z.core.$strip>;
+export declare const directAuthResumeSchema: z.ZodObject<{
+    secret: z.ZodString;
+    origin: z.ZodString;
+    path: z.ZodString;
+}, z.core.$strict>;
+export declare const directAuthRevokeSchema: z.ZodObject<{
+    secret: z.ZodString;
+    origin: z.ZodString;
+}, z.core.$strict>;
+export declare function pkceChallenge(verifier: string): Promise<string>;
+export declare function directAuthRandom(): string;

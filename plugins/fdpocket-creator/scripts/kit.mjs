@@ -17347,15 +17347,7 @@ var init_db_batch = __esm(() => {
 });
 
 // frontend/packages/project-protocol/src/delivery.ts
-var DELIVERY_BUILD_BASE = "/_platform/delivery/__SESSION__/", DELIVERY_PATH = "/_platform/delivery/", deliveryTokenSchema, deliveryResponseSchema;
-var init_delivery = __esm(() => {
-  init_zod();
-  deliveryTokenSchema = exports_external.string().regex(/^[A-Za-z0-9_-]{43}$/);
-  deliveryResponseSchema = exports_external.strictObject({
-    token: deliveryTokenSchema,
-    expiresAt: exports_external.iso.datetime()
-  });
-});
+var DELIVERY_BUILD_BASE = "/_platform/delivery/__SESSION__/";
 
 // frontend/packages/project-protocol/src/dev-ports.ts
 function allocateAppPorts(slugs, firstPort = 5173) {
@@ -17371,10 +17363,9 @@ async function pkceChallenge(verifier) {
 function directAuthRandom() {
   return btoa(String.fromCharCode(...crypto.getRandomValues(new Uint8Array(32)))).replaceAll("+", "-").replaceAll("/", "_").replaceAll("=", "");
 }
-var DIRECT_AUTH_TTL_SECONDS = 120, directAuthOpaqueSchema, directAuthVerifierSchema, directAuthOriginSchema, directAuthPathSchema, directAuthRequestSchema, directAuthExchangeSchema, directAuthIssueResponseSchema, directAuthResultSchema, directSessionSchema, directAuthExchangeResultSchema, directAuthResumeSchema, directAuthRevokeSchema, projectAuthExchangeResponseSchema;
+var DIRECT_AUTH_TTL_SECONDS = 120, directAuthOpaqueSchema, directAuthVerifierSchema, directAuthOriginSchema, directAuthPathSchema, directAuthRequestSchema, directAuthExchangeSchema, directAuthIssueResponseSchema, directAuthResultSchema, directSessionSchema, directAuthExchangeResultSchema, directAuthResumeSchema, directAuthRevokeSchema;
 var init_direct_auth = __esm(() => {
   init_zod();
-  init_delivery();
   init_token();
   directAuthOpaqueSchema = exports_external.string().length(43).regex(/^[A-Za-z0-9_-]{43}$/);
   directAuthVerifierSchema = exports_external.string().regex(/^[A-Za-z0-9._~-]{43,128}$(?![\s\S])/);
@@ -17420,8 +17411,6 @@ var init_direct_auth = __esm(() => {
     expiresAt: exports_external.iso.datetime()
   });
   directAuthResultSchema = tokenExchangeResponse.exact.extend({
-    delivery: deliveryResponseSchema,
-    deliveryLaunch: tokenExchangeResponse.exact,
     path: directAuthPathSchema,
     projectId: exports_external.uuid(),
     app: appSlugSchema
@@ -17431,7 +17420,7 @@ var init_direct_auth = __esm(() => {
     absoluteExpiresAt: exports_external.iso.datetime({ offset: true })
   });
   directAuthExchangeResultSchema = directAuthResultSchema.extend({
-    session: directSessionSchema
+    device: directSessionSchema
   });
   directAuthResumeSchema = exports_external.strictObject({
     secret: directAuthOpaqueSchema,
@@ -17441,9 +17430,6 @@ var init_direct_auth = __esm(() => {
   directAuthRevokeSchema = exports_external.strictObject({
     secret: directAuthOpaqueSchema,
     origin: directAuthOriginSchema
-  });
-  projectAuthExchangeResponseSchema = tokenExchangeResponse.exact.extend({
-    path: directAuthPathSchema
   });
 });
 
@@ -18932,7 +18918,6 @@ var init_src = __esm(() => {
   init_contract();
   init_csp();
   init_db_batch();
-  init_delivery();
   init_direct_auth();
   init_errors3();
   init_gateway_url();
@@ -46106,7 +46091,6 @@ var init_app = __esm(() => {
   HOST_ONLY_PATHS = new Set([
     "/v1/apps",
     "/v1/token/exchange",
-    "/v1/delivery/open",
     "/v1/auth/direct/issue",
     "/v1/connections/requests"
   ]);
@@ -76135,7 +76119,7 @@ async function resolveProjectClaims(c, adapters, config4, cost, claims, options2
   };
   let resolved;
   if (claims.authProvider === "project") {
-    if (!config4.projectAuth || !options2.allowProjectAuth || options2.launch === false || claims.deliveryOnly && !options2.allowDeliveryOnly)
+    if (!config4.projectAuth || !options2.allowProjectAuth || options2.launch === false || claims.deliveryOnly)
       throw new GatewayError("FORBIDDEN", "project authentication is not supported here");
     const scope = projectAuthLaunchScope(claims);
     resolved = checkedProjectAuthResolution(activeOrThrow(await requireProjectAuth(adapters).resolveLaunch({ scope, cost })), scope);
@@ -125919,103 +125903,6 @@ var init_runtime = __esm(() => {
   init_search2();
 });
 
-// frontend/packages/project-gateway/src/delivery/routes.ts
-function sameScope(a2, b3) {
-  return a2.sub === b3.sub && a2.gid === b3.gid && a2.aud === b3.aud && a2.app === b3.app && a2.env === b3.env && a2.envId === b3.envId && a2.actorId === b3.actorId && a2.authProvider === b3.authProvider && a2.deliveryOnly === b3.deliveryOnly && a2.testIdentity === b3.testIdentity && a2.testGrantId === b3.testGrantId && a2.anon === b3.anon;
-}
-async function assertActor(adapters, lease, resolved) {
-  const db = await adapters.turso.connect(resolved.db);
-  const actor = await loadProjectActor(db, lease.claims.sub, [], resolved.user.bootstrap);
-  if (!actor || actor.globalUserId !== lease.claims.gid)
-    throw new GatewayError("NOT_FOUND", "not found");
-  assertAppAccess(resolved, actor.permissions);
-}
-function registerDeliveryRoutes(app, adapters, config6) {
-  app.post("/v1/delivery/open", async (c2) => {
-    if (!adapters.delivery)
-      throw new GatewayError("NOT_FOUND", "delivery not configured");
-    const parsed = openSchema.safeParse(await jsonBody(c2));
-    if (!parsed.success)
-      throw new GatewayError("VALIDATION_FAILED", "invalid delivery request");
-    const input2 = parsed.data;
-    const { claims, resolved } = await verifyProjectToken(c2, adapters, config6, 1, {
-      actAs: false,
-      hostOrigin: true,
-      allowProjectAuth: true,
-      allowDeliveryOnly: true
-    });
-    if (claims.authProvider === "project" && (!claims.deliveryOnly || c2.req.header("origin") !== undefined))
-      throw new GatewayError("FORBIDDEN", "trusted delivery bootstrap required");
-    if (resolved.app.kind !== "web" || !resolved.versionId)
-      throw new GatewayError("NOT_FOUND", "not found");
-    const lease = {
-      claims,
-      versionId: resolved.versionId,
-      expiresAt: new Date(claims.exp * 1000).toISOString()
-    };
-    await assertActor(adapters, lease, resolved);
-    let token2 = input2.token;
-    if (token2) {
-      const previous = await adapters.delivery.get(await sha256Hex2(new TextEncoder().encode(token2)));
-      if (!previous || !sameScope(previous.claims, claims) || previous.versionId !== resolved.versionId) {
-        throw new GatewayError("NOT_FOUND", "delivery lease not found");
-      }
-    } else {
-      token2 = btoa(String.fromCharCode(...crypto.getRandomValues(new Uint8Array(32)))).replace(/\+/g, "-").replace(/\//g, "_").replace(/=+$/, "");
-    }
-    if (!await adapters.delivery.put(await sha256Hex2(new TextEncoder().encode(token2)), lease)) {
-      throw new GatewayError("NOT_FOUND", "delivery lease not found");
-    }
-    return c2.json({ token: token2, expiresAt: lease.expiresAt });
-  });
-  app.post("/v1/delivery/authorize", async (c2) => {
-    if (!adapters.delivery)
-      throw new GatewayError("NOT_FOUND", "not found");
-    if (c2.req.header(ACT_AS_HEADER) !== undefined)
-      throw new GatewayError("UNAUTHENTICATED", "act-as not allowed");
-    const token2 = deliveryTokenSchema.safeParse(bearerOf(c2));
-    if (!token2.success)
-      throw new GatewayError("UNAUTHENTICATED", "invalid delivery token");
-    const parsed = authorizeSchema.safeParse(await jsonBody(c2));
-    if (!parsed.success)
-      throw new GatewayError("VALIDATION_FAILED", "invalid delivery request");
-    const input2 = parsed.data;
-    const lease = await adapters.delivery.get(await sha256Hex2(new TextEncoder().encode(token2.data)));
-    if (!lease || Date.parse(lease.expiresAt) <= adapters.clock().getTime() || lease.claims.exp * 1000 <= adapters.clock().getTime()) {
-      throw new GatewayError("UNAUTHENTICATED", "delivery expired");
-    }
-    const claims = lease.claims;
-    if (claims.authProvider === "project" && !claims.deliveryOnly)
-      throw new GatewayError("UNAUTHENTICATED", "invalid delivery lease");
-    const resolved = claims.authProvider === "project" ? (await resolveProjectClaims(c2, adapters, config6, 1, claims, {
-      allowProjectAuth: true,
-      allowDeliveryOnly: true,
-      hostOrigin: true
-    })).resolved : activeOrThrow(await adapters.registry.resolve(projectResolveInput(claims, 1)));
-    if (resolved.app.kind !== "web" || input2.app !== claims.app || input2.versionId !== lease.versionId || resolved.versionId !== lease.versionId || input2.originHost !== resolved.app.originHost) {
-      throw new GatewayError("NOT_FOUND", "not found");
-    }
-    allowProjectOrigin(c2, config6, resolved.app.originHost, claims.env === "session" ? resolved.liveOrigin : null);
-    await assertActor(adapters, lease, resolved);
-    return c2.body(null, 204);
-  });
-}
-var openSchema, authorizeSchema;
-var init_routes5 = __esm(() => {
-  init_src();
-  init_zod3();
-  init_app();
-  init_errors6();
-  init_project_users();
-  init_session();
-  openSchema = exports_external3.strictObject({ token: deliveryTokenSchema.optional() });
-  authorizeSchema = exports_external3.strictObject({
-    originHost: exports_external3.string(),
-    app: exports_external3.string(),
-    versionId: exports_external3.string()
-  });
-});
-
 // frontend/packages/project-gateway/src/token/routes.ts
 function registerTokenRoutes(app, adapters, config6) {
   app.post("/v1/apps", async (c2) => {
@@ -126159,7 +126046,7 @@ function registerTokenRoutes(app, adapters, config6) {
     return c2.json(body);
   });
   app.post("/v1/token/refresh", async (c2) => {
-    const { claims, target, resolved } = await verifyProjectToken(c2, adapters, config6, EXCHANGE_COST, { actAs: false, allowProjectAuth: true, allowDeliveryOnly: true });
+    const { claims, target, resolved } = await verifyProjectToken(c2, adapters, config6, EXCHANGE_COST, { actAs: false, allowProjectAuth: true });
     const db = await adapters.turso.connect(resolved.db);
     const actor = await loadProjectActor(db, claims.sub, [], resolved.user.bootstrap);
     if (!actor)
@@ -126173,7 +126060,7 @@ function registerTokenRoutes(app, adapters, config6) {
       permissions: actor.permissions,
       resolved,
       issuedBy: "direct",
-      ...claims.authProvider === "project" ? { projectAuth: { previousLaunchId: claims.jti }, deliveryOnly: claims.deliveryOnly } : {}
+      ...claims.authProvider === "project" ? { projectAuth: { previousLaunchId: claims.jti } } : {}
     });
     if (claims.authProvider !== "project")
       await adapters.registry.revokeLaunch(claims.jti, target.userId);
@@ -126283,7 +126170,6 @@ async function issue5(adapters, target, subject) {
     cv: subject.resolved.contract,
     actorId: subject.resolved.actorId,
     ...subject.projectAuth ? { authProvider: "project" } : {},
-    ...subject.deliveryOnly ? { deliveryOnly: true } : {},
     ...subject.resolved.testIdentity ? { testIdentity: subject.resolved.testIdentity.slot } : {},
     ...subject.resolved.testGrantId ? { testGrantId: subject.resolved.testGrantId } : {},
     anon: subject.isAnonymous,
@@ -126334,7 +126220,7 @@ async function issue5(adapters, target, subject) {
   };
 }
 var EXCHANGE_COST = 5, READ_COST = 1;
-var init_routes6 = __esm(() => {
+var init_routes5 = __esm(() => {
   init_src();
   init_errors6();
   init_project_users();
@@ -126370,7 +126256,7 @@ function registerDirectAuthRoutes(app, adapters, config6) {
     const origin2 = c2.req.header("origin");
     if (!origin2 || !config6.hostOrigins.includes(origin2))
       throw new GatewayError("FORBIDDEN", "host origin required");
-    if (!adapters.directAuth || !adapters.delivery)
+    if (!adapters.directAuth)
       throw new GatewayError("NOT_FOUND", "direct auth unavailable");
     const parsed = directAuthRequestSchema.safeParse(await jsonBody(c2));
     if (!parsed.success)
@@ -126397,55 +126283,35 @@ function registerDirectAuthRoutes(app, adapters, config6) {
       scheme: config6.appsScheme
     }) !== input2.origin)
       throw new GatewayError("FORBIDDEN", "direct origin mismatch");
-    const sessions = [];
     const tokens = new Set;
     try {
-      for (let i2 = 0;i2 < 2; i2++) {
-        const response2 = await app.request("https://internal/v1/token/exchange", {
-          method: "POST",
-          headers: {
-            origin: origin2,
-            authorization: c2.req.header("authorization"),
-            "content-type": "application/json"
-          },
-          body: JSON.stringify({
-            projectId: input2.projectId,
-            app: input2.app,
-            environment: input2.environment,
-            environmentId: resolved.environmentId
-          })
-        });
-        sessions.push(await exchangeResponse(response2, tokens));
-      }
-      const deliveryLaunch = sessions[1];
-      const response = await app.request("https://internal/v1/delivery/open", {
+      const response = await app.request("https://internal/v1/token/exchange", {
         method: "POST",
         headers: {
           origin: origin2,
-          authorization: `Bearer ${deliveryLaunch.token}`,
+          authorization: c2.req.header("authorization"),
           "content-type": "application/json"
         },
-        body: "{}"
+        body: JSON.stringify({
+          projectId: input2.projectId,
+          app: input2.app,
+          environment: input2.environment,
+          environmentId: resolved.environmentId
+        })
       });
-      if (!response.ok)
-        throw new UpstreamResponseError(response);
-      const delivery2 = await response.json();
+      const launch = await exchangeResponse(response, tokens);
       const result = directAuthResultSchema.parse({
-        ...sessions[0],
-        deliveryLaunch,
-        delivery: delivery2,
+        ...launch,
         path: input2.path,
         projectId: input2.projectId,
         app: input2.app
       });
       if (!resolved.versionId)
         throw new GatewayError("FORBIDDEN", "Built delivery is unavailable");
-      for (const session2 of sessions) {
-        const claims = await adapters.signer.verify(session2.token);
-        if (claims.aud !== input2.projectId || claims.app !== input2.app || claims.env !== input2.environment || claims.envId !== resolved.environmentId || claims.anon || claims.actorId !== identity2.userId)
-          throw new GatewayError("UNAUTHENTICATED", "direct auth scope mismatch");
-        await assertCurrent(session2.token, resolved.versionId, input2.origin);
-      }
+      const claims = await adapters.signer.verify(launch.token);
+      if (claims.aud !== input2.projectId || claims.app !== input2.app || claims.env !== input2.environment || claims.envId !== resolved.environmentId || claims.anon || claims.actorId !== identity2.userId)
+        throw new GatewayError("UNAUTHENTICATED", "direct auth scope mismatch");
+      await assertCurrent(launch.token, resolved.versionId, input2.origin);
       const code = directAuthRandom();
       const expiresAt = new Date(adapters.clock().getTime() + DIRECT_AUTH_TTL_SECONDS * 1000).toISOString();
       await adapters.directAuth.put(await hash5(code), {
@@ -126470,7 +126336,7 @@ function registerDirectAuthRoutes(app, adapters, config6) {
     c2.header("Cache-Control", "private, no-store");
     if (c2.req.header("origin") !== undefined)
       throw new GatewayError("FORBIDDEN", "trusted bootstrap required");
-    if (!adapters.directAuth || !adapters.delivery)
+    if (!adapters.directAuth)
       throw new GatewayError("NOT_FOUND", "direct auth unavailable");
     const parsed = directAuthExchangeSchema.safeParse(await jsonBody(c2));
     if (!parsed.success)
@@ -126484,34 +126350,18 @@ function registerDirectAuthRoutes(app, adapters, config6) {
     });
     if (!grant)
       throw new GatewayError("UNAUTHENTICATED", "direct auth grant expired or used");
-    const tokens = new Set([grant.result.token, grant.result.deliveryLaunch.token]);
+    const tokens = new Set([grant.result.token]);
     try {
       if (Date.parse(grant.expiresAt) <= adapters.clock().getTime())
         throw new GatewayError("UNAUTHENTICATED", "direct auth grant expired or used");
-      for (const session2 of [grant.result, grant.result.deliveryLaunch]) {
-        await assertCurrent(session2.token, grant.versionId, input2.origin);
-      }
-      for (const session2 of [grant.result, grant.result.deliveryLaunch]) {
-        const response = await app.request("https://internal/v1/token/refresh", {
-          method: "POST",
-          headers: { origin: input2.origin, authorization: `Bearer ${session2.token}` }
-        });
-        const refreshed = await exchangeResponse(response, tokens);
-        Object.assign(session2, refreshed);
-      }
-      for (const session2 of [grant.result, grant.result.deliveryLaunch])
-        await assertCurrent(session2.token, grant.versionId, input2.origin);
-      const delivery2 = await app.request("https://internal/v1/delivery/open", {
+      await assertCurrent(grant.result.token, grant.versionId, input2.origin);
+      const response = await app.request("https://internal/v1/token/refresh", {
         method: "POST",
-        headers: {
-          authorization: `Bearer ${grant.result.deliveryLaunch.token}`,
-          "content-type": "application/json"
-        },
-        body: JSON.stringify({ token: grant.result.delivery.token })
+        headers: { origin: input2.origin, authorization: `Bearer ${grant.result.token}` }
       });
-      if (!delivery2.ok)
-        throw new UpstreamResponseError(delivery2);
-      grant.result.delivery = await delivery2.json();
+      const refreshed = await exchangeResponse(response, tokens);
+      Object.assign(grant.result, refreshed);
+      await assertCurrent(grant.result.token, grant.versionId, input2.origin);
       const result = directAuthResultSchema.parse(grant.result);
       const claims = await adapters.signer.verify(result.token);
       const secret = directAuthRandom();
@@ -126526,7 +126376,7 @@ function registerDirectAuthRoutes(app, adapters, config6) {
       });
       return c2.json(directAuthExchangeResultSchema.parse({
         ...result,
-        session: { secret, absoluteExpiresAt: created.absoluteExpiresAt }
+        device: { secret, absoluteExpiresAt: created.absoluteExpiresAt }
       }));
     } catch (error212) {
       await revokeAll(adapters, tokens);
@@ -126539,7 +126389,7 @@ function registerDirectAuthRoutes(app, adapters, config6) {
     c2.header("Cache-Control", "private, no-store");
     if (c2.req.header("origin") !== undefined)
       throw new GatewayError("FORBIDDEN", "trusted bootstrap required");
-    if (!adapters.directAuth || !adapters.delivery || !config6.directAuth)
+    if (!adapters.directAuth || !config6.directAuth)
       throw new GatewayError("NOT_FOUND", "direct auth unavailable");
     const parsed = directAuthResumeSchema.safeParse(await jsonBody(c2));
     if (!parsed.success)
@@ -126550,47 +126400,30 @@ function registerDirectAuthRoutes(app, adapters, config6) {
       throw new GatewayError("UNAUTHENTICATED", "direct session expired or revoked");
     const tokens = new Set;
     try {
-      const sessions = [];
-      for (let i2 = 0;i2 < 2; i2++) {
-        const { issued, resolved } = await issueForAccount(adapters, {
-          projectId: found.projectId,
-          environment: found.environment,
-          environmentId: found.environmentId,
-          appSlug: found.app,
-          userId: found.userId,
-          issuer: config6.directAuth.issuer,
-          kind: "web",
-          requestId: c2.get("requestId"),
-          issuedBy: "direct"
-        });
-        tokens.add(issued.token);
-        if (resolveAppOrigin({
-          originHost: resolved.app.originHost,
-          appsDomain: config6.appsDomain,
-          scheme: config6.appsScheme
-        }) !== input2.origin)
-          throw new GatewayError("UNAUTHENTICATED", "direct auth target changed");
-        sessions.push(issued);
-      }
-      const deliveryLaunch = sessions[1];
-      const delivery2 = await app.request("https://internal/v1/delivery/open", {
-        method: "POST",
-        headers: {
-          authorization: `Bearer ${deliveryLaunch.token}`,
-          "content-type": "application/json"
-        },
-        body: "{}"
+      const { issued, resolved } = await issueForAccount(adapters, {
+        projectId: found.projectId,
+        environment: found.environment,
+        environmentId: found.environmentId,
+        appSlug: found.app,
+        userId: found.userId,
+        issuer: config6.directAuth.issuer,
+        kind: "web",
+        requestId: c2.get("requestId"),
+        issuedBy: "direct"
       });
-      if (!delivery2.ok)
-        throw new UpstreamResponseError(delivery2);
+      tokens.add(issued.token);
+      if (resolveAppOrigin({
+        originHost: resolved.app.originHost,
+        appsDomain: config6.appsDomain,
+        scheme: config6.appsScheme
+      }) !== input2.origin)
+        throw new GatewayError("UNAUTHENTICATED", "direct auth target changed");
       return c2.json(directAuthExchangeResultSchema.parse({
-        ...sessions[0],
-        deliveryLaunch,
-        delivery: await delivery2.json(),
+        ...issued,
         path: input2.path,
         projectId: found.projectId,
         app: found.app,
-        session: { secret: input2.secret, absoluteExpiresAt: found.absoluteExpiresAt }
+        device: { secret: input2.secret, absoluteExpiresAt: found.absoluteExpiresAt }
       }));
     } catch (error212) {
       await revokeAll(adapters, tokens);
@@ -126631,11 +126464,11 @@ function registerDirectAuthRoutes(app, adapters, config6) {
   }
 }
 var hash5 = (value) => sha256Hex2(new TextEncoder().encode(value)), UpstreamResponseError;
-var init_routes7 = __esm(() => {
+var init_routes6 = __esm(() => {
   init_src();
   init_errors6();
   init_session();
-  init_routes6();
+  init_routes5();
   UpstreamResponseError = class UpstreamResponseError extends Error {
     response;
     constructor(response) {
@@ -126714,7 +126547,7 @@ function registerEraseRoutes(app, adapters, options2) {
     return c2.json({ ...result, ...retentionAfter ? { retentionAfter } : {} });
   });
 }
-var init_routes8 = __esm(() => {
+var init_routes7 = __esm(() => {
   init_errors6();
   init_retention();
   init_session();
@@ -126845,11 +126678,11 @@ function registerMcpRoutes(app, adapters, options2) {
   });
 }
 var MCP_TOKEN_PATH = "/internal/mcp/token", requestSchema2;
-var init_routes9 = __esm(() => {
+var init_routes8 = __esm(() => {
   init_zod3();
   init_errors6();
   init_session();
-  init_routes6();
+  init_routes5();
   requestSchema2 = exports_external3.strictObject({ grantId: exports_external3.uuid(), userId: exports_external3.uuid() });
 });
 
@@ -126861,7 +126694,7 @@ function registerNotificationRoutes(app, adapters, config6) {
   });
 }
 var NOTIFICATIONS_COST = 1;
-var init_routes10 = __esm(() => {
+var init_routes9 = __esm(() => {
   init_session();
 });
 
@@ -126941,7 +126774,7 @@ function registerProfileRoutes(app, adapters, config6) {
     } : await adapters.profiles.get(claims.actorId));
   });
 }
-var init_routes11 = __esm(() => {
+var init_routes10 = __esm(() => {
   init_errors6();
   init_project_users();
   init_session();
@@ -126958,9 +126791,7 @@ function registerProjectAuthRoutes(app, adapters, config6, key) {
     const parsed = exchangeSchema2.safeParse(await jsonBody(c2));
     if (!parsed.success)
       throw new GatewayError("VALIDATION_FAILED", "invalid project auth exchange");
-    const { delivery: withDelivery, ...request } = parsed.data;
-    if (withDelivery && !adapters.delivery)
-      throw new GatewayError("NOT_FOUND", "delivery not configured");
+    const request = parsed.data;
     const projectAuth = requireProjectAuth(adapters);
     const redemption = await projectAuth.redeem(request);
     if (!redemption)
@@ -126989,7 +126820,7 @@ function registerProjectAuthRoutes(app, adapters, config6, key) {
     if (!actor)
       throw new Error("bootstrapped project user disappeared");
     assertAppAccess(resolved, actor.permissions);
-    const issueLaunch = (deliveryOnly) => issue5(adapters, {
+    const launch = await issue5(adapters, {
       projectId: request.projectId,
       environment: request.environment,
       environmentId: request.environmentId,
@@ -127003,59 +126834,30 @@ function registerProjectAuthRoutes(app, adapters, config6, key) {
       permissions: actor.permissions,
       resolved,
       issuedBy: "direct",
-      projectAuth: { authSessionId, policyRevision },
-      deliveryOnly
+      projectAuth: { authSessionId, policyRevision }
     });
-    const launch = await issueLaunch();
-    if (!withDelivery)
-      return c2.json(projectAuthExchangeResponseSchema.parse({ ...launch, path }));
-    const tokens = [launch.token];
-    try {
-      const deliveryLaunch = await issueLaunch(true);
-      tokens.push(deliveryLaunch.token);
-      const delivery2 = await app.request("https://internal/v1/delivery/open", {
-        method: "POST",
-        headers: {
-          authorization: `Bearer ${deliveryLaunch.token}`,
-          "content-type": "application/json"
-        },
-        body: "{}"
-      });
-      if (!delivery2.ok) {
-        await delivery2.body?.cancel();
-        throw new GatewayError("FORBIDDEN", "app delivery is unavailable");
-      }
-      return c2.json(directAuthResultSchema.parse({
-        ...launch,
-        path,
-        projectId: request.projectId,
-        app: request.app,
-        deliveryLaunch,
-        delivery: deliveryResponseSchema.parse(await delivery2.json())
-      }));
-    } catch (error212) {
-      const cleanup = await Promise.allSettled(tokens.map(async (token2) => projectAuth.revokeLaunch(projectAuthLaunchScope(await adapters.signer.verify(token2)))));
-      if (cleanup.some((result) => result.status === "rejected"))
-        throw new Error("Project auth delivery launch cleanup failed", { cause: error212 });
-      throw error212;
-    }
+    return c2.json(directAuthResultSchema.parse({
+      ...launch,
+      path,
+      projectId: request.projectId,
+      app: request.app
+    }));
   });
 }
 var exchangeSchema2;
-var init_routes12 = __esm(() => {
+var init_routes11 = __esm(() => {
   init_src();
   init_zod3();
   init_errors6();
   init_project_users();
   init_session();
-  init_routes6();
+  init_routes5();
   init_gateway_port();
   exchangeSchema2 = directAuthExchangeSchema.extend({
     projectId: exports_external3.uuid(),
     environment: exports_external3.literal("prod"),
     environmentId: exports_external3.uuid(),
-    app: appSlugSchema,
-    delivery: exports_external3.literal(true).optional()
+    app: appSlugSchema
   });
 });
 
@@ -127303,7 +127105,7 @@ var PYTHON_COST = 1, RUN_ID2, FINISH_BODY_MAX_BYTES, limit2 = (maxSize) => bodyL
     throw new GatewayError("PAYLOAD_TOO_LARGE", "request too large");
   }
 });
-var init_routes13 = __esm(() => {
+var init_routes12 = __esm(() => {
   init_src();
   init_body_limit();
   init_errors6();
@@ -127793,7 +127595,7 @@ function blocksOf(userIds) {
   return { userIds: [...new Set(userIds)].sort() };
 }
 var SAFETY_COST = 1;
-var init_routes14 = __esm(() => {
+var init_routes13 = __esm(() => {
   init_src();
   init_errors6();
   init_project_users();
@@ -129458,7 +129260,7 @@ function toStorageFile(file5, adapters, tier) {
   };
 }
 var STORAGE_COST = 2, STAGING_CLEANUP_AFTER_MS, WORKSPACE_WRITERS, DryRun;
-var init_routes15 = __esm(() => {
+var init_routes14 = __esm(() => {
   init_src();
   init_errors6();
   init_audit();
@@ -129666,7 +129468,7 @@ function failed(status) {
   }
 }
 var USER_INVITATION_COST = 1, WORKSPACE_INVITER_ROLES, USERS_INVITE_PERMISSION = "users.invite";
-var init_routes16 = __esm(() => {
+var init_routes15 = __esm(() => {
   init_src();
   init_errors6();
   init_project_users();
@@ -129822,7 +129624,7 @@ function workspaceIdOf(c2) {
   return parsed.data;
 }
 var WORKSPACE_COST = 1, workspaceIdSchema, INVITER_ROLES;
-var init_routes17 = __esm(() => {
+var init_routes16 = __esm(() => {
   init_src();
   init_zod3();
   init_errors6();
@@ -129863,7 +129665,6 @@ function createGateway(adapters, config6, logger = consoleLogger, realtimeTransp
   registerTokenRoutes(app, adapters, config6);
   registerAiRoutes(app, adapters, config6, runtime, logger);
   registerAiOpenAiRoutes(app, adapters, config6, runtime, logger);
-  registerDeliveryRoutes(app, adapters, config6);
   registerDirectAuthRoutes(app, adapters, config6);
   if (config6.projectAuth && adapters.projectAuth)
     registerProjectAuthRoutes(app, adapters, config6, config6.projectAuth.key);
@@ -129916,28 +129717,27 @@ var init_gateway = __esm(() => {
   init_routes4();
   init_rpc();
   init_runtime();
-  init_routes5();
+  init_routes6();
   init_routes7();
-  init_routes8();
   init_errors6();
   init_jobs2();
   init_logger2();
+  init_routes8();
   init_routes9();
-  init_routes10();
   init_send();
+  init_routes10();
   init_routes11();
-  init_routes12();
   init_dev_routes();
-  init_routes13();
+  init_routes12();
   init_service();
-  init_routes14();
+  init_routes13();
   init_session();
   init_session_sample_route();
   init_session_seed_route();
+  init_routes14();
+  init_routes5();
   init_routes15();
-  init_routes6();
   init_routes16();
-  init_routes17();
 });
 
 // frontend/packages/project-gateway/src/notifications/supabase-notifier.ts
@@ -133415,7 +133215,7 @@ var init_user_invitations2 = __esm(() => {
 // frontend/packages/miniapp-kit/src/dev/workspace-invitations.ts
 function createDevWorkspaceInvitations(input2) {
   const invitations = new Map;
-  const sameScope2 = (a2, b3) => a2.projectId === b3.projectId && a2.environment === b3.environment;
+  const sameScope = (a2, b3) => a2.projectId === b3.projectId && a2.environment === b3.environment;
   const live = (row) => row.state === "pending" && Date.parse(row.expiresAt) > input2.clock().getTime();
   return {
     async create(request) {
@@ -133424,7 +133224,7 @@ function createDevWorkspaceInvitations(input2) {
         return { status: "not_found" };
       if (invitee.userId === request.inviterId)
         return { status: "invalid_action" };
-      const duplicate = [...invitations.values()].some((row) => live(row) && sameScope2(row, request) && row.workspaceId === request.workspaceId && row.inviteeId === invitee.userId);
+      const duplicate = [...invitations.values()].some((row) => live(row) && sameScope(row, request) && row.workspaceId === request.workspaceId && row.inviteeId === invitee.userId);
       if (duplicate)
         return { status: "already_invited" };
       const invitationId = crypto.randomUUID();
@@ -133443,7 +133243,7 @@ function createDevWorkspaceInvitations(input2) {
       return { status: "created", invitationId, expiresAt };
     },
     async list(request) {
-      return [...invitations.values()].filter((row) => live(row) && sameScope2(row, request) && row.inviteeId === request.userId).map(({ invitationId, workspaceId, role, invitedBy, expiresAt }) => ({
+      return [...invitations.values()].filter((row) => live(row) && sameScope(row, request) && row.inviteeId === request.userId).map(({ invitationId, workspaceId, role, invitedBy, expiresAt }) => ({
         invitationId,
         workspaceId,
         role,
@@ -133453,7 +133253,7 @@ function createDevWorkspaceInvitations(input2) {
     },
     async accept(request) {
       const row = invitations.get(request.invitationId);
-      if (!row || row.state === "declined" || !sameScope2(row, request) || row.workspaceId !== request.workspaceId || row.inviteeId !== request.userId) {
+      if (!row || row.state === "declined" || !sameScope(row, request) || row.workspaceId !== request.workspaceId || row.inviteeId !== request.userId) {
         return { status: "not_found" };
       }
       if (row.state === "pending") {
@@ -133465,7 +133265,7 @@ function createDevWorkspaceInvitations(input2) {
     },
     async decline(request) {
       const row = invitations.get(request.invitationId);
-      if (!row || row.state !== "pending" || !sameScope2(row, request))
+      if (!row || row.state !== "pending" || !sameScope(row, request))
         return "not_found";
       if (row.inviteeId !== request.userId)
         return "not_found";
@@ -321754,7 +321554,7 @@ function createDistHandler(options2) {
       return new Response("not found", { status: 404 });
     const pathname = new URL(request.url).pathname;
     const prefixed = pathname.startsWith(DELIVERY_BUILD_BASE);
-    if (pathname.startsWith(DELIVERY_PATH) && !prefixed)
+    if (pathname.startsWith("/_platform/") && !prefixed)
       return new Response("not found", { status: 404 });
     const appPath = prefixed ? `/${pathname.slice(DELIVERY_BUILD_BASE.length)}` : pathname;
     const route = appFileOf(decodeURIComponent(appPath), app);

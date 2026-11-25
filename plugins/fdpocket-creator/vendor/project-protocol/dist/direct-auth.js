@@ -1,6 +1,5 @@
 import { z } from 'zod';
 import { isAppPath } from "./app-path.js";
-import { deliveryResponseSchema } from "./delivery.js";
 import { appSlugSchema, environmentSchema, tokenExchangeResponse } from "./token.js";
 /** OAuth-shaped handoff credentials are short-lived, target-bound and never platform JWTs. */
 export const DIRECT_AUTH_TTL_SECONDS = 120;
@@ -72,8 +71,6 @@ export const directAuthIssueResponseSchema = z.strictObject({
     expiresAt: z.iso.datetime(),
 });
 export const directAuthResultSchema = tokenExchangeResponse.exact.extend({
-    delivery: deliveryResponseSchema,
-    deliveryLaunch: tokenExchangeResponse.exact,
     path: directAuthPathSchema,
     projectId: z.uuid(),
     app: appSlugSchema,
@@ -90,9 +87,9 @@ export const directSessionSchema = z.strictObject({
     secret: directAuthOpaqueSchema,
     absoluteExpiresAt: z.iso.datetime({ offset: true }),
 });
-/** Gateway → origin Worker only. The Worker moves `session` into the cookie and strips it. */
+/** Gateway → origin Worker only. The Worker moves `device` into the cookie and strips it. */
 export const directAuthExchangeResultSchema = directAuthResultSchema.extend({
-    session: directSessionSchema,
+    device: directSessionSchema,
 });
 export const directAuthResumeSchema = z.strictObject({
     secret: directAuthOpaqueSchema,
@@ -116,7 +113,3 @@ export function directAuthRandom() {
         .replaceAll('/', '_')
         .replaceAll('=', '');
 }
-/** Private Gateway response. The origin bootstrap uses the validated path after exchange. */
-export const projectAuthExchangeResponseSchema = tokenExchangeResponse.exact.extend({
-    path: directAuthPathSchema,
-});
