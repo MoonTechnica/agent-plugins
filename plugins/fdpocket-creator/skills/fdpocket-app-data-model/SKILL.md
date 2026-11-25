@@ -111,7 +111,7 @@ model Task {
 
 ### 消去のテスト（`packages/db-schema/erase.test.ts`）
 
-動的検証が、`seed.ts` を流した新しい DB でこのテストを流す。`erase(userId)` は Platform の消去そのもの。
+`kit check`（毎ターン）と公開前の動的検証が、`seed.ts` を流した新しい DB でこのテストを流す。`erase(userId)` は Platform の消去そのもの。`kit check` で落ちたら、そのターンのうちに直す（公開まで持ち越さない）。
 モデルを足したら、そのモデルの「本人の行が残らない・他人の行が壊れない」を書き足す。失敗したら投げる（検証は `ERASE_TEST_FAILED`）。
 
 ```ts
