@@ -306242,6 +306242,33 @@ async function userIds(db) {
   const result = await db.execute('SELECT "id" FROM "User" ORDER BY "id"');
   return result.rows.map((row) => String(row.id));
 }
+async function userColumns(db) {
+  const tables = await db.execute(`SELECT "name" FROM sqlite_master WHERE "type" = 'table' AND "name" NOT LIKE 'sqlite_%'`);
+  const found = new Map;
+  for (const row of tables.rows) {
+    const table = String(row.name);
+    const keys = await db.execute(`PRAGMA foreign_key_list(${JSON.stringify(table)})`);
+    const columns = keys.rows.filter((key) => String(key.table) === "User").map((key) => String(key.from));
+    if (columns.length > 0)
+      found.set(table, columns);
+  }
+  return found;
+}
+async function rowsOf(db, columns, others, erased) {
+  const rows = new Set;
+  for (const [table, cols] of columns) {
+    const quoted3 = cols.map((col) => JSON.stringify(col));
+    const result = await db.execute({
+      sql: `SELECT rowid AS r FROM ${JSON.stringify(table)}
+            WHERE (${quoted3.map((col) => `${col} IN (SELECT value FROM json_each(?))`).join(" OR ")})
+              AND NOT (${quoted3.map((col) => `coalesce(${col} = ?, 0)`).join(" OR ")})`,
+      args: [...cols.map(() => JSON.stringify(others)), ...cols.map(() => erased)]
+    });
+    for (const row of result.rows)
+      rows.add(`${table}:${String(row.r)}`);
+  }
+  return rows;
+}
 async function erase(db, userId, schema2) {
   for (;; ) {
     const result = await eraseProjectUser(db, {
@@ -306273,8 +306300,11 @@ async function runEraseCheck(options2) {
       console.warn("erase check skipped: the seed did not run", describe9(error212));
       return { errors: [] };
     }
+    const columns = await userColumns(db);
     let remaining = await userIds(db);
     for (const userId of [...remaining]) {
+      const others = remaining.filter((id) => id !== userId);
+      const kept = await rowsOf(db, columns, others, userId);
       try {
         await erase(db, userId, schema2);
       } catch (error212) {
@@ -306288,11 +306318,20 @@ async function runEraseCheck(options2) {
       if (after.includes(userId)) {
         return { errors: [failed2("a seeded user was still there after the erase")] };
       }
-      const others = remaining.filter((id) => id !== userId);
       if (others.some((id) => !after.includes(id))) {
         return {
           errors: [
             failed2("erasing one user also removed another user (a relation from User to shared data cascades)")
+          ]
+        };
+      }
+      const afterRows = await rowsOf(db, columns, others, userId);
+      const lost = [...kept].filter((row) => !afterRows.has(row));
+      if (lost.length > 0) {
+        const tables = [...new Set(lost.map((row) => row.split(":")[0]))].join(", ");
+        return {
+          errors: [
+            failed2(`erasing one user also removed other users' data (${tables}). A relation from that data to something the erased user owned cascades; use onDelete: SetNull, or give shared data to the Workspace`)
           ]
         };
       }
