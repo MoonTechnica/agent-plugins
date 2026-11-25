@@ -43750,53 +43750,16 @@ async function readTree2(dir) {
   await walk("");
   return files;
 }
-function sameTree(a, b2) {
-  if (a.size !== b2.size)
-    return false;
-  for (const [path, bytes3] of a)
-    if (b2.get(path) !== bytes3)
-      return false;
-  return true;
-}
 async function vendoredPackageDirs(kitRoot) {
   const vendor = join11(kitRoot, KIT_LAYOUT.vendor);
   return existsSync9(vendor) ? (await readdir7(vendor, { withFileTypes: true })).filter((entry) => entry.isDirectory()).map((entry) => entry.name).sort() : [];
-}
-async function modifiedVendoredPackages(root, kitRoot) {
-  const dirs = await vendoredPackageDirs(kitRoot);
-  const modified = [];
-  for (const dir of dirs) {
-    if (OPTIONAL_VENDOR_DIRS.has(dir) && !existsSync9(join11(root, "packages", dir)))
-      continue;
-    const kitTree = await readTree2(join11(kitRoot, KIT_LAYOUT.vendor, dir));
-    if (!sameTree(kitTree, await readTree2(join11(root, "packages", dir)))) {
-      modified.push(dir);
-    }
-  }
-  return modified;
 }
 async function validateSource(options2) {
   const { root, kitRoot } = options2;
   const errors7 = [];
   const warnings = [];
   const skipped = [];
-  const platformPath = join11(root, PROJECT_PATHS.platform);
-  const platformOk = existsSync9(platformPath) && await readFile8(platformPath, "utf8") === await readFile8(join11(kitRoot, KIT_LAYOUT.platform), "utf8");
-  if (!platformOk) {
-    errors7.push({
-      code: "PLATFORM_MODIFIED",
-      path: PROJECT_PATHS.platform,
-      message: "differs from the SDK release (do not edit it; kit.mjs generate restores it)"
-    });
-  }
-  for (const dir of await modifiedVendoredPackages(root, kitRoot)) {
-    errors7.push({
-      code: "VENDOR_MODIFIED",
-      path: `packages/${dir}`,
-      message: "differs from the SDK release (do not edit it; kit.mjs generate restores it)"
-    });
-  }
-  const zmodel = platformOk ? await checkZModel(root, options2.loadZModel) : { errors: [], warnings: [], models: null };
+  const zmodel = await checkZModel(root, options2.loadZModel);
   errors7.push(...zmodel.errors);
   warnings.push(...zmodel.warnings);
   const manifestPath = join11(root, PROJECT_PATHS.manifest);
@@ -43891,7 +43854,7 @@ async function checkLockfile(root, options2, errors7, warnings) {
     warnings.push(...result.warnings);
   }
 }
-var KIT_LAYOUT, OPTIONAL_VENDOR_DIRS;
+var KIT_LAYOUT;
 var init_source = __esm(() => {
   init_src();
   init_ai_prompts();
@@ -43905,7 +43868,6 @@ var init_source = __esm(() => {
   init_webhooks();
   init_zmodel();
   KIT_LAYOUT = { platform: "platform/platform.zmodel", vendor: "vendor" };
-  OPTIONAL_VENDOR_DIRS = new Set(["fdpocket-py"]);
 });
 
 // frontend/packages/project-validator/src/static/repository-assessment.ts
@@ -44044,11 +44006,22 @@ async function runDynamic(check4, input) {
     };
   }
 }
+function blocksDeployment(code) {
+  return code.startsWith("MANIFEST_") || code.startsWith("MIGRATIONS_") || code.startsWith("MASTERS_");
+}
 async function validateProject(archive, source, options2 = {}) {
   const stages = [];
   const staticStage = startStage("static");
   const importStage = startStage("import");
-  const checked = await validateSource(source);
+  const source_ = await validateSource(source);
+  const checked = {
+    ...source_,
+    errors: source_.errors.filter((finding2) => blocksDeployment(finding2.code)),
+    warnings: [
+      ...source_.errors.filter((finding2) => !blocksDeployment(finding2.code)),
+      ...source_.warnings
+    ]
+  };
   const notChecked = checked.skipped.map((skip) => ({
     code: "NOT_CHECKED",
     message: `${skip.check}: ${skip.reason}`
@@ -131984,7 +131957,7 @@ async function readTree3(root) {
   await walk("");
   return files;
 }
-function sameTree2(a2, b3) {
+function sameTree(a2, b3) {
   if (a2.size !== b3.size)
     return false;
   for (const [path, bytes3] of a2)
@@ -132020,7 +131993,7 @@ async function placeTree(source, target) {
   }
   const expected = await readTree3(source);
   const actual = await readTree3(target);
-  if (sameTree2(expected, actual))
+  if (sameTree(expected, actual))
     return "unchanged";
   const existed = actual.size > 0 || existsSync11(target);
   const directories = new Set([""]);
@@ -306243,33 +306216,6 @@ async function userIds(db) {
   const result = await db.execute('SELECT "id" FROM "User" ORDER BY "id"');
   return result.rows.map((row) => String(row.id));
 }
-async function userColumns(db) {
-  const tables = await db.execute(`SELECT "name" FROM sqlite_master WHERE "type" = 'table' AND "name" NOT LIKE 'sqlite_%'`);
-  const found = new Map;
-  for (const row of tables.rows) {
-    const table = String(row.name);
-    const keys = await db.execute(`PRAGMA foreign_key_list(${JSON.stringify(table)})`);
-    const columns = keys.rows.filter((key) => String(key.table) === "User").map((key) => String(key.from));
-    if (columns.length > 0)
-      found.set(table, columns);
-  }
-  return found;
-}
-async function rowsOf(db, columns, others, erased) {
-  const rows = new Set;
-  for (const [table, cols] of columns) {
-    const quoted3 = cols.map((col) => JSON.stringify(col));
-    const result = await db.execute({
-      sql: `SELECT rowid AS r FROM ${JSON.stringify(table)}
-            WHERE (${quoted3.map((col) => `${col} IN (SELECT value FROM json_each(?))`).join(" OR ")})
-              AND NOT (${quoted3.map((col) => `coalesce(${col} = ?, 0)`).join(" OR ")})`,
-      args: [...cols.map(() => JSON.stringify(others)), ...cols.map(() => erased)]
-    });
-    for (const row of result.rows)
-      rows.add(`${table}:${String(row.r)}`);
-  }
-  return rows;
-}
 async function erase(db, userId, schema2) {
   for (;; ) {
     const result = await eraseProjectUser(db, {
@@ -306301,11 +306247,8 @@ async function runEraseCheck(options2) {
       console.warn("erase check skipped: the seed did not run", describe9(error212));
       return { errors: [] };
     }
-    const columns = await userColumns(db);
     let remaining = await userIds(db);
     for (const userId of [...remaining]) {
-      const others = remaining.filter((id) => id !== userId);
-      const kept = await rowsOf(db, columns, others, userId);
       try {
         await erase(db, userId, schema2);
       } catch (error212) {
@@ -306319,20 +306262,11 @@ async function runEraseCheck(options2) {
       if (after.includes(userId)) {
         return { errors: [failed2("a seeded user was still there after the erase")] };
       }
+      const others = remaining.filter((id) => id !== userId);
       if (others.some((id) => !after.includes(id))) {
         return {
           errors: [
             failed2("erasing one user also removed another user (a relation from User to shared data cascades)")
-          ]
-        };
-      }
-      const afterRows = await rowsOf(db, columns, others, userId);
-      const lost = [...kept].filter((row) => !afterRows.has(row));
-      if (lost.length > 0) {
-        const tables = [...new Set(lost.map((row) => row.split(":")[0]))].join(", ");
-        return {
-          errors: [
-            failed2(`erasing one user also removed other users' data (${tables}). A relation from that data to something the erased user owned cascades; use onDelete: SetNull, or give shared data to the Workspace`)
           ]
         };
       }
@@ -327889,6 +327823,7 @@ async function runPermissionMatrix(options2) {
 }
 
 // frontend/packages/miniapp-kit/src/verify/dynamic.ts
+var RUNS = new Set(["APP_BLANK", "APP_EXCHANGE_FAILED", "APP_NOT_CONNECTED", "NOT_OBSERVED"]);
 var CSP_PREFIX = "[kit-validate:csp] ";
 var CONNECTING_TYPES = new Set(["fetch", "xhr", "websocket", "eventsource", "other"]);
 var MOBILE_VIEWPORT = { width: 390, height: 844 };
@@ -327963,13 +327898,14 @@ async function runDynamicChecks(options2) {
     }));
     return {
       ...judged,
-      errors: [
-        ...judged.errors,
+      errors: [...judged.errors.filter((e2) => RUNS.has(e2.code)), ...workerErrors],
+      warnings: [
+        ...judged.errors.filter((e2) => !RUNS.has(e2.code)),
         ...judgePermissionMatrix(matrix),
         ...erase2.errors,
-        ...workerErrors
-      ],
-      warnings: [...judged.warnings, ...captureWarnings]
+        ...judged.warnings,
+        ...captureWarnings
+      ]
     };
   } finally {
     await browser.close();

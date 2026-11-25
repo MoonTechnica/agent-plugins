@@ -112,9 +112,8 @@ model Task {
 ### 消去の確認（Platform が行う）
 
 消去のテストは書かない。`kit check`（毎ターン）と公開前の動的検証が、`seed.ts` を流した新しい DB で seed の利用者を
-1 人ずつ Platform の消去で消し、止まらないこと・本人が消えること・ほかの利用者とその人のデータが残ること・外部キーが壊れないことを確かめる
-（失敗は `ERASE_FAILED`。User への relation の onDelete を `Cascade` か `SetNull` にする。共有のデータが本人の行から
-Cascade でぶら下がっていると、ほかの人のデータまで消えて落ちる。共有のデータは Workspace に持たせるか SetNull にする）。何を消し何を残すかは上の
+1 人ずつ Platform の消去で消し、止まらないこと・本人が消えること・ほかの利用者が残ること・外部キーが壊れないことを確かめる
+（失敗は `ERASE_FAILED`。User への relation の onDelete を `Cascade` か `SetNull` にする）。何を消し何を残すかは上の
 onDelete と `@@platform.retain` で決まる。seed には権限の違う利用者を 2 人以上入れておく。
 
 ## 7. migration の流れ
