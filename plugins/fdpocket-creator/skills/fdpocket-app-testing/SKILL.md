@@ -61,11 +61,16 @@ description: ミニアプリが動くことを確かめる。Vitest で書くテ
 実行後には成功・失敗、実際に本物を使った範囲、モックした範囲、未確認のことを書く。ローカルだけの成功を本物の成功と書かない。
 
 ```bash
-node <kit>/scripts/kit.mjs e2e --live --as member
-node <kit>/scripts/kit.mjs e2e --live --as admin --app admin --test design/e2e.ts
+node <kit>/scripts/kit.mjs e2e --as member
+node <kit>/scripts/kit.mjs e2e --as admin --app admin --test design/e2e.ts
 ```
 
-`--live` と `--as` は必須。`--app` を省くと `web`、無ければ最初の web App を使う。
+`--as` は必須。つなぐ先はいつもこのチャットのセッション環境（消えてよい開発用の環境。main と本番には触れない）。
+手元では `kit dev --connect` と同じく、本人のログインで手元の Vite をこのチャットのセッション環境へつなぎ、
+準備ができてから Playwright でテスト主体として開き、終わったら切断する。
+許可証（`KIT_TEST_GRANT`）は要らない。別の `kit dev --connect` が動いているとその接続は閉じる（同じポートなら先に止める）。
+初めて開く App では共有の同意が要る。先に `kit dev --connect --as <主体>` を開いて利用者に許可してもらってから実行する。
+`--app` を省くと `web`、無ければ最初の web App を使う。
 `--test` は source 内の相対パス。省略時は `design/e2e.ts` があれば実行し、シナリオが無ければ実行しない（プレビューが開くかの確認は Platform がターンの終了時にする。あなたはしない）。
 シナリオは TS / JS の default export として書く。`page` は実際の Playwright Page、`frame` は接続した App の Frame。
 期待と違えば例外にして失敗させる。シナリオの引数に許可証やセッショントークンは渡らない。
@@ -82,8 +87,7 @@ HAR・storageState・trace・スクリーンショットは自動保存しない
 
 ### 許可証とテスト主体
 
-- `KIT_TEST_GRANT` は現在の環境・ターンに束縛された許可証。プロセスの環境だけで扱う。
-  終了・取消・失敗・期限切れ・別環境の許可証は使えない。許可証が無ければ実行を止める。
+- 手元の `--connect` は本人のログインでテスト主体のトークンを交換する。セッション環境の DB・Storage・AI は本物で、費用はチャットの持ち主が払う。
 - 選べるのは予約主体 `admin` / `member` / `anonymous` と `seed.ts` で宣言した slot。
   発行されるのはそのテスト利用者のトークンだけで、本人のトークンは使わない。
 - 本人としてログインする、`KIT_LIVE` の値や保存済みセッションで代用する、トークンを手作りする回避はしない。

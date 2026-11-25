@@ -14,6 +14,7 @@ user-invocable: false
 3. **明示的に同意する**: 表示された手元の Host をブラウザで開き、App の共有情報・接続先・AI/Python の利用を確認して利用者が許可する。自動で同意したり、他の利用者のセッションへ接続したりしない。主体は本人の `self` または現在のセッションで宣言されたテスト主体だけ。宣言されていない主体を本人へ置き換えない。
 4. **変更を確かめる**: 手元の App は割り当てられた `*.localhost:5173` の origin で動き、Platform の DB・Storage・AI・Python は自分のセッションに接続される。Host は `http://127.0.0.1:4320`。Host の開発ツールで主体を切り替え、イベント・ジョブの実行・実行履歴を確認する。増える履歴は「もっと見る」で続ける。
 5. **データと費用を理解する**: 再接続や通常の編集でセッション DB は消えない。意図を伴わない破壊的なスキーマ変更では、このセッションの DB だけを再作成する。main / prod の DB をリセットしない。外部 API は既定で宣言したモック（未宣言なら 501）、通知は送らない。実際の AI・Python/GPU の費用はチャットの持ち主が払う。
-6. **止める**: Ctrl-C で接続を止める。接続は別の機器が引き継いだ時にも終了する。公開版や main は変わらない。成果を Platform に送るときは commit して `$fdpocket-push`。接続中の作業ツリーと push 後の built は区別する。
+6. **E2E で確かめる**: 本物のセッションで操作を自動で確かめるときは `design/test-plan.md` と `design/e2e.ts` を書き、`node <kit>/scripts/kit.mjs e2e --as member|admin|anonymous|宣言したslot [--app <slug>] [--test <path>]`。接続・準備待ち・Playwright の実行・切断まで 1 回で行う。主体はテスト主体だけ（self は不可）。動いている `kit dev --connect` は閉じるので、先に Ctrl-C で止める。初めての App の同意は、先に `dev --connect` で利用者に許可してもらう。つなぐのはこのチャットのセッション環境だけで、main と本番には触れない。
+7. **止める**: Ctrl-C で接続を止める。接続は別の機器が引き継いだ時にも終了する。公開版や main は変わらない。成果を Platform に送るときは commit して `$fdpocket-push`。接続中の作業ツリーと push 後の built は区別する。
 
 OAuth・同意の確認 ID・テスト grant・通知キーを HTML、ログ、`.fdpocket.json`、ソース、テスト計画へ書かない。通常の scoped Project JWT は Host のメモリと MessageChannel だけで扱う。テストの証跡と本物を使う理由は `design/test-plan.md` へ記録する（`$fdpocket-app-testing`）。

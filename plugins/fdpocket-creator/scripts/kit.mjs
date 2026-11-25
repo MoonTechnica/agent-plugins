@@ -305901,7 +305901,7 @@ var COMMANDS = {
   "fetch-review": { required: ["inputs"], optional: [] },
   new: { required: ["name"], optional: ["title", "apps"] },
   generate: { required: [], optional: [] },
-  e2e: { required: ["live", "as"], optional: ["app", "test"], switches: ["live"] },
+  e2e: { required: ["as"], optional: ["app", "test"] },
   "schema-plan": { required: ["context-file", "output"], optional: [] },
   "seed-plan": { required: ["context-file", "output"], optional: [], switches: ["skip-seed"] },
   "sample-plan": {
@@ -325962,25 +325962,33 @@ async function exchange2(request2, options2, send, secrets) {
 function scenarioOf(options2) {
   const path = options2.test ?? (existsSync23(resolve3(options2.root, "design/e2e.ts")) ? "design/e2e.ts" : null);
   if (!path)
-    throw new LiveE2EError("The Platform checks that the preview opens when your turn ends; do not check it yourself. " + "Use e2e --live for something only a real environment shows: write a scenario and pass it " + "with --test (see $app-testing).");
+    throw new LiveE2EError("The Platform checks that the preview opens when your turn ends; do not check it yourself. " + "Use kit e2e for something only a real environment shows: write a scenario and pass it " + "with --test (see $app-testing).");
   return path;
+}
+async function prepareE2E(root, options2, secret) {
+  scenarioOf({ root, ...options2.test ? { test: options2.test } : {} });
+  const planPath = resolve3(root, "design/test-plan.md");
+  const plan = existsSync23(planPath) ? await readFile31(planPath, "utf8") : "";
+  if (!plan.trim() || Buffer.byteLength(plan) > 128 * 1024 || secret !== undefined && plan.includes(secret))
+    throw new LiveE2EError("Write a bounded, credential-free design/test-plan.md before live E2E");
+  const { manifest: manifest2 } = await prepareSessionRuntime(root);
+  const slugs = Object.entries(manifest2.apps).filter(([, app2]) => app2.kind === "web").map(([slug]) => slug).sort((a2, b3) => a2 === "web" ? -1 : b3 === "web" ? 1 : a2.localeCompare(b3));
+  const app = options2.app ?? slugs[0];
+  if (!app || !slugs.includes(app))
+    throw new LiveE2EError("Choose a declared web App for live E2E");
+  return { manifest: manifest2, slugs, app };
 }
 async function runLiveE2E(options2) {
   scenarioOf(options2);
   const env = options2.env ?? process.env;
+  if (!env.KIT_LIVE && !env.KIT_TEST_GRANT)
+    throw new LiveE2EError("Sandbox E2E needs KIT_LIVE and a process-only KIT_TEST_GRANT");
   const input2 = validateLiveE2EInput({
     live: env.KIT_LIVE,
     grant: env.KIT_TEST_GRANT,
     identity: options2.identity
   });
-  const plan = await readFile31(resolve3(options2.root, "design/test-plan.md"), "utf8");
-  if (!plan.trim() || Buffer.byteLength(plan) > 128 * 1024 || plan.includes(input2.grant))
-    throw new LiveE2EError("Write a bounded, credential-free design/test-plan.md before live E2E");
-  const { manifest: manifest2 } = await prepareSessionRuntime(options2.root);
-  const slugs = Object.entries(manifest2.apps).filter(([, app2]) => app2.kind === "web").map(([slug]) => slug).sort((a2, b3) => a2 === "web" ? -1 : b3 === "web" ? 1 : a2.localeCompare(b3));
-  const app = options2.app ?? slugs[0];
-  if (!app || !slugs.includes(app))
-    throw new LiveE2EError("Choose a declared web App for live E2E");
+  const { manifest: manifest2, slugs, app } = await prepareE2E(options2.root, options2, input2.grant);
   const apps = slugs.map((slug) => {
     const origin2 = input2.live.origins.apps[slug] ?? input2.live.origins.apps["*"];
     if (!origin2)
@@ -325998,10 +326006,27 @@ async function runLiveE2E(options2) {
   });
   const server2 = await listen(0, "127.0.0.1", host.fetch, 1024 * 1024);
   try {
-    return await checkBrowser(options2, input2, app, server2.url + prefix2, host.redact, options2.importModule ?? defaultImporter(options2.root, manifest2));
+    return await checkBrowser(options2, { identity: input2.identity, environmentId: input2.live.environmentId }, app, server2.url + prefix2, host.redact, options2.importModule ?? defaultImporter(options2.root, manifest2));
   } finally {
     await server2.close();
   }
+}
+async function runConnectedE2E(options2) {
+  if (!testIdentitySlotSchema.safeParse(options2.identity).success || ["self", "owner"].includes(options2.identity))
+    throw new LiveE2EError("Live E2E requires a test identity; self/owner are unavailable");
+  const { manifest: manifest2, app } = await prepareE2E(options2.root, options2);
+  return options2.connect(options2.identity, async (server2) => {
+    const secrets = server2.secrets.filter(Boolean);
+    const redact2 = (message2) => {
+      for (const secret of secrets)
+        message2 = message2.replaceAll(secret, "[redacted]");
+      return message2;
+    };
+    const url6 = new URL(server2.hostUrl);
+    url6.searchParams.set("app", app);
+    url6.searchParams.set("as", options2.identity);
+    return checkBrowser(options2, { identity: options2.identity, environmentId: server2.environmentId }, app, url6.toString(), redact2, options2.importModule ?? defaultImporter(options2.root, manifest2));
+  });
 }
 async function checkBrowser(options2, input2, app, hostUrl, redact2, importer) {
   const browser = await (options2.launch ?? launchChromium)();
@@ -326030,7 +326055,7 @@ async function checkBrowser(options2, input2, app, hostUrl, redact2, importer) {
       frame: frame2,
       app,
       identity: input2.identity,
-      environmentId: input2.live.environmentId
+      environmentId: input2.environmentId
     });
     if (errors15.length)
       throw new LiveE2EError("Live E2E browser errors: " + errors15.join("; "));
@@ -326038,7 +326063,7 @@ async function checkBrowser(options2, input2, app, hostUrl, redact2, importer) {
       status: "passed",
       app,
       identity: input2.identity,
-      environmentId: input2.live.environmentId,
+      environmentId: input2.environmentId,
       scenario: path
     };
   } catch (error262) {
@@ -328972,6 +328997,18 @@ async function dev(context, flags) {
   }
 }
 async function connectedDev(context, workdir, config7, as) {
+  await withConnectedDev(context, workdir, config7, as, async ({ server: server2, untilLost }) => {
+    print(context, {
+      host_url: server2.liveUrl,
+      gateway_url: server2.gatewayUrl,
+      apps: server2.apps,
+      environment: "session",
+      next: "Open host_url; actions use your session and credits. Ctrl-C disconnects."
+    });
+    await Promise.race([context.untilStopped(), untilLost]);
+  });
+}
+async function withConnectedDev(context, workdir, config7, as, run3) {
   const root = sourceOf(workdir);
   const { manifest: manifest2 } = await readManifest(root);
   const webSlugs = Object.values(manifest2.apps).filter((app) => app.kind === "web").map((app) => app.slug);
@@ -329031,8 +329068,8 @@ async function connectedDev(context, workdir, config7, as) {
             ...testIdentity ? { testIdentity } : {}
           }),
           grantConsent: async ({ version: version7, signal }) => {
-            const result = await connected.call("grant_session_consent", { environment_id: connected.live.environmentId, consent_version: version7 }, signal);
-            if (!result || typeof result !== "object" || !("granted" in result) || result.granted !== true)
+            const result2 = await connected.call("grant_session_consent", { environment_id: connected.live.environmentId, consent_version: version7 }, signal);
+            if (!result2 || typeof result2 !== "object" || !("granted" in result2) || result2.granted !== true)
               throw new CommandError("Project consent was not saved");
           },
           inspect: async ({ section, cursor: cursor2, signal }) => {
@@ -329061,18 +329098,12 @@ async function connectedDev(context, workdir, config7, as) {
         }
       }
     });
-    print(context, {
-      host_url: server2.liveUrl,
-      gateway_url: server2.gatewayUrl,
-      apps: server2.apps,
-      environment: "session",
-      next: "Open host_url; actions use your session and credits. Ctrl-C disconnects."
-    });
     if (lost)
       throw new CommandError("The session connection was lost");
-    await Promise.race([context.untilStopped(), untilLost]);
+    const result = await run3({ server: server2, live: connected.live, untilLost, view: connected.view });
     if (lost)
       throw new CommandError("The session connection was lost");
+    return result;
   } finally {
     lifetime.abort();
     try {
@@ -329312,9 +329343,44 @@ async function seedPlanCommand(context, flags) {
     ...flags["skip-seed"] ? { skipSeed: true } : {}
   });
 }
+var sleepMs = (ms) => new Promise((resolve5) => setTimeout(resolve5, ms));
+async function waitForConnectedEnvironment(view, sleep, options2 = {}) {
+  const interval = options2.intervalMs ?? 3000;
+  const attempts = Math.ceil((options2.timeoutMs ?? 300000) / interval);
+  for (let attempt = 0;attempt < attempts; attempt++) {
+    const { status } = await view();
+    if (status === "active")
+      return;
+    if (status === "failed" || status === "purging")
+      throw new CommandError(`The session environment is ${status}; open the chat to see why`);
+    await sleep(interval);
+  }
+  throw new CommandError("The session environment did not become ready within 5 minutes");
+}
 async function e2eCommand(context, flags) {
   const workdir = await findWorkdir(context.cwd);
   const config7 = await readConfig(workdir);
+  if (!process.env[KIT_LIVE_CONFIG_ENV]) {
+    const result2 = await runConnectedE2E({
+      root: sourceOf(workdir),
+      projectId: config7.project_id,
+      identity: flags.as,
+      ...flags.app ? { app: flags.app } : {},
+      ...flags.test ? { test: flags.test } : {},
+      connect: (identity2, run3) => withConnectedDev(context, workdir, config7, identity2, ({ server: server2, live: live2, untilLost, view }) => Promise.race([
+        waitForConnectedEnvironment(view, context.sleep ?? sleepMs).then(() => run3({
+          hostUrl: server2.liveUrl,
+          environmentId: live2.environmentId,
+          secrets: [live2.token]
+        })),
+        untilLost.then(() => {
+          throw new CommandError("The session connection was lost during E2E");
+        })
+      ]))
+    });
+    print(context, { ...result2, environment: "session" });
+    return;
+  }
   const result = await runLiveE2E({
     root: sourceOf(workdir),
     projectId: config7.project_id,
