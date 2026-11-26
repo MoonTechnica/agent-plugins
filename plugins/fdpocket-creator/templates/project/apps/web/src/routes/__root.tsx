@@ -4,7 +4,8 @@ import { AppNav, AppNavItem } from "@workspace/ui/components/app-nav"
 import { AppShell } from "@workspace/ui/components/app-shell"
 import { House, type LucideIcon } from "lucide-react"
 
-// アプリの骨格はここで 1 回だけ作る（ヘッダー・本文の幅と余白・主な行き先）。画面ごとに外枠を作り直さない。
+// アプリの骨格はここで 1 回だけ作る（本文の幅と余白・主な行き先）。画面ごとに外枠を作り直さない。
+// アプリ名のヘッダーは置かない（スーパーアプリの中では FDPocket が上に出す）。各画面の先頭は PageHeader（その画面の名前）。
 export const Route = createRootRoute({ component: Root })
 
 // 主な行き先（2〜5 個）。画面（routes/ のファイル）を足したら、ここに 1 行足す（`$app-responsive` §2）。
@@ -37,7 +38,7 @@ function Root() {
       </AppNav>
     ) : undefined
   return (
-    <AppShell title="{{PROJECT_TITLE}}" safeArea={safeArea} colorScheme={colorScheme} nav={nav}>
+    <AppShell safeArea={safeArea} colorScheme={colorScheme} nav={nav}>
       <Outlet />
     </AppShell>
   )

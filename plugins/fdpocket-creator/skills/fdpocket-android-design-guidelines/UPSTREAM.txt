@@ -1,0 +1,29 @@
+android-design-guidelines — vendored for the FDPocket Creator Kit
+=====================================================
+
+Upstream : https://github.com/ehmo/platform-design-skills (skills/android/SKILL.md)
+License  : MIT (LICENSE.txt)
+Commit   : dc2be825d8b439caea78e9eaa8fb3ac23b0ff3e9
+Pinned   : skills-lock.json of this repository, skill "android-design-guidelines"
+
+Why this one
+------------
+Mobile screens made by the generation agent were built like desktop pages (app name repeated under
+the host header, a centred "back" row in the middle of the content, one big card for everything).
+The agent needs the platform conventions that people on iPhone and Android expect. This pack turns
+the first-party sources (Material Design 3 と Android の指針: developer.apple.com/design/human-interface-guidelines,
+m3.material.io) into rules with an impact level, is MIT-licensed, plain Markdown (no scripts, no
+network) and is the most-installed pack that covers both iOS and Android (see
+docs/_research/2026-11-26-mobile-uiux-skills.md).
+
+What was changed in SKILL.md
+----------------------------
+- description: rewritten in Japanese to say when the mini-app agent uses it.
+- A section "FDPocket のミニアプリで使うとき" right after the front matter: how each rule maps to the
+  mini-app parts (AppNav, PageHeader, Card rows, Drawer, tokens, lucide), and which sections do not apply.
+- The Agent Skills spec keeps SKILL.md under 500 lines, so the upstream body (everything after its
+  front matter) moved to references/guidelines.md, byte-identical, and SKILL.md ends with the upstream
+  AGENTS.md (the rule index), byte-identical. rules/_sections.md (another index) is not shipped.
+
+To update: copy SKILL.md and AGENTS.md from the pinned upstream, re-apply the changes above,
+and run the Kit tests (src/profile/vendored-design-skill.test.ts).

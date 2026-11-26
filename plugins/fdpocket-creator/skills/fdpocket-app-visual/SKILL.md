@@ -72,24 +72,58 @@ python3 <kit>/skills/fdpocket-ui-ux-pro-max/scripts/search.py "list row badge" -
 `@workspace/ui/components/*`: `app-shell`・`page-header`・`empty-state`・`card`・`button`・`input`・`textarea`・`label`・`badge`・`skeleton`・`separator`・`tabs`・`switch`・`avatar`・`dialog`・`sheet`（`md` 以上で中央のダイアログになる）・`app-nav`（主な行き先。幅でタブバー → レール → サイドバー）・`dropdown-menu`（「…」の操作）・`tooltip`（アイコンのボタンの名前と近道）。
 
 - 幅ごとの形（ナビ・一覧と詳細・密度・指とマウス）は `$fdpocket-app-responsive`。
-- **外枠は `__root.tsx` の `AppShell` で 1 回だけ**（ヘッダー・本文の幅と余白）。利用者向けは `width="narrow"`、管理画面は `width="wide"`。画面ごとに外枠を作り直さない。
-- 各画面の先頭は `PageHeader`（タイトル・1 行の説明・右に主な操作）。
+- **外枠は `__root.tsx` の `AppShell` で 1 回だけ**（本文の幅と余白・セーフエリア・ナビ）。利用者向けは `width="narrow"`、管理画面は `width="wide"`。画面ごとに外枠を作り直さない。
+- **アプリ名のヘッダー（上に固定した帯）を作らない。** スーパーアプリの中では FDPocket がアプリの名前・閉じる・メニューを上に出している。自分で帯を足すと名前が 2 回並び、本文が狭くなる（`kit shot` が「header bar is pinned above the content」と出す）。上に固定してよいのは、その画面だけの道具（検索欄・絞り込みのタブ）だけ。
+- 各画面の先頭は `PageHeader`: `title` は**その画面に何があるか**（「今日のタスク」「連絡先」。アプリ名ではない）、`description` は 1 行、`actions` に主な操作（編集・追加）、詳細・編集の画面は `back` に左上の戻る（`<Link>` を入れる。48px の丸いアイコンになる）。**本文の途中に「← 戻る」の行やボタンを置かない**。
+- 下のタブ（`AppNav`）は選択中がブランド色と太字になる。ラベルを消さない。
 - 部品が足りないときは `packages/ui/src/components/` に shadcn の書き方で足し、web と admin で共有する（クラス文字列を画面ごとにコピペしない）。`radix-ui` は入っている。
 - ボタンの既定は 44px 高（スマホのタップ標的）。`size="sm"` / `"xs"` は管理画面の表の中など、デスクトップで詰めたい所だけ。
 - アイコンは `lucide-react`（16 か 20px、線の太さをそろえる）。絵文字をアイコン代わりにしない。
 
 ## 5. 画面の型
 
+スマホ幅の型は、iPhone と Android の人がふだん使っている形に合わせる（`$fdpocket-ios-design-guidelines`・`$fdpocket-android-design-guidelines`。両方に共通することを既定にする）。迷ったら、その節を開いて「なぜそうするか」を読む。
+
 | 画面 | 型 |
 |---|---|
 | 一覧 | `Card` の中に `divide-y` で行を並べる（行ごとにカードを作らない）。行 = 左に頭文字かアイコン、真ん中にタイトルと補足、右に `Badge` か日付。行の高さは 56px 以上で、行全体を押せる |
-| 詳細 | `PageHeader`（戻る・タイトル・操作）→ 情報を `Card` のまとまり（見出し + 項目の定義リスト）に分ける |
+| 詳細 | 下の「詳細の画面」の型。`PageHeader`（左上の戻る・名前・右に編集）→ 本人が分かるまとまり → 種類ごとの `Card` |
 | フォーム | `Label` は欄の上、欄は縦に `gap-4`。主ボタンは 1 つ（`w-full` でスマホ幅いっぱい）で、フォームの直下。エラーは欄の下に具体的に。送信中はボタンを無効にして文言を変える |
 | 空 | `EmptyState`（アイコン + 何も無いこと + **次にすること**のボタン）。文字だけを置かない |
 | 読み込み中 | `Skeleton` を**実際の行と同じ高さ・数**で。読み込み後に動かさない |
 | エラー | 原因と次にすること（再試行のボタン）。`SdkError` の `code` に対応した文言（`$fdpocket-app-ui` §3） |
 | 数字の要約 | 2 列の `Card`（小さな見出し + 大きな数字 `tabular` + 前回との差）。3 つ以上並べるなら横スクロールにせず 2 列で折り返す |
 | 確認（削除など） | `Dialog`（短い確認）。入力が多い・選択肢が多い操作は `Sheet`（スマホ幅は下から、`md` 以上は中央。`$fdpocket-app-responsive` §5） |
+
+### 詳細の画面（連絡先・案件・注文など 1 件を見る画面）
+
+AI がいちばん崩しやすい画面。**全部を 1 枚のカードに詰めない**。上から次の順に組む。
+
+1. `PageHeader`: `back` に一覧への戻る、`title` にその 1 件の名前、`actions` に「編集」（アイコン + 文字か、`aria-label` 付きのアイコン）。
+2. **本人が分かるまとまり**（カードにしない）: 大きめのアバターか頭文字、名前（`text-xl font-semibold`）、所属・肩書きなど 1 行、状態は `Badge`（「対応中」）。**状態を `select` で出さない**（変えるのは編集の画面か、押すと `Sheet` で選べる行）。名前の下に、他の欄の値を「・」でつないだ 1 行を作らない（同じ値が下に出て二重になる）。
+3. **よく使う操作を 2〜4 個の丸いボタンで横に並べる**（電話・メール・地図など。アイコン + 短いラベル。値があるものだけ）。連絡先の値をそのまま青いリンクにして並べない。
+4. **種類ごとの `Card`**（「連絡先」「会社」「メモ」）。中は区切り線の行で、行 = 上に小さなラベル（`text-xs text-muted-foreground`）・下に値、押せる行は右に `ChevronRight`。値が複数あるもの（電話 3 つなど）は行を分け、5 つ以上は「すべて表示」で畳む。空の欄の行は出さない。
+5. 関連する一覧（やりとりの履歴など）は最後に 3 件だけ見せ、「すべて見る」で別の画面へ。
+6. 削除などの危ない操作は画面の最後か「…」メニューに。詳細の画面の主役にしない。
+
+```tsx
+<PageHeader
+  back={<Link to="/contacts" aria-label="連絡先に戻る"><ChevronLeft /></Link>}
+  title={contact.name}
+  actions={<Button asChild variant="ghost"><Link to="/contacts/$id/edit" params={{ id }}>編集</Link></Button>}
+/>
+<section className="flex flex-col items-center gap-2 py-4 text-center">
+  <Avatar className="size-20">…</Avatar>
+  <p className="text-sm text-muted-foreground">{contact.company}・{contact.title}</p>
+  <Badge variant="secondary">{statusLabel[contact.status]}</Badge>
+</section>
+<div className="grid grid-cols-3 gap-2">{/* 電話・メール・地図。値があるものだけ */}</div>
+<Card>
+  <dl className="divide-y">
+    <div className="px-4 py-3"><dt className="text-xs text-muted-foreground">携帯</dt><dd>{phone}</dd></div>
+  </dl>
+</Card>
+```
 
 ```tsx
 // 一覧の行（Card の中に divide-y で並べる）
@@ -113,7 +147,7 @@ python3 <kit>/skills/fdpocket-ui-ux-pro-max/scripts/search.py "list row badge" -
 
 ## 6. 文字・余白・動き
 
-- 文字は 5 段階だけ: 画面の見出し `text-2xl font-semibold`、節の見出し `text-lg font-semibold`、本文 `text-base`、補足 `text-sm text-muted-foreground`、注記 `text-xs`（12px が下限）。全部を太字・中央揃えにしない。
+- 文字は 5 段階だけ: 画面の見出し `text-3xl font-semibold`（`PageHeader` の `title`。30px。iOS の大きなタイトル 34pt・Material の Headline に近い大きさで、どの画面にいるかが一目で分かる）、節の見出し `text-lg font-semibold`、本文 `text-base`、補足 `text-sm text-muted-foreground`、注記 `text-xs`（12px が下限）。全部を太字・中央揃えにしない。
 - 余白は 4px の倍数: 要素の間 `gap-2`〜`gap-4`、まとまりの間 `gap-6`、画面の左右 `px-4`。**区切りは線より余白**。カードの入れ子（カードの中のカード）は作らない。
 - 金額・件数・時刻は `tabular`（桁をそろえる）。長い文字は `truncate` か折り返し（`min-w-0` を忘れない）。
 - 動きは利用者の操作に答える所に使う（開閉・切り替え・押した反応・増えた・消えた）。150〜250ms。`motion-reduce` を尊重する（部品は対応済み）。装飾のための動き・グラデーションの塊・影の重ねがけをしない。
@@ -141,7 +175,7 @@ node <kit>/scripts/kit.mjs shot --out /tmp/fdpocket/shots --as admin --app admin
 ```
 
 - 既定は 390px（スマホ）・768px（タブレット）・1280px（PC）の 3 枚（1024px 以下は指の端末として撮る）。幅ごとに形が変わっているかは `$fdpocket-app-responsive` §9 で確かめる。**暗い画面も 1 回は撮る**（`--theme dark`。画像は `<app>-<幅>-dark.png`）。画面の端に固定したバー・シートがあるなら、ノッチとホームバーを重ねた 1 枚も撮る（`--safe-area iphone`。`$fdpocket-app-pwa` §2）。画像（`/tmp/fdpocket/shots/<app>-<幅>.png`）を**開いて見る**。
-- JSON の `checks` も読む: `horizontalOverflow: true`（横にはみ出している）・`smallTargets`（44px 未満の操作）・`smallTextCount`（12px 未満の文字）・`consoleErrors`（コンソールエラー。画像の参照切れも）。**どれも 0 / false になるまで直す。** `bottomNavMissing`（スマホ幅で主な行き先が下に無い）は知らせるだけ。直すか、意図した配置なら理由を結果に書く（`$fdpocket-app-responsive` §2）。
+- JSON の `checks` も読む: `horizontalOverflow: true`（横にはみ出している）・`smallTargets`（44px 未満の操作）・`smallTextCount`（12px 未満の文字）・`lowContrastText`（背景との差が足りない文字。本文 4.5:1・大きな文字 3:1 未満。`muted-foreground` より薄い色を使っていないか）・`coveredByBottomBar`（いちばん下までスクロールしても下に固定したナビ・ボタンに隠れる本文。最後の行やボタンが押せない）・`consoleErrors`（コンソールエラー。画像の参照切れも）。**どれも 0 / false / 空になるまで直す。** `appBarAboveContent: true`（上に固定した帯がある）は、アプリ名の帯なら消す（§4）。その画面の道具（検索欄など）なら残してよい。 `bottomNavMissing`（スマホ幅で主な行き先が下に無い）は知らせるだけ。直すか、意図した配置なら理由を結果に書く（`$fdpocket-app-responsive` §2）。
 - 空・読み込み中・エラーの状態も撮って見る（`seed.ts` を空にする・存在しない `--path` を開くなど）。
 - 見た画像で次を確かめる: 主役が 1 つに見えるか／余白がそろっているか／文字が読めるか／押せそうな所が押せそうに見えるか／色が 1 色に絞られているか。
 - 撮った画像を**自分で批評する**: 社名とデータを消しても、このアプリだと分かるか（分からなければ §8 の既定の見た目に寄っている）。目立たせるのは画面の**どこか 1 か所**（今日の件数・次にやること・主な操作）。そこは思い切って目立たせ、まわりは静かにする（§6「使って気持ちいい画面にする」）。出かける前に鏡を見て 1 つ外すように、飾り（意味の無い区切り線・バッジ・アイコン・影）を**1 つ外す**。外して困らなければ戻さない。

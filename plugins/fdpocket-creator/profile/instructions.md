@@ -49,6 +49,8 @@
 | `$fdpocket-app-ui` | **必ず**。画面の作り方（shadcn・Tailwind・スマホ幅とキーボード・5 つの状態・一覧のページング・エラーの出し方） |
 | `$fdpocket-app-visual` | **画面を作る・直すとき必ず**（`$fdpocket-app-ui` と一緒に）。方向を 3 行で決める → トークン（`--brand-hue`）と部品で組む → `kit shot` で撮って見て直す。クラウドでも手元でも同じ手順 |
 | `$fdpocket-ui-ux-pro-max` | `$fdpocket-app-visual` から使う。業種に合う色・書体・スタイル・119 の UX 指針を `search.py` で検索する（Python のみ・ネット不要） |
+| `$fdpocket-ios-design-guidelines` | `$fdpocket-app-visual`・`$fdpocket-app-ux-patterns`・`$fdpocket-app-design-review` から使う。Apple HIG の規則。スマホ幅の画面の型（ナビ・戻る・一覧・詳細・シート・押せる大きさ）を決める・採点するとき、該当する章を読む |
+| `$fdpocket-android-design-guidelines` | 同じく Material Design 3 の規則。iPhone と Android に共通することを既定にする（先頭の「ミニアプリで使うとき」の表で部品に読み替える） |
 | `$fdpocket-app-responsive` | **画面を作る・直すとき必ず**。スマホ・タブレット・PC のどれでもその端末らしく: 幅のクラスと `md:` `lg:`、ナビ（下のタブ → レール → サイドバー）、シート ↔ ダイアログ、一覧と詳細、指とマウス（hover・pointer）、キーボードの近道・右クリック・ツールチップ、`kit shot` の 3 つの幅 |
 | `$fdpocket-app-ux-patterns` | **画面の流れ・操作を作るとき必ず**。行き来（タブ・戻る・深さ）、フォーム、結果の伝え方、削除と取り消し、検索・絞り込み、初めての人 |
 | `$fdpocket-app-ux-writing` | **画面の文言を書くとき必ず**。ボタン・入力欄・空・エラー・確認・通知を業務の言葉で短く（全対応言語） |

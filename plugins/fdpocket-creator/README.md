@@ -28,7 +28,7 @@ project template that the Platform's generation agent uses, plus a connection to
 Things to know up front:
 
 - **`kit dev` runs your apps locally** with the same Gateway the Platform uses, a local database and file store,
-  and a development host page (`http://localhost:4320`) where you switch between apps and test users.
+  and a development host page (`http://127.0.0.1:4320`) where you switch between apps and test users.
 - **Publishing and posting are done by you, in the browser.** The agent can create, edit, and push drafts,
   but it cannot make an app public.
 - **Pushing runs the Platform's validation every time.** The Kit runs the same static checks locally before each push.

@@ -53,12 +53,13 @@ const nav = (
     <AppNavItem asChild><Link to="/settings"><SettingsIcon aria-hidden />{t.settings}</Link></AppNavItem>
   </AppNav>
 )
-<AppShell title={t.appName} nav={nav} safeArea={safeArea} colorScheme={colorScheme}><Outlet /></AppShell>
+<AppShell nav={nav} safeArea={safeArea} colorScheme={colorScheme}><Outlet /></AppShell>
 ```
 
 - 行き先は**どの幅でも同じ並び・同じ名前**（幅で項目を増減しない）。今いる場所は `aria-current="page"`（TanStack Router の `Link` が付ける）。
 - ラベルを消してアイコンだけにしない（レールでもラベルを出す）。6 個以上は 5 個に絞る（`$fdpocket-app-ux-patterns` §1）。
 - 管理画面（admin）も同じ部品でよい。PC 幅が主なので、サイドバーに節の見出しを足してもよい。
+- **キーボードが出ても、下に固定した入力欄・主ボタンが見えること**（スマホではキーボードが画面の約半分を覆う）。ひな形の `index.html` は viewport に `interactive-widget=resizes-content` を付けてあり、キーボードの分だけ画面が縮むので、`fixed bottom-0` の帯と `dvh` はキーボードの上に乗る（iOS Safari の既定は縮まないので、この指定を消さない）。フォームの中では、タブバーと同じ場所に主ボタンを固定せず、フォームの最後に置く。チャットのような下固定の入力欄は、入力中は下のタブを隠す（`focus-within` で `AppNav` を消す）。`env(keyboard-inset-*)` は iOS で常に 0 なので頼らない。
 - PC 幅で**大事な操作を画面の下端に置かない**（Apple: macOS では窓の下に重要な操作を置かない）。スマホ幅で下に固定した主ボタンは、PC 幅では `PageHeader` の右か、フォームの直下に戻す。
 
 ## 3. 指とマウス（入力の種類は画面の幅から推測しない）
@@ -73,8 +74,9 @@ const nav = (
 
 - **hover でしか見えない情報・操作を作らない**。行の上に乗せたときだけ出る「…」、ツールチップにしか書いていない説明は、指では見つけられない。操作は常に見せるか、行を押した先・「…」メニューに置く。
 - `:hover` の見た目を付けたら `:focus-visible` も付ける（キーボードでも同じ手がかり）。
-- 標的は**どの幅でも 44×44px 以上**（Apple: Mac でも大きめのタップ標的にしつつ見た目の大きさと密度は保つ）。PC 幅で詰めたいときは見た目の余白を減らし、押せる範囲は padding で保つ。
+- 標的は**どの幅でも 44×44px 以上**（ひな形のアイコンボタン・戻る・閉じるは 48px。Material の 48dp に合わせ、iOS の 44pt も満たす。Apple: Mac でも大きめのタップ標的にしつつ見た目の大きさと密度は保つ）。PC 幅で詰めたいときは見た目の余白を減らし、押せる範囲は padding で保つ。
 - 長押し・スワイプ・ドラッグでしかできない操作を作らない（`$fdpocket-app-accessibility` §6）。
+- **画面の左右の端から始まる横スワイプを作らない**（iOS の左端からの戻る、Android の予測型「戻る」と同じ動きになり、どちらかが効かなくなる）。カルーセル・行のスワイプは端から 24px 以上内側で始め、同じ操作をボタンにも置く（`$fdpocket-app-ux-patterns` §1）。
 
 ## 4. PC でうれしいこと（キーボード・右クリック・ツールチップ）
 

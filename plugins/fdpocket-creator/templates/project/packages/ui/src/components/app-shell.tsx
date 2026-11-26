@@ -33,15 +33,17 @@ function useColorSchemeClass(scheme: ColorScheme | undefined) {
 }
 
 /**
- * アプリの骨格: 上に固定のヘッダー、本文は幅を決めて中央に。セーフエリアの余白もここで取る（`$app-pwa` §2）。
+ * アプリの骨格: 本文の幅と余白、セーフエリア、明暗、主な行き先（`nav`）。
+ *
+ * **アプリ名のヘッダーは持たない。** スーパーアプリの中では FDPocket が上にアプリ名と閉じるボタンを出すので、
+ * ここでも出すとアプリ名が二重になる。画面の一番上は各画面の `PageHeader`（その画面の名前・戻る・操作）にする
+ * （iOS・Android の標準アプリと同じく、上に出すのは「今いる画面」の名前）。
  * 主な行き先が 2〜5 個なら `nav` に `AppNav` を渡す（スマホ幅は下のタブバー、広い画面は左のレール・サイドバー。
  * 本文の下の余白もタブバーの分だけ取る。`$app-responsive` §2）。
  * 各 App のルート（`__root.tsx`）で 1 回だけ使う。画面ごとに外枠を作り直さない（`$app-visual` §4）。
  * `safeArea` には `useSafeArea()`、`colorScheme` には `useColorScheme()`（どちらも `@workspace/miniapp-sdk/react`）を渡す。
  */
 function AppShell({
-  title,
-  actions,
   width = 'narrow',
   nav,
   safeArea,
@@ -49,8 +51,6 @@ function AppShell({
   children,
   className,
 }: {
-  title: string
-  actions?: React.ReactNode
   /** `AppNav`（主な行き先）。行き先が 1 つなら渡さない */
   nav?: React.ReactNode
   width?: keyof typeof WIDTHS
@@ -62,25 +62,12 @@ function AppShell({
   useHostSafeArea(safeArea)
   useColorSchemeClass(colorScheme)
   return (
-    <div data-slot="app-shell" className="min-h-dvh bg-background text-foreground">
-      <header className="sticky top-0 z-10 border-b bg-background/85 pt-[var(--safe-top)] backdrop-blur supports-[backdrop-filter]:bg-background/70">
-        <div
-          className={cn(
-            'mx-auto flex h-14 w-full items-center justify-between gap-3 pr-[max(1rem,var(--safe-right))] pl-[max(1rem,var(--safe-left))]',
-            // ナビがあるときは画面の幅いっぱい（見出しを左のナビの上にそろえる。PC アプリの窓の形）
-            WIDTHS[width],
-            nav && 'md:max-w-none'
-          )}
-        >
-          <p className="truncate text-base font-semibold">{title}</p>
-          {actions ? <div className="flex items-center gap-1">{actions}</div> : null}
-        </div>
-      </header>
+    <div data-slot="app-shell" className="group/shell min-h-dvh bg-background text-foreground">
       <div className={cn(nav && 'md:flex')}>
         {nav}
         <main
           className={cn(
-            'mx-auto flex w-full min-w-0 flex-col gap-6 pt-6 pr-[max(1rem,var(--safe-right))] pb-[calc(1.5rem+var(--safe-bottom))] pl-[max(1rem,var(--safe-left))]',
+            'mx-auto flex w-full min-w-0 flex-col gap-6 pt-[calc(1rem+var(--safe-top))] pr-[max(1rem,var(--safe-right))] pb-[calc(1.5rem+var(--safe-bottom))] pl-[max(1rem,var(--safe-left))]',
             // 下のタブバー（56px + ホームバー）に最後の行が隠れないように。広い画面のナビは左にあるので戻す
             nav &&
               'pb-[calc(5rem+var(--safe-bottom))] md:pb-[calc(1.5rem+var(--safe-bottom))] md:pl-6',

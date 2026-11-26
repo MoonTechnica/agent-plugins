@@ -22,7 +22,7 @@ description: ミニアプリを誰でも使えるようにする。キーボー�
 | 表 | `<table>` + `<th scope>`（`$fdpocket-app-data-display` §1） | `div` の格子 |
 
 - `div` に `onClick` を付けたくなったら `button` にする。`role="button"` + `tabIndex` + キー操作を自分で足すより確実。
-- ページの大枠は `<header>` `<nav>` `<main>`（`AppShell` が持つ）。
+- ページの大枠は `<nav>` `<main>`（`AppShell` が持つ）。画面の名前は `PageHeader` の `<h1>`（1 画面に 1 つ）。戻るのアイコンには `aria-label`（「連絡先に戻る」）。
 
 ## 2. キーボード
 
@@ -63,6 +63,6 @@ description: ミニアプリを誰でも使えるようにする。キーボー�
 ## 7. 確かめる
 
 1. **キーボードだけで**、いちばん多い操作を最初から最後まで通す（マウス・タップを使わない）。どこにフォーカスがあるか常に見えたか。
-2. `kit shot` の `checks`（`smallTargets` / `smallTextCount`）が 0。
+2. `kit shot` の `checks`（`smallTargets` / `smallTextCount` / `lowContrastText`）が 0 / 空。
 3. コードを読んで確かめる: `onClick` の付いた `div`・`span` が無い／アイコンだけのボタンに `aria-label`／すべての入力に `Label`／`<img>` に `alt`／生の色や透明度で薄くした文字が無い。
 4. 画像を見られる環境なら、撮った画像で色だけの区別・薄い文字が無いか見る。見られないなら、そのことを結果に書く。

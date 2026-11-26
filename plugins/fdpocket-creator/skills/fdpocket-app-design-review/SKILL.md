@@ -22,7 +22,8 @@ node <kit>/scripts/kit.mjs shot --out /tmp/fdpocket/shots --path / --widths 390 
 - 既定で 390（スマホ）・768（タブレット）・1280（PC）の 3 枚になる。3 枚を**並べて**見比べる（`$fdpocket-app-responsive` §9）。
 - 撮るのは **いちばん多い操作で通る画面すべて**（一覧・詳細・作成フォーム）と、**空・エラーの状態**（`$fdpocket-app-visual` §7）。
 - 画面が多いアプリでも、少なくともトップ・主な一覧・主なフォーム・管理画面のトップの 4 つ。
-- `checks` の値（`horizontalOverflow` / `smallTargets` / `smallTextCount` / `consoleErrors`）が 0 / false でなければ、採点の前に直す。
+- `checks` の値（`horizontalOverflow` / `smallTargets` / `smallTextCount` / `lowContrastText` / `coveredByBottomBar` / `consoleErrors`）が 0 / 空でなければ、採点の前に直す。`appBarAboveContent` が true なら、上に固定した帯がアプリ名の繰り返しでないか見る（`$fdpocket-app-visual` §4）。
+- スマホ幅の 1 枚は「iPhone や Android の標準のアプリに並べて違和感が無いか」で見る（`$fdpocket-ios-design-guidelines`・`$fdpocket-android-design-guidelines` の「Never Do」と評価のチェックリスト）。
 
 ## 2. 採点する（各 0〜2 点）
 
@@ -34,7 +35,7 @@ node <kit>/scripts/kit.mjs shot --out /tmp/fdpocket/shots --path / --widths 390 
 | **余白と整列** | 余白が 4px の倍数でそろう。左端がそろう。カードの入れ子が無い | 詰まりすぎ／スカスカ・中央揃えの多用・線で区切りすぎ |
 | **状態** | 読み込み中・空・エラー・送信中が作られ、空とエラーに次の操作がある | 空のときに真っ白・エラーが空の一覧に見える |
 | **文言** | 業務の言葉・具体的な動詞・内部の言葉が無い（`$fdpocket-app-ux-writing` §5） | 「データ」「送信」「pending」・en が崩れる |
-| **端末に合う** | 390・768・1280 の 3 枚がそれぞれの端末らしい（スマホは下のタブとシート、PC はサイドバー・表・一覧と詳細・中央のダイアログ）。hover だけ・右クリックだけの操作が無い（`$fdpocket-app-responsive` §9） | PC がスマホの引き伸ばし・スマホが PC の縮小・hover で隠れた操作・PC の下端に固定した主ボタン |
+| **端末に合う** | 390・768・1280 の 3 枚がそれぞれの端末らしい（スマホは下のタブ・左上の戻る・下から出るシート、PC はサイドバー・表・一覧と詳細・中央のダイアログ）。hover だけ・右クリックだけの操作が無い（`$fdpocket-app-responsive` §9） | PC がスマホの引き伸ばし・スマホが PC の縮小・アプリ名の帯の二重表示・本文の途中の「戻る」の行・詳細を 1 枚のカードに詰める・状態を select で出す・下のナビに隠れる最後の行・hover で隠れた操作 |
 | **誰でも使える** | 44px・16px・コントラスト（**明と暗の両方**）・キーボード・`aria-label`（`$fdpocket-app-accessibility` §7） | アイコンだけのボタン・薄い文字・`div` の onClick |
 | **この業務らしさ** | 社名とデータを消しても、何の業務のアプリか分かる。色・密度・言葉がこの業務に合う（`$fdpocket-app-visual` §1） | AI が作った既定の見た目（`$fdpocket-app-visual` §8。中央揃えの多用・飾りのグラデーション・全部同じ角丸カード・英字の小さなラベル）・ひな形の色のまま |
 | **動く** | 見えているボタン・リンク・メニュー・タブ・入力が全部、押すと本当に動く（保存される・開く・絞り込まれる） | 押しても何も起きない（空の onClick・`href="#"`・まだ無い画面へのリンク）・作り物のデータを本物のように表示・「近日公開」の飾り |

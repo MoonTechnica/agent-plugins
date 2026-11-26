@@ -19,7 +19,7 @@ description: ミニアプリが動くことを確かめる。Vitest で書くテ
 
 | 場所 | 中身 |
 |---|---|
-| `http://localhost:4320` | 通常の開発用 Host ページ。App とテスト主体を切り替える |
+| `http://127.0.0.1:4320` | 通常の開発用 Host ページ。App とテスト主体を切り替える |
 | 起動ログにある各 App の URL | 本番と同じ bridge で App を開くローカルの画面 |
 
 
@@ -40,7 +40,7 @@ description: ミニアプリが動くことを確かめる。Vitest で書くテ
 3. 一覧で 21 件目以降が「もっと見る」で出る（seed で 20 件以上入れておく）。
 4. admin を member で開くと `FORBIDDEN`、admin で開くと開く。
 5. 匿名を許していない App を anonymous で開くと開かない。
-6. スマホ・タブレット・PC の幅（390 / 768 / 1280。`kit shot` の既定）で崩れず、それぞれに合う形になっている（`$fdpocket-app-responsive` §9）。**`kit shot` で撮って見る**（`$fdpocket-app-visual` §7。クラウドでも手元でも）: `horizontalOverflow` / `smallTargets` / `smallTextCount` / `consoleErrors` が 0 になり、画像で主役・余白・文字が整っている。
+6. スマホ・タブレット・PC の幅（390 / 768 / 1280。`kit shot` の既定）で崩れず、それぞれに合う形になっている（`$fdpocket-app-responsive` §9）。**`kit shot` で撮って見る**（`$fdpocket-app-visual` §7。クラウドでも手元でも）: `horizontalOverflow` / `smallTargets` / `smallTextCount` / `lowContrastText` / `coveredByBottomBar` / `consoleErrors` が 0 になり、画像で主役・余白・文字が整っている。
 7. **押しても何も起きない物が無い**: 見えているボタン・リンク・メニュー・タブ・入力・切り替えを全部 1 回ずつ押し、保存される・開く・絞り込まれるなど本当に動くことを確かめる。空の `onClick`・`href="#"`・まだ無い画面へのリンク・作り物のデータを本物のように出す表示・「近日公開」の飾りは残さない（作らない物は画面から消す）。`grep -rnE 'onClick=\{\(\) => \{\}\}|href="#"' apps packages --include='*.tsx'` が 0 件になる。
 8. 全対応言語で主要画面・入力案内・空状態・エラー・確認ダイアログ・`aria-label`が翻訳される。
    現在のKitのHost言語は`?locale=ja` / `?locale=en`で確認できる（既存クエリがあれば`&locale=`）。

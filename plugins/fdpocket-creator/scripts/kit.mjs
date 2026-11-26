@@ -132292,18 +132292,32 @@ function freePort() {
     });
   });
 }
-var spawnPython = (spec) => {
-  const child = spawn2(spec.command, spec.args, {
-    cwd: spec.cwd,
-    env: spec.env,
-    stdio: ["ignore", "inherit", "inherit"]
-  });
+var PARENT_GUARD = `
+import { spawn } from 'node:child_process';
+const [command, ...args] = process.argv.slice(1);
+const child = spawn(command, args, { stdio: ['ignore', 'inherit', 'inherit'] });
+const stop = () => { if (child.exitCode === null && child.signalCode === null) child.kill('SIGTERM'); };
+process.stdin.once('end', stop);
+process.stdin.resume();
+for (const signal of ['SIGTERM', 'SIGINT', 'SIGHUP']) process.once(signal, stop);
+child.once('error', (error) => {
+  if (error.code !== 'ENOENT') console.error('kit dev: could not start', command, { code: error.code });
+  process.exit(error.code === 'ENOENT' ? 127 : 1);
+});
+child.once('exit', (code, signal) => process.exit(code ?? (signal ? 1 : 0)));
+`, spawnPython = (spec) => {
+  const child = spawn2(process.execPath, ["--input-type=module", "--eval", PARENT_GUARD, "--", spec.command, ...spec.args], { cwd: spec.cwd, env: spec.env, stdio: ["pipe", "inherit", "inherit"] });
   const exited = new Promise((resolve3) => {
     child.once("error", (error212) => {
-      console.error(error212.code === "ENOENT" ? `kit dev: ${spec.label} needs uv (https://docs.astral.sh/uv/) to run python apps` : `kit dev: ${spec.label} could not start`, { code: error212.code });
+      console.error(`kit dev: ${spec.label} could not start`, { code: error212.code });
       resolve3(null);
     });
-    child.once("exit", (code) => resolve3(code));
+    child.once("exit", (code) => {
+      if (code !== 127)
+        return resolve3(code);
+      console.error(`kit dev: ${spec.label} needs uv (https://docs.astral.sh/uv/) to run python apps`);
+      resolve3(null);
+    });
   });
   return { kill: () => child.kill("SIGTERM"), exited };
 };
@@ -321921,7 +321935,7 @@ init_seed();
 // frontend/packages/miniapp-kit/src/dev/server.ts
 init_src();
 init_src2();
-import { spawn as spawn7 } from "node:child_process";
+import { spawn as spawn8 } from "node:child_process";
 import { readFileSync as readFileSync4 } from "node:fs";
 import { join as join43 } from "node:path";
 
@@ -323478,7 +323492,9 @@ async function listen(port, hostname11, handle, maxBodyBytes) {
     respond(req, res, hostname11, handle, maxBodyBytes);
   });
   await new Promise((resolve3, reject) => {
-    server2.once("error", reject);
+    server2.once("error", (error262) => {
+      reject(error262.code === "EADDRINUSE" ? portInUse(port) : error262);
+    });
     server2.listen(port, hostname11, () => resolve3());
   });
   const { port: actual } = server2.address();
@@ -323489,6 +323505,28 @@ async function listen(port, hostname11, handle, maxBodyBytes) {
       server2.closeAllConnections();
     })
   };
+}
+function portInUse(port, what = "kit dev") {
+  return new Error(`port ${port} is already in use (${what}); usually an earlier kit dev is still running. ` + `Find it with lsof -nP -iTCP:${port} -sTCP:LISTEN, stop it, and run kit dev again`);
+}
+async function isPortFree(port) {
+  const probe = createServer3();
+  return new Promise((resolve3, reject) => {
+    probe.once("error", (error262) => {
+      if (error262.code === "EADDRINUSE")
+        resolve3(false);
+      else
+        reject(error262);
+    });
+    probe.listen(port, "127.0.0.1", () => probe.close(() => resolve3(true)));
+  });
+}
+function redirectLocalhost(request) {
+  const url6 = new URL(request.url);
+  if (url6.hostname !== "localhost")
+    return null;
+  url6.hostname = "127.0.0.1";
+  return new Response(null, { status: 308, headers: { location: url6.href } });
 }
 async function respond(req, res, hostname11, handle, maxBodyBytes) {
   try {
@@ -323560,6 +323598,72 @@ function createLiveHostHandler(options2) {
       });
     }
   };
+}
+
+// frontend/packages/miniapp-kit/src/dev/orphan-guard.ts
+import { spawn as spawn7 } from "node:child_process";
+var WATCHDOG = `
+import { execFileSync } from 'node:child_process';
+const root = Number(process.argv[1]);
+let known = [];
+const scan = () => {
+  let out;
+  try {
+    out = execFileSync('ps', ['-A', '-o', 'pid=,ppid='], { encoding: 'utf8' });
+  } catch (error) {
+    console.error('kit dev watchdog: ps failed', { code: error.code });
+    return;
+  }
+  const children = new Map();
+  for (const line of out.split('\\n')) {
+    const [pid, ppid] = line.trim().split(/\\s+/).map(Number);
+    if (!pid) continue;
+    if (!children.has(ppid)) children.set(ppid, []);
+    children.get(ppid).push(pid);
+  }
+  const found = [];
+  const stack = [root];
+  while (stack.length > 0) {
+    for (const child of children.get(stack.pop()) ?? []) {
+      if (child === process.pid) continue;
+      found.push(child);
+      stack.push(child);
+    }
+  }
+  known = found;
+};
+const signal = (name) => {
+  for (const pid of known) {
+    try {
+      process.kill(pid, name);
+    } catch {
+      // もう終わっている（ESRCH）。止める相手がいないだけなので続ける
+    }
+  }
+};
+const timer = setInterval(scan, 1000);
+scan();
+process.stdin.once('end', () => {
+  clearInterval(timer);
+  signal('SIGTERM');
+  setTimeout(() => {
+    signal('SIGKILL');
+    process.exit(0);
+  }, 3000);
+});
+process.stdin.resume();
+`;
+var guarded = false;
+function guardChildren() {
+  if (guarded || process.platform === "win32")
+    return;
+  guarded = true;
+  const watchdog = spawn7(process.execPath, ["--input-type=module", "--eval", WATCHDOG, "--", String(process.pid)], { stdio: ["pipe", "ignore", "inherit"], detached: true });
+  watchdog.once("error", (error262) => {
+    console.error("kit dev: could not start the child-process watchdog", { code: error262.code });
+  });
+  watchdog.unref();
+  watchdog.stdin?.unref?.();
 }
 
 // frontend/packages/miniapp-kit/src/dev/prepared-app.ts
@@ -325276,6 +325380,7 @@ function preparationDiagnostic(error262, capabilities) {
 var DEV_PORTS = { host: 4320, gateway: 4321, objects: 4322 };
 async function startDev(options2) {
   const { root, kitRoot, projectId } = options2;
+  guardChildren();
   const { manifest: manifest2 } = await prepareProject({
     root,
     kitRoot,
@@ -325315,7 +325420,7 @@ async function startDev(options2) {
       return runtime.objects.handle(request2);
     });
     closers.push(objects.close);
-    const host = await listen(ports.host, "127.0.0.1", async (request2) => hostRoutes(request2, runtime, pageConfig, workers));
+    const host = await listen(ports.host, "127.0.0.1", async (request2) => redirectLocalhost(request2) ?? hostRoutes(request2, runtime, pageConfig, workers));
     closers.push(host.close);
     const dist = options2.dist;
     const appOf = (request2) => {
@@ -325626,7 +325731,7 @@ async function startLiveDev(options2, manifest2) {
       }
       const host2 = await listen(options2.ports?.host ?? DEV_PORTS.host, options2.connected ? "127.0.0.1" : "0.0.0.0", async (request2) => {
         if (options2.connected)
-          return handler.fetch(request2);
+          return redirectLocalhost(request2) ?? handler.fetch(request2);
         const workerResponse = await workers?.fetch(request2);
         if (workerResponse)
           return workerResponse;
@@ -325834,6 +325939,10 @@ try {
   });
   // Vite owns SIGTERM and closes the server in its built-in finally handler.
   process.once('SIGINT', () => { void stop(); });
+  process.once('SIGHUP', () => { void stop(); });
+  // stdin is a pipe from kit dev. It closes when kit dev goes away, even after SIGKILL, so we never outlive it.
+  process.stdin.once('end', () => { void stop(); });
+  process.stdin.resume();
   await server.listen();
 } catch (error) {
   console.error(error);
@@ -325841,10 +325950,13 @@ try {
 }
 `;
 var viteDev = async ({ slug, appDir, port, env }) => {
-  const child = spawn7(process.execPath, ["--input-type=module", "--eval", VITE_DEV_RUNNER, "--", String(port)], {
+  if (!await isPortFree(port)) {
+    throw new DevError(portInUse(port, `the ${slug} App`).message);
+  }
+  const child = spawn8(process.execPath, ["--input-type=module", "--eval", VITE_DEV_RUNNER, "--", String(port)], {
     cwd: appDir,
     env: { ...process.env, ...env },
-    stdio: ["ignore", "pipe", "pipe"]
+    stdio: ["pipe", "pipe", "pipe"]
   });
   const prefix2 = (chunk) => chunk.toString("utf8").split(`
 `).filter((line) => line.trim() !== "").map((line) => `[${slug}] ${line}
@@ -325876,7 +325988,7 @@ var viteDev = async ({ slug, appDir, port, env }) => {
 };
 
 // frontend/packages/miniapp-kit/src/doctor.ts
-import { spawn as spawn8 } from "node:child_process";
+import { spawn as spawn9 } from "node:child_process";
 var NODE_MINIMUM = [22, 12];
 async function runDoctor(deps) {
   const checks11 = [
@@ -325954,7 +326066,7 @@ async function tryExec(deps, command, args) {
 var firstLine = (text4) => text4.trim().split(`
 `)[0] ?? "";
 var execCommand = (command, args) => new Promise((resolve3, reject) => {
-  const child = spawn8(command, [...args], { stdio: ["ignore", "pipe", "pipe"] });
+  const child = spawn9(command, [...args], { stdio: ["ignore", "pipe", "pipe"] });
   const stdout = [];
   const stderr = [];
   child.stdout.on("data", (chunk) => stdout.push(chunk));
@@ -326027,7 +326139,7 @@ function reasonOf(body2) {
 }
 
 // frontend/packages/miniapp-kit/src/verify/browser.ts
-import { spawn as spawn9 } from "node:child_process";
+import { spawn as spawn10 } from "node:child_process";
 import { existsSync as existsSync23 } from "node:fs";
 import { createRequire as createRequire12 } from "node:module";
 import { dirname as dirname13, join as join44 } from "node:path";
@@ -326071,7 +326183,7 @@ async function launchInstallingBrowser(options2) {
 function installChromium(playwrightEntry) {
   const cli = join44(dirname13(playwrightEntry), "cli.js");
   return new Promise((resolve3, reject) => {
-    const child = spawn9(process.execPath, [cli, "install", "--only-shell", "chromium"], {
+    const child = spawn10(process.execPath, [cli, "install", "--only-shell", "chromium"], {
       stdio: ["ignore", "inherit", "inherit"]
     });
     child.on("error", reject);
@@ -327696,7 +327808,7 @@ var MIN_TEXT_PX = 12;
 var SETTLE_MS = 5000;
 var REPORTED_TARGETS = 8;
 function defaultHost(env) {
-  return env.KIT_LIVE ? "http://localhost:4420" : "http://localhost:4320";
+  return env.KIT_LIVE ? "http://127.0.0.1:4420" : "http://127.0.0.1:4320";
 }
 function parseWidths(spec) {
   if (spec === undefined)
@@ -327728,8 +327840,10 @@ function hostPageUrl(options2) {
     throw new ShotError(`--host is not a URL: ${options2.host}`);
   }
   if (host.protocol !== "http:" || !LOOPBACK.has(host.hostname)) {
-    throw new ShotError("--host must be the local kit dev page (http://localhost:<port>)");
+    throw new ShotError("--host must be the local kit dev page (http://127.0.0.1:<port>)");
   }
+  if (host.hostname === "localhost")
+    host.hostname = "127.0.0.1";
   if (!/^\/(?!\/)/.test(options2.path)) {
     throw new ShotError('--path must start with a single "/" (a path inside the app)');
   }
@@ -327772,16 +327886,71 @@ function inspectPage(limits2) {
       }
     }
   }
+  const parseColor = (value2) => {
+    const match2 = value2.match(/rgba?\(([^)]+)\)/);
+    if (!match2?.[1])
+      return null;
+    const parts = match2[1].split(/[\s,/]+/).filter(Boolean).map(Number);
+    if (parts.length < 3 || parts.some(Number.isNaN))
+      return null;
+    return [parts[0], parts[1], parts[2], parts[3] ?? 1];
+  };
+  const over = (top, bottom) => {
+    const alpha = top[3];
+    return [
+      top[0] * alpha + bottom[0] * (1 - alpha),
+      top[1] * alpha + bottom[1] * (1 - alpha),
+      top[2] * alpha + bottom[2] * (1 - alpha),
+      1
+    ];
+  };
+  const backdropOf = (element) => {
+    const layers = [];
+    for (let current = element;current; current = current.parentElement) {
+      const style = getComputedStyle(current);
+      if (style.backgroundImage !== "none")
+        return null;
+      const color = parseColor(style.backgroundColor);
+      if (color && color[3] > 0) {
+        layers.push(color);
+        if (color[3] >= 1)
+          break;
+      }
+    }
+    return layers.reduceRight((below, layer) => over(layer, below), [255, 255, 255, 1]);
+  };
+  const luminance = ([r2, g3, b3]) => {
+    const channel = (value2) => {
+      const v3 = value2 / 255;
+      return v3 <= 0.04045 ? v3 / 12.92 : ((v3 + 0.055) / 1.055) ** 2.4;
+    };
+    return 0.2126 * channel(r2) + 0.7152 * channel(g3) + 0.0722 * channel(b3);
+  };
+  const contrastOf = (foreground, background) => {
+    const [light, dark] = [luminance(foreground), luminance(background)].sort((a2, b3) => b3 - a2);
+    return (light + 0.05) / (dark + 0.05);
+  };
   let smallTextCount = 0;
+  const lowContrastText = [];
   const walker2 = document.createTreeWalker(document.body, NodeFilter.SHOW_TEXT);
   const counted = new Set;
   for (let node2 = walker2.nextNode();node2; node2 = walker2.nextNode()) {
     const parent = node2.parentElement;
     if (!parent || counted.has(parent) || !node2.textContent?.trim() || !visible(parent))
       continue;
-    if (Number.parseFloat(getComputedStyle(parent).fontSize) < limits2.text) {
-      counted.add(parent);
+    counted.add(parent);
+    const style = getComputedStyle(parent);
+    const size = Number.parseFloat(style.fontSize);
+    if (size < limits2.text)
       smallTextCount += 1;
+    const color = parseColor(style.color);
+    const backdrop = color ? backdropOf(parent) : null;
+    if (!color || !backdrop || color[3] === 0)
+      continue;
+    const ratio = contrastOf(over(color, backdrop), backdrop);
+    const large = size >= 24 || size >= 18.66 && Number.parseInt(style.fontWeight, 10) >= 700;
+    if (ratio < (large ? 3 : 4.5)) {
+      lowContrastText.push({ label: labelOf(parent), ratio: Math.round(ratio * 100) / 100 });
     }
   }
   let bottomNavMissing = false;
@@ -327801,12 +327970,48 @@ function inspectPage(limits2) {
     });
     bottomNavMissing = navs.length > 0 && !atBottom;
   }
+  const pinned = (edge) => [...document.body.querySelectorAll("*")].filter((element) => {
+    if (element.closest("main") || !visible(element))
+      return false;
+    const position = getComputedStyle(element).position;
+    if (position !== "fixed" && position !== "sticky")
+      return false;
+    const rect = element.getBoundingClientRect();
+    if (rect.width < window.innerWidth * 0.6)
+      return false;
+    return edge === "top" ? rect.top <= 8 && rect.height >= 32 : rect.bottom >= window.innerHeight - 8 && rect.top >= window.innerHeight * 0.6;
+  });
+  const coveredByBottomBar = [];
+  let appBarAboveContent = false;
+  if (limits2.phone) {
+    appBarAboveContent = pinned("top").some((bar) => !bar.closest('nav, [role="navigation"]') && bar.innerText.trim() !== "");
+    const scroller = document.scrollingElement ?? document.documentElement;
+    const before = scroller.scrollTop;
+    scroller.scrollTop = scroller.scrollHeight;
+    const bars = pinned("bottom").map((bar) => bar.getBoundingClientRect());
+    if (bars.length > 0) {
+      const top = Math.min(...bars.map((rect) => rect.top));
+      const items = document.querySelectorAll('main button, main a[href], main input, main select, main textarea, main [role="switch"], main p, main li, main dd, main h2, main h3');
+      for (const element of items) {
+        if (!visible(element))
+          continue;
+        const rect = element.getBoundingClientRect();
+        if (rect.bottom > top + 1 && rect.top < window.innerHeight) {
+          coveredByBottomBar.push(labelOf(element));
+        }
+      }
+    }
+    scroller.scrollTop = before;
+  }
   const root = document.documentElement;
   return {
     bottomNavMissing,
+    coveredByBottomBar: coveredByBottomBar.slice(0, limits2.reported),
+    appBarAboveContent,
     horizontalOverflow: root.scrollWidth > window.innerWidth + 1,
     smallTargets: smallTargets.slice(0, limits2.reported),
     smallTextCount,
+    lowContrastText: lowContrastText.slice(0, limits2.reported),
     height: Math.max(root.scrollHeight, document.body?.scrollHeight ?? 0)
   };
 }
@@ -327854,6 +328059,16 @@ async function takeShots(options2, launch = launchChromium) {
         if (inspected.bottomNavMissing) {
           notes.push(`${width}px: the app has 2+ main destinations but no navigation at the bottom of the screen; on phones put them in a bottom bar within thumb reach ($app-responsive §2). Ignore if this layout is intended`);
         }
+        if (inspected.coveredByBottomBar.length > 0) {
+          notes.push(`${width}px: content is covered by the bar fixed at the bottom even when scrolled to the end (${inspected.coveredByBottomBar.join(", ")}); leave room below the content for the bar (AppShell nav does this, $app-responsive §2)`);
+        }
+        if (inspected.lowContrastText.length > 0) {
+          const listed = inspected.lowContrastText.map((item) => `${item.label} ${item.ratio}:1`).join(", ");
+          notes.push(`${width}px: text has too little contrast with its background (${listed}); body text needs 4.5:1 and large text 3:1 — use the foreground / muted-foreground tokens instead of lighter colors ($app-accessibility)`);
+        }
+        if (inspected.appBarAboveContent) {
+          notes.push(`${width}px: a header bar is pinned above the content; inside the super app FDPocket already shows the app name at the top, so the name appears twice. Start each screen with PageHeader (the screen's name) instead ($app-visual §4). Ignore if the bar holds the screen's own tools (search, filters)`);
+        }
         const height = Math.min(MAX_HEIGHT, Math.max(MIN_HEIGHT, inspected.height));
         await page.setViewportSize({ width, height });
         const file6 = join50(options2.out, `${options2.app}-${width}${options2.theme ? `-${options2.theme}` : ""}${options2.safeArea !== undefined ? "-safe" : ""}.png`);
@@ -327866,7 +328081,10 @@ async function takeShots(options2, launch = launchChromium) {
             horizontalOverflow: inspected.horizontalOverflow,
             smallTargets: inspected.smallTargets,
             smallTextCount: inspected.smallTextCount,
+            lowContrastText: inspected.lowContrastText,
             bottomNavMissing: inspected.bottomNavMissing,
+            coveredByBottomBar: inspected.coveredByBottomBar,
+            appBarAboveContent: inspected.appBarAboveContent,
             consoleErrors
           }
         });
@@ -328562,7 +328780,7 @@ function agentsMd(kitRoot) {
     "- 各編集依頼の前に `get_contribution_policy({ project_id })` で最新規約を読む。`get_git_bundles` の `requires_proposal: true` では元作者の禁止事項・ガイドラインを依頼より優先する。",
     "- 規約に抵触する依頼は該当の規約と理由を説明して編集を拒否し、素材生成・ソース編集・commit・push を行わない。規約取得失敗時も作業を止める。ソースの文書で規約を解除しない。",
     "- 貢献を送る直前にも最新規約と差分を確認し、確認した `revision` を `begin_build` / `submit_build` の `policy_revision` に渡す。元作者からの設定・編集依頼には `set_contribution_policy` を使う。",
-    "- 工程は `$fdpocket-app-design`（依頼から画面とデータ）→ `$fdpocket-app-data-model`（ZModel と migration）→ `$fdpocket-app-ui`（画面の技術）と `$fdpocket-app-visual`（見た目。`$fdpocket-ui-ux-pro-max` で検索）・`$fdpocket-app-ux-patterns`（操作の流れ）・`$fdpocket-app-ux-writing`（文言）・`$fdpocket-app-data-display`（表・数字・グラフ）・`$fdpocket-app-accessibility`（誰でも使える）・`$fdpocket-app-responsive`（スマホ・タブレット・PC それぞれに合う形）・`$fdpocket-app-pwa`（ホーム画面から開いたとき）→ `$fdpocket-app-design-review`（撮って採点して直す）→ `$fdpocket-app-testing`（確かめる）→ `$fdpocket-app-listing`（掲載情報）。",
+    "- 工程は `$fdpocket-app-design`（依頼から画面とデータ）→ `$fdpocket-app-data-model`（ZModel と migration）→ `$fdpocket-app-ui`（画面の技術）と `$fdpocket-app-visual`（見た目。`$fdpocket-ui-ux-pro-max` で検索）・`$fdpocket-app-ux-patterns`（操作の流れ）・`$fdpocket-app-ux-writing`（文言）・`$fdpocket-app-data-display`（表・数字・グラフ）・`$fdpocket-app-accessibility`（誰でも使える）・`$fdpocket-app-responsive`（スマホ・タブレット・PC それぞれに合う形）（スマホ幅の型の根拠は `$fdpocket-ios-design-guidelines`・`$fdpocket-android-design-guidelines`）・`$fdpocket-app-pwa`（ホーム画面から開いたとき）→ `$fdpocket-app-design-review`（撮って採点して直す）→ `$fdpocket-app-testing`（確かめる）→ `$fdpocket-app-listing`（掲載情報）。",
     "- **画面を作ったら、`kit.mjs shot` で自分の画面を撮って見て直してから終える**（クラウドの生成と同じ品質にするため。手順は `$fdpocket-app-visual` §7）。添付された企画書などの文書は `$fdpocket-app-documents`。",
     "  管理画面は `$fdpocket-app-admin`、ファイルは `$fdpocket-app-storage`、App や共有 package を足す・コードを共有するときは `$fdpocket-app-structure`。",
     "  外部利用者のアカウント・ログイン方式・利用者 ID と業務権限の設計には `$fdpocket-app-auth` を使う。",
@@ -328571,7 +328789,7 @@ function agentsMd(kitRoot) {
     "",
     "## 確かめ方",
     "",
-    "- 作っている間は `node <kit>/scripts/kit.mjs dev` で全 App を手元で動かし、開発用 Host ページ（`http://localhost:4320`）で App と主体を切り替えて確かめる。",
+    "- 作っている間は `node <kit>/scripts/kit.mjs dev` で全 App を手元で動かし、開発用 Host ページ（`http://127.0.0.1:4320`）で App と主体を切り替えて確かめる。",
     "- push（`$fdpocket-push`）が `ready` になったら、`get_build` が返した `editor_url` を",
     "  **`node <kit>/scripts/kit.mjs open --url <editor_url>` でブラウザに開く**（この会話で最初に `ready` になったときだけ。",
     "  制作画面は開いたままでも新しい版が届くので、2 回目以降は開かない）。",
@@ -328621,6 +328839,7 @@ function defaultContext(cwd, kitRoot) {
     untilStopped: () => new Promise((resolve5) => {
       process.once("SIGINT", () => resolve5());
       process.once("SIGTERM", () => resolve5());
+      process.once("SIGHUP", () => resolve5());
     })
   };
 }

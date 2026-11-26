@@ -13,7 +13,7 @@ function Home() {
   const session = useSession()
   return (
     <>
-      <PageHeader title="{{PROJECT_TITLE}} 管理" description={session?.displayName ?? undefined} />
+      <PageHeader title="管理" description={session?.displayName ?? undefined} />
       <EmptyState icon={Inbox} title="まだ何もありません" description="管理する項目がここに並びます。" />
     </>
   )
