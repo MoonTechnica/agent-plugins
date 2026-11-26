@@ -321173,6 +321173,10 @@ var AUTO_APPROVE_TOOLS = [
   "invite_project_collaborator",
   "revoke_project_collaborator_invitation",
   "resend_project_collaborator_invitation",
+  "create_organization_team",
+  "set_organization_team_member",
+  "set_project_team_grant",
+  "share_project_with_organization_members",
   "rebut_review"
 ];
 function codexApprovalToml(pluginId, server2) {

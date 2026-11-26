@@ -455,7 +455,11 @@ GitHub 管理でできるのは、Issue の一覧（`query` で検索）・詳�
 宛先は `account_name`（`search_invitable_accounts` で探す）か `email` のどちらか 1 つ。未登録のメールには招待メールが届く。7 日で失効し、**受諾・辞退は招かれた本人が画面で行う**（MCP には無い）。
 `list_organization_invitations` / `list_project_collaborator_invitations` で保留中を見て、`revoke_*` で取り消し、`resend_*` で送り直す。`list_organization_members` / `list_project_collaborators` で現在の人を見る。
 **メンバー・共同編集者を外す（`remove_organization_member` / `remove_project_collaborator`）と組織の削除（`delete_organization`）は、クライアントが利用者に確認を求める**（取り戻せない）。断られたら押さない。
-グループ（チーム）・財布・通報は画面。
+**組織 → アプリ → 共有を一気通貫にする流れ**: `create_organization` → `create_project({ title, owner_account_id: <組織の id> })`（作った人がそのアプリの管理者）→ 作る・push・取り込み → 共有。
+共有は 3 通り。**組織のメンバーには受諾が要らない**: `share_project_with_organization_members({ project_id, role, user_ids? })`（全員、または指定した人。すでに役割のある人は変えずに飛ばし、人ごとの結果を返す）か、`invite_project_collaborator`（1 人）が即時に付与する。
+**グループ**で渡すなら `create_organization_team` → `set_organization_team_member` → `set_project_team_grant({ project_id, team_id, role })`（`role` を省くと外す）。
+**組織の外の人・アカウントの無い人**: `invite_organization_member`（組織に入れる）か `invite_project_collaborator`（アプリだけ）にメールを渡す。招待メールが届き、**受諾は本人が画面で行う**（アカウントが無ければサインアップしてから）。受諾後に `list_project_collaborators` で付与を確かめる。
+公開前のアプリに `use` は付けられない（`read` / `write` で共有するか、公開してから）。財布・通報は画面。
 
 | エラー | すること |
 |---|---|

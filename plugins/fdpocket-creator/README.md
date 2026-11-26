@@ -259,6 +259,18 @@ approval_mode = "auto"
 [plugins."fdpocket-creator@moon-technica".mcp_servers.fdpocket.tools.resend_project_collaborator_invitation]
 approval_mode = "auto"
 
+[plugins."fdpocket-creator@moon-technica".mcp_servers.fdpocket.tools.create_organization_team]
+approval_mode = "auto"
+
+[plugins."fdpocket-creator@moon-technica".mcp_servers.fdpocket.tools.set_organization_team_member]
+approval_mode = "auto"
+
+[plugins."fdpocket-creator@moon-technica".mcp_servers.fdpocket.tools.set_project_team_grant]
+approval_mode = "auto"
+
+[plugins."fdpocket-creator@moon-technica".mcp_servers.fdpocket.tools.share_project_with_organization_members]
+approval_mode = "auto"
+
 [plugins."fdpocket-creator@moon-technica".mcp_servers.fdpocket.tools.rebut_review]
 approval_mode = "auto"
 ```
