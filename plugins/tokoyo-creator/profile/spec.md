@@ -26,16 +26,11 @@ Debug MenuのUIと試験用の処理は各ゲームの`godot/dev/`に作成し�
 │   │   ├── MIGRATION.md     # 版を上げるときの差分
 │   │   ├── types/           # .d.ts（TypeScript の型。実装は含まない）
 │   │   └── build-config/    # kit build（Godot の export と固定の橋渡し。変更しない）
-│   ├── app-server-sdk/
-│   │   ├── spec.md          # ★ 対戦のルール（server.bundle.js の defineSpace）の API 契約
-│   │   ├── types/
-│   │   ├── src/             # defineSpace の実体と createLocalSpace（ルールをサーバー無しで動かす）
-│   │   └── build-config/
 │   ├── sample-godot/        # Godot Web/nativeの描画・保存・端末API
-│   ├── sample-godot-multiplayer/ # Godot Web/native対戦。GDScript画面とdefineSpaceサーバー
+│   ├── sample-godot-multiplayer/ # Godot Web/native対戦。GDScript画面とGodotの対戦サーバー（`godot/server/rules.gd`）
 │   ├── package.json         # 使える第三者ライブラリ（版は完全一致）
 │   ├── npm-shrinkwrap.json  # その lockfile（integrity。setup が npm ci で入れる）
-│   └── node_modules/        # サーバー物理用Babylon core / Havok / Rapier 2D の決定版 / @colyseus/schema（これ以外は無い）
+│   └── node_modules/        # ビルドの道具（rollup / typescript。これ以外は無い）
 ├── profile/
 │   ├── spec.md              # この文書
 │   └── instructions.md      # 作業手順と出力の約束
@@ -75,7 +70,7 @@ Debug MenuのUIと試験用の処理は各ゲームの`godot/dev/`に作成し�
 |---|---|---|
 | 1 | `<kit>/profile/instructions.md` | 何を作り、何を `outputs/` に置くか |
 | 2 | `<kit>/sdk/app-sdk/spec.md` | `manifest.json` の形、Capability、GDScript の facade（`TokoyoApp` / `TokoyoDevice` / `TokoyoSpace`）とその下の `app.*` の契約、禁止事項 |
-| 3 | `<kit>/sdk/app-server-sdk/spec.md` | 対戦を作る場合のみ。`defineSpace` の書き方（状態・入力・`step`・`finish`） |
+| 3 | `<kit>/sdk/sample-godot-multiplayer/godot/server/rules.gd` と Skill `game-multiplayer` | 対戦を作る場合のみ。`TokoyoRules` の書き方（入力の宣言・`step`・`finish`） |
 | 4 | `<kit>/sdk/sample-godot/`（対戦は `sample-godot-multiplayer/`） | 1〜3 を満たした最小の Godot 実装。**構成はこれに倣う** |
 | 4b | `<kit>/skills/*/SKILL.md` | 操作・画面・素材・3D・対戦・ランキング・ゲーム内 AI・掲載情報の作り方（`instructions.md` §0 の表のとおりに使う） |
 | 5 | `<kit>/sdk/*/build-config/` | `kit build` の実体（読むだけ。変更しない） |
@@ -92,7 +87,7 @@ Debug MenuのUIと試験用の処理は各ゲームの`godot/dev/`に作成し�
 | 個人のセーブ（`TokoyoApp.save`。契約は `app.store`） | 1 件 **1 MiB** まで（送る JSON の長さ。`blob` 型は gzip + base64 の後）・書き込みは毎分 12 回。大きな値は `blob` に置き、世界は seed + 変えたところだけ、オートセーブは 1 分に 1 回 | Platform の上限（`<kit>/sdk/app-sdk/spec.md` §3.2） |
 | 外部通信 | 不可（`externalNetwork: false`） | Shell の CSP が `default-src 'none'` |
 | 端末の機能（傾き・マウス固定・カメラ・マイク） | `capabilities` と `device` に宣言し、傾き・カメラ・マイクは `TokoyoDevice`（契約は `app.device`）、マウス固定は Godot の `Input.mouse_mode` を使う（`$game-controls`）。`required` は原則 `false` | Platform が宣言と呼び出しを突き合わせる。宣言の無い機能は iframe で使えない（`<kit>/sdk/app-sdk/spec.md` §8.4） |
-| 依存の追加 | Kitの固定lockfileだけ。Babylon core/Havok/Rapierはサーバー物理専用 | 描画はGodot。JS描画エンジン・codec・client物理は同梱しない |
+| 依存の追加 | Kitの固定lockfileだけ（rollup/typescript） | 描画・物理はGodot。JS描画エンジン・codec・client物理は同梱しない |
 
 ## 4. 仕様と食い違いが出たとき
 

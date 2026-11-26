@@ -39,7 +39,7 @@
 依頼と差分を再確認し、抵触したら理由を説明して送信を拒否する。元作者・チーム編集者から規約の設定・編集を依頼されたときは
 `set_contribution_policy` を使う。貢献者の依頼では呼ばない。
 1. `<kit>/profile/spec.md` を読む（何がどこにあるか）
-2. `<kit>/sdk/app-sdk/spec.md` を読む（**App の API 契約。正本**）。手元では `kit.mjs setup` が SDK を展開した後にできる（`$tokoyo-new` 1.）3. Godotは`<kit>/sdk/sample-godot/`、オンライン対戦は`<kit>/sdk/sample-godot-multiplayer/`を読む。Godotの画面・入力はGDScript、対戦の権威あるルールは`server/main.ts`のdefineSpaceで書き、共有TokoyoSpaceで接続する。
+2. `<kit>/sdk/app-sdk/spec.md` を読む（**App の API 契約。正本**）。手元では `kit.mjs setup` が SDK を展開した後にできる（`$tokoyo-new` 1.）3. Godotは`<kit>/sdk/sample-godot/`、オンライン対戦は`<kit>/sdk/sample-godot-multiplayer/`を読む。Godotの画面・入力はGDScript、対戦の権威あるルールは`godot/server/rules.gd`（`TokoyoRules`）で書き、共有TokoyoSpaceで接続する。
 4. **依頼に必要な Skill だけを使う**（`<kit>/skills/`。下の表）。依頼の意図と変更範囲から自分で選び、
    関係しない Skill は読まない。数値や文言の小さな修正なら Skill を読まずに直してよい。
    ただし**新しいゲーム・遊びの核や見た目の方向を変えるときは `$game-design` と `$game-art-direction` を必ず読む**。
@@ -119,7 +119,7 @@ source-dirは`./source`。SDKのCLIと作業ディレクトリ側の`scripts/kit
 | 形 | 内容 | `manifest.json` の `space` |
 |---|---|---|
 | **ソロ** | 1 人で遊ぶ。ブラウザの中だけで完結する | `null` |
-| **オンライン対戦** | 2〜8 人が同じ対戦（Match）に入る。ルールと勝敗は `server/main.ts` の `defineSpace` が決める | `{ "server": "server.bundle.js", "participants": { "min": 2, "max": 4 }, "maxDurationSec": ... }`（人数は遊びに合わせる。役割があれば `participants.roles`） |
+| **オンライン対戦** | 2〜8 人が同じ対戦（Match）に入る。ルールと勝敗は `godot/server/rules.gd` が決める | `{ "server": "server.pck", "participants": { "min": 2, "max": 4 }, "maxDurationSec": ... }`（人数は遊びに合わせる。役割があれば `participants.roles`） |
 | **非同期対戦** | 相手と同時にいなくても、交代で 1 手ずつ進める（通信対局・攻め合い・記録への挑戦）。場は Platform の共有レコード、ルールと勝敗は画面が決める | `null`（代わりに `documentSchema`。下の「非同期対戦」） |
 
 
@@ -171,7 +171,7 @@ source-dirは`./source`。SDKのCLIと作業ディレクトリ側の`scripts/kit
 
 ```text
 app.bundle.js        # Platform との橋渡し（kit build が作る。Godot の pack は assets/godot/・bundles/godot_native/・bundles/<地域>/）
-server.bundle.js     # 対戦があるときだけ（server/main.ts の defineSpace）
+server.pck           # 対戦があるときだけ（godot/server/ のルールを書き出した Godot の pack）
 manifest.json        # 書庫の根に置く。入れ子にすると取り込みに落とされる
 assets/godot/        # Web 用の game.js・game.wasm・game.pck（kit build が作る）
 bundles/godot_native/ # 組み込み native 用の game.pck（kit build が作る。ブラウザは取らない）
@@ -205,7 +205,7 @@ ai/<key>.md          # ゲーム内 AI の指示文（`ai.chat` のときだけ�
 | 外部 URL のフォント・画像・音 | ゲームの中（`godot/`）に同梱する |
 | `JavaScriptBridge` / `OS.execute` / 文字列からのスクリプト生成 | 使わない（Platform との接続は `TokoyoApp` / `TokoyoDevice` / `TokoyoSpace` だけ） |
 | GDExtension / C# / 追加の pack の読み込み | GDScript とシーンだけで書く |
-| 依存パッケージの追加 | Kitの固定lockfileだけを使う。Babylon core/Havok/Rapierはサーバー物理専用。Phaser・Babylon描画・JS codecは提供しない |
+| 依存パッケージの追加 | Kitの固定lockfileだけを使う。サーバー物理もGodot（PhysicsServer2D/3D）。Phaser・Babylon描画・JS codecは提供しない |
 | `manifest.json` に宣言していない Capability の API | 使うものを `capabilities` に宣言する |
 
 `externalNetwork` は常に `false`。広告・解析・外部ログインは入れられない。生成 AI は外部の API を直接呼べず、
@@ -250,16 +250,16 @@ ai/<key>.md          # ゲーム内 AI の指示文（`ai.chat` のときだけ�
 0. `$game-design` の段階 1〜3（企画・見た目の合意・素材の設計）を先に済ませる。見た目と遊びの方向を見せて止まるかは `$game-art-direction` §2 の表で決める
    （新しいゲームは原則見せる。利用者が「確認なしで」「おまかせで最後まで」と言ったときは見せずに作り進める。コンセプトはどちらでも作る）。
    手元に企画のターンは無いので、見せるときは会話でコンセプト画像と企画を示し、承認されたら同じ会話で作り続ける（§2）。1. `<kit>/sdk/sample-godot/`（オンライン対戦は `<kit>/sdk/sample-godot-multiplayer/`）を土台にして、**同じ構成**
-   （`godot/` / `manifest.json` / `package.json` / `debug/` / `.gitattributes`、対戦は `server/main.ts`）でプロジェクトを作る。
+   （`godot/`〔対戦は `godot/server/rules.gd`〕 / `manifest.json` / `package.json` / `debug/` / `.gitattributes`）でプロジェクトを作る。
    `.gitattributes` は画像・音・3D・フォントを Git LFS に置く規則なので必ず写す。
    土台のキューブの場面は依頼のゲームに置き換え、`godot/tokoyo_*.gd`（Platform との接続・移動スティック）はそのまま残す。
    ルールと調整値は GDScript の別ファイルに分ける（`$game-design` §3 の責務。TypeScript で重複して書かない）。
 2. `package.json` の依存は **ローカルパス参照**のまま変えない
    （`"@workspace/app-sdk": "file:/workspace/sdk/app-sdk"` のように、Sandbox 上の実パスへ向ける。
    手元では `file:<kit>/sdk/app-sdk` の絶対パスにする。commit には git のフィルタが `/workspace` の形で入れる。§8）。
-   対戦サーバーで必要な場合だけ、固定のHavok/Rapier依存を参照する。描画はGodot。
+   描画・物理はGodot。
    **rollup / typescriptはKitが固定する**。ゲームの依存へ追加しない。
-3. 対戦は、権威あるルールを `server/main.ts` の `defineSpace`（`@workspace/app-server-sdk`）に書き、画面（GDScript）は
+3. 対戦は、権威あるルールを `godot/server/rules.gd`（`TokoyoRules`）に書き、画面（GDScript）は
    土台の `TokoyoSpace` で接続する（`$game-multiplayer`）。
 4. **ビルドは必ず `kit build` で行う**（Platform も版を合わせるときに、同じソースから同じ手順でビルドし直す）。
    プロジェクトのディレクトリで:
@@ -270,7 +270,7 @@ ai/<key>.md          # ゲーム内 AI の指示文（`ai.chat` のときだけ�
    手元では `source/` の上（作業ディレクトリ）で `node <kit>/scripts/kit.mjs build`（中身は同じ。§8.3）。
 
    `kit build` は `dist/` を消してから、`godot/project.godot` を見つけて Godot を取り込み、Web と native の pack・
-   固定の `app.bundle.js`（Platform との橋渡し）を出す。`server/main.ts` があれば `server.bundle.js` も作り、
+   固定の `app.bundle.js`（Platform との橋渡し）を出す。`godot/server/` があれば `server.pck` も作り、
    続けてハッシュ一覧（`dist/.artifact-index.json`）を書く。ゲームの `build.mjs` は実行されないので書かない
    （ビルドの手順や生成済みの橋渡しのコードを変えない。`$game-godot`）。
    続けて**実際に動かして確かめる**（Godot の import・export が通る、GDScript の構文エラーが無い、
@@ -284,8 +284,8 @@ JS/TSで書くゲーム（canvas・Phaser・three.js・Babylon.jsのクライア
 ルール・素材をGodotへ移し、移行点と未対応機能を`build-report.json`へ記録する。
 manifestは`godot`宣言を必須とし（`renderer`項目は無い）、Web/nativeを同じソースからexportする。
 
-対戦の認可・マッチング・権威あるルール・結果処理は既存Spaceを維持する。`server/main.ts`はTypeScriptの`defineSpace`、
-画面は`TokoyoSpace`。3Dサーバー物理に限りBabylon NullEngine/Havok、2Dサーバー物理に固定Rapierを使える。
+対戦の認可・マッチング・権威あるルール・結果処理は既存Spaceを維持する。ルールはGDScript（`godot/server/rules.gd`）、
+画面は`TokoyoSpace`。サーバー物理もGodotの`PhysicsServer2D/3D`を使う。
 Godot物理との決定的一致を前提にせず、位置と向きの補間だけを描画側で行う。`$game-multiplayer`と`$game-physics`を読む。
 
 ## 5. 絵と音

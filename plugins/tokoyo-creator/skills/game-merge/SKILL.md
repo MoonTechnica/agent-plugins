@@ -85,6 +85,6 @@ Platform の規則（別のゲームとのマージでは `listing/` は ours・
       （`git diff --check` と `git status` に `Unmerged paths` が無いことも）
 - [ ] `manifest.json` と `package.json` が JSON として読める。`manifest.json` の `bundles` は `godot_native` と `godot.regions` の地域だけで、両方の地域の一覧が一致している
 - [ ] `kit build` が通る（Godot の import・export と GDScript の構文）。`godot/rules.gd` があればルールの検査が通る（`$game-playtest`）
-- [ ] 対戦のあるゲームなら `server/main.ts` の `defineSpace` と画面（`TokoyoSpace` の状態・message 名・入力）が食い違っていない（`$game-multiplayer`）
+- [ ] 対戦のあるゲームなら `godot/server/rules.gd` と画面（`TokoyoSpace` の状態・message 名・入力）が食い違っていない（`$game-multiplayer`）
 - [ ] `notes` に衝突ごとの解き方を書いた（衝突 0 件なら「衝突なし」と、ビルドや検証で直したこと）
 - [ ] 新しい機能・見た目の変更を足していない

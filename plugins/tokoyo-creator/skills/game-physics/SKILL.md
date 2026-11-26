@@ -12,21 +12,17 @@ Godot公式の固定版API定義を確認し、高速体の連続衝突・接地
 
 ## 権威あるサーバー物理
 
-Spaceの認可・参加・結果は既存Platformを維持する。ルールは`server/main.ts`の`defineSpace`へ書く。
-3Dは`@workspace/app-server-sdk/physics`のBabylon NullEngine + Havok、2Dは固定Rapier deterministic 0.21.0。
-これはheadless CPU物理であり、Godot側へJSエンジンを追加するための依存ではない。
-APIの正本は`<kit>/sdk/app-server-sdk/spec.md`と同梱型。
+Spaceの認可・参加・結果はPlatformを維持する。ルールは`godot/server/rules.gd`（`TokoyoRules`）へ書く。
+サーバー物理もGodot: 卓ごとに`PhysicsServer2D/3D`のspaceを`space_create`で作り、`space_set_active(true)`にする
+（ノードやSceneは作らない。`$game-multiplayer`）。これはheadless CPU物理であり、描画側のJSエンジンではない。
 
-- 3DのHavok初期化はSpace Server loaderが所有する。ゲームからWASMをfetchしない。
-- `createPhysicsScene(gravity, timestep)`を卓ごとに作る。ノードはTransformNode、shapeは明示してMeshの境界へ依存しない。
-- `step(ctx)`から`stepPhysics(scene, ctx.dt)`を一回呼ぶ。描画側やtimerで進めない。
-- 数値の位置・四元数・速度だけをstateへ写す。内部Scene/bodyをstateへ入れない。
-- SceneはstateをキーにしたWeakMapへ持ち、勝敗・退出・終了時に`disposePhysicsScene(scene)`でbody/shape/engineも破棄する。
-- Rapier worldは卓ごとに作り、固定tickでstepし、終了時に`world.free()`する。
-- 全入力の型・有限値・範囲・手番・終了済みをサーバーで検証する。時間はctx.dt、乱数はseed付き状態から作る。
+- `setup`でbody・shapeを作り、`step(ctx)`で入力を速度・力へ写す。物理はエンジンが固定tickで進める。
+- 数値の位置・回転・速度だけを`ctx.state`へ写す（`PackedFloat32Array`が軽い）。RIDやNodeをstateへ入れない。
+- RIDは自動で解放されない。`_notification(NOTIFICATION_PREDELETE)`でbody・shape・spaceを`free_rid`する。
+- 全入力の型・有限値・範囲・手番・終了済みをサーバーで検証する。時間は`ctx.dt`、乱数は卓ごとのseed付き`RandomNumberGenerator`。
 
 `TokoyoSpace`が送るサーバー状態からGodotで描画し、表示だけを補間する。
-GodotとHavok/Rapierは同じ物理結果になるとは限らない。クライアント予測・reconciler/rollback・練習モードは提供しない。
+画面のGodot物理とサーバーの物理は同じ結果になるとは限らない。クライアント予測・reconciler/rollback・練習モードは提供しない。
 補間した表示位置から被弾・勝敗・成績を確定しない。
 teleport/respawnでは補間履歴を捨てる。履歴には上限を置く。
 

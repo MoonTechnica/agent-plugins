@@ -169,7 +169,7 @@ var require_ms = __commonJS(function(exports, module) {
   }
 });
 
-// frontend/node_modules/debug/src/common.js
+// frontend/node_modules/music-metadata/node_modules/debug/src/common.js
 var require_common = __commonJS(function(exports, module) {
   function setup(env) {
     createDebug.debug = createDebug;
@@ -344,7 +344,7 @@ var require_common = __commonJS(function(exports, module) {
   module.exports = setup;
 });
 
-// frontend/node_modules/debug/src/browser.js
+// frontend/node_modules/music-metadata/node_modules/debug/src/browser.js
 var require_browser = __commonJS(function(exports, module) {
   exports.formatArgs = formatArgs;
   exports.save = save;
@@ -613,7 +613,7 @@ var require_supports_color = __commonJS(function(exports, module) {
   };
 });
 
-// frontend/node_modules/debug/src/node.js
+// frontend/node_modules/music-metadata/node_modules/debug/src/node.js
 var require_node = __commonJS(function(exports, module) {
   var tty = __require("tty");
   var util = __require("util");
@@ -784,7 +784,7 @@ var require_node = __commonJS(function(exports, module) {
   };
 });
 
-// frontend/node_modules/debug/src/index.js
+// frontend/node_modules/music-metadata/node_modules/debug/src/index.js
 var require_src = __commonJS(function(exports, module) {
   if (typeof process === "undefined" || process.type === "renderer" || false || process.__nwjs) {
     module.exports = require_browser();
@@ -3073,6 +3073,521 @@ var require_dist = __commonJS(function(exports) {
     if (TEXT_REGEXP.test(str))
       return `"${str.replace(QUOTE_REGEXP, "\\$&")}"`;
     throw new TypeError(`Invalid parameter value: ${str}`);
+  }
+});
+
+// frontend/node_modules/@tokenizer/inflate/node_modules/debug/src/common.js
+var require_common2 = __commonJS(function(exports, module) {
+  function setup(env) {
+    createDebug.debug = createDebug;
+    createDebug.default = createDebug;
+    createDebug.coerce = coerce;
+    createDebug.disable = disable;
+    createDebug.enable = enable;
+    createDebug.enabled = enabled;
+    createDebug.humanize = require_ms();
+    createDebug.destroy = destroy;
+    Object.keys(env).forEach((key) => {
+      createDebug[key] = env[key];
+    });
+    createDebug.names = [];
+    createDebug.skips = [];
+    createDebug.formatters = {};
+    function selectColor(namespace) {
+      let hash = 0;
+      for (let i = 0;i < namespace.length; i++) {
+        hash = (hash << 5) - hash + namespace.charCodeAt(i);
+        hash |= 0;
+      }
+      return createDebug.colors[Math.abs(hash) % createDebug.colors.length];
+    }
+    createDebug.selectColor = selectColor;
+    function createDebug(namespace) {
+      let prevTime;
+      let enableOverride = null;
+      let namespacesCache;
+      let enabledCache;
+      function debug(...args) {
+        if (!debug.enabled) {
+          return;
+        }
+        const self2 = debug;
+        const curr = Number(new Date);
+        const ms = curr - (prevTime || curr);
+        self2.diff = ms;
+        self2.prev = prevTime;
+        self2.curr = curr;
+        prevTime = curr;
+        args[0] = createDebug.coerce(args[0]);
+        if (typeof args[0] !== "string") {
+          args.unshift("%O");
+        }
+        let index = 0;
+        args[0] = args[0].replace(/%([a-zA-Z%])/g, (match, format) => {
+          if (match === "%%") {
+            return "%";
+          }
+          index++;
+          const formatter = createDebug.formatters[format];
+          if (typeof formatter === "function") {
+            const val = args[index];
+            match = formatter.call(self2, val);
+            args.splice(index, 1);
+            index--;
+          }
+          return match;
+        });
+        createDebug.formatArgs.call(self2, args);
+        const logFn = self2.log || createDebug.log;
+        logFn.apply(self2, args);
+      }
+      debug.namespace = namespace;
+      debug.useColors = createDebug.useColors();
+      debug.color = createDebug.selectColor(namespace);
+      debug.extend = extend;
+      debug.destroy = createDebug.destroy;
+      Object.defineProperty(debug, "enabled", {
+        enumerable: true,
+        configurable: false,
+        get: () => {
+          if (enableOverride !== null) {
+            return enableOverride;
+          }
+          if (namespacesCache !== createDebug.namespaces) {
+            namespacesCache = createDebug.namespaces;
+            enabledCache = createDebug.enabled(namespace);
+          }
+          return enabledCache;
+        },
+        set: (v) => {
+          enableOverride = v;
+        }
+      });
+      if (typeof createDebug.init === "function") {
+        createDebug.init(debug);
+      }
+      return debug;
+    }
+    function extend(namespace, delimiter) {
+      const newDebug = createDebug(this.namespace + (typeof delimiter === "undefined" ? ":" : delimiter) + namespace);
+      newDebug.log = this.log;
+      return newDebug;
+    }
+    function enable(namespaces) {
+      createDebug.save(namespaces);
+      createDebug.namespaces = namespaces;
+      createDebug.names = [];
+      createDebug.skips = [];
+      const split = (typeof namespaces === "string" ? namespaces : "").trim().replace(/\s+/g, ",").split(",").filter(Boolean);
+      for (const ns of split) {
+        if (ns[0] === "-") {
+          createDebug.skips.push(ns.slice(1));
+        } else {
+          createDebug.names.push(ns);
+        }
+      }
+    }
+    function matchesTemplate(search, template) {
+      let searchIndex = 0;
+      let templateIndex = 0;
+      let starIndex = -1;
+      let matchIndex = 0;
+      while (searchIndex < search.length) {
+        if (templateIndex < template.length && (template[templateIndex] === search[searchIndex] || template[templateIndex] === "*")) {
+          if (template[templateIndex] === "*") {
+            starIndex = templateIndex;
+            matchIndex = searchIndex;
+            templateIndex++;
+          } else {
+            searchIndex++;
+            templateIndex++;
+          }
+        } else if (starIndex !== -1) {
+          templateIndex = starIndex + 1;
+          matchIndex++;
+          searchIndex = matchIndex;
+        } else {
+          return false;
+        }
+      }
+      while (templateIndex < template.length && template[templateIndex] === "*") {
+        templateIndex++;
+      }
+      return templateIndex === template.length;
+    }
+    function disable() {
+      const namespaces = [
+        ...createDebug.names,
+        ...createDebug.skips.map((namespace) => "-" + namespace)
+      ].join(",");
+      createDebug.enable("");
+      return namespaces;
+    }
+    function enabled(name) {
+      for (const skip of createDebug.skips) {
+        if (matchesTemplate(name, skip)) {
+          return false;
+        }
+      }
+      for (const ns of createDebug.names) {
+        if (matchesTemplate(name, ns)) {
+          return true;
+        }
+      }
+      return false;
+    }
+    function coerce(val) {
+      if (val instanceof Error) {
+        return val.stack || val.message;
+      }
+      return val;
+    }
+    function destroy() {
+      console.warn("Instance method `debug.destroy()` is deprecated and no longer does anything. It will be removed in the next major version of `debug`.");
+    }
+    createDebug.enable(createDebug.load());
+    return createDebug;
+  }
+  module.exports = setup;
+});
+
+// frontend/node_modules/@tokenizer/inflate/node_modules/debug/src/browser.js
+var require_browser2 = __commonJS(function(exports, module) {
+  exports.formatArgs = formatArgs;
+  exports.save = save;
+  exports.load = load;
+  exports.useColors = useColors;
+  exports.storage = localstorage();
+  exports.destroy = (() => {
+    let warned = false;
+    return () => {
+      if (!warned) {
+        warned = true;
+        console.warn("Instance method `debug.destroy()` is deprecated and no longer does anything. It will be removed in the next major version of `debug`.");
+      }
+    };
+  })();
+  exports.colors = [
+    "#0000CC",
+    "#0000FF",
+    "#0033CC",
+    "#0033FF",
+    "#0066CC",
+    "#0066FF",
+    "#0099CC",
+    "#0099FF",
+    "#00CC00",
+    "#00CC33",
+    "#00CC66",
+    "#00CC99",
+    "#00CCCC",
+    "#00CCFF",
+    "#3300CC",
+    "#3300FF",
+    "#3333CC",
+    "#3333FF",
+    "#3366CC",
+    "#3366FF",
+    "#3399CC",
+    "#3399FF",
+    "#33CC00",
+    "#33CC33",
+    "#33CC66",
+    "#33CC99",
+    "#33CCCC",
+    "#33CCFF",
+    "#6600CC",
+    "#6600FF",
+    "#6633CC",
+    "#6633FF",
+    "#66CC00",
+    "#66CC33",
+    "#9900CC",
+    "#9900FF",
+    "#9933CC",
+    "#9933FF",
+    "#99CC00",
+    "#99CC33",
+    "#CC0000",
+    "#CC0033",
+    "#CC0066",
+    "#CC0099",
+    "#CC00CC",
+    "#CC00FF",
+    "#CC3300",
+    "#CC3333",
+    "#CC3366",
+    "#CC3399",
+    "#CC33CC",
+    "#CC33FF",
+    "#CC6600",
+    "#CC6633",
+    "#CC9900",
+    "#CC9933",
+    "#CCCC00",
+    "#CCCC33",
+    "#FF0000",
+    "#FF0033",
+    "#FF0066",
+    "#FF0099",
+    "#FF00CC",
+    "#FF00FF",
+    "#FF3300",
+    "#FF3333",
+    "#FF3366",
+    "#FF3399",
+    "#FF33CC",
+    "#FF33FF",
+    "#FF6600",
+    "#FF6633",
+    "#FF9900",
+    "#FF9933",
+    "#FFCC00",
+    "#FFCC33"
+  ];
+  function useColors() {
+    if (typeof window !== "undefined" && window.process && (window.process.type === "renderer" || window.process.__nwjs)) {
+      return true;
+    }
+    if (typeof navigator !== "undefined" && navigator.userAgent && navigator.userAgent.toLowerCase().match(/(edge|trident)\/(\d+)/)) {
+      return false;
+    }
+    let m;
+    return typeof document !== "undefined" && document.documentElement && document.documentElement.style && document.documentElement.style.WebkitAppearance || typeof window !== "undefined" && window.console && (window.console.firebug || window.console.exception && window.console.table) || typeof navigator !== "undefined" && navigator.userAgent && (m = navigator.userAgent.toLowerCase().match(/firefox\/(\d+)/)) && parseInt(m[1], 10) >= 31 || typeof navigator !== "undefined" && navigator.userAgent && navigator.userAgent.toLowerCase().match(/applewebkit\/(\d+)/);
+  }
+  function formatArgs(args) {
+    args[0] = (this.useColors ? "%c" : "") + this.namespace + (this.useColors ? " %c" : " ") + args[0] + (this.useColors ? "%c " : " ") + "+" + module.exports.humanize(this.diff);
+    if (!this.useColors) {
+      return;
+    }
+    const c = "color: " + this.color;
+    args.splice(1, 0, c, "color: inherit");
+    let index = 0;
+    let lastC = 0;
+    args[0].replace(/%[a-zA-Z%]/g, (match) => {
+      if (match === "%%") {
+        return;
+      }
+      index++;
+      if (match === "%c") {
+        lastC = index;
+      }
+    });
+    args.splice(lastC, 0, c);
+  }
+  exports.log = console.debug || console.log || (() => {});
+  function save(namespaces) {
+    try {
+      if (namespaces) {
+        exports.storage.setItem("debug", namespaces);
+      } else {
+        exports.storage.removeItem("debug");
+      }
+    } catch (error) {}
+  }
+  function load() {
+    let r;
+    try {
+      r = exports.storage.getItem("debug") || exports.storage.getItem("DEBUG");
+    } catch (error) {}
+    if (!r && typeof process !== "undefined" && "env" in process) {
+      r = process.env.DEBUG;
+    }
+    return r;
+  }
+  function localstorage() {
+    try {
+      return localStorage;
+    } catch (error) {}
+  }
+  module.exports = require_common2()(exports);
+  var { formatters } = module.exports;
+  formatters.j = function(v) {
+    try {
+      return JSON.stringify(v);
+    } catch (error) {
+      return "[UnexpectedJSONParseError]: " + error.message;
+    }
+  };
+});
+
+// frontend/node_modules/@tokenizer/inflate/node_modules/debug/src/node.js
+var require_node2 = __commonJS(function(exports, module) {
+  var tty = __require("tty");
+  var util = __require("util");
+  exports.init = init;
+  exports.log = log;
+  exports.formatArgs = formatArgs;
+  exports.save = save;
+  exports.load = load;
+  exports.useColors = useColors;
+  exports.destroy = util.deprecate(() => {}, "Instance method `debug.destroy()` is deprecated and no longer does anything. It will be removed in the next major version of `debug`.");
+  exports.colors = [6, 2, 3, 4, 5, 1];
+  try {
+    const supportsColor = require_supports_color();
+    if (supportsColor && (supportsColor.stderr || supportsColor).level >= 2) {
+      exports.colors = [
+        20,
+        21,
+        26,
+        27,
+        32,
+        33,
+        38,
+        39,
+        40,
+        41,
+        42,
+        43,
+        44,
+        45,
+        56,
+        57,
+        62,
+        63,
+        68,
+        69,
+        74,
+        75,
+        76,
+        77,
+        78,
+        79,
+        80,
+        81,
+        92,
+        93,
+        98,
+        99,
+        112,
+        113,
+        128,
+        129,
+        134,
+        135,
+        148,
+        149,
+        160,
+        161,
+        162,
+        163,
+        164,
+        165,
+        166,
+        167,
+        168,
+        169,
+        170,
+        171,
+        172,
+        173,
+        178,
+        179,
+        184,
+        185,
+        196,
+        197,
+        198,
+        199,
+        200,
+        201,
+        202,
+        203,
+        204,
+        205,
+        206,
+        207,
+        208,
+        209,
+        214,
+        215,
+        220,
+        221
+      ];
+    }
+  } catch (error) {}
+  exports.inspectOpts = Object.keys(process.env).filter((key) => {
+    return /^debug_/i.test(key);
+  }).reduce((obj, key) => {
+    const prop = key.substring(6).toLowerCase().replace(/_([a-z])/g, (_, k) => {
+      return k.toUpperCase();
+    });
+    let val = process.env[key];
+    if (/^(yes|on|true|enabled)$/i.test(val)) {
+      val = true;
+    } else if (/^(no|off|false|disabled)$/i.test(val)) {
+      val = false;
+    } else if (val === "null") {
+      val = null;
+    } else {
+      val = Number(val);
+    }
+    obj[prop] = val;
+    return obj;
+  }, {});
+  function useColors() {
+    return "colors" in exports.inspectOpts ? Boolean(exports.inspectOpts.colors) : tty.isatty(process.stderr.fd);
+  }
+  function formatArgs(args) {
+    const { namespace: name, useColors } = this;
+    if (useColors) {
+      const c = this.color;
+      const colorCode = "\x1B[3" + (c < 8 ? c : "8;5;" + c);
+      const prefix = `  ${colorCode};1m${name} \x1B[0m`;
+      args[0] = prefix + args[0].split(`
+`).join(`
+` + prefix);
+      args.push(colorCode + "m+" + module.exports.humanize(this.diff) + "\x1B[0m");
+    } else {
+      args[0] = getDate() + name + " " + args[0];
+    }
+  }
+  function getDate() {
+    if (exports.inspectOpts.hideDate) {
+      return "";
+    }
+    return new Date().toISOString() + " ";
+  }
+  function log(...args) {
+    return process.stderr.write(util.formatWithOptions(exports.inspectOpts, ...args) + `
+`);
+  }
+  function save(namespaces) {
+    if (namespaces) {
+      process.env.DEBUG = namespaces;
+    } else {
+      delete process.env.DEBUG;
+    }
+  }
+  function load() {
+    return process.env.DEBUG;
+  }
+  function init(debug) {
+    debug.inspectOpts = {};
+    const keys = Object.keys(exports.inspectOpts);
+    for (let i = 0;i < keys.length; i++) {
+      debug.inspectOpts[keys[i]] = exports.inspectOpts[keys[i]];
+    }
+  }
+  module.exports = require_common2()(exports);
+  var { formatters } = module.exports;
+  formatters.o = function(v) {
+    this.inspectOpts.colors = this.useColors;
+    return util.inspect(v, this.inspectOpts).split(`
+`).map((str) => str.trim()).join(" ");
+  };
+  formatters.O = function(v) {
+    this.inspectOpts.colors = this.useColors;
+    return util.inspect(v, this.inspectOpts);
+  };
+});
+
+// frontend/node_modules/@tokenizer/inflate/node_modules/debug/src/index.js
+var require_src2 = __commonJS(function(exports, module) {
+  if (typeof process === "undefined" || process.type === "renderer" || false || process.__nwjs) {
+    module.exports = require_browser2();
+  } else {
+    module.exports = require_node2();
   }
 });
 
@@ -19794,6 +20309,16 @@ var numberProcessor = (schema, ctx, _json, _params) => {
 var booleanProcessor = (_schema, _ctx, json, _params) => {
   json.type = "boolean";
 };
+var bigintProcessor = (_schema, ctx, _json, _params) => {
+  if (ctx.unrepresentable === "throw") {
+    throw new Error("BigInt cannot be represented in JSON Schema");
+  }
+};
+var symbolProcessor = (_schema, ctx, _json, _params) => {
+  if (ctx.unrepresentable === "throw") {
+    throw new Error("Symbols cannot be represented in JSON Schema");
+  }
+};
 var nullProcessor = (_schema, ctx, json, _params) => {
   if (ctx.target === "openapi-3.0") {
     json.type = "string";
@@ -19808,10 +20333,21 @@ var undefinedProcessor = (_schema, ctx, _json, _params) => {
     throw new Error("Undefined cannot be represented in JSON Schema");
   }
 };
+var voidProcessor = (_schema, ctx, _json, _params) => {
+  if (ctx.unrepresentable === "throw") {
+    throw new Error("Void cannot be represented in JSON Schema");
+  }
+};
 var neverProcessor = (_schema, _ctx, json, _params) => {
   json.not = {};
 };
+var anyProcessor = (_schema, _ctx, _json, _params) => {};
 var unknownProcessor = (_schema, _ctx, _json, _params) => {};
+var dateProcessor = (_schema, ctx, _json, _params) => {
+  if (ctx.unrepresentable === "throw") {
+    throw new Error("Date cannot be represented in JSON Schema");
+  }
+};
 var enumProcessor = (schema, _ctx, json, _params) => {
   const def = schema._zod.def;
   const values = getEnumValues(def.entries);
@@ -19859,14 +20395,69 @@ var literalProcessor = (schema, ctx, json, _params) => {
     json.enum = vals;
   }
 };
+var nanProcessor = (_schema, ctx, _json, _params) => {
+  if (ctx.unrepresentable === "throw") {
+    throw new Error("NaN cannot be represented in JSON Schema");
+  }
+};
+var templateLiteralProcessor = (schema, _ctx, json, _params) => {
+  const _json = json;
+  const pattern = schema._zod.pattern;
+  if (!pattern)
+    throw new Error("Pattern not found in template literal");
+  _json.type = "string";
+  _json.pattern = pattern.source;
+};
+var fileProcessor = (schema, _ctx, json, _params) => {
+  const _json = json;
+  const file = {
+    type: "string",
+    format: "binary",
+    contentEncoding: "binary"
+  };
+  const { minimum, maximum, mime } = schema._zod.bag;
+  if (minimum !== undefined)
+    file.minLength = minimum;
+  if (maximum !== undefined)
+    file.maxLength = maximum;
+  if (mime) {
+    if (mime.length === 1) {
+      file.contentMediaType = mime[0];
+      Object.assign(_json, file);
+    } else {
+      Object.assign(_json, file);
+      _json.anyOf = mime.map((m) => ({ contentMediaType: m }));
+    }
+  } else {
+    Object.assign(_json, file);
+  }
+};
+var successProcessor = (_schema, _ctx, json, _params) => {
+  json.type = "boolean";
+};
 var customProcessor = (_schema, ctx, _json, _params) => {
   if (ctx.unrepresentable === "throw") {
     throw new Error("Custom types cannot be represented in JSON Schema");
   }
 };
+var functionProcessor = (_schema, ctx, _json, _params) => {
+  if (ctx.unrepresentable === "throw") {
+    throw new Error("Function types cannot be represented in JSON Schema");
+  }
+};
 var transformProcessor = (_schema, ctx, _json, _params) => {
   if (ctx.unrepresentable === "throw") {
     throw new Error("Transforms cannot be represented in JSON Schema");
+  }
+};
+var mapProcessor = (_schema, ctx, _json, _params) => {
+  if (ctx.unrepresentable === "throw") {
+    throw new Error("Map cannot be represented in JSON Schema");
+  }
+};
+var setProcessor = (_schema, ctx, _json, _params) => {
+  if (ctx.unrepresentable === "throw") {
+    throw new Error("Set cannot be represented in JSON Schema");
   }
 };
 var arrayProcessor = (schema, ctx, _json, params) => {
@@ -19948,6 +20539,48 @@ var intersectionProcessor = (schema, ctx, json, params) => {
     ...isSimpleIntersection(b) ? b.allOf : [b]
   ];
   json.allOf = allOf;
+};
+var tupleProcessor = (schema, ctx, _json, params) => {
+  const json = _json;
+  const def = schema._zod.def;
+  json.type = "array";
+  const prefixPath = ctx.target === "draft-2020-12" ? "prefixItems" : "items";
+  const restPath = ctx.target === "draft-2020-12" ? "items" : ctx.target === "openapi-3.0" ? "items" : "additionalItems";
+  const prefixItems = def.items.map((x, i) => process2(x, ctx, {
+    ...params,
+    path: [...params.path, prefixPath, i]
+  }));
+  const rest = def.rest ? process2(def.rest, ctx, {
+    ...params,
+    path: [...params.path, restPath, ...ctx.target === "openapi-3.0" ? [def.items.length] : []]
+  }) : null;
+  if (ctx.target === "draft-2020-12") {
+    json.prefixItems = prefixItems;
+    if (rest) {
+      json.items = rest;
+    }
+  } else if (ctx.target === "openapi-3.0") {
+    json.items = {
+      anyOf: prefixItems
+    };
+    if (rest) {
+      json.items.anyOf.push(rest);
+    }
+    json.minItems = prefixItems.length;
+    if (!rest) {
+      json.maxItems = prefixItems.length;
+    }
+  } else {
+    json.items = prefixItems;
+    if (rest) {
+      json.additionalItems = rest;
+    }
+  }
+  const { minimum, maximum } = schema._zod.bag;
+  if (typeof minimum === "number")
+    json.minItems = minimum;
+  if (typeof maximum === "number")
+    json.maxItems = maximum;
 };
 var recordProcessor = (schema, ctx, _json, params) => {
   const json = _json;
@@ -20045,12 +20678,99 @@ var readonlyProcessor = (schema, ctx, json, params) => {
   seen.ref = def.innerType;
   json.readOnly = true;
 };
+var promiseProcessor = (schema, ctx, _json, params) => {
+  const def = schema._zod.def;
+  process2(def.innerType, ctx, params);
+  const seen = ctx.seen.get(schema);
+  seen.ref = def.innerType;
+};
 var optionalProcessor = (schema, ctx, _json, params) => {
   const def = schema._zod.def;
   process2(def.innerType, ctx, params);
   const seen = ctx.seen.get(schema);
   seen.ref = def.innerType;
 };
+var lazyProcessor = (schema, ctx, _json, params) => {
+  const innerType = schema._zod.innerType;
+  process2(innerType, ctx, params);
+  const seen = ctx.seen.get(schema);
+  seen.ref = innerType;
+};
+var allProcessors = {
+  string: stringProcessor,
+  number: numberProcessor,
+  boolean: booleanProcessor,
+  bigint: bigintProcessor,
+  symbol: symbolProcessor,
+  null: nullProcessor,
+  undefined: undefinedProcessor,
+  void: voidProcessor,
+  never: neverProcessor,
+  any: anyProcessor,
+  unknown: unknownProcessor,
+  date: dateProcessor,
+  enum: enumProcessor,
+  literal: literalProcessor,
+  nan: nanProcessor,
+  template_literal: templateLiteralProcessor,
+  file: fileProcessor,
+  success: successProcessor,
+  custom: customProcessor,
+  function: functionProcessor,
+  transform: transformProcessor,
+  map: mapProcessor,
+  set: setProcessor,
+  array: arrayProcessor,
+  object: objectProcessor,
+  union: unionProcessor,
+  intersection: intersectionProcessor,
+  tuple: tupleProcessor,
+  record: recordProcessor,
+  nullable: nullableProcessor,
+  nonoptional: nonoptionalProcessor,
+  default: defaultProcessor,
+  prefault: prefaultProcessor,
+  catch: catchProcessor,
+  pipe: pipeProcessor,
+  readonly: readonlyProcessor,
+  promise: promiseProcessor,
+  optional: optionalProcessor,
+  lazy: lazyProcessor
+};
+function toJSONSchema(input, params) {
+  if ("_idmap" in input) {
+    const registry = input;
+    const ctx = initializeContext({ ...params, processors: allProcessors });
+    const defs = {};
+    for (const entry of registry._idmap.entries()) {
+      const [_, schema] = entry;
+      process2(schema, ctx);
+    }
+    const schemas = {};
+    const external = {
+      registry,
+      uri: params?.uri,
+      defs
+    };
+    ctx.external = external;
+    for (const entry of registry._idmap.entries()) {
+      const [key, schema] = entry;
+      extractDefs(ctx, schema);
+      schemas[key] = finalize(ctx, schema);
+    }
+    if (Object.keys(defs).length > 0) {
+      const defsSegment = ctx.target === "draft-2020-12" ? "$defs" : "definitions";
+      schemas.__shared = {
+        [defsSegment]: defs
+      };
+    }
+    return { schemas };
+  }
+  const ctx = initializeContext({ ...params, processors: allProcessors });
+  process2(input, ctx);
+  extractDefs(ctx, input);
+  return finalize(ctx, input);
+}
 // frontend/node_modules/zod/v4/classic/iso.js
 var exports_iso = {};
 __export(exports_iso, {
@@ -21083,6 +21803,17 @@ var CAPTURE_MAX_BYTES = 2 * 1024 * 1024;
 var SHARE_TEXT_MAX_CHARS = 100;
 var AI_HISTORY_MAX_BYTES = 32 * 1024;
 var DEVICE_MICROPHONE_MAX_SAMPLE_RATE = 48000;
+var TELEMETRY_BATCH_MAX_BYTES = 32 * 1024;
+var TELEMETRY_FINGERPRINTS_PER_SESSION_MAX = 50;
+var TELEMETRY_EVENTS_PER_SESSION_MAX = 500;
+var TELEMETRY_ERROR_STACK_MAX_BYTES = 4 * 1024;
+var TELEMETRY_ERROR_MESSAGE_MAX_CHARS = 500;
+var TELEMETRY_CUSTOM_MONITORS_MAX = 8;
+var TELEMETRY_FRAME_HIST_BUCKETS = 51;
+var TELEMETRY_NAME_MAX_CHARS = 32;
+var TELEMETRY_SCREENS_MAX = 64;
+var TELEMETRY_EVENT_KINDS_MAX = 32;
+var TELEMETRY_EVENT_PROPS_MAX = 4;
 
 // frontend/packages/app-protocol/src/manifest.ts
 var MANIFEST_VERSION = 1;
@@ -21136,7 +21867,7 @@ var spaceParticipantsSchema = strictObject({
   return roleMin <= min && max <= roleMax;
 }, { error: "participants must fit the roles (sum of role mins <= min, max <= sum of role maxes)" });
 var spaceManifestSchema = strictObject({
-  server: artifactPathSchema,
+  server: literal("server.pck"),
   participants: spaceParticipantsSchema,
   maxDurationSec: int().min(SPACE_MIN_DURATION_SEC).max(SPACE_MAX_DURATION_SEC).default(SPACE_DEFAULT_DURATION_SEC)
 });
@@ -21176,6 +21907,32 @@ var leaderboardSchema = strictObject({
   verifiedOnly: boolean2().default(false)
 });
 var leaderboardsManifestSchema = record(lowerIdentifierSchema, leaderboardSchema).refine((boards) => Object.keys(boards).length <= LEADERBOARD_MAX_BOARDS, `at most ${LEADERBOARD_MAX_BOARDS} leaderboards`);
+var ANALYTICS_ENUM_MAX = 16;
+var analyticsPropSchema = union([
+  _enum(["int", "float", "bool"]),
+  array(lowerIdentifierSchema).min(1).max(ANALYTICS_ENUM_MAX).refine((v) => new Set(v).size === v.length, "enum values must be unique")
+]);
+var analyticsEventSchema = strictObject({
+  props: record(lowerIdentifierSchema, analyticsPropSchema).refine((p) => Object.keys(p).length <= TELEMETRY_EVENT_PROPS_MAX, `at most ${TELEMETRY_EVENT_PROPS_MAX} props per event`)
+});
+var ANALYTICS_FUNNELS_MAX = 8;
+var ANALYTICS_FUNNEL_STEPS_MAX = 10;
+var analyticsManifestSchema = strictObject({
+  events: record(lowerIdentifierSchema, analyticsEventSchema).refine((e) => Object.keys(e).length <= TELEMETRY_EVENT_KINDS_MAX, `at most ${TELEMETRY_EVENT_KINDS_MAX} events`),
+  funnels: record(lowerIdentifierSchema, array(lowerIdentifierSchema).min(2).max(ANALYTICS_FUNNEL_STEPS_MAX)).refine((f) => Object.keys(f).length <= ANALYTICS_FUNNELS_MAX, `at most ${ANALYTICS_FUNNELS_MAX} funnels`)
+}).superRefine((analytics, ctx) => {
+  for (const [name, steps] of Object.entries(analytics.funnels)) {
+    for (const step of steps) {
+      if (!(step in analytics.events)) {
+        ctx.addIssue({
+          code: "custom",
+          path: ["funnels", name],
+          message: `funnel step "${step}" is not a declared event`
+        });
+      }
+    }
+  }
+});
 var DOCUMENT_FIELD_TYPES = [...STORE_FIELD_TYPES, "json"];
 var documentFieldSchema = strictObject({
   type: _enum(DOCUMENT_FIELD_TYPES),
@@ -21266,6 +22023,7 @@ var manifestSchema = strictObject({
   documentSchema: documentSchemaSchema.nullable().default(null),
   ai: aiManifestSchema.nullable().default(null),
   device: deviceManifestSchema.default({}),
+  analytics: analyticsManifestSchema.optional(),
   godot: godotManifestSchema
 }).superRefine((manifest, ctx) => {
   const declared = new Set([GODOT_NATIVE_BUNDLE, ...manifest.godot.regions]);
@@ -21335,7 +22093,9 @@ ${lines.join(`
 `), hash);
 }
 var ARTIFACT_INDEX_PATH = ".artifact-index.json";
-var SERVER_BUNDLE_PATH = "server.bundle.js";
+var SERVER_PACK_PATH = "server.pck";
+var SERVER_FILE_PATHS = [SERVER_PACK_PATH];
+var isServerFile = (path) => SERVER_FILE_PATHS.includes(path);
 var artifactIndexSchema = strictObject({
   artifactHash: string2().regex(SHA256_HEX),
   entrypoint: artifactPathSchema,
@@ -21358,7 +22118,7 @@ function planBundles(manifest, files) {
   for (const file of files) {
     const segments = file.path.split("/");
     if (segments[0] !== BUNDLES_DIR) {
-      if (file.path === SERVER_BUNDLE_PATH)
+      if (isServerFile(file.path))
         continue;
       initial.files.push(file);
       initial.size += file.size;
@@ -21497,6 +22257,57 @@ var commerceConsumptionSchema = strictObject({
   receipt_id: uuid2(),
   request_key: uuid2(),
   consumed_at: exports_iso.datetime({ offset: true })
+});
+// frontend/packages/app-protocol/src/conformance.ts
+var SCENARIO_FEATURES = ["telemetry", "store", "leaderboard", "documents"];
+var SCENARIO_EXPANDED_MAX_BYTES = 1024 * 1024;
+var playerId = string2().regex(/^p[1-9]$/);
+var stepSchema = strictObject({
+  op: string2().regex(/^[a-z]+(\.[a-zA-Z]+)+$/),
+  as: playerId,
+  atS: int().min(0).max(30 * 24 * 3600),
+  args: unknown(),
+  repeat: strictObject({ count: int().min(2).max(5000), everyS: int().min(1) }).optional(),
+  expect: union([
+    strictObject({ ok: literal(true) }),
+    strictObject({ errorCode: errorCodeSchema })
+  ]),
+  invalidBecause: _enum(["shape", "size"]).optional()
+});
+var scenarioSchema = strictObject({
+  name: string2().min(1).max(120),
+  feature: _enum(SCENARIO_FEATURES),
+  description: string2().max(400).optional(),
+  setup: strictObject({
+    players: array(playerId).min(1).max(8),
+    analytics: analyticsManifestSchema.optional()
+  }),
+  steps: array(stepSchema).min(1).max(50)
+}).superRefine((scenario, ctx) => {
+  let previous = 0;
+  scenario.steps.forEach((step, i) => {
+    if (!scenario.setup.players.includes(step.as)) {
+      ctx.addIssue({
+        code: "custom",
+        path: ["steps", i, "as"],
+        message: `unknown player ${step.as}`
+      });
+    }
+    if (step.atS < previous) {
+      ctx.addIssue({
+        code: "custom",
+        path: ["steps", i, "atS"],
+        message: "time must not go backwards"
+      });
+    }
+    previous = step.atS + (step.repeat ? (step.repeat.count - 1) * step.repeat.everyS : 0);
+  });
+});
+var fillSchema = strictObject({
+  $fill: strictObject({ char: string2().length(1), length: int().min(0).max(1e7) })
+});
+var repeatSchema = strictObject({
+  $repeat: strictObject({ count: int().min(0).max(1000), item: unknown() })
 });
 // frontend/packages/app-protocol/src/debug.ts
 var DEBUG_CATALOG_PATH = "debug/catalog.json";
@@ -21713,6 +22524,14 @@ var GRAPHICS_FPS = new Set(["auto", 24, 30, 60]);
 // frontend/packages/app-protocol/src/godot-runtime.ts
 var GODOT_WEB_GLUE_SHA256 = "8a7c7d57f7da69bb71da9de302480b87e4c7ecb467ce643665b4a288683cd18f";
 var GODOT_WEB_WASM_SHA256 = "6498359ba889796a0d95a2f71113ac184badc0f2d84cf28f4103c7e399d2d547";
+// frontend/packages/app-protocol/src/godot-variant.ts
+var FLAG_64 = 1 << 16;
+var DEFAULT_LIMITS = {
+  maxDepth: 16,
+  maxItems: 1e5,
+  maxBytes: 1024 * 1024,
+  plain: false
+};
 // frontend/packages/app-protocol/src/messages.ts
 var slotSchema = int().min(1);
 var nonceSchema = string2().length(32);
@@ -22027,6 +22846,7 @@ var outcomeSchema = _enum(OUTCOMES);
 var outcomesSchema = record(string2().regex(/^[1-9]\d*$/, "must be a slot number (1-based)"), outcomeSchema);
 var ranksSchema = record(string2().regex(/^[1-9]\d*$/, "must be a slot number (1-based)"), int().min(1));
 var scoresSchema = record(string2().regex(/^[1-9]\d*$/, "must be a slot number (1-based)"), record(lowerIdentifierSchema, number2().finite()));
+var SPACE_PLATFORM_MESSAGE_PREFIX = "platform:";
 var spacePlayersPayloadSchema = array(strictObject({
   slot: slotSchema,
   role: string2().min(1),
@@ -22090,6 +22910,117 @@ var screenshotResultMessageSchema = discriminatedUnion("ok", [
     reason: _enum(["unavailable", "failed"])
   })
 ]);
+// frontend/packages/app-protocol/src/space-wire.ts
+var SPACE_WIRE_VERSION = 1;
+var SPACE_INPUT_FIELDS_MAX = 64;
+var fieldName = string2().regex(/^[A-Za-z][A-Za-z0-9_]{0,31}$/);
+var spaceInputFieldSchema = strictObject({
+  n: fieldName,
+  k: _enum(["f", "b"]),
+  d: union([number2().finite(), boolean2()])
+}).refine((f) => f.k === "f" ? typeof f.d === "number" : typeof f.d === "boolean", {
+  message: "default must match the field kind"
+});
+var spaceWelcomeSchema = strictObject({
+  t: literal("welcome"),
+  v: literal(SPACE_WIRE_VERSION),
+  slot: slotSchema,
+  input: strictObject({
+    stepMs: number2().positive().max(1000),
+    fields: array(spaceInputFieldSchema).max(SPACE_INPUT_FIELDS_MAX)
+  })
+});
+var spaceServerTextSchema = discriminatedUnion("t", [
+  spaceWelcomeSchema,
+  strictObject({ t: literal("players"), players: spacePlayersPayloadSchema }),
+  spaceFinishedPayloadSchema.extend({ t: literal("finished") }),
+  strictObject({ t: literal("msg"), type: string2().min(1), payload: unknown() }),
+  strictObject({ t: literal("error"), code: string2().min(1) })
+]);
+var spaceClientTextSchema = discriminatedUnion("t", [
+  strictObject({
+    t: literal("hello"),
+    v: literal(SPACE_WIRE_VERSION),
+    space: string2().min(1),
+    slot: slotSchema,
+    token: string2().min(1)
+  }),
+  strictObject({
+    t: literal("msg"),
+    type: string2().min(1).refine((type) => !type.startsWith(SPACE_PLATFORM_MESSAGE_PREFIX)),
+    payload: unknown()
+  })
+]);
+var SPACE_WIRE_TEXT_MAX_BYTES = SPACE_MESSAGE_MAX_BYTES * 4;
+var FORBIDDEN_KEYS = new Set(["__proto__", "constructor", "prototype"]);
+// frontend/packages/app-protocol/src/telemetry.ts
+var nameSchema = string2().max(TELEMETRY_NAME_MAX_CHARS).regex(/^[a-z][a-z0-9_]*$/);
+var utf8Bytes = (s) => new TextEncoder().encode(s).length;
+var telemetryEnvironmentSchema = _enum(["production", "preview", "development"]);
+var telemetryPlatformSchema = _enum(["web", "ios", "android"]);
+var telemetryDeviceClassSchema = _enum(["low", "mid", "high", "unknown"]);
+var telemetryEndReasonSchema = _enum([
+  "closed",
+  "disconnected",
+  "error",
+  "hidden",
+  "unknown"
+]);
+var telemetryErrorTypeSchema = _enum(["script", "engine", "shader", "native", "other"]);
+var count = int().min(0).max(1e9);
+var finite = number2().finite();
+var telemetrySessionSchema = strictObject({
+  durationS: int().min(0).max(7 * 24 * 3600),
+  endReason: telemetryEndReasonSchema,
+  bootMs: int().min(0).max(10 * 60 * 1000),
+  frameMsHist: array(count).length(TELEMETRY_FRAME_HIST_BUCKETS),
+  fpsP5: finite.min(0).max(1000),
+  peakNodes: count,
+  peakMemMb: int().min(0).max(1e6).optional(),
+  custom: record(nameSchema, finite).refine((v) => Object.keys(v).length <= TELEMETRY_CUSTOM_MONITORS_MAX)
+});
+var telemetryErrorSchema = strictObject({
+  fingerprint: string2().regex(/^[0-9a-f]{16}$/),
+  errorType: telemetryErrorTypeSchema,
+  message: string2().max(TELEMETRY_ERROR_MESSAGE_MAX_CHARS),
+  file: string2().max(256),
+  line: int().min(0).max(1e7),
+  count: int().min(1).max(1e9),
+  backtrace: string2().refine((v) => utf8Bytes(v) <= TELEMETRY_ERROR_STACK_MAX_BYTES).optional()
+});
+var telemetryScreenSchema = strictObject({
+  screen: nameSchema,
+  seconds: int().min(0).max(7 * 24 * 3600),
+  frameMsP95: finite.min(0).max(60000)
+});
+var eventPropValue = union([finite, boolean2(), nameSchema]);
+var telemetryEventSchema = strictObject({
+  name: nameSchema,
+  count: int().min(1).max(TELEMETRY_EVENTS_PER_SESSION_MAX),
+  props: record(nameSchema, eventPropValue).refine((v) => Object.keys(v).length <= TELEMETRY_EVENT_PROPS_MAX)
+});
+var telemetryBatchSchema = strictObject({
+  v: literal(1),
+  environment: telemetryEnvironmentSchema,
+  platform: telemetryPlatformSchema,
+  deviceClass: telemetryDeviceClassSchema,
+  session: telemetrySessionSchema,
+  errors: array(telemetryErrorSchema).max(TELEMETRY_FINGERPRINTS_PER_SESSION_MAX),
+  screens: array(telemetryScreenSchema).max(TELEMETRY_SCREENS_MAX),
+  events: array(telemetryEventSchema).max(TELEMETRY_EVENT_KINDS_MAX)
+}).refine((b) => b.events.reduce((n, e) => n + e.count, 0) <= TELEMETRY_EVENTS_PER_SESSION_MAX, {
+  message: "events exceed the per-session limit",
+  path: ["events"]
+});
+var telemetryBatchJsonSchema = toJSONSchema(telemetryBatchSchema, {
+  io: "input",
+  unrepresentable: "any"
+});
+// frontend/packages/app-protocol/src/telemetry-text.ts
+var FNV_OFFSET = BigInt("0xcbf29ce484222325");
+var FNV_PRIME = BigInt("0x100000001b3");
+var MASK_64 = BigInt("0xffffffffffffffff");
+var LAST_BUCKET = TELEMETRY_FRAME_HIST_BUCKETS - 1;
 // frontend/packages/app-validator/src/version.ts
 var VALIDATOR_VERSION = "1.1.0";
 
@@ -22426,41 +23357,12 @@ var CODE_RULES = [
     why: "reaching into __platform directly instead of importing the SDK"
   },
   {
-    code: "SPACE_API_V1",
-    pattern: /\.space\s*\.\s*(?:send|subscribe)\s*\(/,
-    severity: "error",
-    why: "app.space.send / subscribe were removed; join the space with app.space.join(definition) and use the session"
-  },
-  {
     code: "SERVICE_WORKER",
     pattern: /navigator\s*\.\s*serviceWorker/,
     severity: "error",
     why: "a service worker would outlive the Launch and its capabilities"
   }
 ];
-var SERVER_RULES = [
-  {
-    code: "SERVER_NODE_API",
-    pattern: /\brequire\s*\(|\bprocess\s*\.|from\s*['"]node:/,
-    why: "a space definition only gets its ctx; Node APIs (process, require, node:*) are off limits"
-  },
-  {
-    code: "SERVER_NETWORK",
-    pattern: /\b(?:fetch|WebSocket|XMLHttpRequest)\s*\(/,
-    why: "a space definition has no network; everything goes through ctx.send / ctx.broadcast / ctx.state"
-  },
-  {
-    code: "SERVER_TIMERS",
-    pattern: /(?<![.\w])set(?:Timeout|Interval)\s*\(/,
-    why: "timers run outside the space: they keep firing after finish and escape the step budget; use tickRate / step and ctx.elapsedMs"
-  }
-];
-var SERVER_ALLOWED_IMPORTS = new Set([
-  "@workspace/app-server-sdk",
-  "@workspace/app-server-sdk/physics",
-  "@dimforge/rapier2d-compat",
-  "@dimforge/rapier2d-deterministic-compat"
-]);
 var AI_PROMPT_PATH = /^ai\/([a-z0-9][a-z0-9_-]{0,31})\.md$/;
 var AI_SCHEMA_PATH = /^ai\/schemas\/([A-Za-z0-9_-]{1,64})\.json$/;
 function extensionOf(path) {
@@ -22512,12 +23414,12 @@ function validateStatic(files, options = {}) {
     const server = byPath.get(manifest.space.server);
     if (!server) {
       errors.push({
-        code: "MISSING_SERVER_BUNDLE",
+        code: "MISSING_SERVER_PACK",
         message: `the manifest declares a space server "${manifest.space.server}" that is missing`,
         path: manifest.space.server
       });
     } else {
-      validateServerBundle(server, errors);
+      validateServerPack(server, errors);
     }
     const { min, max } = manifest.space.participants;
     if (min < SPACE_PARTICIPANTS_MIN || max > SPACE_PARTICIPANTS_MAX) {
@@ -22774,38 +23676,31 @@ function isJsonObject(source) {
     return false;
   }
 }
-function validateServerBundle(server, errors) {
-  const source = decode2(server);
-  const hasDefaultExport = /\bexport\s+default\b/.test(source) || /\bexport\s*\{[^}]*\bas\s+default\b[^}]*\}/.test(source);
-  if (!hasDefaultExport) {
+var SERVER_PACK_FORBIDDEN = [
+  /\bOS\s*\.\s*(?:execute|create_process|create_instance|shell_open|shell_show_in_file_manager|kill)\b/,
+  /\b(?:bytes_to_var|var_to_bytes)_with_objects\b/,
+  /\ballow_object(?:s|_decoding)\b/,
+  /\bGDExtension(?:Manager)?\b/
+];
+function validateServerPack(server, errors) {
+  const magic = new TextDecoder().decode(server.bytes.subarray(0, 4));
+  if (magic !== "GDPC") {
     errors.push({
-      code: "SERVER_NO_DEFAULT_EXPORT",
-      message: "server.bundle.js must `export default defineSpace({ … })`",
+      code: "SERVER_PACK_INVALID",
+      message: "server.pck is not a Godot pack (it must start with GDPC)",
       path: server.path
     });
+    return;
   }
-  const usesDefineSpace = /\bimport\s*\{[^}]*\bdefineSpace\b[^}]*\}\s*from\s*['"]@workspace\/app-server-sdk['"]/.test(source);
-  if (!usesDefineSpace) {
-    errors.push({
-      code: "SERVER_NOT_DEFINE_SPACE",
-      message: "server.bundle.js must build its default export with defineSpace from @workspace/app-server-sdk (a plain function default export is the removed v1 form)",
-      path: server.path
-    });
-  }
-  const imports = [...source.matchAll(/\bfrom\s*['"]([^'"]+)['"]/g)].map((match) => match[1]);
-  for (const specifier of imports) {
-    if (specifier !== undefined && SERVER_ALLOWED_IMPORTS.has(specifier))
+  const source = new TextDecoder("utf-8", { fatal: false }).decode(server.bytes);
+  for (const pattern of SERVER_PACK_FORBIDDEN) {
+    if (!pattern.test(source))
       continue;
     errors.push({
-      code: "SERVER_EXTERNAL_IMPORT",
-      message: `server.bundle.js imports "${specifier}"; only @workspace/app-server-sdk, @workspace/app-server-sdk/physics and the bundled Rapier2D are allowed`,
+      code: "SERVER_PACK_FORBIDDEN_API",
+      message: `server.pck uses a forbidden API (${pattern.source.slice(0, 40)}…)`,
       path: server.path
     });
-  }
-  for (const rule of SERVER_RULES) {
-    if (rule.pattern.test(source)) {
-      errors.push({ code: rule.code, message: rule.why, path: server.path });
-    }
   }
 }
 
@@ -22856,7 +23751,7 @@ function buildArtifactIndex(files, input) {
 var key2 = string2().trim().min(1).max(64);
 var duration3 = number2().int().min(0).max(30000);
 var point = { x: number2().finite().min(0), y: number2().finite().min(0) };
-var stepSchema = discriminatedUnion("type", [
+var stepSchema2 = discriminatedUnion("type", [
   object({ type: literal("press"), key: key2 }).strict(),
   object({ type: literal("hold"), keys: array(key2).min(1).max(8), ms: duration3 }).strict(),
   object({ type: literal("click"), ...point }).strict(),
@@ -22871,7 +23766,7 @@ var observationPlanSchema = object({
     height: number2().int().min(240).max(1920)
   }).strict(),
   inputMode: _enum(["touch", "keyboard-pointer"]).default("keyboard-pointer"),
-  steps: array(stepSchema).min(1).max(64)
+  steps: array(stepSchema2).min(1).max(64)
 }).strict().superRefine((plan, ctx) => {
   let scheduledMs = 0;
   const captures = new Set;
@@ -32438,7 +33333,7 @@ init_core();
 
 // frontend/node_modules/@tokenizer/inflate/lib/ZipHandler.js
 init_lib3();
-var import_debug4 = __toESM(require_src(), 1);
+var import_debug4 = __toESM(require_src2(), 1);
 
 // frontend/node_modules/@tokenizer/inflate/lib/ZipToken.js
 init_lib3();

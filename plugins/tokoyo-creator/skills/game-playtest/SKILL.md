@@ -71,7 +71,7 @@ Platformの毎版検証やthoroughを自動で増やす指示ではない。描�
 4. 結果を `design/playtest.md` の「結果」に写す。
 
 - 世界生成・保存往復・クエスト遷移など独立した重要性質の検査は必要なら追加する。実装をなぞるだけのテストは書かない。
-- 対戦の勝敗・手番は `server/main.ts` の `defineSpace` が持つ（`$game-multiplayer`）。画面側の `rules.gd` で勝敗を決めない。
+- 対戦の勝敗・手番は `godot/server/rules.gd` が持つ（`$game-multiplayer`）。画面側の `rules.gd` で勝敗を決めない。
 - 数値を直すときは `godot/tuning.gd` だけを変えて回し直す。
 
 ## 3. Platform の試遊（検証のついで）

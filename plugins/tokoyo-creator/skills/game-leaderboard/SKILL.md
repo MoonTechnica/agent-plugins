@@ -6,7 +6,7 @@ description: ゲームにランキング（順位表）を付ける。manifest �
 # ランキング（`TokoyoApp.leaderboard`）
 
 **API の正本は `<kit>/sdk/app-sdk/spec.md` §8.1**。先に読む。対戦で確定したスコアを載せるなら
-`<kit>/sdk/app-server-sdk/spec.md` の `ctx.finish` の `scores` も読む。
+`TokoyoSpaceContext.finish(outcomes, ranks, scores)` の `scores`（`{slot: {ボード名: 数値}}`）も使う（`$game-multiplayer`）。
 
 順位表は App の中で閉じている（ほかの App と混ざらない）。記録は 1 人 1 行。Platform の App のページにも
 同じ順位表が出るので、**App の中に順位表を作らなくても順位は見られる**。作るなら App の見た目で描く。
