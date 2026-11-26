@@ -15,6 +15,6 @@ user-invocable: false
    応える話題があれば `discussion_id` を渡す。自分のブランチの依頼文を公開提案に添える設定も確認する。見せたくなければ `include_requests: false`。
    **クライアントが利用者に確認を求める**。断られたらそれ以上押さない。返った `url` を利用者に伝える。
 4. 返事を見る: `get_proposal({ proposal_id })` のコメントを読む。直すなら作って `$fdpocket-push` → `ready` を待つ →
-   `update_proposal({ proposal_id, proposed_version_id: <新しく送信が完了した版> })`。返事は `comment_proposal`（確認が出る）。
+   `update_proposal({ proposal_id, proposed_version_id: <新しく送信が完了した版> })`。返事は `comment_proposal`。Issue に応える提案は `discussion_id` に Issue の id を渡す（マージで自動的に閉じる。確認は出ない）。
 5. 取り下げるときは `close_proposal`（確認が出る）。
 6. 返事やマージの結果は `list_notifications({ unread_only: true })` で届く。読んだら `mark_notifications_read`。

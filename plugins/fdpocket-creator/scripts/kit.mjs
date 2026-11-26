@@ -321139,14 +321139,29 @@ init_src2();
 
 // frontend/packages/miniapp-kit/src/approval.ts
 var ASK_A_PERSON_TOOLS = [
+  "grant_session_consent",
+  "adopt_branch",
+  "publish_project"
+];
+var AUTO_APPROVE_TOOLS = [
+  "create_issue",
+  "comment_issue",
+  "update_issue",
+  "edit_issue_comment",
+  "set_issue_state",
+  "manage_issue",
+  "delete_issue",
   "open_proposal",
+  "update_proposal",
   "close_proposal",
   "request_proposal_changes",
   "comment_proposal",
   "merge_proposal",
-  "grant_session_consent",
-  "adopt_branch",
-  "publish_project"
+  "open_pull_request",
+  "comment_pull_request",
+  "update_pull_request",
+  "set_pull_request_state",
+  "merge_pull_request"
 ];
 function codexApprovalToml(pluginId, server2) {
   const table = `plugins."${pluginId}".mcp_servers.${server2}`;
@@ -321157,6 +321172,11 @@ function codexApprovalToml(pluginId, server2) {
       "",
       `[${table}.tools.${tool}]`,
       'approval_mode = "approve"'
+    ]),
+    ...AUTO_APPROVE_TOOLS.flatMap((tool) => [
+      "",
+      `[${table}.tools.${tool}]`,
+      'approval_mode = "auto"'
     ])
   ].join(`
 `);

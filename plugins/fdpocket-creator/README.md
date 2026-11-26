@@ -147,6 +147,134 @@ In Codex, call the Skills with `$`:
 | `$fdpocket-remix` | Contribute to a published app. |
 | `$fdpocket-propose` | Propose your branch's changes to main. |
 | `$fdpocket-proposals` | Review proposals sent to your app. |
+| `$fdpocket-issues` | Read, file, comment on, close and reopen Issues. |
+| `$fdpocket-release` | Owners and app admins: bring your branch into main and publish, after the mandatory checks. |
+
+### 3. Approval settings
+
+Like GitHub, writing Issues and proposals (create, comment, edit, open / close / merge) needs no confirmation, so
+they run without a prompt. Bringing a branch into main (`adopt_branch`) and publishing (`publish_project`) reach
+everyone, so they stay approval-only.
+Codex plugins cannot ship this setting, so add the following to `~/.codex/config.toml`
+(`node <kit>/scripts/kit.mjs codex-config` prints the same text, and `codex-config --write` writes it there for you,
+replacing an earlier copy and keeping the rest of the file):
+
+```toml
+[plugins."fdpocket-creator@moon-technica".mcp_servers.fdpocket]
+default_tools_approval_mode = "writes"
+
+[plugins."fdpocket-creator@moon-technica".mcp_servers.fdpocket.tools.grant_session_consent]
+approval_mode = "approve"
+
+[plugins."fdpocket-creator@moon-technica".mcp_servers.fdpocket.tools.adopt_branch]
+approval_mode = "approve"
+
+[plugins."fdpocket-creator@moon-technica".mcp_servers.fdpocket.tools.publish_project]
+approval_mode = "approve"
+
+[plugins."fdpocket-creator@moon-technica".mcp_servers.fdpocket.tools.create_issue]
+approval_mode = "auto"
+
+[plugins."fdpocket-creator@moon-technica".mcp_servers.fdpocket.tools.comment_issue]
+approval_mode = "auto"
+
+[plugins."fdpocket-creator@moon-technica".mcp_servers.fdpocket.tools.update_issue]
+approval_mode = "auto"
+
+[plugins."fdpocket-creator@moon-technica".mcp_servers.fdpocket.tools.edit_issue_comment]
+approval_mode = "auto"
+
+[plugins."fdpocket-creator@moon-technica".mcp_servers.fdpocket.tools.set_issue_state]
+approval_mode = "auto"
+
+[plugins."fdpocket-creator@moon-technica".mcp_servers.fdpocket.tools.manage_issue]
+approval_mode = "auto"
+
+[plugins."fdpocket-creator@moon-technica".mcp_servers.fdpocket.tools.delete_issue]
+approval_mode = "auto"
+
+[plugins."fdpocket-creator@moon-technica".mcp_servers.fdpocket.tools.open_proposal]
+approval_mode = "auto"
+
+[plugins."fdpocket-creator@moon-technica".mcp_servers.fdpocket.tools.update_proposal]
+approval_mode = "auto"
+
+[plugins."fdpocket-creator@moon-technica".mcp_servers.fdpocket.tools.close_proposal]
+approval_mode = "auto"
+
+[plugins."fdpocket-creator@moon-technica".mcp_servers.fdpocket.tools.request_proposal_changes]
+approval_mode = "auto"
+
+[plugins."fdpocket-creator@moon-technica".mcp_servers.fdpocket.tools.comment_proposal]
+approval_mode = "auto"
+
+[plugins."fdpocket-creator@moon-technica".mcp_servers.fdpocket.tools.merge_proposal]
+approval_mode = "auto"
+
+[plugins."fdpocket-creator@moon-technica".mcp_servers.fdpocket.tools.open_pull_request]
+approval_mode = "auto"
+
+[plugins."fdpocket-creator@moon-technica".mcp_servers.fdpocket.tools.comment_pull_request]
+approval_mode = "auto"
+
+[plugins."fdpocket-creator@moon-technica".mcp_servers.fdpocket.tools.update_pull_request]
+approval_mode = "auto"
+
+[plugins."fdpocket-creator@moon-technica".mcp_servers.fdpocket.tools.set_pull_request_state]
+approval_mode = "auto"
+
+[plugins."fdpocket-creator@moon-technica".mcp_servers.fdpocket.tools.merge_pull_request]
+approval_mode = "auto"
+```
+
+### Update
+
+```text
+/plugin marketplace update moon-technica
+/plugin update fdpocket-creator@moon-technica
+/reload-plugins
+```
+
+Then ask the agent to run `kit.mjs link` in each working directory. `kit push` and `kit doctor` tell you when a newer Kit is out.
+
+To update automatically, run `/plugin`, open the **Marketplaces** tab, select `moon-technica`, and choose **Enable auto-update**
+(auto-update is off by default for this marketplace).
+
+## Quick start (Claude app)
+
+You can install the Kit from the Claude desktop app without typing any commands.
+
+1. Open **Customize → Plugins**, choose **Add → Add marketplace**, and enter `https://github.com/MoonTechnica/agent-plugins`.
+2. Add **FDPocket Developer Kit** from the list.
+3. Open the **Code** tab, pick a working folder, and use the same commands as in Claude Code (for example `/fdpocket-creator:new`).
+
+The plugin is saved to your Claude account, so it also appears in Claude Code on your computer.
+Building and pushing run on your computer, so use the **Code** tab (chat cannot run the Kit's tools).
+
+## Quick start (Codex)
+
+### 1. Install
+
+```text
+codex plugin marketplace add https://github.com/MoonTechnica/agent-plugins
+codex plugin add fdpocket-creator@moon-technica
+```
+
+Then start a new Codex session. The first time the agent uses FDPocket, your browser opens and you approve the login once. (You can also install from `/plugins` inside Codex.)
+
+### 2. Use it
+
+In Codex, call the Skills with `$`:
+
+| Skill | What it does |
+|---|---|
+| `$fdpocket-new` | Start a new mini-app. |
+| `$fdpocket-pull` | Bring an existing app's latest version to your machine. |
+| `$fdpocket-push` | Check and send your app to the Platform. |
+| `$fdpocket-remix` | Contribute to a published app. |
+| `$fdpocket-propose` | Propose your branch's changes to main. |
+| `$fdpocket-proposals` | Review proposals sent to your app. |
+| `$fdpocket-issues` | Read, file, comment on, close and reopen Issues. |
 | `$fdpocket-release` | Owners and app admins: bring your branch into main and publish, after the mandatory checks. |
 
 ### 3. Require approval for proposal actions

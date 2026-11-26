@@ -17,7 +17,9 @@ user-invocable: false
    特に `packages/db-schema/schema.zmodel`（データを壊す変更・ポリシーを緩める変更）と `infra/project.yaml`（capability・Role の追加）を見る。
    base が null なら `git diff <ours> <theirs>`。**ブランチは切り替えない（読むだけ）。**
 4. 利用者の判断に従う:
-   - マージ: `merge_proposal({ proposal_id, request_key: <新しい UUID> })`（確認が出る）。`get_build({ job_id })` を 3 秒ごとに見て、
+   - マージ: `merge_proposal({ proposal_id, request_key: <新しい UUID> })`。`get_build({ job_id })` を 3 秒ごとに見て、
      `ready` なら `editor_url` を伝える。**検証の成功は候補を用意するだけ**。制作画面で試して差分を確かめた後、利用者が main への取り込みを確定する。
      公開も別の明示操作。
-   - 返事: `comment_proposal`（確認が出る）。見送り: `close_proposal`（確認が出る）。
+   - 返事: `comment_proposal`。見送り: `close_proposal`。修正の依頼: `request_proposal_changes`。
+   - 提案に結び付いた Issue（`discussion_id`）は、マージされると自動で閉じる（`fdpocket-issues`）。
+   - 確認は出ない（GitHub と同じ）。
