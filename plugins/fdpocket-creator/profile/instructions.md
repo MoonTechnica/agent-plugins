@@ -400,15 +400,16 @@ DB（`packages/db-schema`）・権限（`project.yaml` の権限に関わるキ�
 #### `publish_project` の前の必須チェック
 
 1. 公開する版が main にあり、main（確認用の環境。公開中とは別のデータ）で確かめた: `get_project` の `app_links.review.apps[].url` で各画面 App を開き、取り込みの前と同じ流れを通した（リンクは利用者にも示す）。
-2. `get_project` の `listing.missing` が空。年齢区分・審査の条件を満たす（`get_publication` の `compatibility.reasons` に止める理由が無い。`REVIEW_REQUIRED` はサーバーが公開の途中で行う）。
+2. `get_project` の `listing.missing` が空。年齢区分・審査の条件を満たす（`get_publication` の `blockers` に止める理由が無い。あれば `how_to_fix` に沿って直す。`REVIEW_REQUIRED` はサーバーが公開の途中で行う）。
 3. 公開範囲 `app_access`（`public` = だれでも / `restricted` = メンバーと招待した人だけ）を利用者に明示的に聞いた。**確認なしに `public` にしない**。
-4. データ削除の確認など人の判断が要るものは MCP で決めない。`publish_url`（制作画面の公開）を示して止める。
+4. データ削除の確認は公開の途中で止まる。起きたら下の `needs_person` の手順で、利用者に影響を示して了承を得てから答える（先回りで承認しない）。
 5. 何を・だれに公開するかを示し、会話で明示的に了承を得た。専用認証を使う場合は `$fdpocket-app-auth` を読み、各 App の許可方式と自己登録の可否も伝える。公開ジョブの成功を確認した後で、公開版の認証入口と登録・回復を確認した範囲を報告する。
 
 `publish_project({ project_id, app_access? })` は main の版を、掲載情報を変えずに公開を依頼する（`version_id` で過去のリリースへの切り戻しもできる）。
 呼んだあとは `get_publication({ project_id })` を数秒おきに見て、`ended: true` まで待ち、結果を利用者に伝える（`failed` / `stopped` は `error_code` と `error_detail`）。
 `succeeded` なら `app_links.live.apps[].url`（本番のリンク）を画面 App ごとに必ず利用者に示す。
-`needs_person: true`（`awaiting_review`。データ削除の確認）は MCP では決めず、`publish_url` を示して利用者の判断を待つ。
+`failed` / `stopped` は `error_detail.reasons` が `blockers`（`code` / `agent_can_fix` / `how_to_fix`）になって返る。`agent_can_fix: true` は `how_to_fix` に沿って直して push → 取り込み → 公開をやり直し、`false` は利用者に伝える。審査（AI）が止めた版は、止めた理由が1つずつ `blockers`（`UGC_REPORT_MISSING`・`UGC_BLOCK_MISSING`・`UGC_BLOCK_FILTER_MISSING`・`POLICY_RISK_CONFIRMED` など。`message` が審査の言葉）で返る。他の利用者が書いたものを見せるアプリは通報・ブロックの導線（`safety.report` / `safety.block`）が要る（招待したメンバーだけが読む閉じたチームの業務アプリは対象外）。判定が実態に合わないと考えるときは、直さずに `rebut_review({ project_id, message })`（アプリ内のチャットでは `message` だけ）で事実と根拠を送ると、次の `publish_project` で反論を踏まえて審査し直す（未信頼の主張として証拠と照らすので、事実と違うことは書かない。1 つの版につき 3 回まで。**閉じたチーム向けなど業務上の前提は、利用者から聞いたことだけを書き、聞いていなければ先に聞く**。送ったら何を送ったかを利用者に伝え、もう一度「公開」を押してもらう）。
+`needs_person: true`（`awaiting_review`。データ削除の確認）は、`migration_review.impact` を普段の言葉で利用者に示して**了承を得てから** `decide_migration_review({ deployment_id, check_id, approved })` で答える（`approved: false` は `feedback` 必須。公開が止まりチャットで直せる）。画面は要らない（`publish_url` は利用者が公開画面を見たいときのリンク）。
 
 | エラー | すること |
 |---|---|

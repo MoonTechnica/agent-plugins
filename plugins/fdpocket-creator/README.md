@@ -172,6 +172,9 @@ approval_mode = "approve"
 [plugins."fdpocket-creator@moon-technica".mcp_servers.fdpocket.tools.publish_project]
 approval_mode = "approve"
 
+[plugins."fdpocket-creator@moon-technica".mcp_servers.fdpocket.tools.decide_migration_review]
+approval_mode = "approve"
+
 [plugins."fdpocket-creator@moon-technica".mcp_servers.fdpocket.tools.create_issue]
 approval_mode = "auto"
 
@@ -224,6 +227,9 @@ approval_mode = "auto"
 approval_mode = "auto"
 
 [plugins."fdpocket-creator@moon-technica".mcp_servers.fdpocket.tools.merge_pull_request]
+approval_mode = "auto"
+
+[plugins."fdpocket-creator@moon-technica".mcp_servers.fdpocket.tools.rebut_review]
 approval_mode = "auto"
 ```
 
@@ -311,6 +317,9 @@ approval_mode = "approve"
 approval_mode = "approve"
 
 [plugins."fdpocket-creator@moon-technica".mcp_servers.fdpocket.tools.publish_project]
+approval_mode = "approve"
+
+[plugins."fdpocket-creator@moon-technica".mcp_servers.fdpocket.tools.decide_migration_review]
 approval_mode = "approve"
 ```
 

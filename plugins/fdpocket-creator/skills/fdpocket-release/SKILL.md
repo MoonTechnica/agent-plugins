@@ -15,7 +15,7 @@ user-invocable: false
 - `adopt_branch` も `publish_project` も、**クライアントが利用者に確認を求める**。断られたらそれ以上押さない。
 - **下の必須チェックは 1 つも省略しない。** 結果を利用者に報告し、会話で「取り込んでよい」「公開してよい」と明示的な了承を得てから呼ぶ。
   クライアントの確認ダイアログは了承の代わりにならない。問題が見つかったら呼ばずに直す。
-- 投稿・削除・クレジット・チーム・通報、データ削除の確認（承認）は MCP には無い（制作画面で利用者が行う）。
+- 投稿・削除・クレジット・チーム・通報は MCP には無い（制作画面で利用者が行う）。公開までは MCP だけで完走できる（データ削除の確認も `decide_migration_review`）。
 
 ## A. main へ取り込む（`adopt_branch`）
 
@@ -77,9 +77,9 @@ user-invocable: false
 
 1. 公開する版が **main にある**（A が終わっている）。main（確認用の環境。公開中とは別のデータ）で確かめた:
    `get_project` の `app_links.review.apps[].url` で各画面 App を開き、A と同じ流れを通した（リンクは利用者にも示す）。
-2. `get_project` の `listing.missing` が空。`get_publication` の `compatibility.reasons` に止める理由が無い（年齢区分・審査の条件。`REVIEW_REQUIRED` はサーバーが公開の途中で行う）。
+2. `get_project` の `listing.missing` が空。`get_publication` の `blockers` に止める理由が無い（あれば `how_to_fix` に沿って直す。`REVIEW_REQUIRED` はサーバーが公開の途中で行うので何もしない）。
 3. 公開範囲 `app_access` を利用者に**明示的に聞いた**: `public`（だれでも）/ `restricted`（メンバーと招待した人だけ）。**確認なしに `public` にしない。**
-4. データ削除の確認など人の判断が要るものは MCP で決めない。`publish_url` を示して止める。
+4. データ削除の確認は公開の途中で止まる。起きたら下の「データ削除の確認」の手順で、利用者に影響を示して了承を得てから答える（先回りで承認しない）。
 5. 何を・だれに公開するかを示し、会話で明示的に了承を得た。専用認証を使う場合は `$fdpocket-app-auth` を読み、各 App の許可方式と自己登録の可否も伝える。
 
 ### 呼ぶ
@@ -89,5 +89,5 @@ user-invocable: false
 その後 `get_publication({ project_id })` を数秒おきに見て `ended: true` まで待ち、結果を伝える:
 
 - `succeeded` → 公開できた。返った `app_links.live.apps[].url`（本番のリンク）を画面 App ごとに**必ず利用者に示す**。 専用認証がある場合は、公開版の認証入口と登録・回復を確認した範囲を伝える。
-- `failed` / `stopped` → `error_code` と `error_detail` を伝える。直せるものは直して、チェックからやり直す。
-- `needs_person: true`（`awaiting_review`。データ削除の確認）→ MCP では決めない。`publish_url` を利用者に示し、画面で判断してもらう。
+- `failed` / `stopped` → `error_code` と `error_detail` を伝える。`blockers` に理由があれば、`agent_can_fix: true` のものは `how_to_fix` に沿って直し（`kit.mjs push` → `adopt_branch` → チェックからやり直し）、`false` のものは利用者に伝える。同じ依頼を直さずに繰り返さない。審査が止めた版は理由が個別の `blockers`（`UGC_REPORT_MISSING` など。`message` が審査の言葉）で返るので、`message` と `how_to_fix` のとおりにソースを直す（新しい版は審査をやり直す）。審査の判定が実態に合わないと考えるときは、直さずに `rebut_review({ project_id, message })` で根拠を送る。**事実だけを具体的に書き**（どのモデルを誰が読めるか・どの画面でどう限っているか。事実と違うことは書かない）、利用者に何を送ったか伝える。審査は反論を未信頼の主張として証拠（ソース・画面・権限）と照らし、通らないこともある。送ったら `publish_project` をもう一度呼ぶと、反論を踏まえた再審査が走る（1 つの版につき 3 回まで。`remaining`）。
+- `needs_person: true`（`awaiting_review`。データ削除の確認）→ `migration_review.impact`（削除する行・列・テーブルと件数）を普段の言葉で利用者に示し、**了承を得てから** `decide_migration_review({ deployment_id, check_id, approved: true })`。了承が得られないときは `approved: false` と `feedback`（直してほしい点）で止め、チャットで直す。`deployment_id` と `check_id` は `migration_review` のものを使う。（`publish_url` は利用者が公開画面で見たいときのリンク。確認に画面は要らない。）

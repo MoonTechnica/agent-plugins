@@ -321141,7 +321141,8 @@ init_src2();
 var ASK_A_PERSON_TOOLS = [
   "grant_session_consent",
   "adopt_branch",
-  "publish_project"
+  "publish_project",
+  "decide_migration_review"
 ];
 var AUTO_APPROVE_TOOLS = [
   "create_issue",
@@ -321161,7 +321162,8 @@ var AUTO_APPROVE_TOOLS = [
   "comment_pull_request",
   "update_pull_request",
   "set_pull_request_state",
-  "merge_pull_request"
+  "merge_pull_request",
+  "rebut_review"
 ];
 function codexApprovalToml(pluginId, server2) {
   const table = `plugins."${pluginId}".mcp_servers.${server2}`;
