@@ -43091,12 +43091,39 @@ var init_repository_tree = () => {};
 import { existsSync as existsSync6 } from "node:fs";
 import { readdir as readdir4, readFile as readFile5 } from "node:fs/promises";
 import { join as join8 } from "node:path";
+function pinnedEdges(classes) {
+  const edges = new Set;
+  for (const token2 of classes.split(/\s+/)) {
+    const match = /^-?(top|bottom)-(.+)$/.exec(token2.replace(/^[a-z0-9-]+:/, ""));
+    if (!match)
+      continue;
+    const value = match[2] ?? "";
+    if (value.includes("/") || value.includes("%") || value === "auto" || value === "full")
+      continue;
+    edges.add(match[1]);
+  }
+  return [...edges];
+}
+function fixedEdgeInClasses(source) {
+  return [...source.matchAll(/(["'`])((?:(?!\1)[^\n])*)\1/g)].some(([, , classes = ""]) => {
+    if (!/(?:^|\s)fixed(?:\s|$)/.test(classes))
+      return false;
+    return pinnedEdges(classes).some((edge) => !classes.includes(`--safe-${edge}`));
+  });
+}
+function fixedEdgeInBlocks(source) {
+  return [...source.matchAll(/\{([^{}]*)\}/g)].some(([, block = ""]) => {
+    if (!/position\s*:\s*['"]?fixed\b/.test(block))
+      return false;
+    return ["top", "bottom"].some((edge) => new RegExp(`(?:^|[\\s,;{])${edge}\\s*:\\s*['"]?-?\\d[\\d.]*(?:px|rem|em)?['"]?\\s*(?:[,;}]|$)`, "m").test(block) && !block.includes(`--safe-${edge}`));
+  });
+}
 function safeAreaWarnings(files) {
   const warnings = [];
   for (const rule of RULES) {
-    const hit = Object.entries(files).find(([, source]) => rule.test(source));
-    if (hit)
-      warnings.push({ code: rule.code, path: hit[0], message: rule.message });
+    const hits = Object.entries(files).filter(([, source]) => rule.test(source));
+    for (const [path] of hits.slice(0, MAX_FILES_PER_CODE))
+      warnings.push({ code: rule.code, path, message: rule.message });
   }
   return warnings;
 }
@@ -43120,7 +43147,7 @@ async function checkSafeArea(root, manifest2) {
   }
   return safeAreaWarnings(files);
 }
-var RULES;
+var RULES, MAX_FILES_PER_CODE = 5;
 var init_safe_area = __esm(() => {
   RULES = [
     {
@@ -43136,14 +43163,8 @@ var init_safe_area = __esm(() => {
     },
     {
       code: "SAFE_AREA_FIXED_EDGE",
-      test: (source) => [...source.matchAll(/(["'`])((?:(?!\1)[^\n])*)\1/g)].some(([, , classes = ""]) => {
-        if (!/(?:^|\s)fixed(?:\s|$)/.test(classes))
-          return false;
-        const top = /(?:^|\s)top-0(?:\s|$)/.test(classes);
-        const bottom = /(?:^|\s)bottom-0(?:\s|$)/.test(classes);
-        return top && !classes.includes("--safe-top") || bottom && !classes.includes("--safe-bottom");
-      }),
-      message: "A fixed bar at the top or bottom edge needs the matching inset, e.g. pb-[max(0.75rem,var(--safe-bottom))] / pt-[var(--safe-top)] ($app-pwa §2)."
+      test: (source) => fixedEdgeInClasses(source) || fixedEdgeInBlocks(source),
+      message: "A fixed bar or button at the top or bottom edge needs the matching inset, e.g. pb-[max(0.75rem,var(--safe-bottom))] / pt-[var(--safe-top)] / bottom-[calc(1rem+var(--safe-bottom))] ($app-pwa §2)."
     }
   ];
 });

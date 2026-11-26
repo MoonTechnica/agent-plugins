@@ -94,11 +94,11 @@ window.addEventListener("vite:preloadError", () => {
 - ホーム画面のアイコンと名前は**掲載情報**（`$fdpocket-app-listing`）から作られる。アイコンは小さく丸く切り抜かれても判別できる絵にし、細かい文字を入れない。
 - 名前はホーム画面で長いと切れる（目安は全角 6〜8 字・英字 12 字）。App の表示名は短く（「タスク帳」）。
 - `<title>` は画面ごとに「画面の名前 · アプリ名」に（タスクの切り替え・履歴で区別できる）。
-- テーマ色は Platform が白にしている。上の帯の色を変えたいときだけ、`index.html` に `<meta name="theme-color" content="…">` をヘッダーの背景と同じ色で書く。明と暗で 2 つ（`media="(prefers-color-scheme: light)"` / `dark`）書き、暗い画面で白い帯が残らないようにする。
+- テーマ色は Platform が明暗の 2 つを入れている（明るい表示は白 `#ffffff`、暗い表示は `#0a0a0a`。manifest の `theme_color` と起動画面の背景は白）。上の帯の色を変えたいときだけ、`index.html` に `<meta name="theme-color" content="…">` をヘッダーの背景と同じ色で書く（アプリの指定が Platform より先に効く）。書くときは必ず明と暗の 2 つ（`media="(prefers-color-scheme: light)"` / `dark`）を書く。片方だけだと、もう片方の表示で帯とヘッダーの色がずれる。
 
 ## 8. 確かめる
 
 1. `kit shot --safe-area iphone --widths 390` で、ノッチ（上 59px）とホームバー（下 34px）を赤い縞で重ねて撮る。縞の上に文字・ボタンが乗っていないか、下のバーの背景が縞の下まで伸びているかを見る（`--safe-area 上,右,下,左` で横向きなども再現できる）。
-2. `kit check` の警告 `SAFE_AREA_*`（`h-screen`・`env()` の直書き・安全領域の無い端の固定バー）が出ていたら直す。
+2. `kit check` の警告 `SAFE_AREA_*`（`h-screen`・`env()` の直書き・安全領域の無い端の固定バーと浮いたボタン。クラスに加え CSS とインラインの `position: fixed` も見る）が出ていたら、挙がったファイルをすべて直す。警告は見落としを拾うためのもので、出ないことは正しさの証明ではない（`sticky` や親の余白は 3 で読む）。
 3. コードを読んで: `env(safe-area-inset-` を直接書いていない／`fixed bottom-0` の要素に `--safe-bottom` がある／詳細の画面すべてに戻る導線がある／`location.href` で別のオリジンへ移っていない／Service Worker・manifest を書いていない。
 4. 実機のホーム画面では確かめられないので、確かめられなかったことを結果に書く（ノッチのある端末での見え方など）。
