@@ -36,6 +36,7 @@ description: ミニアプリが動くことを確かめる。Vitest で書くテ
 
 1. Host ページと各 App が開く（HTTP 200）。起動ログ・ブラウザのコンソールにエラーが無い。
 2. web を member で開き、主な流れ（`design/context.md` と完成の基準 §6）を 1 回通す: 作る → 一覧に出る → 直す → 消す。
+   ファイルのアップロード・ジョブ・AI など Platform に渡す流れは、通常の `kit dev` では Gateway の検査を通らない。**main に取り込む前に `kit e2e` で本物のセッション環境を使って 1 回通す**（画面が開くだけで終わらせない。アップロードはテスト用の小さな画像を `setInputFiles` で渡す）。
 3. 一覧で 21 件目以降が「もっと見る」で出る（seed で 20 件以上入れておく）。
 4. admin を member で開くと `FORBIDDEN`、admin で開くと開く。
 5. 匿名を許していない App を anonymous で開くと開かない。

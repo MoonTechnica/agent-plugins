@@ -63,6 +63,8 @@ const { url } = await bucket.getDownloadUrl(file.id)    // 表示・ダウンロ
 await bucket.remove(file.id)
 ```
 
+- `visibility: 'workspace'` には `workspaceId` が要る（無いと型と SDK が止める。Gateway も `VALIDATION_FAILED` で断る）。今いる Workspace の id を渡す。
+- **上げる流れは、取り込む前に `kit e2e` で本物のセッション環境に 1 回上げて確かめる**（`$fdpocket-app-testing`）。可視性・バケットの種類・容量の検査は Gateway で行われ、通常の `kit dev` では確かめられない。
 - 業務のモデルからは `StorageFile` の id（`String`）を持つか、`StorageFile` への relation を張る。**URL を DB に保存しない**（署名 URL は切れる）。
 - 権限取消を次の取得から反映したいprivateバケットは `delivery: proxy` を指定する。同じ `getDownloadUrl()` のURLをimg/videoのsrcやPDFを開くリンクへ指定できる。全量をBlobにしない。Rangeはブラウザが必要に応じて送る。URLは特定ファイルの短命な資格情報なので共有・保存・ログ出力しない。長時間再生ではexpiresAt前に再発行し、再生位置を保ってURLを更新する。publicとは併用できない。取得済みの内容は回収できない。
 - 一覧は `client.db.storageFile.findMany({ where: { bucket: 'attachments', workspaceId, status: 'active' }, orderBy: [{ createdAt: 'desc' }, { id: 'desc' }], take: 20 })`。

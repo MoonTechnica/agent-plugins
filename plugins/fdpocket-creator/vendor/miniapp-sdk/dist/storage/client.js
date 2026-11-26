@@ -37,6 +37,9 @@ export function createStorage(transport, fetchImpl, gateway) {
                         throw new SdkError('VALIDATION_FAILED', 'file name is required');
                     if (blob.size <= 0)
                         throw new SdkError('VALIDATION_FAILED', 'file is empty');
+                    if (options.visibility === 'workspace' && !options.workspaceId) {
+                        throw new SdkError('VALIDATION_FAILED', "visibility 'workspace' needs workspaceId (the workspace whose members can see the file)");
+                    }
                     if (blob.size > STORAGE_FILE_MAX_BYTES) {
                         throw new SdkError('PAYLOAD_TOO_LARGE', 'file is larger than the upload limit');
                     }

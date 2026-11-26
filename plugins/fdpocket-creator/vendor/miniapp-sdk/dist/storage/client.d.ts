@@ -8,19 +8,28 @@ export interface UploadProgress {
     loaded: number;
     total: number;
 }
-export interface UploadOptions {
+interface UploadOptionsBase {
     /** 表示名。省略時は `File` の名前 */
     name?: string;
     /** 省略時は Blob の type（`; charset=…` は除く） */
     contentType?: string;
-    workspaceId?: string;
-    visibility?: FileVisibility;
     /**
      * 送った量。`XMLHttpRequest` のある環境（ブラウザ）では逐次、無い環境では送り終えたときに 1 回。
      * fetch は送信の進捗を取れない（ストリーム送信は Content-Length を付けられず、署名と合わない）
      */
     onProgress?: (progress: UploadProgress) => void;
 }
+/**
+ * `visibility: 'workspace'` はそのワークスペースのメンバーに見せる保存なので、`workspaceId` が要る
+ * （型と、送る前の検査の両方で止める）。`workspaceId` だけを渡すと `workspace` になる。
+ */
+export type UploadOptions = UploadOptionsBase & ({
+    visibility: 'workspace';
+    workspaceId: string;
+} | {
+    visibility?: Exclude<FileVisibility, 'workspace'>;
+    workspaceId?: string;
+});
 /** `get` が返すメタデータ（公開 URL は `getDownloadUrl` で取る） */
 export type StorageFileMeta = Omit<StorageFile, 'publicUrl'>;
 export interface Bucket {
