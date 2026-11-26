@@ -110,12 +110,28 @@ teleport/respawnでは履歴をリセットする。勝敗・被弾・スコア�
 
 - `input_fields()`の項目は`d`（既定値）を必ず書く。範囲外・不正値は`step`で丸めるか捨てる。
 - 卓の値は`ctx.state`とルールのメンバー変数に置く。秘密は`ctx.send_to`で本人へ送り、stateに載せない。
+  `ctx.state`に入れてよいのは数・真偽・文字列・配列・Dictionary・Packed配列だけ（Vector2・Object・NaN・無限大は送れない）。256KiBまで。
 - `on_message`は形・範囲・手番・重複・終了済みを検査する。入力も信用しない。
 - `step`は`ctx.dt`・入力・seed付き状態で進める。`Time`・大域の乱数・`await`・Timerを使わない。
+  乱数は**`ctx.seed`（サーバーが卓ごとに渡す）を`RandomNumberGenerator.seed`へ入れて**使う。`randi()`・`randomize()`・時刻で種を作らない（再現も再生検証もできない）。
 - `tick_rate`は通常20〜30。残り時間を状態に持ち、`maxDurationSec`より前に決着する。
-- `ctx.finish(outcomes, ranks?, scores?)`を一度だけ呼ぶ。全slotの結果、3人以上は順位も含める。
+  `maxDurationSec`に達すると、Platformが結果なし（`outcomes:null`・timeout）で終わらせる。
+- **時計は卓の登録から進む**（`setup`は席が埋まる前に呼ばれ、`step`も参加を待たない）。カウントダウン・制限時間・「全員そろったら開始」は、`on_join`で参加席を数えて、そろってから動かす。
+- `ctx.players[i].connected`が接続中かを表す。`on_leave`は**切断から60秒の猶予後**にしか呼ばれないので、アバターを即座に消す処理は`connected`を見て`step`で行う。
+- `ctx.finish(outcomes, ranks?, scores?)`を一度だけ呼ぶ。`outcomes`のキーは**整数の席番号**で、全slotに`"win"`/`"lose"`/`"draw"`を入れる。3人以上は順位（`ranks`。同順位は同じ値）も含める。
+  `scores`は`{席: {ランキング名: 数値}}`で、manifestの`leaderboards`に宣言した名前だけが記録される。
 - 切断猶予後の`on_leave`で継続/敗北/終了を決める。再参加の`on_join`で秘密情報も再送する。
 - 画面の勝敗を成績記録に使わない。結果・認可・参加券・台帳はPlatformの経路を維持する。
+- 直線の弾のような単純な動きは、物理サーバーを使わず数式でよい（`Geometry2D`など）。`PhysicsServer`を使うなら終了時にRIDを解放する。
+
+## サーバーのルールの自己試遊
+
+`<kit>/skills/game-playtest/assets/`の`playtest_server.gd`と`playtest_server.sh`を`scripts/`にコピーし、`scripts/playtest_server.sh`を実行する
+（席数を変えるときは`scripts/playtest_server.sh res://server/rules.gd 4`）。書き換えは要らない。`playtest_rules.gd`は1人用のstatic関数のルール用で、`TokoyoRules`には使えない。
+状態が送れる形か・極端な入力・決着の形（全席分・1回だけ）・離脱・変なmessageで壊れないかを、実サーバーと同じ順（`setup`→`on_join`→`step`）で確かめる。
+**`SCRIPT ERROR`が1行でも出たら失敗**（GDScriptの実行時エラーはGodotを止めない）。`.sh`はそこまで見て終了コードにする。
+画面側の`main.gd`のパースエラーは、サーバーが`--path`でプロジェクト全体を読むと出るだけで、サーバー検査は通る。`main.gd`も別に起動して確かめる。
+`_draw`・`_process`・`_input`などはGodotの予約名なので、自作の関数名に使わない（`_draw_state`のように別名にする）。
 
 ## 完了条件
 

@@ -72,6 +72,7 @@ Platformの毎版検証やthoroughを自動で増やす指示ではない。描�
 
 - 世界生成・保存往復・クエスト遷移など独立した重要性質の検査は必要なら追加する。実装をなぞるだけのテストは書かない。
 - 対戦の勝敗・手番は `godot/server/rules.gd` が持つ（`$game-multiplayer`）。画面側の `rules.gd` で勝敗を決めない。
+  **`godot/server/rules.gd`（`TokoyoRules`）の検査は `playtest_rules.gd` ではなく `assets/playtest_server.gd` + `playtest_server.sh`**（`$game-multiplayer`「サーバーのルールの自己試遊」）。
 - 数値を直すときは `godot/tuning.gd` だけを変えて回し直す。
 
 ## 3. Platform の試遊（検証のついで）
