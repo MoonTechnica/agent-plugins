@@ -8,11 +8,6 @@
   },
   "plugins": [
     {
-      "name": "tokoyo-creator",
-      "source": "./plugins/tokoyo-creator",
-      "description": "TOKOYO.games のミニゲームを手元の Coding Agent で作る Creator Kit（Skills・SDK・検証器・Platform MCP）"
-    },
-    {
       "name": "opusia-creator",
       "source": "./plugins/opusia-creator",
       "description": "Make short films, animation and music videos with your own coding agent through Opusia: script, design sheets, storyboards, video, audio and the final render."
@@ -21,6 +16,11 @@
       "name": "fdpocket-creator",
       "source": "./plugins/fdpocket-creator",
       "description": "FDPocket のミニアプリを手元の Coding Agent で作る Creator Kit。画面・データ管理・外部連携・バックグラウンド処理・AI を組み合わせるための Skills・SDK・CLI・Platform MCP。"
+    },
+    {
+      "name": "tokoyo-creator",
+      "source": "./plugins/tokoyo-creator",
+      "description": "TOKOYO.games のミニゲームを手元の Coding Agent で作る Creator Kit（Skills・SDK・検証器・Platform MCP）"
     }
   ]
 }

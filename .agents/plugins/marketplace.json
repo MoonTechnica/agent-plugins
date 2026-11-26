@@ -5,18 +5,6 @@
   },
   "plugins": [
     {
-      "name": "tokoyo-creator",
-      "source": {
-        "source": "local",
-        "path": "./plugins/tokoyo-creator"
-      },
-      "policy": {
-        "installation": "AVAILABLE",
-        "authentication": "ON_INSTALL"
-      },
-      "category": "Productivity"
-    },
-    {
       "name": "opusia-creator",
       "source": {
         "source": "local",
@@ -33,6 +21,18 @@
       "source": {
         "source": "local",
         "path": "./plugins/fdpocket-creator"
+      },
+      "policy": {
+        "installation": "AVAILABLE",
+        "authentication": "ON_INSTALL"
+      },
+      "category": "Productivity"
+    },
+    {
+      "name": "tokoyo-creator",
+      "source": {
+        "source": "local",
+        "path": "./plugins/tokoyo-creator"
       },
       "policy": {
         "installation": "AVAILABLE",

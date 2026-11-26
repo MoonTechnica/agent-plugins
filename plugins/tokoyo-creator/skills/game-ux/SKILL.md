@@ -23,6 +23,7 @@ description: ゲームを遊べる体験にする規則。新しく作るとき�
 | 説明で開始を妨げない | 操作はタイトル/ポーズの「操作方法」画面で入力方法ごとに丁寧に説明し、プレイ中は初めて要る瞬間に一言だけ示す。説明ページの通過を強制しない |
 
 開始・再開・設定・読み込みを作る/変更する時は [references/start-screen.md](references/start-screen.md) を読む。
+音の役割・混ぜ方・音楽の切り替え・Web の音の制限は [references/sound-design.md](references/sound-design.md)、文字の大きさ・字幕・手助け・割り当ての変更などの設定は [references/accessibility.md](references/accessibility.md)。
 ジャンルと初回/再訪の状態に合う入口を選び、機能一覧を全ゲームへ一律に足さない。
 
 ## 2. 手応え

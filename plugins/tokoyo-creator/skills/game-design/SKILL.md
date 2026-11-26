@@ -109,6 +109,8 @@ godot/
   RPGで不要なscore/ゲーム全体のisOverを強制しない。定義データとruntime進行を分け、局所更新を検査可能にする。
   毎frameの全世界deep cloneは行わず、保存時の固定snapshotとsimulationを分離する。
 - RPG/長期探索は [references/rpg.md](references/rpg.md) を先に読む。会話・クエスト・所持品は依頼の核に必要なものだけ作る。
+- 物語・世界・会話がある作品は [references/narrative.md](references/narrative.md)、パズルは [references/puzzle.md](references/puzzle.md)、ループ・メタ進行・仕組みの組み合わせや企画が平凡なときの発想法は [references/systems.md](references/systems.md)。
+- 操作キャラの動きとカメラは `$game-character-camera`、攻撃・敵・ボスは `$game-combat`、数値と難しさは `$game-balance`。
 - 対戦は手番・勝敗の判定・1 tick の計算を `server/main.ts` の `defineSpace` だけが持つ（サーバーが権威。`$game-multiplayer` §2）。
   画面側の GDScript は手を送って同期された状態を描くだけで、勝敗を計算しない。
 - **プレイヤーに有利に「ごまかす」**のは既定で入れる（`tuning.gd` に値を置く）:

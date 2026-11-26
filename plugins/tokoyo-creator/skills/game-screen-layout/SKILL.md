@@ -118,6 +118,7 @@ func _layout() -> void:
   単純なゲームは中央の短いメニューでもよい。配置をジャンルだけで固定しない。
 - 通常/選択/押下/準備中/使用不可を区別する。操作部と文字の大きさ・背板・セーフエリアは §3/§4 と `$game-ux`。
   メニューの後ろの動きは同Skill §5 に従い、操作受付を遅らせる入場演出を作らない。
+  メニュー・HUD の見た目は `$game-art-direction` references/ui-visual.md、出入りと押した反応の時間は `$game-motion` references/ui-motion.md。
 
 ## 5.1 リザルトを共有する（`TokoyoApp.ui`）
 

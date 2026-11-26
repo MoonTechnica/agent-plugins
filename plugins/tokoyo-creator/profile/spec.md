@@ -43,6 +43,10 @@ Debug MenuのUIと試験用の処理は各ゲームの`godot/dev/`に作成し�
 │   ├── game-design/         # 工程の正本（企画 brief・段階と完了条件・ジャンルの下限・rules.gd / tuning.gd）
 │   ├── game-art-direction/  # 見た目の合意（コンセプト画像・スタイルガイド・素材の判定表）
 │   ├── game-level-design/   # ステージ/マップ（体験・進行・空間候補・仮組み・到達/進行検査・選定）
+│   ├── game-character-camera/ # 動きとカメラ（ジャンプの式・コヨーテタイム・2D カメラ・三人称/一人称・ロックオン）
+│   ├── game-combat/         # 戦い（予備動作と当たり判定の時間・被弾の反応・敵の役割・ボス）
+│   ├── game-motion/         # 動き（タイミングと緩急・2D の連番 assets/sprites.gd・3D の AnimationTree・UI の動き assets/motion.gd）
+│   ├── game-balance/        # 数値の設計（時間と回数の表・難しさの曲線・自動プレイの分布 assets/balance_sim.gd・経済と確率）
 │   ├── game-playtest/       # 自分で遊んで確かめる（rubric・ルール検査 assets/playtest_rules.gd・前の版の試遊結果）
 │   ├── tokoyo-continue/     # ローカル・クラウドの固定ソースと共有文脈を受領し続きを作る
 │   ├── game-controls/       # PC とスマホの操作（InputMap・移動スティック・操作方法の画面・ジャンル別の割り当て）

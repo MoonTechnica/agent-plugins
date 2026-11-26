@@ -99,7 +99,7 @@ CLIは参照検索と決定的なローカル加工だけで、有料生成・�
 | 効果音 | `generate_sound_effect(name, prompt, duration_sec)`。短く具体的に（「軽いジャンプ音、上がる音程、0.3 秒」） | MP3。0.5〜2 秒 |
 | BGM | `generate_music(name, prompt, duration_sec=30)`。雰囲気・テンポ・楽器を書き「ループしやすい」と添える | MP3。ループ再生 |
 | 3D モデル | 透過した元画像の `asset_id`（§3 の結果、または `generate_image(transparent=true)` の結果）で `generate_model_3d(name, asset_id, polycount="low")`。**数分かかる** | GLB を `godot/` の下に置いて import する（`$game-3d-and-bundles`） |
-| 人型のモーション | フリー素材のアニメ付きキャラ（§3.5）に無い動きだけ `generate_motion(name, prompt, duration_sec)`。prompt は英語で 1 人の動きを具体的に（「A person swings a sword overhead, then steps back.」）。ループする動き（待機・歩き）は 1 周期の長さにする | **FBX のままゲームに入れない。** `$game-3d-studio` §4.3.1 でキャラの骨格にリターゲットし、キャラの GLB にクリップとして入れる |
+| 人型のモーション | フリー素材のアニメ付きキャラ（§3.5）とプリセットに無い**一発もの**（固有の攻撃・技・感情）だけ `generate_motion(name, prompt, duration_sec)`。prompt は英語 60 語以内で、体の部位と動きを具体的に（「A person swings a sword overhead, then steps back.」）。ループ・その場の動き・人型以外は苦手なので使わない（`$game-motion` references/3d-animation.md §1） | **FBX のままゲームに入れない。** `$game-3d-studio` §4.3.1 でキャラの骨格にリターゲットし、キャラの GLB にクリップとして入れる |
 | 自分で作った音・GLB | ほかのファイルと同じく commit する（Git LFS に入り、次のターンにも残る）。他のターン・リミックスで使い回すなら `upload_asset(name, kind)` でも台帳に載せる（§4） | `godot/` の下 |
 
 - 生成したままの PNG（1 枚 1〜2 MB）を `godot/` に入れない。必ず縮小する（PCK は 64 MiB まで）。
@@ -144,12 +144,15 @@ Smart Topologyや複数視点等を公式サイトで見つけても、現行ツ
 
 ### 3.1 連番アニメを作る（素材に無い主役の歩き・攻撃など）
 
+詳しい手順（キー姿勢の頼み方・コマ数・足の取り違え・ドット化・カットアウト）は `$game-motion` references/sprite-2d.md。
+
 1. 1 回の生成で **1 列に並んだ N コマ（4〜8）** を作る。指示に「同じ大きさの枠が横に N 個、各枠に同じキャラクター、
    足元は同じ高さ、枠の間は無地、単色の背景、影なし」と、主役の設定画（`hero.png`）に合わせる特徴を書く。
    画像の参照入力が要るときは `generate_image` ではなく、登録済みの設定画の素材に `edit_image` を使う（`generate_image` は参照画像を受け取らない）。
 2. §3 の 2.〜4. で背景を抜いて取得する。
-3. コマの境目を確かめる: `$game-level-design` の `tiles.gd sheet <画像> --tile <幅>x<高さ> --separation 0,0`（コマの大きさを
-   指定する）で拡大図を作り、足元の高さ・大きさ・向きがそろっているかを見る。ずれているコマは作り直すか、そのコマだけ位置を直す。
+3. コマをそろえる: `$game-motion` の `sprites.gd frames <画像> --grid Nx1 --height <背の高さ> --out <シート>` で、全コマを同じ倍率にし、
+   足元を 1 本の線にそろえる。`*.check.png` と警告（大きさのずれ・空のコマ・背景色の縁）を見て、悪いコマは作り直す。
+   ドット絵なら最後に `sprites.gd pixel` をシート全体に 1 回かける。
 4. 上の「連番フレーム」と同じく `AtlasTexture` の `region` で切り出して `SpriteFrames` に並べる。
 
 ## 3.5 フリー素材（CC0）を探して取り込む

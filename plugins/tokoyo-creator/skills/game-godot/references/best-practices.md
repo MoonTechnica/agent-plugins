@@ -23,6 +23,8 @@ Read before writing gameplay code for a new game or a changed core loop. Each ru
 
 ## Juice with engine features
 
+- Shared tween helpers and timing constants: `$game-motion` assets/motion.gd (copy to `res://motion.gd`).
+- AnimationTree: transition `xfade_time` and OneShot `fadein_time`/`fadeout_time` default to 0 (poses snap) — always set them; `BlendSpace1D.sync` defaults to false. Godot 4.5.1 has no `TwoBoneIK3D` (added in 4.6) and `SkeletonIK3D` is deprecated; see `$game-motion` references/3d-animation.md.
 - Tweens: `create_tween()` is bound to the node. Keep the tween in a variable and `kill()` the previous one before tweening the same property again. Menu animations during pause need `set_pause_mode(Tween.TWEEN_PAUSE_PROCESS)`.
 - Hit-stop: set `Engine.time_scale` low (e.g. `0.05`, never `0`) for the stop and restore it with `get_tree().create_timer(seconds, true, false, true)` (the last argument ignores time scale). Time scale does not slow audio. UI tweens use `set_ignore_time_scale(true)`. In crowded fights stop only the two involved bodies instead. Never stop an authoritative online tick.
 - Screen shake: shake `Camera2D.offset` (it may pass the limits), never `position` (fights smoothing and limits). Trauma 0–1 decays over 0.1–0.3 s; displacement = trauma² × a few to ~15 logical px; directional shake for directional events; a settings switch turns it off.
