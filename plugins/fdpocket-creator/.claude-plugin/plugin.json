@@ -1,7 +1,7 @@
 {
   "name": "fdpocket-creator",
   "displayName": "FDPocket Developer Kit",
-  "version": "3.5.d0fb3ea8",
+  "version": "3.5.1fc9a08c",
   "description": "FDPocket のミニアプリを手元の Coding Agent で作る Creator Kit。画面・データ管理・外部連携・バックグラウンド処理・AI を組み合わせるための Skills・SDK・CLI・Platform MCP。",
   "author": {
     "name": "Moon Technica"

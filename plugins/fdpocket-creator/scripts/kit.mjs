@@ -321127,6 +321127,8 @@ var envelopeSchema = exports_external5.strictObject({
 });
 // frontend/packages/project-host/src/refresh.ts
 init_src();
+var WAKE_REFRESH_MARGIN_MS = 2 * 60 * 1000;
+var REFRESH_GIVE_UP_MS = 2 * 60 * 1000;
 // frontend/packages/project-host/src/session.ts
 var SESSION_WAIT_MS = 5 * 60 * 1000;
 // frontend/packages/project-host/src/share.ts
