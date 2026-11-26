@@ -3,6 +3,7 @@
   "private": true,
   "type": "module",
   "dependencies": {
-    "miniflare": "4.20260730.0"
+    "miniflare": "4.20260730.0",
+    "playwright-core": "1.56.0"
   }
 }

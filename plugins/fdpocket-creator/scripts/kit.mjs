@@ -305681,7 +305681,7 @@ Additional information: BADCLIENT: Bad error code, ${badCode} not found in range
 });
 
 // frontend/packages/miniapp-kit/src/cli.ts
-import { dirname as dirname16, resolve as resolve5 } from "node:path";
+import { dirname as dirname17, resolve as resolve5 } from "node:path";
 import { fileURLToPath as fileURLToPath2 } from "node:url";
 
 // frontend/packages/miniapp-kit/src/args.ts
@@ -306438,10 +306438,10 @@ async function changedMigrations(options2) {
 
 // frontend/packages/miniapp-kit/src/commands.ts
 import { createHash as createHash17, randomUUID as randomUUID5 } from "node:crypto";
-import { existsSync as existsSync28 } from "node:fs";
-import { mkdir as mkdir24, readdir as readdir18, readFile as readFile39, writeFile as writeFile26 } from "node:fs/promises";
+import { existsSync as existsSync29 } from "node:fs";
+import { mkdir as mkdir24, readdir as readdir18, readFile as readFile40, writeFile as writeFile26 } from "node:fs/promises";
 import { homedir } from "node:os";
-import { dirname as dirname15, join as join53, resolve as resolve4 } from "node:path";
+import { dirname as dirname16, join as join54, resolve as resolve4 } from "node:path";
 import { createInterface } from "node:readline";
 
 // frontend/packages/project-host/src/bridge.ts
@@ -321026,18 +321026,74 @@ function openInBrowser(url6) {
 init_src();
 init_src2();
 init_generate();
-import { spawn as spawn4 } from "node:child_process";
-import { existsSync as existsSync20, readFileSync as readFileSync3 } from "node:fs";
-import { mkdir as mkdir12, readFile as readFile23, rm as rm14, writeFile as writeFile14 } from "node:fs/promises";
+import { spawn as spawn5 } from "node:child_process";
+import { existsSync as existsSync21, readFileSync as readFileSync3 } from "node:fs";
+import { mkdir as mkdir12, readFile as readFile24, rm as rm14, writeFile as writeFile14 } from "node:fs/promises";
 import { createRequire as createRequire10 } from "node:module";
-import { dirname as dirname12, join as join33 } from "node:path";
+import { dirname as dirname12, join as join34 } from "node:path";
+
+// frontend/packages/miniapp-kit/src/kit-runtime.ts
+import { spawn as spawn4 } from "node:child_process";
+import { existsSync as existsSync19 } from "node:fs";
+import { readFile as readFile23 } from "node:fs/promises";
+import { join as join32 } from "node:path";
+
+class KitRuntimeError extends Error {
+  name = "KitRuntimeError";
+}
+var RUNTIME_PACKAGE = "fdpocket-creator-runtime";
+async function installedVersion(kitRoot, dependency) {
+  const manifest2 = join32(kitRoot, "node_modules", dependency, "package.json");
+  if (!existsSync19(manifest2))
+    return null;
+  const parsed = JSON.parse(await readFile23(manifest2, "utf8"));
+  return typeof parsed.version === "string" ? parsed.version : null;
+}
+function installKitRuntime(kitRoot) {
+  return new Promise((resolve3, reject) => {
+    const child = spawn4("bun", ["install", "--frozen-lockfile", "--ignore-scripts"], {
+      cwd: kitRoot,
+      stdio: ["ignore", "pipe", "pipe"]
+    });
+    const output2 = [];
+    child.stdout.on("data", (chunk) => output2.push(chunk));
+    child.stderr.on("data", (chunk) => output2.push(chunk));
+    child.on("error", (error262) => reject(new KitRuntimeError(`bun could not be started: ${error262.message}`)));
+    child.on("close", (code) => {
+      if (code === 0)
+        return resolve3();
+      const text4 = Buffer.concat(output2).toString("utf8").trim();
+      reject(new KitRuntimeError(`bun install in ${kitRoot} failed (exit ${code}):
+${text4}`));
+    });
+  });
+}
+async function ensureKitRuntimeDependencies(kitRoot, install = installKitRuntime) {
+  const manifest2 = join32(kitRoot, "package.json");
+  if (!existsSync19(manifest2))
+    return;
+  const authored = JSON.parse(await readFile23(manifest2, "utf8"));
+  if (authored.name !== RUNTIME_PACKAGE)
+    return;
+  const missing2 = [];
+  for (const [dependency, version7] of Object.entries(authored.dependencies ?? {})) {
+    if (await installedVersion(kitRoot, dependency) !== version7)
+      missing2.push(dependency);
+  }
+  if (!missing2.length)
+    return;
+  console.info(`kit: installing the Kit runtime (${missing2.join(", ")})`);
+  await install(kitRoot);
+}
+
+// frontend/packages/miniapp-kit/src/build.ts
 init_pack();
 
 // frontend/packages/miniapp-kit/src/python-build.ts
 init_pack();
-import { existsSync as existsSync19 } from "node:fs";
+import { existsSync as existsSync20 } from "node:fs";
 import { cp as cp2, mkdir as mkdir11, rm as rm13 } from "node:fs/promises";
-import { basename, join as join32 } from "node:path";
+import { basename, join as join33 } from "node:path";
 
 class PythonBuildError extends Error {
   name = "PythonBuildError";
@@ -321046,32 +321102,32 @@ var ROOT_FILES2 = ["pyproject.toml", "uv.lock", ".python-version"];
 var REQUIRED = ["pyproject.toml", "uv.lock"];
 var SKIPPED2 = new Set(["__pycache__", ".venv", ".pytest_cache", ".mypy_cache", ".ruff_cache"]);
 async function copyPythonApp(input2) {
-  const appDir = join32(input2.root, "apps", input2.slug);
+  const appDir = join33(input2.root, "apps", input2.slug);
   for (const name3 of REQUIRED) {
-    if (!existsSync19(join32(appDir, name3))) {
+    if (!existsSync20(join33(appDir, name3))) {
       throw new PythonBuildError(`apps/${input2.slug}/${name3} is missing; python apps need pyproject.toml and a committed uv.lock (uv lock)`);
     }
   }
-  if (!existsSync19(join32(appDir, "src"))) {
+  if (!existsSync20(join33(appDir, "src"))) {
     throw new PythonBuildError(`apps/${input2.slug}/src is missing; put the package under src/`);
   }
-  const out = join32(input2.root, "dist", input2.slug);
+  const out = join33(input2.root, "dist", input2.slug);
   await rm13(out, { recursive: true, force: true });
   await mkdir11(out, { recursive: true });
   for (const name3 of ROOT_FILES2) {
-    if (existsSync19(join32(appDir, name3)))
-      await cp2(join32(appDir, name3), join32(out, name3));
+    if (existsSync20(join33(appDir, name3)))
+      await cp2(join33(appDir, name3), join33(out, name3));
   }
-  await cp2(join32(appDir, "src"), join32(out, "src"), {
+  await cp2(join33(appDir, "src"), join33(out, "src"), {
     recursive: true,
     filter: (path) => !SKIPPED2.has(basename(path)) && !path.endsWith(".pyc")
   });
   return "";
 }
 async function listPythonAppFiles(input2) {
-  const appDir = join32(input2.root, "apps", input2.slug);
+  const appDir = join33(input2.root, "apps", input2.slug);
   for (const name3 of [...REQUIRED, "src"]) {
-    if (!existsSync19(join32(appDir, name3)))
+    if (!existsSync20(join33(appDir, name3)))
       throw new PythonBuildError(`apps/${input2.slug}/${name3} is missing (uv lock writes uv.lock)`);
   }
   const limits2 = {
@@ -321109,7 +321165,7 @@ async function buildProject(options2) {
     kitRoot,
     ...options2.install ? { install: options2.install } : {}
   });
-  const dist = join33(root, "dist");
+  const dist = join34(root, "dist");
   await rm14(dist, { recursive: true, force: true });
   const apps = Object.values(manifest2.apps);
   const env = {
@@ -321120,7 +321176,7 @@ async function buildProject(options2) {
   for (const app of apps) {
     const input2 = {
       slug: app.slug,
-      appDir: join33(root, "apps", app.slug),
+      appDir: join34(root, "apps", app.slug),
       env
     };
     const output2 = app.kind === "web" ? await (options2.runVite ?? viteBuild)(input2) : isWorkerAppKind(app.kind) ? await (options2.runWorker ?? buildWorkerBundle)({ ...input2, root, kind: app.kind }) : await copyPythonApp({ root, slug: app.slug });
@@ -321138,13 +321194,13 @@ async function buildProject(options2) {
       throw error262;
     }
     const text4 = renderMcpCatalog(mcpTools);
-    await mkdir12(join33(root, PROJECT_PATHS.generated), { recursive: true });
-    await writeFile14(join33(root, PROJECT_PATHS.mcpTools), text4);
-    await writeFile14(join33(dist, mcpToolsDistPath(mcp2.slug)), text4);
+    await mkdir12(join34(root, PROJECT_PATHS.generated), { recursive: true });
+    await writeFile14(join34(root, PROJECT_PATHS.mcpTools), text4);
+    await writeFile14(join34(dist, mcpToolsDistPath(mcp2.slug)), text4);
   }
   let index2;
   try {
-    index2 = await buildArtifactIndex(existsSync20(dist) ? await collectFiles(dist) : [], apps.map((app) => ({
+    index2 = await buildArtifactIndex(existsSync21(dist) ? await collectFiles(dist) : [], apps.map((app) => ({
       slug: app.slug,
       entry: app.entry.replace(/^dist\//, ""),
       kind: app.kind
@@ -321152,9 +321208,9 @@ async function buildProject(options2) {
   } catch (error262) {
     throw new BuildError(error262 instanceof Error ? error262.message : String(error262));
   }
-  await writeFile14(join33(dist, ARTIFACT_INDEX_PATH), `${JSON.stringify(index2, null, 1)}
+  await writeFile14(join34(dist, ARTIFACT_INDEX_PATH), `${JSON.stringify(index2, null, 1)}
 `);
-  const schemaVersion = schemaVersionOf(await readFile23(join33(root, PROJECT_PATHS.generated, "schema.json"), "utf8"));
+  const schemaVersion = schemaVersionOf(await readFile24(join34(root, PROJECT_PATHS.generated, "schema.json"), "utf8"));
   return {
     artifactHash: index2.artifactHash,
     apps: index2.apps,
@@ -321178,16 +321234,16 @@ async function prepareProject(options2) {
       throw new BuildError(findings.map((finding2) => finding2.message).join(`
 `));
   }
-  const manifest2 = JSON.parse(await readFile23(join33(root, PROJECT_PATHS.generated, "project.json"), "utf8"));
+  const manifest2 = JSON.parse(await readFile24(join34(root, PROJECT_PATHS.generated, "project.json"), "utf8"));
   return { generate, manifest: manifest2 };
 }
 async function checkLockfile2(root) {
-  const path = join33(root, "bun.lock");
-  if (!existsSync20(path)) {
+  const path = join34(root, "bun.lock");
+  if (!existsSync21(path)) {
     throw new BuildError("bun.lock is missing; run bun install in source/ and commit bun.lock");
   }
   try {
-    const violations = checkBunLockfile(await readFile23(path, "utf8"));
+    const violations = checkBunLockfile(await readFile24(path, "utf8"));
     if (violations.length > 0) {
       const lines = violations.map((v3) => `  ${v3.key}: ${v3.reason}`);
       throw new BuildError(`bun.lock may only contain npm registry packages (with sha512 integrity) and workspace packages (sdk.md §5.2):
@@ -321202,7 +321258,7 @@ ${lines.join(`
 }
 function run(command, args, cwd, env) {
   return new Promise((resolve3, reject) => {
-    const child = spawn4(command, args, {
+    const child = spawn5(command, args, {
       cwd,
       env: { ...process.env, ...env, NO_COLOR: "1", FORCE_COLOR: "0" },
       stdio: ["ignore", "pipe", "pipe"]
@@ -321220,37 +321276,18 @@ ${text4}`));
     });
   });
 }
-async function ensureKitRuntimeDependencies(kitRoot) {
-  const manifest2 = join33(kitRoot, "package.json");
-  if (!existsSync20(manifest2))
-    return;
-  const authored = JSON.parse(await readFile23(manifest2, "utf8"));
-  if (authored.name !== "fdpocket-creator-runtime")
-    return;
-  const require2 = createRequire10(manifest2);
-  try {
-    const installed = JSON.parse(await readFile23(require2.resolve("miniflare/package.json"), "utf8"));
-    if (installed.version === authored.dependencies?.miniflare)
-      return;
-  } catch (error262) {
-    if (!(error262 instanceof Error) || !("code" in error262) || error262.code !== "MODULE_NOT_FOUND")
-      throw error262;
-    console.info("kit: Cloudflare development runtime is not installed");
-  }
-  await run("bun", ["install", "--frozen-lockfile", "--ignore-scripts"], kitRoot, {});
-}
 async function bunInstall(root, kitRoot) {
-  await run("bun", [join33(kitRoot, "scripts/sdk-dependencies.mjs"), root], root, {});
+  await run("bun", [join34(kitRoot, "scripts/sdk-dependencies.mjs"), root], root, {});
   await run("bun", ["install", "--frozen-lockfile", "--ignore-scripts"], root, {});
 }
 function resolveViteBin(appDir) {
   try {
-    const manifestPath = createRequire10(join33(appDir, "package.json")).resolve("vite/package.json");
+    const manifestPath = createRequire10(join34(appDir, "package.json")).resolve("vite/package.json");
     const declared = JSON.parse(readFileSync3(manifestPath, "utf8")).bin;
     const relative4 = typeof declared === "string" ? declared : declared?.vite;
     if (typeof relative4 !== "string")
       throw new Error('vite has no "vite" bin');
-    return join33(dirname12(manifestPath), relative4);
+    return join34(dirname12(manifestPath), relative4);
   } catch (error262) {
     throw new BuildError(`vite is not installed for ${appDir}; run bun install (${error262 instanceof Error ? error262.message : String(error262)})`);
   }
@@ -321299,9 +321336,9 @@ init_src2();
 init_generate();
 init_masters2();
 import { createHash as createHash11 } from "node:crypto";
-import { existsSync as existsSync21 } from "node:fs";
-import { mkdir as mkdir13, readFile as readFile24, rm as rm15, writeFile as writeFile15 } from "node:fs/promises";
-import { join as join34 } from "node:path";
+import { existsSync as existsSync22 } from "node:fs";
+import { mkdir as mkdir13, readFile as readFile25, rm as rm15, writeFile as writeFile15 } from "node:fs/promises";
+import { join as join35 } from "node:path";
 var fail5 = (message2) => new DbError(message2);
 var describe12 = (change) => `${change.kind} ${change.table}${change.column ? `.${change.column}` : ""}${change.index ? ` (${change.index})` : ""}`;
 function migrationSlug(text4) {
@@ -321309,17 +321346,17 @@ function migrationSlug(text4) {
   return slug === "" ? "change" : slug;
 }
 async function readIfPresent(path) {
-  return existsSync21(path) ? await readFile24(path, "utf8") : null;
+  return existsSync22(path) ? await readFile25(path, "utf8") : null;
 }
 async function projectIndexSql(root, migrations, draftSql) {
-  const schemaPath = join34(root, PROJECT_PATHS.generated, "schema.json");
-  if (!existsSync21(schemaPath)) {
-    const zmodel = await readIfPresent(join34(root, PROJECT_PATHS.schema)) ?? "";
+  const schemaPath = join35(root, PROJECT_PATHS.generated, "schema.json");
+  if (!existsSync22(schemaPath)) {
+    const zmodel = await readIfPresent(join35(root, PROJECT_PATHS.schema)) ?? "";
     if (zmodel.includes("@@platform.search"))
       throw new DbError("run kit.mjs generate first (no schema.json)");
     return "";
   }
-  const schema2 = JSON.parse(await readFile24(schemaPath, "utf8"));
+  const schema2 = JSON.parse(await readFile25(schemaPath, "utf8"));
   return [
     planSearchSql({ schema: schema2, migrations, draftSql }),
     planVectorSql({ schema: schema2, migrations, draftSql })
@@ -321333,21 +321370,21 @@ async function clearDrafts(root) {
     INTENT_PATH,
     `${PROJECT_PATHS.pending}/${PENDING_POLICY_FILE}`
   ]) {
-    await rm15(join34(root, path), { force: true });
+    await rm15(join35(root, path), { force: true });
   }
 }
 async function migrateDatabase(options2) {
   const { root } = options2;
   await placePlatform(root, options2.kitRoot);
   const diff = await renderMigrationDiff(root);
-  const data = (await readIfPresent(join34(root, PENDING_DATA_PATH)))?.trim() ?? "";
-  const parsed = parseIntent(await readIfPresent(join34(root, INTENT_PATH)));
+  const data = (await readIfPresent(join35(root, PENDING_DATA_PATH)))?.trim() ?? "";
+  const parsed = parseIntent(await readIfPresent(join35(root, INTENT_PATH)));
   const hasContract = parsed.intent?.some((item) => ("contract" in item)) ?? false;
   const masters = await projectMasters(root, options2.importModule)();
   const search3 = await projectIndexSql(root, diff.migrations, data === "" ? diff.body : `${diff.body}
 ${data}`);
   if (diff.body === "" && data === "" && !hasContract && masters === null && search3 === "") {
-    await rm15(join34(root, LEGACY_PENDING_SQL_PATH), { force: true });
+    await rm15(join35(root, LEGACY_PENDING_SQL_PATH), { force: true });
     return { status: "empty", migration: null, changes: [] };
   }
   const createClient = options2.createLibsqlClient ?? await loadProjectLibsql(root, fail5);
@@ -321393,11 +321430,11 @@ ${data}
   }) : { sql: "", tables: [], findings: [] };
   findings.push(...master.findings);
   if (draftSql === "" && !hasContract && master.sql === "" && search3 === "" && findings.length === 0) {
-    await rm15(join34(root, LEGACY_PENDING_SQL_PATH), { force: true });
+    await rm15(join35(root, LEGACY_PENDING_SQL_PATH), { force: true });
     return { status: "empty", migration: null, changes: [] };
   }
   const sql3 = attachMigrationPolicy([draftSql, search3, master.sql].filter((part) => part !== "").join(`
-`), intent2, await readIfPresent(join34(root, PROJECT_PATHS.pending, PENDING_POLICY_FILE)), changes, master.tables);
+`), intent2, await readIfPresent(join35(root, PROJECT_PATHS.pending, PENDING_POLICY_FILE)), changes, master.tables);
   const shadow = await checkShadow({
     migrations: diff.migrations,
     prodMigrations: null,
@@ -321416,16 +321453,16 @@ ${data}
     at = new Date(Date.UTC(+y2, +mo - 1, +d2, +h2, +mi, +s3 + 1));
   }
   const name3 = `${migrationTimestamp(at)}_${migrationSlug(options2.slug)}`;
-  const dir = join34(root, PROJECT_PATHS.migrations, name3);
+  const dir = join35(root, PROJECT_PATHS.migrations, name3);
   await mkdir13(dir, { recursive: true });
-  await writeFile15(join34(dir, "migration.sql"), sql3);
+  await writeFile15(join35(dir, "migration.sql"), sql3);
   const meta11 = {
     changes,
     intent: intent2 ?? [],
     name: name3,
     sha256: createHash11("sha256").update(sql3).digest("hex")
   };
-  await writeFile15(join34(dir, "meta.json"), `${JSON.stringify(meta11, null, 2)}
+  await writeFile15(join35(dir, "meta.json"), `${JSON.stringify(meta11, null, 2)}
 `);
   await clearDrafts(root);
   return { status: "migrated", migration: name3, changes, warnings: shadow.warnings };
@@ -321664,9 +321701,9 @@ init_seed();
 // frontend/packages/miniapp-kit/src/dev/server.ts
 init_src();
 init_src2();
-import { spawn as spawn6 } from "node:child_process";
+import { spawn as spawn7 } from "node:child_process";
 import { readFileSync as readFileSync4 } from "node:fs";
-import { join as join41 } from "node:path";
+import { join as join42 } from "node:path";
 
 // frontend/packages/miniapp-kit/src/verify/dist-server.ts
 init_src();
@@ -323563,9 +323600,9 @@ function createPreparedAppPlugin(options2, render, boot, loaded, parse25, allowe
 init_python3();
 
 // frontend/packages/miniapp-kit/src/dev/realtime.ts
-import { readFile as readFile25 } from "node:fs/promises";
+import { readFile as readFile26 } from "node:fs/promises";
 import { createRequire as createRequire11 } from "node:module";
-import { join as join35 } from "node:path";
+import { join as join36 } from "node:path";
 
 // infra/workers/gateway/src/realtime.ts
 init_errors3();
@@ -323614,7 +323651,7 @@ async function wakeRealtime(scope, env) {
 // frontend/packages/miniapp-kit/src/dev/realtime.ts
 async function startRealtimeGateway(options2) {
   const { Miniflare, Response: WorkerResponse } = requireMiniflare(options2.kitRoot);
-  const source = await readFile25(join35(options2.kitRoot, "platform", "realtime-local.js"), "utf8");
+  const source = await readFile26(join36(options2.kitRoot, "platform", "realtime-local.js"), "utf8");
   const runtime = new Miniflare({
     modules: true,
     script: source,
@@ -323707,7 +323744,7 @@ function requireMiniflare(kitRoot) {
   const roots = [process.env.KIT_TOOL_ROOT, kitRoot, process.cwd()].filter((root) => Boolean(root));
   for (const root of roots) {
     try {
-      return createRequire11(join35(root, "package.json"))("miniflare");
+      return createRequire11(join36(root, "package.json"))("miniflare");
     } catch (error262) {
       if (!(error262 instanceof Error) || !("code" in error262) || error262.code !== "MODULE_NOT_FOUND") {
         throw error262;
@@ -323724,8 +323761,8 @@ init_runtime2();
 init_src();
 init_zod4();
 import { createHmac, timingSafeEqual } from "node:crypto";
-import { mkdir as mkdir14, readdir as readdir14, readFile as readFile26, rename as rename4, rm as rm16, writeFile as writeFile16 } from "node:fs/promises";
-import { join as join36 } from "node:path";
+import { mkdir as mkdir14, readdir as readdir14, readFile as readFile27, rename as rename4, rm as rm16, writeFile as writeFile16 } from "node:fs/promises";
+import { join as join37 } from "node:path";
 
 // infra/workers/outbound/src/index.ts
 init_network();
@@ -323897,7 +323934,7 @@ async function createSandboxWorkers(options2) {
   const { Miniflare, Response: WorkerResponse } = requireMiniflare(options2.kitRoot);
   const workers = new Map;
   const apps = new Map;
-  const directory = join36(options2.root, ".kit", "session-workers");
+  const directory = join37(options2.root, ".kit", "session-workers");
   await mkdir14(directory, { recursive: true, mode: 448 });
   let closed = false;
   let hookWindow = 0;
@@ -323933,7 +323970,7 @@ async function createSandboxWorkers(options2) {
     }
     clearTimeout(loaded.timer);
     workers.delete(loaded.name);
-    await rm16(join36(directory, `${loaded.name}.json`), { force: true });
+    await rm16(join37(directory, `${loaded.name}.json`), { force: true });
     await loaded.runtime.dispose();
     await (await loaded.mock)?.dispose();
   };
@@ -324033,7 +324070,7 @@ async function createSandboxWorkers(options2) {
   };
   try {
     for (const file6 of (await readdir14(directory)).filter((file7) => /^[a-z][a-z0-9-]*\.json$/.test(file7))) {
-      const saved = exports_external4.object({ name: exports_external4.string(), publication: publicationSchema }).parse(JSON.parse(await readFile26(join36(directory, file6), "utf8")));
+      const saved = exports_external4.object({ name: exports_external4.string(), publication: publicationSchema }).parse(JSON.parse(await readFile27(join37(directory, file6), "utf8")));
       activate(await load(saved.name, saved.publication));
     }
   } catch (error262) {
@@ -324054,7 +324091,7 @@ async function createSandboxWorkers(options2) {
         const existing = workers.get(name3);
         if (existing && apps.get(existing.publication.appSlug) === name3) {
           apps.delete(existing.publication.appSlug);
-          await rm16(join36(directory, `${name3}.json`), { force: true });
+          await rm16(join37(directory, `${name3}.json`), { force: true });
         }
         if (existing)
           await dispose(existing);
@@ -324072,10 +324109,10 @@ async function createSandboxWorkers(options2) {
           return Response.json({ ready: true, worker: name3 });
         }
         loaded = await load(name3, publication);
-        await writeFile16(join36(directory, `${name3}.pending`), JSON.stringify({ name: name3, publication }), {
+        await writeFile16(join37(directory, `${name3}.pending`), JSON.stringify({ name: name3, publication }), {
           mode: 384
         });
-        await rename4(join36(directory, `${name3}.pending`), join36(directory, `${name3}.json`));
+        await rename4(join37(directory, `${name3}.pending`), join37(directory, `${name3}.json`));
         activate(loaded);
         return Response.json({ ready: true, worker: name3 });
       } catch (error262) {
@@ -324162,18 +324199,18 @@ async function createSandboxWorkers(options2) {
 }
 
 // frontend/packages/miniapp-kit/src/dev/vars.ts
-import { readFile as readFile27 } from "node:fs/promises";
-import { join as join37 } from "node:path";
+import { readFile as readFile28 } from "node:fs/promises";
+import { join as join38 } from "node:path";
 import { parseEnv } from "node:util";
 
 // frontend/packages/miniapp-kit/src/git.ts
-import { spawn as spawn5 } from "node:child_process";
+import { spawn as spawn6 } from "node:child_process";
 
 class GitError extends Error {
   name = "GitError";
 }
 var runGit = (args, options2) => new Promise((resolve3, reject) => {
-  const child = spawn5("git", [...args], {
+  const child = spawn6("git", [...args], {
     cwd: options2.cwd,
     env: { ...process.env, ...options2.env },
     stdio: [options2.input === undefined ? "ignore" : "pipe", "pipe", "pipe"]
@@ -324212,7 +324249,7 @@ async function readDevVars(root, hosted) {
   if (hosted)
     return {};
   try {
-    const values = parseEnv(await readFile27(join37(root, ".kit/dev.vars"), "utf8"));
+    const values = parseEnv(await readFile28(join38(root, ".kit/dev.vars"), "utf8"));
     const result = {};
     for (const [name3, value2] of Object.entries(values)) {
       if (value2 !== undefined && name3 !== "GATEWAY_URL" && !name3.startsWith("PLATFORM_"))
@@ -324247,13 +324284,13 @@ import { relative as relative4, sep as sep2 } from "node:path";
 init_src2();
 init_pack();
 import { createHash as createHash14 } from "node:crypto";
-import { mkdir as mkdir16, readFile as readFile30, writeFile as writeFile18 } from "node:fs/promises";
-import { join as join40 } from "node:path";
+import { mkdir as mkdir16, readFile as readFile31, writeFile as writeFile18 } from "node:fs/promises";
+import { join as join41 } from "node:path";
 
 // frontend/packages/miniapp-kit/src/dev/prebuilt-worker.ts
 import { execFile as execFile2 } from "node:child_process";
-import { readFile as readFile28 } from "node:fs/promises";
-import { join as join38 } from "node:path";
+import { readFile as readFile29 } from "node:fs/promises";
+import { join as join39 } from "node:path";
 import { promisify } from "node:util";
 var run2 = promisify(execFile2);
 var PREBUILT_DIR = ".kit/prebuilt";
@@ -324268,7 +324305,7 @@ async function mismatch(root, appSlug, commit) {
     "--porcelain",
     "--untracked-files=all",
     "--",
-    join38("apps", appSlug),
+    join39("apps", appSlug),
     "packages",
     "package.json",
     "bun.lock"
@@ -324276,9 +324313,9 @@ async function mismatch(root, appSlug, commit) {
   return changed.trim() === "" ? null : "the app or the packages differ from the commit";
 }
 async function readPrebuiltWorker(root, appSlug) {
-  const placed = join38(root, PREBUILT_DIR);
-  const commit = await readFile28(join38(placed, "commit"), "utf8").then((text4) => text4.trim(), () => null);
-  const bytes3 = await readFile28(join38(placed, `${appSlug}.js`)).then((content) => new Uint8Array(content), () => null);
+  const placed = join39(root, PREBUILT_DIR);
+  const commit = await readFile29(join39(placed, "commit"), "utf8").then((text4) => text4.trim(), () => null);
+  const bytes3 = await readFile29(join39(placed, `${appSlug}.js`)).then((content) => new Uint8Array(content), () => null);
   if (!commit || !bytes3)
     return null;
   try {
@@ -324299,8 +324336,8 @@ init_schema_plan();
 // frontend/packages/miniapp-kit/src/dev/schema-plan-cache.ts
 init_compiler_fingerprint();
 import { createHash as createHash13, randomUUID as randomUUID4 } from "node:crypto";
-import { mkdir as mkdir15, readFile as readFile29, rename as rename5, writeFile as writeFile17 } from "node:fs/promises";
-import { join as join39 } from "node:path";
+import { mkdir as mkdir15, readFile as readFile30, rename as rename5, writeFile as writeFile17 } from "node:fs/promises";
+import { join as join40 } from "node:path";
 
 // frontend/packages/miniapp-kit/src/dev/source-snapshot.ts
 init_src();
@@ -324380,14 +324417,14 @@ var CACHE_PATH = ".kit/cache/schema-plan.json";
 async function schemaPlanCacheKey(root, kitRoot, baseline) {
   const hash8 = createHash13("sha256").update("schema-plan-v1\x00").update(await compilerFingerprint()).update(JSON.stringify(baseline)).update((await collectWorkingSource(root)).hash);
   for (const path of ["platform/platform.zmodel", "package.json", "bun.lock"]) {
-    hash8.update(path).update("\x00").update(await optionalFile2(join39(kitRoot, path)) ?? "");
+    hash8.update(path).update("\x00").update(await optionalFile2(join40(kitRoot, path)) ?? "");
   }
   for (const path of [".kit/generated/schema.json", ".kit/generated/project.json"])
-    hash8.update(path).update("\x00").update(await optionalFile2(join39(root, path)) ?? "");
+    hash8.update(path).update("\x00").update(await optionalFile2(join40(root, path)) ?? "");
   return hash8.digest("hex");
 }
 async function readSchemaPlanCache(root, key) {
-  const raw2 = await optionalFile2(join39(root, CACHE_PATH));
+  const raw2 = await optionalFile2(join40(root, CACHE_PATH));
   if (raw2 === null)
     return null;
   try {
@@ -324412,15 +324449,15 @@ async function readSchemaPlanCache(root, key) {
   }
 }
 async function cacheSchemaPlan(root, key, notification) {
-  const path = join39(root, CACHE_PATH);
-  await mkdir15(join39(root, ".kit/cache"), { recursive: true });
+  const path = join40(root, CACHE_PATH);
+  await mkdir15(join40(root, ".kit/cache"), { recursive: true });
   const temporary = `${path}.${randomUUID4()}`;
   await writeFile17(temporary, JSON.stringify({ key, checksum: digest3(JSON.stringify(notification)), notification }));
   await rename5(temporary, path);
 }
 async function optionalFile2(path) {
   try {
-    return await readFile29(path);
+    return await readFile30(path);
   } catch (error262) {
     if (error262.code === "ENOENT")
       return null;
@@ -324514,24 +324551,24 @@ async function pythonEvent(root, appSlug, manifest2) {
   };
 }
 async function workerEvent(root, appSlug, kind, manifest2) {
-  const appDir = join40(root, "apps", appSlug);
-  const files = await collectFiles(join40(appDir, "src"));
+  const appDir = join41(root, "apps", appSlug);
+  const files = await collectFiles(join41(appDir, "src"));
   const sources = new Map(files.map((file6) => [`${appSlug}/src/${file6.path}`, new TextDecoder().decode(file6.bytes)]));
   const findings = checkAppNetwork(manifest2, sources);
   if (findings.length)
     throw new DevError(findings.map((finding2) => `${finding2.path}: ${finding2.code}: ${finding2.message}`).join(`
 `));
-  const output2 = join40(root, "dist", appSlug, "index.js");
+  const output2 = join41(root, "dist", appSlug, "index.js");
   const key = await workerCacheKey(root, appSlug, kind);
   let bundle = await readCachedWorker(root, appSlug, key);
   bundle ??= await readPrebuiltWorker(root, appSlug);
   if (bundle) {
-    await mkdir16(join40(root, "dist", appSlug), { recursive: true });
+    await mkdir16(join41(root, "dist", appSlug), { recursive: true });
     await writeFile18(output2, bundle);
     await cacheWorker(root, appSlug, key, bundle);
   } else {
     await buildWorkerBundle({ root, appDir, slug: appSlug, kind });
-    bundle = new Uint8Array(await readFile30(output2));
+    bundle = new Uint8Array(await readFile31(output2));
     await cacheWorker(root, appSlug, key, bundle);
   }
   const payload = {
@@ -325073,7 +325110,7 @@ async function startDev(options2) {
   if (options2.live)
     return startLiveDev(options2, manifest2);
   const createLibsqlClient = options2.createLibsqlClient ?? await loadProjectLibsql(root, (m3) => new DevError(m3));
-  const projectName = String(JSON.parse(readFileSync4(join41(root, "package.json"), "utf8")).name ?? "");
+  const projectName = String(JSON.parse(readFileSync4(join42(root, "package.json"), "utf8")).name ?? "");
   const offset = process.env[KIT_LIVE_CONFIG_ENV] ? 100 : 0;
   const ports = options2.ports ?? {
     host: DEV_PORTS.host + offset,
@@ -325197,11 +325234,11 @@ async function startDev(options2) {
         if (!dist)
           await buildWorkerBundle({
             root,
-            appDir: join41(root, "apps", app.slug),
+            appDir: join42(root, "apps", app.slug),
             slug: app.slug,
             kind: app.kind
           });
-        const bytes3 = dist ? dist.files.get(`${app.slug}/index.js`) : readFileSync4(join41(root, "dist", app.slug, "index.js"));
+        const bytes3 = dist ? dist.files.get(`${app.slug}/index.js`) : readFileSync4(join42(root, "dist", app.slug, "index.js"));
         if (!bytes3)
           throw new DevError(`missing Worker bundle: ${app.slug}/index.js`);
         return {
@@ -325272,7 +325309,7 @@ async function startDev(options2) {
     for (const slug of dist ? [] : webApps) {
       const vite = await (options2.startVite ?? viteDev)({
         slug,
-        appDir: join41(root, "apps", slug),
+        appDir: join42(root, "apps", slug),
         port: appPorts[slug],
         env
       });
@@ -325435,7 +325472,7 @@ async function startLiveDev(options2, manifest2) {
         throw new DevError("live App configuration is incomplete");
       const vite = await (options2.startVite ?? viteDev)({
         slug,
-        appDir: join41(options2.root, "apps", slug),
+        appDir: join42(options2.root, "apps", slug),
         port,
         env: {
           [KIT_BUILD_ENV.projectId]: options2.projectId,
@@ -325627,7 +325664,7 @@ try {
 }
 `;
 var viteDev = async ({ slug, appDir, port, env }) => {
-  const child = spawn6(process.execPath, ["--input-type=module", "--eval", VITE_DEV_RUNNER, "--", String(port)], {
+  const child = spawn7(process.execPath, ["--input-type=module", "--eval", VITE_DEV_RUNNER, "--", String(port)], {
     cwd: appDir,
     env: { ...process.env, ...env },
     stdio: ["ignore", "pipe", "pipe"]
@@ -325662,7 +325699,7 @@ var viteDev = async ({ slug, appDir, port, env }) => {
 };
 
 // frontend/packages/miniapp-kit/src/doctor.ts
-import { spawn as spawn7 } from "node:child_process";
+import { spawn as spawn8 } from "node:child_process";
 var NODE_MINIMUM = [22, 12];
 async function runDoctor(deps) {
   const checks11 = [
@@ -325740,7 +325777,7 @@ async function tryExec(deps, command, args) {
 var firstLine = (text4) => text4.trim().split(`
 `)[0] ?? "";
 var execCommand = (command, args) => new Promise((resolve3, reject) => {
-  const child = spawn7(command, [...args], { stdio: ["ignore", "pipe", "pipe"] });
+  const child = spawn8(command, [...args], { stdio: ["ignore", "pipe", "pipe"] });
   const stdout = [];
   const stderr = [];
   child.stdout.on("data", (chunk) => stdout.push(chunk));
@@ -325756,44 +325793,79 @@ var execCommand = (command, args) => new Promise((resolve3, reject) => {
 // frontend/packages/miniapp-kit/src/e2e.ts
 init_src();
 import { randomBytes as randomBytes4 } from "node:crypto";
-import { existsSync as existsSync23 } from "node:fs";
-import { readFile as readFile31, realpath } from "node:fs/promises";
+import { existsSync as existsSync24 } from "node:fs";
+import { readFile as readFile32, realpath } from "node:fs/promises";
 import { relative as relative5, resolve as resolve3, sep as sep3 } from "node:path";
 init_runtime2();
 init_session_runtime();
 
 // frontend/packages/miniapp-kit/src/verify/browser.ts
-import { existsSync as existsSync22 } from "node:fs";
+import { spawn as spawn9 } from "node:child_process";
+import { existsSync as existsSync23 } from "node:fs";
 import { createRequire as createRequire12 } from "node:module";
-import { join as join42 } from "node:path";
+import { dirname as dirname13, join as join43 } from "node:path";
 import { pathToFileURL as pathToFileURL9 } from "node:url";
 
 class BrowserUnavailableError extends Error {
   name = "BrowserUnavailableError";
 }
 function resolvePlaywright() {
-  const bases = [process.env.KIT_PLAYWRIGHT_DIR, process.cwd()].filter((base) => Boolean(base));
+  const bases = [
+    process.env.KIT_PLAYWRIGHT_DIR && join43(process.env.KIT_PLAYWRIGHT_DIR, "noop.js"),
+    import.meta.url,
+    join43(process.cwd(), "noop.js")
+  ].filter((base) => Boolean(base));
   for (const base of bases) {
     try {
-      return createRequire12(join42(base, "noop.js")).resolve("playwright-core");
+      return createRequire12(base).resolve("playwright-core");
     } catch {}
   }
+  throw new BrowserUnavailableError("playwright-core is not installed next to the Kit. Update the fdpocket-creator plugin, or run `bun install` in the plugin directory");
+}
+var MISSING_BROWSER = /Executable doesn't exist/;
+async function launchInstallingBrowser(options2) {
   try {
-    return createRequire12(import.meta.url).resolve("playwright-core");
+    return await options2.launch();
   } catch (error262) {
-    throw new BrowserUnavailableError(`playwright-core is not installed (set KIT_PLAYWRIGHT_DIR): ${String(error262)}`);
+    if (!(error262 instanceof Error) || !MISSING_BROWSER.test(error262.message))
+      throw error262;
+    if (!options2.canInstall)
+      throw new BrowserUnavailableError(error262.message);
+    console.info("kit: installing Chromium for the browser checks (first time only, about 100 MB)");
+    try {
+      await options2.install();
+    } catch (installError) {
+      console.error("kit: Chromium install failed", installError);
+      throw new BrowserUnavailableError(`Chromium is not installed and the automatic install failed (${installError instanceof Error ? installError.message : String(installError)}). ` + "Run: node <kit>/node_modules/playwright-core/cli.js install --only-shell chromium");
+    }
+    return options2.launch();
   }
 }
+function installChromium(playwrightEntry) {
+  const cli = join43(dirname13(playwrightEntry), "cli.js");
+  return new Promise((resolve3, reject) => {
+    const child = spawn9(process.execPath, [cli, "install", "--only-shell", "chromium"], {
+      stdio: ["ignore", "inherit", "inherit"]
+    });
+    child.on("error", reject);
+    child.on("close", (code) => code === 0 ? resolve3() : reject(new Error(`playwright install exited with ${code}`)));
+  });
+}
 var launchChromium = async () => {
-  const loaded = await import(pathToFileURL9(resolvePlaywright()).href);
+  const entry2 = resolvePlaywright();
+  const loaded = await import(pathToFileURL9(entry2).href);
   const module = loaded.default ?? loaded;
   const executablePath = process.env.KIT_CHROMIUM_PATH;
-  if (executablePath && !existsSync22(executablePath)) {
+  if (executablePath && !existsSync23(executablePath)) {
     throw new BrowserUnavailableError(`KIT_CHROMIUM_PATH does not exist: ${executablePath}`);
   }
-  return module.chromium.launch({
-    ...executablePath ? { executablePath } : {},
-    args: ["--host-resolver-rules=MAP *.localhost 127.0.0.1"]
+  return launchInstallingBrowser({
+    launch: () => module.chromium.launch({
+      ...executablePath ? { executablePath } : {},
+      args: ["--host-resolver-rules=MAP *.localhost 127.0.0.1"]
+    }),
+    install: () => installChromium(entry2),
+    canInstall: !executablePath && !process.env.KIT_PLAYWRIGHT_DIR
   });
 };
 
@@ -325887,7 +325959,7 @@ async function exchange2(request2, options2, send, secrets) {
   }
 }
 function scenarioOf(options2) {
-  const path = options2.test ?? (existsSync23(resolve3(options2.root, "design/e2e.ts")) ? "design/e2e.ts" : null);
+  const path = options2.test ?? (existsSync24(resolve3(options2.root, "design/e2e.ts")) ? "design/e2e.ts" : null);
   if (!path)
     throw new LiveE2EError("The Platform checks that the preview opens when your turn ends; do not check it yourself. " + "Use kit e2e for something only a real environment shows: write a scenario and pass it " + "with --test (see $app-testing).");
   return path;
@@ -325895,7 +325967,7 @@ function scenarioOf(options2) {
 async function prepareE2E(root, options2, secret) {
   scenarioOf({ root, ...options2.test ? { test: options2.test } : {} });
   const planPath = resolve3(root, "design/test-plan.md");
-  const plan = existsSync23(planPath) ? await readFile31(planPath, "utf8") : "";
+  const plan = existsSync24(planPath) ? await readFile32(planPath, "utf8") : "";
   if (!plan.trim() || Buffer.byteLength(plan) > 128 * 1024 || secret !== undefined && plan.includes(secret))
     throw new LiveE2EError("Write a bounded, credential-free design/test-plan.md before live E2E");
   const { manifest: manifest2 } = await prepareSessionRuntime(root);
@@ -326078,10 +326150,10 @@ async function checkKitUpdate(input2) {
 
 // frontend/packages/miniapp-kit/src/login.ts
 import { createHash as createHash15, randomBytes as randomBytes5 } from "node:crypto";
-import { existsSync as existsSync24 } from "node:fs";
-import { chmod, mkdir as mkdir17, readFile as readFile32, rename as rename6, writeFile as writeFile19 } from "node:fs/promises";
+import { existsSync as existsSync25 } from "node:fs";
+import { chmod, mkdir as mkdir17, readFile as readFile33, rename as rename6, writeFile as writeFile19 } from "node:fs/promises";
 import { createServer as createServer4 } from "node:http";
-import { join as join43 } from "node:path";
+import { join as join44 } from "node:path";
 var DEFAULT_MCP_URL = "https://fdpocket.dev/mcp/creator";
 var REDIRECT_URI = "http://127.0.0.1:43126/callback";
 var REFRESH_MARGIN_MS = 60000;
@@ -326095,10 +326167,10 @@ class LoginError extends Error {
 class LoginInProgress extends LoginError {
 }
 async function readLogins(configDir) {
-  const path = join43(configDir, CREDENTIALS_FILE);
-  if (!existsSync24(path))
+  const path = join44(configDir, CREDENTIALS_FILE);
+  if (!existsSync25(path))
     return {};
-  const parsed = JSON.parse(await readFile32(path, "utf8"));
+  const parsed = JSON.parse(await readFile33(path, "utf8"));
   return parsed.logins ?? {};
 }
 async function writeLogin(configDir, mcpUrl, login) {
@@ -326108,7 +326180,7 @@ async function writeLogin(configDir, mcpUrl, login) {
   else
     logins[mcpUrl] = login;
   await mkdir17(configDir, { recursive: true, mode: 448 });
-  const path = join43(configDir, CREDENTIALS_FILE);
+  const path = join44(configDir, CREDENTIALS_FILE);
   const temporary = `${path}.${process.pid}.tmp`;
   await writeFile19(temporary, `${JSON.stringify({ logins }, null, 2)}
 `, { mode: 384 });
@@ -326562,9 +326634,9 @@ async function serveMcpStdio(proxy, io) {
 init_src();
 init_dist();
 init_vendor();
-import { existsSync as existsSync25 } from "node:fs";
-import { mkdir as mkdir18, readdir as readdir15, readFile as readFile33, writeFile as writeFile20 } from "node:fs/promises";
-import { dirname as dirname13, join as join44, relative as relative6 } from "node:path";
+import { existsSync as existsSync26 } from "node:fs";
+import { mkdir as mkdir18, readdir as readdir15, readFile as readFile34, writeFile as writeFile20 } from "node:fs/promises";
+import { dirname as dirname14, join as join45, relative as relative6 } from "node:path";
 var TEMPLATE_DIR = "templates/project";
 var DEFAULT_APP_SPECS = ["web", "admin"];
 var NAME_PATTERN = /^[a-z][a-z0-9-]{0,63}$/;
@@ -326596,22 +326668,22 @@ async function newProject(options2) {
     throw new NewProjectError("declare at most one mcp App (one /mcp URL per Project)");
   if (!declarations.length || declarations.length > PROJECT_APPS_MAX || new Set(declarations.map((a2) => a2.slug)).size !== declarations.length)
     throw new NewProjectError(`declare 1–${PROJECT_APPS_MAX} unique Apps`);
-  if (existsSync25(root) && (await readdir15(root)).some((entry2) => entry2 !== ".git")) {
+  if (existsSync26(root) && (await readdir15(root)).some((entry2) => entry2 !== ".git")) {
     throw new NewProjectError(`${root} is not empty; kit new only fills an empty Project`);
   }
-  const template = join44(options2.kitRoot, TEMPLATE_DIR);
+  const template = join45(options2.kitRoot, TEMPLATE_DIR);
   const files = [];
   const sources = await listFiles(template);
   const put = async (target2, text4) => {
-    await mkdir18(dirname13(join44(root, target2)), { recursive: true });
-    await writeFile20(join44(root, target2), text4);
+    await mkdir18(dirname14(join45(root, target2)), { recursive: true });
+    await writeFile20(join45(root, target2), text4);
     files.push(target2);
   };
   for (const source of sources) {
     if (source.startsWith("apps/"))
       continue;
     const target2 = targetPath(source);
-    let text4 = fill(await readFile33(join44(template, source), "utf8"), { name: name3, title });
+    let text4 = fill(await readFile34(join45(template, source), "utf8"), { name: name3, title });
     if (target2 === PROJECT_PATHS.manifest) {
       const document2 = $parseDocument(text4);
       const original = document2.toJS().apps;
@@ -326661,7 +326733,7 @@ async function newProject(options2) {
     const prefix2 = `apps/${templateSlug}/`;
     for (const source of sources.filter((path) => path.startsWith(prefix2))) {
       const target2 = `apps/${slug}/${source.slice(prefix2.length)}`;
-      let text4 = fill(await readFile33(join44(template, source), "utf8"), { name: name3, title });
+      let text4 = fill(await readFile34(join45(template, source), "utf8"), { name: name3, title });
       if (target2.endsWith("/vite.config.ts"))
         text4 = text4.replace(`createAppConfig("${templateSlug}"`, `createAppConfig("${slug}"`);
       if (target2.endsWith("/package.json")) {
@@ -326756,7 +326828,7 @@ async function listFiles(root) {
   const files = [];
   const walk = async (dir) => {
     for (const entry2 of await readdir15(dir, { withFileTypes: true })) {
-      const path = join44(dir, entry2.name);
+      const path = join45(dir, entry2.name);
       if (entry2.isDirectory())
         await walk(path);
       else if (entry2.isFile())
@@ -327006,8 +327078,8 @@ function nextStep(error262) {
 
 // frontend/packages/miniapp-kit/src/read.ts
 import { execFile as execFile3 } from "node:child_process";
-import { mkdir as mkdir19, readdir as readdir16, readFile as readFile34, stat as stat3, writeFile as writeFile21 } from "node:fs/promises";
-import { extname, join as join45 } from "node:path";
+import { mkdir as mkdir19, readdir as readdir16, readFile as readFile35, stat as stat3, writeFile as writeFile21 } from "node:fs/promises";
+import { extname, join as join46 } from "node:path";
 var DOCUMENT_MAX_BYTES = 50 * 1024 * 1024;
 var TEXT_MAX_CHARS = 300000;
 var PAGES_MAX = 60;
@@ -327148,7 +327220,7 @@ ${page.trim()}`).join(`
   return { text: text4, pages: pages.length };
 }
 async function pdfImages(file6, out, range, deps) {
-  const directory = join45(out, "pages");
+  const directory = join46(out, "pages");
   await mkdir19(directory, { recursive: true });
   try {
     await deps.run("pdftoppm", [
@@ -327160,7 +327232,7 @@ async function pdfImages(file6, out, range, deps) {
       "-l",
       String(range.last),
       file6,
-      join45(directory, "page")
+      join46(directory, "page")
     ], { timeoutMs: TOOL_TIMEOUT_MS });
   } catch (error262) {
     if (!(error262 instanceof ToolMissingError))
@@ -327168,7 +327240,7 @@ async function pdfImages(file6, out, range, deps) {
     return { images: [], note: "page images are unavailable: pdftoppm is not installed" };
   }
   const names = (await readdir16(directory)).filter((name3) => name3.endsWith(".png")).sort();
-  return { images: names.map((name3) => join45(directory, name3)), note: null };
+  return { images: names.map((name3) => join46(directory, name3)), note: null };
 }
 async function officeText(file6, deps) {
   return await deps.run("markitdown", [file6], { timeoutMs: TOOL_TIMEOUT_MS });
@@ -327179,7 +327251,7 @@ async function readDocument(options2, deps = realDeps) {
   if ((await stat3(options2.file)).size > maxBytes) {
     throw new ReadError(`${options2.file} is too large (limit ${maxBytes} bytes)`);
   }
-  checkContent(kind, await readFile34(options2.file), options2.file);
+  checkContent(kind, await readFile35(options2.file), options2.file);
   await mkdir19(options2.out, { recursive: true });
   const notes = [];
   let pageCount = null;
@@ -327199,12 +327271,12 @@ async function readDocument(options2, deps = realDeps) {
   } else if (kind === "docx" || kind === "pptx" || kind === "xlsx") {
     text4 = await officeText(options2.file, deps);
   } else {
-    text4 = (await readFile34(options2.file)).toString("utf8");
+    text4 = (await readFile35(options2.file)).toString("utf8");
   }
   const kept = cut(text4, options2.maxChars ?? TEXT_MAX_CHARS);
   if (kept.note)
     notes.push(kept.note);
-  const textPath = join45(options2.out, "text.md");
+  const textPath = join46(options2.out, "text.md");
   await writeFile21(textPath, kept.body);
   return {
     kind,
@@ -327218,9 +327290,9 @@ async function readDocument(options2, deps = realDeps) {
 }
 
 // frontend/packages/miniapp-kit/src/repo.ts
-import { existsSync as existsSync26 } from "node:fs";
-import { appendFile, mkdir as mkdir20, readFile as readFile35, rm as rm17, writeFile as writeFile22 } from "node:fs/promises";
-import { join as join46 } from "node:path";
+import { existsSync as existsSync27 } from "node:fs";
+import { appendFile, mkdir as mkdir20, readFile as readFile36, rm as rm17, writeFile as writeFile22 } from "node:fs/promises";
+import { join as join47 } from "node:path";
 class RepoError extends Error {
   name = "RepoError";
 }
@@ -327238,10 +327310,10 @@ async function configureRepo(git2, source, config7, author) {
   await set6(git2, source, `branch.${branch}.remote`, ".");
   await set6(git2, source, `branch.${branch}.merge`, trackingRef(config7.thread_ref));
   await set6(git2, source, `branch.${branch}.rebase`, "true");
-  const info = join46(source, ".git", "info");
+  const info = join47(source, ".git", "info");
   await mkdir20(info, { recursive: true });
-  const excludePath = join46(info, "exclude");
-  const excluded = existsSync26(excludePath) ? (await readFile35(excludePath, "utf8")).split(`
+  const excludePath = join47(info, "exclude");
+  const excluded = existsSync27(excludePath) ? (await readFile36(excludePath, "utf8")).split(`
 `) : [];
   const missing2 = EXCLUDES.filter((line) => !excluded.includes(line));
   if (missing2.length > 0)
@@ -327250,12 +327322,12 @@ async function configureRepo(git2, source, config7, author) {
 `);
 }
 function requireRepo(source) {
-  if (!existsSync26(join46(source, ".git"))) {
+  if (!existsSync27(join47(source, ".git"))) {
     throw new RepoError(`${source} is not a git repository; run kit.mjs clone in a new directory`);
   }
 }
 async function requireClean(git2, source, what) {
-  if (existsSync26(join46(source, ".git", "rebase-merge")) || existsSync26(join46(source, ".git", "rebase-apply"))) {
+  if (existsSync27(join47(source, ".git", "rebase-merge")) || existsSync27(join47(source, ".git", "rebase-apply"))) {
     throw new RepoError("a git rebase is in progress in source/; finish it (git rebase --continue) first");
   }
   if (await gitOk(git2, source, ["status", "--porcelain"]) !== "") {
@@ -327265,13 +327337,13 @@ async function requireClean(git2, source, what) {
 async function fetchBundles(git2, source, pulled, already, download2) {
   const listed = new Set(pulled.bundles.map((bundle2) => bundle2.sha256));
   const fetched = already.filter((sha) => listed.has(sha));
-  const dir = join46(source, ".git", "fdpocket-bundles");
+  const dir = join47(source, ".git", "fdpocket-bundles");
   await mkdir20(dir, { recursive: true });
   for (const bundle2 of fetchOrder(pulled.bundles)) {
     if (fetched.includes(bundle2.sha256))
       continue;
     const bytes3 = await download2(`bundle ${bundle2.seq}`, bundle2.url, bundle2.sha256);
-    const file6 = join46(dir, `${bundle2.sha256}.bundle`);
+    const file6 = join47(dir, `${bundle2.sha256}.bundle`);
     await writeFile22(file6, bytes3);
     try {
       await gitOk(git2, source, [
@@ -327326,15 +327398,15 @@ async function integrate(git2, source, threadRef) {
 
 // frontend/packages/miniapp-kit/src/sdk-fingerprint.ts
 import { createHash as createHash16 } from "node:crypto";
-import { readdir as readdir17, readFile as readFile36 } from "node:fs/promises";
-import { join as join47, relative as relative7, sep as sep4 } from "node:path";
+import { readdir as readdir17, readFile as readFile37 } from "node:fs/promises";
+import { join as join48, relative as relative7, sep as sep4 } from "node:path";
 async function sdkVendorHash(kitRoot) {
-  const root = join47(kitRoot, "vendor");
+  const root = join48(kitRoot, "vendor");
   const entries = await readdir17(root, { recursive: true, withFileTypes: true });
-  const files = entries.filter((entry2) => entry2.isFile()).map((entry2) => relative7(root, join47(entry2.parentPath, entry2.name)).split(sep4).join("/")).sort();
+  const files = entries.filter((entry2) => entry2.isFile()).map((entry2) => relative7(root, join48(entry2.parentPath, entry2.name)).split(sep4).join("/")).sort();
   const digest5 = createHash16("sha256");
   for (const path of files) {
-    const content = await readFile36(join47(root, path));
+    const content = await readFile37(join48(root, path));
     digest5.update(`${path}\x00${createHash16("sha256").update(content).digest("hex")}
 `);
   }
@@ -327343,7 +327415,7 @@ async function sdkVendorHash(kitRoot) {
 
 // frontend/packages/miniapp-kit/src/shot.ts
 import { mkdir as mkdir21 } from "node:fs/promises";
-import { join as join48 } from "node:path";
+import { join as join49 } from "node:path";
 class ShotError extends Error {
   name = "ShotError";
 }
@@ -327520,7 +327592,7 @@ async function takeShots(options2, launch = launchChromium) {
         }
         const height = Math.min(MAX_HEIGHT, Math.max(MIN_HEIGHT, inspected.height));
         await page.setViewportSize({ width, height });
-        const file6 = join48(options2.out, `${options2.app}-${width}${options2.theme ? `-${options2.theme}` : ""}${options2.safeArea !== undefined ? "-safe" : ""}.png`);
+        const file6 = join49(options2.out, `${options2.app}-${width}${options2.theme ? `-${options2.theme}` : ""}${options2.safeArea !== undefined ? "-safe" : ""}.png`);
         await page.screenshot({ path: file6, type: "png" });
         shots.push({
           width,
@@ -327589,8 +327661,8 @@ function captureName(id) {
 // frontend/packages/miniapp-kit/src/verify/external-history.ts
 init_src();
 init_src2();
-import { readFile as readFile37 } from "node:fs/promises";
-import { join as join49 } from "node:path";
+import { readFile as readFile38 } from "node:fs/promises";
+import { join as join50 } from "node:path";
 function parseExternalHistoryContext(text4) {
   if (Buffer.byteLength(text4, "utf8") > 1024 * 1024)
     throw new Error("External history context is too large");
@@ -327649,7 +327721,7 @@ async function verifyExternalHistory(options2) {
         return migration;
       let meta11 = null;
       try {
-        meta11 = JSON.parse(await readFile37(join49(root, PROJECT_PATHS.migrations, migration.name, "meta.json"), "utf8"));
+        meta11 = JSON.parse(await readFile38(join50(root, PROJECT_PATHS.migrations, migration.name, "meta.json"), "utf8"));
       } catch {}
       return { ...migration, meta: meta11 };
     }));
@@ -327681,12 +327753,12 @@ class ValidationFailed extends Error {
 init_src();
 init_src2();
 import { mkdir as mkdir23, writeFile as writeFile24 } from "node:fs/promises";
-import { join as join51 } from "node:path";
+import { join as join52 } from "node:path";
 
 // frontend/packages/miniapp-kit/src/verify/dynamic.ts
 init_src2();
 import { mkdir as mkdir22, writeFile as writeFile23 } from "node:fs/promises";
-import { join as join50 } from "node:path";
+import { join as join51 } from "node:path";
 
 // frontend/packages/miniapp-kit/src/verify/judge.ts
 function webApps(manifest2) {
@@ -327882,7 +327954,7 @@ async function runDynamicChecks(options2) {
   });
   const browser = await (options2.launch ?? launchChromium)();
   try {
-    await mkdir22(join50(options2.outDir, "screenshots"), { recursive: true });
+    await mkdir22(join51(options2.outDir, "screenshots"), { recursive: true });
     const observations = [];
     const at = (app) => ({
       hostUrl: dev.hostUrl,
@@ -327918,7 +327990,7 @@ async function runDynamicChecks(options2) {
       gatewayUrl: dev.gatewayUrl,
       appOrigins: dev.appOrigins
     });
-    await writeFile23(join50(options2.outDir, "permission-matrix.json"), `${JSON.stringify(matrix, null, 1)}
+    await writeFile23(join51(options2.outDir, "permission-matrix.json"), `${JSON.stringify(matrix, null, 1)}
 `);
     const erase2 = await runEraseCheck({
       root: options2.root,
@@ -327926,7 +327998,7 @@ async function runDynamicChecks(options2) {
     });
     const judged = judgeDynamic(options2.manifest, observations);
     const workerResults = await dev.checkWorkers();
-    await writeFile23(join50(options2.outDir, "worker-mocks.json"), `${JSON.stringify({ results: workerResults, events: dev.workerEvents() }, null, 1)}
+    await writeFile23(join51(options2.outDir, "worker-mocks.json"), `${JSON.stringify({ results: workerResults, events: dev.workerEvents() }, null, 1)}
 `);
     const workerErrors = workerResults.filter((result) => result.status >= (result.kind === "jobs" ? 400 : 500)).map((result) => ({
       code: "WORKER_RUNTIME_FAILED",
@@ -328005,7 +328077,7 @@ async function observe(context, visit3, at, shot) {
     if (shot)
       await page.waitForTimeout(shot.settleMs);
     const name3 = shot?.name ?? `screenshots/${visit3.app}-${visit3.principal}.png`;
-    await writeFile23(join50(at.outDir, name3), await page.locator("#frame").screenshot());
+    await writeFile23(join51(at.outDir, name3), await page.locator("#frame").screenshot());
     observation.screenshot = name3;
     return observation;
   } finally {
@@ -328093,18 +328165,18 @@ async function validateVersion(options2) {
     ...externalHistory ? { externalHistoryChecked: externalHistory.errors.length === 0 } : {}
   });
   await mkdir23(options2.outDir, { recursive: true });
-  await writeFile24(join51(options2.outDir, "report.json"), `${JSON.stringify(report2, null, 2)}
+  await writeFile24(join52(options2.outDir, "report.json"), `${JSON.stringify(report2, null, 2)}
 `);
   if (result.schemaJson !== undefined) {
-    await writeFile24(join51(options2.outDir, "schema.json"), result.schemaJson);
+    await writeFile24(join52(options2.outDir, "schema.json"), result.schemaJson);
   }
   return report2;
 }
 
 // frontend/packages/miniapp-kit/src/workdir.ts
-import { existsSync as existsSync27 } from "node:fs";
-import { readFile as readFile38, unlink, writeFile as writeFile25 } from "node:fs/promises";
-import { dirname as dirname14, join as join52 } from "node:path";
+import { existsSync as existsSync28 } from "node:fs";
+import { readFile as readFile39, unlink, writeFile as writeFile25 } from "node:fs/promises";
+import { dirname as dirname15, join as join53 } from "node:path";
 var CONFIG_FILE = ".fdpocket.json";
 var LEGACY_CONFIG_FILE = ".tokoyo.json";
 var WORKDIR_DIRS = {
@@ -328177,10 +328249,10 @@ function locateWorkdir(start) {
   return locateFile(start, CONFIG_FILE);
 }
 function locateFile(start, name3) {
-  for (let current = start;; current = dirname14(current)) {
-    if (existsSync27(join52(current, name3)))
+  for (let current = start;; current = dirname15(current)) {
+    if (existsSync28(join53(current, name3)))
       return current;
-    if (dirname14(current) === current)
+    if (dirname15(current) === current)
       return null;
   }
 }
@@ -328190,9 +328262,9 @@ async function migrateLegacyWorkdir(start) {
   const found = locateFile(start, LEGACY_CONFIG_FILE);
   if (found === null)
     return null;
-  const { app_id, ...rest } = JSON.parse(await readFile38(join52(found, LEGACY_CONFIG_FILE), "utf8"));
-  await writeFile25(join52(found, CONFIG_FILE), serializeConfig(parseConfig(JSON.stringify({ project_id: app_id, ...rest }))));
-  await unlink(join52(found, LEGACY_CONFIG_FILE));
+  const { app_id, ...rest } = JSON.parse(await readFile39(join53(found, LEGACY_CONFIG_FILE), "utf8"));
+  await writeFile25(join53(found, CONFIG_FILE), serializeConfig(parseConfig(JSON.stringify({ project_id: app_id, ...rest }))));
+  await unlink(join53(found, LEGACY_CONFIG_FILE));
   return found;
 }
 async function findWorkdir(start) {
@@ -328255,11 +328327,11 @@ class CommandError extends Error {
 }
 function defaultConfigDir() {
   const xdg = process.env.XDG_CONFIG_HOME;
-  return join53(xdg && xdg !== "" ? xdg : join53(homedir(), ".config"), "fdpocket");
+  return join54(xdg && xdg !== "" ? xdg : join54(homedir(), ".config"), "fdpocket");
 }
 function defaultCodexHome() {
   const home = process.env.CODEX_HOME;
-  return home && home !== "" ? home : join53(homedir(), ".codex");
+  return home && home !== "" ? home : join54(homedir(), ".codex");
 }
 async function readStdin() {
   const chunks = [];
@@ -328356,7 +328428,7 @@ async function runCommand(args, context) {
         return await shotCommand(context, flags);
     }
   } catch (error262) {
-    if (error262 instanceof RepoError || error262 instanceof PulledError || error262 instanceof GenerateError || error262 instanceof NewProjectError || error262 instanceof BuildError || error262 instanceof DevError || error262 instanceof DbError || error262 instanceof VendorError || error262 instanceof PushError || error262 instanceof ReadError || error262 instanceof ShotError || error262 instanceof ToolMissingError || error262 instanceof McpToolError) {
+    if (error262 instanceof RepoError || error262 instanceof PulledError || error262 instanceof GenerateError || error262 instanceof NewProjectError || error262 instanceof BuildError || error262 instanceof KitRuntimeError || error262 instanceof BrowserUnavailableError || error262 instanceof DevError || error262 instanceof DbError || error262 instanceof VendorError || error262 instanceof PushError || error262 instanceof ReadError || error262 instanceof ShotError || error262 instanceof ToolMissingError || error262 instanceof McpToolError) {
       throw new CommandError(error262.message);
     }
     if (error262 instanceof McpAuthError) {
@@ -328368,30 +328440,30 @@ async function runCommand(args, context) {
 var print = (context, value2) => context.stdout(JSON.stringify(value2, null, 2));
 var mcpUrlOf = (flag) => flag ?? process.env.CREATOR_MCP_URL ?? DEFAULT_MCP_URL;
 async function kitVersion(kitRoot) {
-  const manifest2 = join53(kitRoot, ".claude-plugin", "plugin.json");
-  if (!existsSync28(manifest2))
+  const manifest2 = join54(kitRoot, ".claude-plugin", "plugin.json");
+  if (!existsSync29(manifest2))
     throw new CommandError(`${manifest2} is missing; reinstall the Kit`);
-  const version7 = JSON.parse(await readFile39(manifest2, "utf8")).version;
+  const version7 = JSON.parse(await readFile40(manifest2, "utf8")).version;
   if (typeof version7 !== "string")
     throw new CommandError(`${manifest2} has no version`);
   return version7;
 }
 async function readConfig(workdir) {
-  return parseConfig(await readFile39(join53(workdir, CONFIG_FILE), "utf8"));
+  return parseConfig(await readFile40(join54(workdir, CONFIG_FILE), "utf8"));
 }
 async function saveConfig(workdir, config7) {
-  await writeFile26(join53(workdir, CONFIG_FILE), serializeConfig(config7));
+  await writeFile26(join54(workdir, CONFIG_FILE), serializeConfig(config7));
 }
-var sourceOf = (workdir) => join53(workdir, WORKDIR_DIRS.source);
+var sourceOf = (workdir) => join54(workdir, WORKDIR_DIRS.source);
 var AGENTS_TITLE = agentsMd("").split(`
 `)[0];
 async function writeAgentFiles(workdir, kitRoot) {
-  const agents = join53(workdir, "AGENTS.md");
-  if (!existsSync28(agents) || (await readFile39(agents, "utf8")).startsWith(AGENTS_TITLE)) {
+  const agents = join54(workdir, "AGENTS.md");
+  if (!existsSync29(agents) || (await readFile40(agents, "utf8")).startsWith(AGENTS_TITLE)) {
     await writeFile26(agents, agentsMd(kitRoot));
   }
-  const claude = join53(workdir, "CLAUDE.md");
-  if (!existsSync28(claude))
+  const claude = join54(workdir, "CLAUDE.md");
+  if (!existsSync29(claude))
     await writeFile26(claude, CLAUDE_MD);
 }
 async function fetchVerified(context, name3, url7, sha2562) {
@@ -328417,8 +328489,8 @@ async function clone8(context, flags) {
   }
   const pulled = parsePulled(bundles);
   const workdir = context.cwd;
-  const path = join53(workdir, CONFIG_FILE);
-  if (existsSync28(path)) {
+  const path = join54(workdir, CONFIG_FILE);
+  if (existsSync29(path)) {
     const existing = await readConfig(workdir);
     if (existing.project_id !== pulled.project_id) {
       throw new CommandError(`${path} belongs to App ${existing.project_id}; use another directory for App ${pulled.project_id}`);
@@ -328426,11 +328498,11 @@ async function clone8(context, flags) {
     throw new CommandError(`${workdir} already has App ${pulled.project_id}; run kit.mjs pull instead`);
   }
   const source = sourceOf(workdir);
-  if (existsSync28(source) && (await readdir18(source)).length > 0) {
+  if (existsSync29(source) && (await readdir18(source)).length > 0) {
     throw new CommandError(`${source} is not empty; clone into a new directory`);
   }
   for (const dir of Object.values(WORKDIR_DIRS))
-    await mkdir24(join53(workdir, dir), { recursive: true });
+    await mkdir24(join54(workdir, dir), { recursive: true });
   const branch = threadBranch(pulled.thread_ref);
   await gitOk(context.git, workdir, ["init", "-q", "-b", branch, source]);
   const config7 = {
@@ -328588,15 +328660,15 @@ async function push(context, flags) {
   print(context, { ...result, ...update.status === "outdated" ? { kit_update: update } : {} });
 }
 async function writeBuildReport(workdir, built, policyRevision) {
-  const path = join53(workdir, WORKDIR_DIRS.outputs, "build-report.json");
+  const path = join54(workdir, WORKDIR_DIRS.outputs, "build-report.json");
   const report2 = completeBuildReport({
-    existing: existsSync28(path) ? JSON.parse(await readFile39(path, "utf8")) : null,
-    projectYaml: await readFile39(join53(sourceOf(workdir), "infra", "project.yaml"), "utf8"),
+    existing: existsSync29(path) ? JSON.parse(await readFile40(path, "utf8")) : null,
+    projectYaml: await readFile40(join54(sourceOf(workdir), "infra", "project.yaml"), "utf8"),
     apps: built.apps,
     schemaVersion: built.schema_version,
     ...policyRevision === undefined ? {} : { policyRevision }
   });
-  await mkdir24(dirname15(path), { recursive: true });
+  await mkdir24(dirname16(path), { recursive: true });
   await writeFile26(path, `${JSON.stringify(report2, null, 2)}
 `);
 }
@@ -328635,7 +328707,7 @@ async function doctor(context) {
     throw new CommandError('some checks failed; follow each "fix" above');
 }
 async function kitUpdate(context) {
-  const manifest2 = JSON.parse(await readFile39(join53(context.kitRoot, ".claude-plugin", "plugin.json"), "utf8"));
+  const manifest2 = JSON.parse(await readFile40(join54(context.kitRoot, ".claude-plugin", "plugin.json"), "utf8"));
   const current = typeof manifest2.version === "string" ? manifest2.version : "unknown";
   if (process.env.KIT_TOOL_ROOT)
     return { status: "unknown", current };
@@ -328763,7 +328835,7 @@ async function validate2(context, flags) {
     root,
     kitRoot: context.kitRoot,
     git: context.git,
-    archive: new Uint8Array(await readFile39(resolve4(context.cwd, flags.archive))),
+    archive: new Uint8Array(await readFile40(resolve4(context.cwd, flags.archive))),
     outDir: resolve4(context.cwd, flags.out),
     projectId: flags["project-id"],
     gatewayUrl: flags["gateway-url"],
@@ -328771,9 +328843,9 @@ async function validate2(context, flags) {
     sdkUpdate: flags["sdk-update"] === "true",
     skipDynamic: flags["skip-dynamic"] === "true",
     ...flags["external-history"] ? {
-      externalHistory: parseExternalHistoryContext(await readFile39(resolve4(context.cwd, flags["external-history"]), "utf8"))
+      externalHistory: parseExternalHistoryContext(await readFile40(resolve4(context.cwd, flags["external-history"]), "utf8"))
     } : {},
-    ...flags.captures ? { captures: parseCaptures(await readFile39(resolve4(context.cwd, flags.captures), "utf8")) } : {}
+    ...flags.captures ? { captures: parseCaptures(await readFile40(resolve4(context.cwd, flags.captures), "utf8")) } : {}
   });
   print(context, {
     passed: report2.passed,
@@ -328854,7 +328926,7 @@ async function withConnectedDev(context, workdir, config7, as, run3) {
     throw new CommandError("--connect needs at least one web App");
   const appPorts = allocateAppPorts(webSlugs);
   await assertConnectedPorts([4320, ...Object.values(appPorts)]);
-  const projectPackage = JSON.parse(await readFile39(join53(root, "package.json"), "utf8"));
+  const projectPackage = JSON.parse(await readFile40(join54(root, "package.json"), "utf8"));
   const name3 = projectPackage && typeof projectPackage === "object" && "name" in projectPackage && typeof projectPackage.name === "string" ? projectPackage.name : "project";
   const scope = {
     projectId: config7.project_id,
@@ -328977,16 +329049,16 @@ async function pack(context) {
   if (tip === base) {
     throw new CommandError("no new commits since the head kit.mjs pull took (base_commit_oid); git commit first");
   }
-  const outputs = join53(workdir, WORKDIR_DIRS.outputs);
-  const reportPath = join53(outputs, "build-report.json");
-  if (!existsSync28(reportPath)) {
+  const outputs = join54(workdir, WORKDIR_DIRS.outputs);
+  const reportPath = join54(outputs, "build-report.json");
+  if (!existsSync29(reportPath)) {
     throw new CommandError("outputs/build-report.json is missing; write it first (instructions.md §2)");
   }
-  const dist = join53(source, "dist");
-  if (!existsSync28(dist))
+  const dist = join54(source, "dist");
+  if (!existsSync29(dist))
     throw new CommandError("source/dist is missing; kit.mjs build first");
   await mkdir24(outputs, { recursive: true });
-  const bundlePath = join53(outputs, "source.bundle");
+  const bundlePath = join54(outputs, "source.bundle");
   await gitOk(context.git, source, [
     "bundle",
     "create",
@@ -328996,12 +329068,12 @@ async function pack(context) {
     ...base === null ? [] : [`^${base}`]
   ]);
   const distArchive = buildDistArchive(await collectFiles(dist));
-  await writeFile26(join53(outputs, "dist.tar.gz"), distArchive);
+  await writeFile26(join54(outputs, "dist.tar.gz"), distArchive);
   print(context, {
     files: {
-      "source.bundle": describeFile(new Uint8Array(await readFile39(bundlePath))),
+      "source.bundle": describeFile(new Uint8Array(await readFile40(bundlePath))),
       "dist.tar.gz": describeFile(distArchive),
-      "build-report.json": describeFile(new Uint8Array(await readFile39(reportPath)))
+      "build-report.json": describeFile(new Uint8Array(await readFile40(reportPath)))
     },
     project_id: config7.project_id,
     session_id: config7.session_id,
@@ -329025,7 +329097,7 @@ async function uploadOutputs(context, flags) {
       throw new CommandError(`--urls has no URL for ${name3}`);
   }
   for (const [name3, contentType2] of Object.entries(OUTPUT_FILES)) {
-    const bytes3 = new Uint8Array(await readFile39(join53(workdir, WORKDIR_DIRS.outputs, name3)));
+    const bytes3 = new Uint8Array(await readFile40(join54(workdir, WORKDIR_DIRS.outputs, name3)));
     await upload(name3, urls[name3], bytes3, contentType2, context.fetch);
   }
   print(context, { uploaded: Object.keys(OUTPUT_FILES) });
@@ -329086,8 +329158,8 @@ async function addAsset(context, flags) {
   }
   const workdir = await findWorkdir(context.cwd);
   const bytes3 = await fetchVerified(context, path, flags.url, flags.sha256);
-  const target2 = join53(sourceOf(workdir), ...segments);
-  await mkdir24(dirname15(target2), { recursive: true });
+  const target2 = join54(sourceOf(workdir), ...segments);
+  await mkdir24(dirname16(target2), { recursive: true });
   await writeFile26(target2, bytes3);
   print(context, {
     path,
@@ -329121,8 +329193,8 @@ async function codexConfig(context, flags) {
     context.stdout(codexApprovalToml(pluginId, MCP_SERVER_NAME));
     return;
   }
-  const path = join53(context.codexHome, "config.toml");
-  const existing = existsSync28(path) ? await readFile39(path, "utf8") : "";
+  const path = join54(context.codexHome, "config.toml");
+  const existing = existsSync29(path) ? await readFile40(path, "utf8") : "";
   let merged;
   try {
     merged = mergeCodexApproval(existing, pluginId, MCP_SERVER_NAME);
@@ -329143,6 +329215,7 @@ async function codexConfig(context, flags) {
   });
 }
 async function shotCommand(context, flags) {
+  await ensureKitRuntimeDependencies(context.kitRoot);
   const result = await takeShots({
     host: flags.host ?? defaultHost(process.env),
     app: flags.app ?? "web",
@@ -329199,6 +329272,7 @@ async function e2eCommand(context, flags) {
   const workdir = await findWorkdir(context.cwd);
   const config7 = await readConfig(workdir);
   if (!process.env[KIT_LIVE_CONFIG_ENV]) {
+    await ensureKitRuntimeDependencies(context.kitRoot);
     const result2 = await runConnectedE2E({
       root: sourceOf(workdir),
       projectId: config7.project_id,
@@ -329232,7 +329306,7 @@ async function e2eCommand(context, flags) {
 
 // frontend/packages/miniapp-kit/src/cli.ts
 function kitRootOf(scriptUrl) {
-  return resolve5(dirname16(fileURLToPath2(scriptUrl)), "..");
+  return resolve5(dirname17(fileURLToPath2(scriptUrl)), "..");
 }
 async function main(argv, scriptUrl) {
   let args;

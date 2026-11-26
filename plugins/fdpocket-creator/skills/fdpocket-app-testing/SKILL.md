@@ -70,6 +70,8 @@ node <kit>/scripts/kit.mjs e2e --as admin --app admin --test design/e2e.ts
 準備ができてから Playwright でテスト主体として開き、終わったら切断する。
 許可証（`KIT_TEST_GRANT`）は要らない。別の `kit dev --connect` が動いているとその接続は閉じる（同じポートなら先に止める）。
 初めて開く App では共有の同意が要る。先に `kit dev --connect --as <主体>` を開いて利用者に許可してもらってから実行する。
+手元で初めて `kit e2e` / `kit shot` を使うときは、Kit が Playwright と Chromium（約 100 MB）を自動で入れる（1 回だけ）。
+入れられなかったときはエラーに出るコマンドを実行してからやり直す。
 `--app` を省くと `web`、無ければ最初の web App を使う。
 `--test` は source 内の相対パス。省略時は `design/e2e.ts` があれば実行し、シナリオが無ければ実行しない（プレビューが開くかの確認は Platform がターンの終了時にする。あなたはしない）。
 シナリオは TS / JS の default export として書く。`page` は実際の Playwright Page、`frame` は接続した App の Frame。
