@@ -153,8 +153,8 @@ In Codex, call the Skills with `$`:
 ### 3. Approval settings
 
 Like GitHub, writing Issues and proposals (create, comment, edit, open / close / merge) needs no confirmation, so
-they run without a prompt. Bringing a branch into main (`adopt_branch`) and publishing (`publish_project`) reach
-everyone, so they stay approval-only.
+they run without a prompt. Bringing a branch into main (`adopt_branch`), publishing (`publish_project`), and removing a member or
+deleting an organization reach other people and cannot be undone, so they stay approval-only.
 Codex plugins cannot ship this setting, so add the following to `~/.codex/config.toml`
 (`node <kit>/scripts/kit.mjs codex-config` prints the same text, and `codex-config --write` writes it there for you,
 replacing an earlier copy and keeping the rest of the file):
@@ -164,6 +164,15 @@ replacing an earlier copy and keeping the rest of the file):
 default_tools_approval_mode = "writes"
 
 [plugins."fdpocket-creator@moon-technica".mcp_servers.fdpocket.tools.grant_session_consent]
+approval_mode = "approve"
+
+[plugins."fdpocket-creator@moon-technica".mcp_servers.fdpocket.tools.remove_organization_member]
+approval_mode = "approve"
+
+[plugins."fdpocket-creator@moon-technica".mcp_servers.fdpocket.tools.delete_organization]
+approval_mode = "approve"
+
+[plugins."fdpocket-creator@moon-technica".mcp_servers.fdpocket.tools.remove_project_collaborator]
 approval_mode = "approve"
 
 [plugins."fdpocket-creator@moon-technica".mcp_servers.fdpocket.tools.adopt_branch]
@@ -227,6 +236,27 @@ approval_mode = "auto"
 approval_mode = "auto"
 
 [plugins."fdpocket-creator@moon-technica".mcp_servers.fdpocket.tools.merge_pull_request]
+approval_mode = "auto"
+
+[plugins."fdpocket-creator@moon-technica".mcp_servers.fdpocket.tools.create_organization]
+approval_mode = "auto"
+
+[plugins."fdpocket-creator@moon-technica".mcp_servers.fdpocket.tools.invite_organization_member]
+approval_mode = "auto"
+
+[plugins."fdpocket-creator@moon-technica".mcp_servers.fdpocket.tools.revoke_organization_invitation]
+approval_mode = "auto"
+
+[plugins."fdpocket-creator@moon-technica".mcp_servers.fdpocket.tools.resend_organization_invitation]
+approval_mode = "auto"
+
+[plugins."fdpocket-creator@moon-technica".mcp_servers.fdpocket.tools.invite_project_collaborator]
+approval_mode = "auto"
+
+[plugins."fdpocket-creator@moon-technica".mcp_servers.fdpocket.tools.revoke_project_collaborator_invitation]
+approval_mode = "auto"
+
+[plugins."fdpocket-creator@moon-technica".mcp_servers.fdpocket.tools.resend_project_collaborator_invitation]
 approval_mode = "auto"
 
 [plugins."fdpocket-creator@moon-technica".mcp_servers.fdpocket.tools.rebut_review]

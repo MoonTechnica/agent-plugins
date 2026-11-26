@@ -321140,6 +321140,9 @@ init_src2();
 // frontend/packages/miniapp-kit/src/approval.ts
 var ASK_A_PERSON_TOOLS = [
   "grant_session_consent",
+  "remove_organization_member",
+  "delete_organization",
+  "remove_project_collaborator",
   "adopt_branch",
   "publish_project",
   "decide_migration_review"
@@ -321163,6 +321166,13 @@ var AUTO_APPROVE_TOOLS = [
   "update_pull_request",
   "set_pull_request_state",
   "merge_pull_request",
+  "create_organization",
+  "invite_organization_member",
+  "revoke_organization_invitation",
+  "resend_organization_invitation",
+  "invite_project_collaborator",
+  "revoke_project_collaborator_invitation",
+  "resend_project_collaborator_invitation",
   "rebut_review"
 ];
 function codexApprovalToml(pluginId, server2) {

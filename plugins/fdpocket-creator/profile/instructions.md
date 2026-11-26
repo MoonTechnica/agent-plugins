@@ -448,6 +448,21 @@ GitHub 管理でできるのは、Issue の一覧（`query` で検索）・詳�
 | `INVALID_ACTION`（`discussion_not_found` / `reason_only_when_closed` / `*_length`） | id と引数を直す。`reason` は `closed` のときだけ |
 | `RATE_LIMITED` | Issue は 1 日 10 件、コメントは 1 日 200 件まで。待つ |
 
+### 8.9 組織と招待
+
+`list_organizations` で自分の組織を見て、`create_organization({ account_name, display_name })` で作る（作った人が最初の owner。1 日 10 件まで）。
+招くのは `invite_organization_member`（owner だけ。`role` は `member` / `owner`）と `invite_project_collaborator`（アプリの管理者だけ。`role` は `use` / `read` / `write` / `admin`。公開前のアプリに `use` は出せない）。
+宛先は `account_name`（`search_invitable_accounts` で探す）か `email` のどちらか 1 つ。未登録のメールには招待メールが届く。7 日で失効し、**受諾・辞退は招かれた本人が画面で行う**（MCP には無い）。
+`list_organization_invitations` / `list_project_collaborator_invitations` で保留中を見て、`revoke_*` で取り消し、`resend_*` で送り直す。`list_organization_members` / `list_project_collaborators` で現在の人を見る。
+**メンバー・共同編集者を外す（`remove_organization_member` / `remove_project_collaborator`）と組織の削除（`delete_organization`）は、クライアントが利用者に確認を求める**（取り戻せない）。断られたら押さない。
+グループ（チーム）・財布・通報は画面。
+
+| エラー | すること |
+|---|---|
+| `FORBIDDEN`（owner / 管理者でない） | 立場の問題。利用者に伝えて止まる |
+| `INVALID_ACTION`（`account_name_taken` / `invalid_email` / `invitation_target_required`） | 名前・宛先を直す |
+| `RATE_LIMITED` | 組織の作成は 1 日 10 件、招待の検索は 1 分 60 回。待つ |
+
 ## 公開の安全条件
 
 年齢区分は Platform の審査が実際の画面と内容から判定する（作者の申告欄は無い）。審査で区分を判断できるよう、`listing/` の説明と画面の内容を一致させる。
