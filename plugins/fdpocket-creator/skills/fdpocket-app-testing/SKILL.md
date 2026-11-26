@@ -84,6 +84,7 @@ export default async ({ frame }) => {
 }
 ```
 
+テストのブラウザは日本語（`ja-JP`）の設定で開くので、App は日本語で表示される。英語の画面を確かめるときは、シナリオの中で `?locale=en` を付けて開き直す。
 引数にはほかに `page` / `app` / `identity` / `environmentId` がある。単なる接続 smoke の成功を、業務操作や権限制御まで確認した結果としない。
 HAR・storageState・trace・スクリーンショットは自動保存しない。結果は秘密を除いて計画へ追記する。
 

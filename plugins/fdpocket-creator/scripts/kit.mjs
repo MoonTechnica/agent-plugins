@@ -326031,6 +326031,7 @@ async function runLiveE2E(options2) {
     await server2.close();
   }
 }
+var E2E_LOCALE = "ja-JP";
 async function runConnectedE2E(options2) {
   if (!testIdentitySlotSchema.safeParse(options2.identity).success || ["self", "owner"].includes(options2.identity))
     throw new LiveE2EError("Live E2E requires a test identity; self/owner are unavailable");
@@ -326051,7 +326052,10 @@ async function runConnectedE2E(options2) {
 async function checkBrowser(options2, input2, app, hostUrl, redact2, importer) {
   const browser = await (options2.launch ?? launchChromium)();
   try {
-    const context = await browser.newContext({ viewport: { width: 390, height: 844 } });
+    const context = await browser.newContext({
+      viewport: { width: 390, height: 844 },
+      locale: E2E_LOCALE
+    });
     const page = await context.newPage();
     const errors15 = [];
     page.on("pageerror", (error262) => {
