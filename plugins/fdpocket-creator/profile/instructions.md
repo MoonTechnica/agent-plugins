@@ -200,6 +200,7 @@ SDKの `useLocale()` / `client.ui.locale()` で利用者のロケールを取得
 通常の `kit dev` はローカル DB とファイル置き場・モックで動く。本物の Gateway のポリシー、Worker、Storage、Realtime、
 AI・GPU のように本物でしか分からないことだけ、本物のセッション環境で確認する。判断の表と手順は `$fdpocket-app-testing`。
 実行前に `design/test-plan.md` へ必要な確認、その方法を選ぶ理由、外部への副作用とモック、費用を書く。
+画面 App があれば、利用者がする流れごとに `design/e2e/*.ts` を 1 つ書いて `design/test-plan.md` に並べ、commit してから `kit e2e --as <主体>`（`--test` なし）で全部を通す。`kit check` が抜け・未実行・失敗を警告するので、push の前に消す（`$fdpocket-app-testing` §3）。
 
 手元の通常 `kit dev` はローカルだけで動く。開発用 Host ページの URL をブラウザで開き、App とテスト主体を切り替える。
 利用者にもこのローカル URL を示してよい。止めるときは Ctrl-C。
@@ -364,6 +365,7 @@ DB（`packages/db-schema`）・権限（`project.yaml` の権限に関わるキ�
 1. `kit.mjs check` が通り、`kit.mjs push` で送った版が `ready` で、未解決の警告が無い。
 2. 変更した画面 App すべてを `kit.mjs dev`（またはチャットのプレビュー）で動かした: 各 App のホストを開き、主な流れ・App 間の移動（`ui.navigate`）・API の呼び出し・
    権限の違い（admin / member / 匿名）を通した。コンソールにエラーが無い。
+   アップロード・ジョブ・AI・外部 API を使う流れは、本物のセッション環境で `kit.mjs e2e --as <テスト主体> --test <シナリオ>` を通した（`passed`。`platformErrors` に意図しない断りが無い。`$fdpocket-app-testing`）。
 3. DB・権限の変更を読んだ: migration は意図どおりで、データを失わない。ZModel のポリシー・capability の変更を説明できる。
 4. main に入るもの（差分の要約・リスク）を利用者に示し、会話で明示的に了承を得た。
 

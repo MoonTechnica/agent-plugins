@@ -36,7 +36,7 @@ description: ミニアプリが動くことを確かめる。Vitest で書くテ
 
 1. Host ページと各 App が開く（HTTP 200）。起動ログ・ブラウザのコンソールにエラーが無い。
 2. web を member で開き、主な流れ（`design/context.md` と完成の基準 §6）を 1 回通す: 作る → 一覧に出る → 直す → 消す。
-   ファイルのアップロード・ジョブ・AI など Platform に渡す流れは、通常の `kit dev` では Gateway の検査を通らない。**main に取り込む前に `kit e2e` で本物のセッション環境を使って 1 回通す**（画面が開くだけで終わらせない。アップロードはテスト用の小さな画像を `setInputFiles` で渡す）。
+   ファイルのアップロード・ジョブ・AI など Platform に渡す流れは、**画面を開くだけでなく実際に操作して通す**（アップロードはテスト用の小さな画像を `setInputFiles` で渡す）。`kit dev` も本番と同じ Gateway の検査を通るので、引数の誤り（例: `visibility: 'workspace'` に `workspaceId` が無い）は手元で分かる。ただしファイルの置き場・AI・ジョブの配送は手元の代わりのものなので、**main に取り込む前に `kit e2e` で本物のセッション環境を使って 1 回通す**。失敗したら、エラーに並ぶ「Platform refused or did not receive」の行（Gateway の理由・届かなかった要求）を読んで直す。App の画面の汎用の文言（「入力内容を確認してください」）からは原因が分からない。
 3. 一覧で 21 件目以降が「もっと見る」で出る（seed で 20 件以上入れておく）。
 4. admin を member で開くと `FORBIDDEN`、admin で開くと開く。
 5. 匿名を許していない App を anonymous で開くと開かない。
@@ -74,7 +74,18 @@ node <kit>/scripts/kit.mjs e2e --as admin --app admin --test design/e2e.ts
 手元で初めて `kit e2e` / `kit shot` を使うときは、Kit が Playwright と Chromium（約 100 MB）を自動で入れる（1 回だけ）。
 入れられなかったときはエラーに出るコマンドを実行してからやり直す。
 `--app` を省くと `web`、無ければ最初の web App を使う。
-`--test` は source 内の相対パス。省略時は `design/e2e.ts` があれば実行し、シナリオが無ければ実行しない（プレビューが開くかの確認は Platform がターンの終了時にする。あなたはしない）。
+### 正常系の流れ（`design/e2e/*.ts`）
+
+画面 App がある Project では、**利用者がする流れごとに 1 ファイル**を `design/e2e/` に書き（例: `design/e2e/register-card.ts`・`design/e2e/admin-list.ts`）、
+`design/test-plan.md` の「正常系」にパスで並べる（`- 名刺を撮って登録する → design/e2e/register-card.ts`）。
+シナリオの先頭で `export const as = 'member'`・`export const app = 'admin'` と書けば、その流れだけテスト主体・App を変えられる（無ければ `--as` / `--app`）。
+
+- `--test` を付けずに `kit e2e --as <主体>` を実行すると、`design/e2e/` の流れを**全部**回す。1 つ落ちても残りを回し、`flows` に流れごとの結果を出す。1 つでも落ちたら失敗で終わる。
+- **commit してから回す**。commit していない変更があると結果を残さない（`recorded: false`）。残した結果はその commit の中身と一緒に覚えられる。
+- `kit check` は、流れが 1 つも無い・一覧と食い違う・いまの commit で全部を回していない・落ちたままの流れがある、を警告する（`E2E_FLOWS_MISSING` / `E2E_FLOW_UNLISTED` / `E2E_FLOW_MISSING` / `E2E_NOT_RUN` / `E2E_FAILED`）。公開・配備では止めないので、**push の前に警告を消す**。直したら commit して回し直す。
+
+`--test` は source 内の相対パスで、その 1 つだけを回す（結果は残さない。直している途中の確認に使う）。
+`design/e2e/` が無く `--test` も無いときは、`design/e2e.ts` があれば実行し、シナリオが無ければ実行しない（プレビューが開くかの確認は Platform がターンの終了時にする。あなたはしない）。
 シナリオは TS / JS の default export として書く。`page` は実際の Playwright Page、`frame` は接続した App の Frame。
 期待と違えば例外にして失敗させる。シナリオの引数に許可証やセッショントークンは渡らない。
 
@@ -143,7 +154,7 @@ web の App ごとに Vite → `dist/<slug>/` と `dist/.artifact-index.json`。
 「ビルドが通った」は完成ではない。**依頼者の業務でそのアプリが使えること**が完成で、その基準を**実行できるテスト**として持つ（要件の文書は作らない。コードと二重になる）。
 
 - 新規・大きな変更では 3〜7 本。**テスト名を業務の言葉**にする（例: 「店舗スタッフが空き枠に予約を入れると一覧に出て、同じ枠には入らない」）。
-  置き場は Vitest か `design/e2e.ts`（live が使えるときだけ。§3）。
+  置き場は Vitest か `design/e2e/*.ts`（live が使えるときだけ。§3）。
 - **権限のテスト（「見えない」「変えられない」）を必ず 1 本以上**入れる（別の主体で読み書きして拒否されること）。
 - 小さな修正では新しいテストを書かず、既存のテストが通ることを確かめる。
 - `build-report.json` の `acceptance` に、テストごとの結果を書く:

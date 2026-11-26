@@ -24,6 +24,8 @@ user-invocable: false
 1. `node <kit>/scripts/kit.mjs check` が通り、`kit.mjs push` で送った版が `ready`、未解決の警告が無い。
 2. 変更した**画面 App すべて**を `kit.mjs dev`（またはチャットのプレビュー）で動かした:
    各 App のホストを開く・主な流れ・App 間の移動（`ui.navigate`）・API の呼び出し・権限の違い（admin / member / 匿名）。コンソールにエラーが無い。
+   **アップロード・ジョブ・AI・外部 API を使う流れは、本物のセッション環境で `kit.mjs e2e --as <テスト主体> --test <シナリオ>` を通す**（`$fdpocket-app-testing`）。
+   結果が `passed` で、`platformErrors`（Platform に断られた要求）に意図しないものが無いこと。失敗したら、エラーに並ぶ Platform の理由を読んで直す。
 3. DB・権限の変更を読んだ: `packages/db-schema` の migration は意図どおりで、データを失わない。ZModel のポリシー・capability の変更を説明できる。
 4. main に入るもの（差分の要約・リスク）を利用者に示し、会話で明示的に了承を得た。
 
