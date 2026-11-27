@@ -169,7 +169,7 @@ Smart Topologyや複数視点等を公式サイトで見つけても、現行ツ
 - **語は英語で短く**（素材の名前が英語）。1 つ目で見つからなければ語を変えて 2〜3 回まで。
   索引にあるのはファイル名・パック名・分類の語だけで、曲調・テンポ・用途（「勝利」「落ち着いた」）は無い。`win` や `calm` ではなく `jingles` / `music` / パック名で探し、候補の `pack` と `name` から選ぶ。
 - **PBR テクスチャも `image`**。Poly Haven / ambientCG を `wood color` / `stone roughness` / `brick normal` 等で探す。同じ `pack` の map を揃える。3Dで使う画像は §8 の `convert_texture` へ渡す。法線は `mode: "normal"`。一部の大きい原本は512pxへ縮小されるので、取り込み結果の寸法を使う。
-- 供給元は Kenney、既存固定版 Quaternius UAL、Superpowers、KayKit（Prototype Bits・Adventurers・Skeletons・Dungeon Remastered・Medieval Hexagon・City Builder・Furniture・Halloween・Restaurant・Space Base・Character Animations。すべて CC0）、Poly Haven、ambientCG。人型キャラのモーションは `$game-motion` references/motion-library.md。検索は索引だけを読み、素材原本は取り込み時に取得する。HDRI・字体・SVG・CC BY の素材はこの経路にはまだ含まれない。
+- 供給元は Kenney、既存固定版 Quaternius UAL、Superpowers、KayKit（Prototype Bits・Adventurers・Skeletons・Dungeon Remastered・Medieval Hexagon・City Builder・Furniture・Halloween・Restaurant・Space Base・Character Animations。すべて CC0）、Poly Haven、ambientCG、OpenGameArt（CC0 の効果音・音楽 140 パック約 2,300 本。`kind: audio` で `retro jump`・`sword`・`monster growl`・`battle theme`・`town`・`dark ambience` などを探す。zip の中の 1 本だけを取り込み時に取り出す）。人型キャラのモーションは `$game-motion` references/motion-library.md。検索は索引だけを読み、素材原本は取り込み時に取得する。HDRI・字体・SVG・CC BY の素材はこの経路にはまだ含まれない。
 - 結果は良く合う順。`pack`（パック名）が同じものは絵柄がそろっている。続きは `next_cursor` を渡す。
 - **連番フレーム**（`playerBlue_walk1` … `playerBlue_walk5`）は、同じ大きさのフレームが並ぶフォルダなら下のタイルと同じく
   **フォルダで 1 回**取り込む（返る `tileset.files` がファイル名ごとのシート上の [列, 行]）。1 枚ずつ取り込むと 1 枚で `stock` 枠を 1 回使う。
