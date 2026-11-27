@@ -117,6 +117,18 @@ godot/
   足場の端から離れても少しの間は跳べる（coyote 80〜120ms）、着地の少し前の入力を覚える（buffer 100ms）、
   当たり判定は見た目より少し小さく、取る判定は少し大きく。
 
+### 出来事を宣言する（観測）
+
+公開後に作者が「どこで離脱したか・どのステージが難しいか」を見られるよう、核の動詞と山場を出来事として `manifest.json` の `analytics` に最初から宣言する。最低限のセット:
+
+- チュートリアルがあるなら `tutorial_start` / `tutorial_done` と、その間の段階（`tutorial_*`）を 2〜5 個。`funnels` に並べる。
+- ステージ・面があるなら `stage_start` / `stage_clear`（項目 `stage`: int、`time_s`: float）と `stage_fail`。クリア率が見える。
+- 課金・購入があるなら `item_bought`（項目は列挙の `item` だけ）。
+
+宣言は 32 種まで・項目は 4 個まで・項目は int / float / bool / 列挙（16 個まで）だけで、**文字列の項目は無い**（自由文を集めない）。ゲームの中では `TokoyoApp.analytics.event("stage_clear", {"stage": 3, "time_s": 42.5})` と書く。宣言に無い名前や型の違う値は 1 回だけ警告して捨てられるので、増やすときは `analytics` の宣言も一緒に足す。場面の名前は `TokoyoApp.analytics.screen("stage_3")`（小文字・数字・`_`）。
+
+エラーと性能は何も書かなくても集まる。**ログを止める設定・呼び出し**（`project.godot` の `run/disable_stderr` / `run/disable_stdout`、`OS.remove_logger()`）は使わない。ビルドが断る。
+
 ## 4. 磨く（段階 8）
 
 機能は足さず、`$game-ux` §9 のチェック（手応え・読める文字・動きの安全・リザルト・設定）を通し、足りないものだけ入れる。

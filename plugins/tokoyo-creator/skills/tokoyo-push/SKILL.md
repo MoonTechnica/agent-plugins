@@ -36,3 +36,7 @@ description: 手元で作った TOKOYO.games のゲームを Platform に送る�
 `product_id` と同じ条件で再実行し、別商品を作らない。一覧は `next_cursor` で最後まで確認する。
 ゲームは既存の共通 commerce API と Host 購入画面を使い、独自の模擬残高・確認画面を追加しない。
 これはPreview専用で、実残高・作者売上・公開販売には触れない。公開商品の登録・公開・実購入は代行しない。
+
+## 送った後: 直したエラーの確認
+
+公開中のゲームのエラーを直す依頼だったときは、送って `ready` になり公開されたあと、次の集計（当日分は未集計。`get_app_insights` の `computed_through` で集計済みの日が分かる）で `list_error_groups` を見て、そのグループが新しい版で出なくなったか確かめる。出なくなったら `resolve_error_group` に直した版を渡す。まだ出るなら、`get_error_group` の新しいスタックから直し直す。公開前の版（ready 直後）では確かめられない。

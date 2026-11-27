@@ -21723,6 +21723,9 @@ var ERROR_CODES = [
   "CONTENT_CHECK_FAILED",
   "RATE_LIMITED",
   "QUOTA_EXCEEDED",
+  "COOLDOWN",
+  "DAILY_CAP",
+  "INSUFFICIENT",
   "SPACE_UNAVAILABLE",
   "SPACE_FINISHED",
   "INTERNAL"
@@ -21814,6 +21817,18 @@ var TELEMETRY_NAME_MAX_CHARS = 32;
 var TELEMETRY_SCREENS_MAX = 64;
 var TELEMETRY_EVENT_KINDS_MAX = 32;
 var TELEMETRY_EVENT_PROPS_MAX = 4;
+var STATS_MAX = 32;
+var ACHIEVEMENTS_MAX = 64;
+var ACHIEVEMENT_POINTS_MIN = 5;
+var ACHIEVEMENT_POINTS_MAX = 200;
+var ACHIEVEMENT_POINTS_TOTAL_MAX = 1000;
+var ACHIEVEMENT_NAME_MAX_CHARS = 60;
+var ACHIEVEMENT_DESCRIPTION_MAX_CHARS = 140;
+var SERVER_RULES_VALUES_MAX = 16;
+var SERVER_RULES_GRANTS_MAX = 32;
+var SERVER_RULES_SPENDS_MAX = 32;
+var SERVER_RULES_ROLLS_MAX = 8;
+var SERVER_RULES_ROLL_ITEMS_MAX = 16;
 
 // frontend/packages/app-protocol/src/manifest.ts
 var MANIFEST_VERSION = 1;
@@ -21933,6 +21948,81 @@ var analyticsManifestSchema = strictObject({
     }
   }
 });
+var STAT_AGGS = ["sum", "max", "min", "latest"];
+var STAT_SOURCES = ["client", "server"];
+var statSchema = strictObject({
+  agg: _enum(STAT_AGGS),
+  min: int().default(0),
+  max: int(),
+  maxPerMinute: int().min(1).optional(),
+  source: _enum(STAT_SOURCES).default("client")
+}).superRefine((stat, ctx) => {
+  if (stat.max < stat.min) {
+    ctx.addIssue({ code: "custom", path: ["max"], message: "max must be >= min" });
+  }
+  if (stat.maxPerMinute !== undefined && (stat.agg !== "sum" || stat.source !== "client")) {
+    ctx.addIssue({
+      code: "custom",
+      path: ["maxPerMinute"],
+      message: "maxPerMinute is only for client-written sum stats"
+    });
+  }
+});
+var statsManifestSchema = record(lowerIdentifierSchema, statSchema).refine((s) => Object.keys(s).length <= STATS_MAX, `at most ${STATS_MAX} stats`);
+var localizedText = (maxChars) => strictObject({ ja: string2().min(1).max(maxChars), en: string2().min(1).max(maxChars) });
+var achievementIconSchema = string2().regex(/^listing\/achievements\/[a-z0-9_-]{1,64}\.png$/, "icon must be listing/achievements/<name>.png");
+var achievementSchema = strictObject({
+  name: localizedText(ACHIEVEMENT_NAME_MAX_CHARS),
+  description: localizedText(ACHIEVEMENT_DESCRIPTION_MAX_CHARS),
+  icon: achievementIconSchema,
+  points: int().min(ACHIEVEMENT_POINTS_MIN).max(ACHIEVEMENT_POINTS_MAX),
+  hidden: boolean2().default(false),
+  unlock: union([
+    literal("client"),
+    strictObject({ stat: lowerIdentifierSchema, gte: int().min(1) })
+  ])
+});
+var achievementsManifestSchema = record(lowerIdentifierSchema, achievementSchema).refine((a) => Object.keys(a).length <= ACHIEVEMENTS_MAX, `at most ${ACHIEVEMENTS_MAX} achievements`).refine((a) => Object.values(a).reduce((sum, item) => sum + item.points, 0) <= ACHIEVEMENT_POINTS_TOTAL_MAX, `achievement points must total at most ${ACHIEVEMENT_POINTS_TOTAL_MAX}`);
+var serverValueSchema = strictObject({
+  initial: int().min(0),
+  max: int().min(1),
+  regen: strictObject({ amount: int().min(1), every_s: int().min(1) }).optional()
+}).refine((v) => v.initial <= v.max, { error: "initial must be <= max", path: ["initial"] });
+var amountsSchema = record(lowerIdentifierSchema, int().min(1));
+var serverGrantSchema = strictObject({
+  add: amountsSchema.optional(),
+  stats: amountsSchema.optional(),
+  cooldown_s: int().min(1).optional(),
+  cooldown: literal("daily").optional(),
+  daily_cap: int().min(1).optional()
+}).superRefine((g, ctx) => {
+  if (Object.keys(g.add ?? {}).length + Object.keys(g.stats ?? {}).length === 0) {
+    ctx.addIssue({ code: "custom", message: "a grant must add a value or a stat" });
+  }
+  if (g.cooldown !== undefined && g.cooldown_s !== undefined) {
+    ctx.addIssue({
+      code: "custom",
+      path: ["cooldown"],
+      message: "use cooldown or cooldown_s, not both"
+    });
+  }
+});
+var serverSpendSchema = strictObject({
+  sub: amountsSchema.refine((s) => Object.keys(s).length > 0, "a spend must subtract a value"),
+  stats: amountsSchema.optional()
+});
+var serverRollSchema = strictObject({
+  cost: amountsSchema.optional(),
+  table: array(strictObject({ item: lowerIdentifierSchema, weight: int().min(1).max(1000) })).min(1).max(SERVER_RULES_ROLL_ITEMS_MAX).refine((t) => new Set(t.map((e) => e.item)).size === t.length, "items must be unique"),
+  stats: amountsSchema.optional()
+});
+var limited = (schema, max, what) => record(lowerIdentifierSchema, schema).refine((r) => Object.keys(r).length <= max, `at most ${max} ${what}`);
+var serverRulesSchema = strictObject({
+  values: limited(serverValueSchema, SERVER_RULES_VALUES_MAX, "values").default({}),
+  grants: limited(serverGrantSchema, SERVER_RULES_GRANTS_MAX, "grants").default({}),
+  spends: limited(serverSpendSchema, SERVER_RULES_SPENDS_MAX, "spends").default({}),
+  rolls: limited(serverRollSchema, SERVER_RULES_ROLLS_MAX, "rolls").default({})
+});
 var DOCUMENT_FIELD_TYPES = [...STORE_FIELD_TYPES, "json"];
 var documentFieldSchema = strictObject({
   type: _enum(DOCUMENT_FIELD_TYPES),
@@ -22024,8 +22114,59 @@ var manifestSchema = strictObject({
   ai: aiManifestSchema.nullable().default(null),
   device: deviceManifestSchema.default({}),
   analytics: analyticsManifestSchema.optional(),
+  stats: statsManifestSchema.optional(),
+  achievements: achievementsManifestSchema.optional(),
+  serverRules: serverRulesSchema.optional(),
   godot: godotManifestSchema
 }).superRefine((manifest, ctx) => {
+  const stats = manifest.stats ?? {};
+  for (const [name, achievement] of Object.entries(manifest.achievements ?? {})) {
+    if (achievement.unlock === "client")
+      continue;
+    const stat = stats[achievement.unlock.stat];
+    if (!stat) {
+      ctx.addIssue({
+        code: "custom",
+        path: ["achievements", name, "unlock", "stat"],
+        message: `stat "${achievement.unlock.stat}" is not declared`
+      });
+    } else if (stat.agg === "min") {
+      ctx.addIssue({
+        code: "custom",
+        path: ["achievements", name, "unlock", "stat"],
+        message: 'a "min" stat cannot unlock an achievement by threshold'
+      });
+    }
+  }
+  const rules = manifest.serverRules;
+  if (rules) {
+    const refs = [];
+    for (const [name, g] of Object.entries(rules.grants)) {
+      refs.push([["grants", name, "add"], "value", Object.keys(g.add ?? {})]);
+      refs.push([["grants", name, "stats"], "stat", Object.keys(g.stats ?? {})]);
+    }
+    for (const [name, s] of Object.entries(rules.spends)) {
+      refs.push([["spends", name, "sub"], "value", Object.keys(s.sub)]);
+      refs.push([["spends", name, "stats"], "stat", Object.keys(s.stats ?? {})]);
+    }
+    for (const [name, r] of Object.entries(rules.rolls)) {
+      refs.push([["rolls", name, "cost"], "value", Object.keys(r.cost ?? {})]);
+      refs.push([["rolls", name, "stats"], "stat", Object.keys(r.stats ?? {})]);
+    }
+    for (const [path, kind, names] of refs) {
+      for (const ref of names) {
+        const stat = stats[ref];
+        const bad = kind === "value" ? !(ref in rules.values) : !stat || stat.source !== "server" || stat.agg !== "sum";
+        if (bad) {
+          ctx.addIssue({
+            code: "custom",
+            path: ["serverRules", ...path, ref],
+            message: kind === "value" ? `value "${ref}" is not declared in serverRules.values` : `stat "${ref}" must be a declared server-source sum stat`
+          });
+        }
+      }
+    }
+  }
   const declared = new Set([GODOT_NATIVE_BUNDLE, ...manifest.godot.regions]);
   const bundles = Object.keys(manifest.bundles);
   if (bundles.length !== declared.size || bundles.some((name) => !declared.has(name))) {
