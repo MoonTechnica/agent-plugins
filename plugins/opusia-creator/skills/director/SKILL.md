@@ -37,10 +37,10 @@ tool の引数として渡し、Storage への保存はサーバ側に閉じて�
 |---|---|---|---|
 | **何を作るにも最初** | `list_projects` / `list_compositions` の `format` を見る。未設定なら `set_work_format`（§1 の段取りは形式で分岐する） | director | 物語ものの 9 段を MV や撮影済みに当てて、要らない設定資料と絵コンテに費用を使う |
 | **依頼を受けたら（毎回、最初の 2 手）** | `start_timeline`（無ければ）→ **`declare_deliverable`**（依頼文から尺・比率・参照・intent を起こす。形式の門番はサーバが足す）。「予算 N ドルまで」とあれば `set_thread_budget`（下げるだけ）。手順は [references/closing-the-loop.md](references/closing-the-loop.md) | director | 「できました」が自己申告になり、検品の基準も完了カードも無い |
-| **「MV を作って」「この曲で」「PV に曲を付けて」** | `set_work_format(mv)` → 曲を確定 → 曲の地図（`measure_music` → `hear_music` / `hear_lyrics` → 分割を決めて `write_music_map` → 歌詞の時刻。audio-engineer §7）→ 小節の表の上でカットを割り `plan_scenes` に写す（`mv_check.py` の所見 0 まで。§1.2） | audio-engineer → screenwriter | 物語の型（三幕・ビートシート）を当てて曲と合わなくなる |
+| **「MV を作って」「この曲で」「PV に曲を付けて」** | `set_work_format(mv)` → 曲を確定 → 曲の地図（`measure_music` → 表から自分で名付けて分割を決め `write_music_map` → 歌詞の時刻。audio-engineer §7）→ 小節の表の上でカットを割り `plan_scenes` に写す（`mv_check.py` の所見 0 まで。§1.2） | audio-engineer → screenwriter | 物語の型（三幕・ビートシート）を当てて曲と合わなくなる |
 | **「この動画を編集して」「字幕を付けて」「YouTube 用に」「撮った素材から」** | `set_work_format(footage_edit)` → `generate_asset(speech_to_text, canvas_node_id)` → `read_transcript` → `plan_footage_scenes`（§1.3） | screenwriter → compositor | 生成に走って、あるものを作り直す |
 | **「サービス紹介を作って」「製品の説明動画」「使い方の動画」「会社紹介」「この機能を紹介して」「LP から動画に」「説明資料」** | `set_work_format(explainer)` → **実物（画面収録・スクショ・ロゴ・ブランド色・数字）を人に出してもらう** → 企画書とビート表（約束 → 根拠 → CTA）→ `plan_scenes`（§1.4） | screenwriter → art-director → compositor | 物語の 9 段を当てて、要らない絵コンテと人物の動画生成に費用を使う。実物を近似で描いて信用を失う |
-| 「音を聴いて」「動画を見て確かめて」「口は合っている?」 | `ask_gemini`（素材を渡して訊く。あなたの代わりに聴く・見る）。**制作に要る確認だけ**。出来の検品を毎回かけない（費用）→ `delivery.md` §5 | 全員 | コンタクトシートだけで判断して、音のずれや繋がりの破綻を見逃す。逆に、生成のたびに検品して費用が跳ねる |
+| 「音を聴いて」「動画を見て確かめて」「口は合っている?」 | 音は誰も聴けない。口合わせ・音質・読み・BGM の感じは**確かめず「未確認」と書いて人に渡す**。画（構図・色・顔・カット間の繋がり）は `get_asset_preview` のコンタクトシートを自分の目で見る → `delivery.md` §5 | 全員 | 聴いたふり・口が合っていると言い切る。逆に、画で決まることまで人に投げる |
 | 「アニメを作って」「動画にして」「1 本作って」 | `list_compositions` / `list_scenes` で**既にあるものを見る** → 見積もり（§5）→ §1 の段取りを頭から | director | 確定済みの資料を無視して作り直す |
 | **「脚本を書いて」**「プロットから起こして」「続きを」 | `start_timeline`（タイムライン + 空の脚本が対でできる）→ 返ってきた `script_asset_id` に `put_document(asset_id=…, script.v1)` で**版を積む** | screenwriter | 脚本を新規に作ろうとすると断られる（脚本はタイムラインの中身で、単独では存在しない） |
 | **「コンテを切って」**「シーンに割って」「字コンテにして」 | `read_script` → **`put_document`（`storyboard.v1`。画・カメラ / セリフ / 尺 / 音の 4 列）** → `plan_scenes`（scenes + cuts）→ **`apply_scene_proposal` でレーンへ置くまでが 1 セット**（「提案だけして」なら `propose_scenes`） | screenwriter | `plan_scenes` で止めるとタイムラインは空のまま。人には「何も起きなかった」ように見える。文字コンテを書かずに JSON を組むと、人がレビューできる地点が消える **字コンテでカットごと・要素ごとに持ち主（生成 / モーション / タイムライン / 音声トラック。見た目も音も）を 1 つ決める**（`ai-video-craft` の references/layer-ownership.md §2）。 |
@@ -121,8 +121,8 @@ tool の引数として渡し、Storage への保存はサーバ側に閉じて�
 
 **既にあるものを見る**（`list_compositions` / `list_scenes` / `list_slots` /
 `search_assets`）。連作では作り直さずに引くのが原則で、確定済みの設定資料はシリーズ
-全体に効く。**人がアップロードした素材も同じ `assets` にある** —— 音や動画の中身が
-知りたければ `ask_gemini` に渡す（あなたは聴けない・動画を見られない）。
+全体に効く。**人がアップロードした素材も同じ `assets` にある** —— 動画の中身は
+`get_asset_preview` のコンタクトシート、音の中身は文字起こし（`read_transcript`）で知る（あなたは聴けない・動画は静止画でしか見られない）。
 
 ## 0.2 作品の骨子（この入れ子を頭に入れてから動く）
 
@@ -336,7 +336,7 @@ UNIQUE）。脚本だけ・タイムラインだけ、という状態は存在�
 
 ### 1.3 撮影済み（`footage_edit`）— 素材が先
 
-文字起こし（語ごとの時刻）→ 内容の把握（`read_transcript` / `ask_gemini`）→
+文字起こし（語ごとの時刻）→ 内容の把握（`read_transcript` / `get_asset_preview`）→
 **使う区間を選んでシーンにする**（`plan_footage_scenes`）→ 字幕 → 音 → 書き出し。
 ②b④'⑤⑥ は無く、**生成しないので費用は文字起こしと書き出しだけ**。段ごとの道具と担当は
 **[references/other-formats.md](references/other-formats.md) §1.3**。
@@ -407,7 +407,7 @@ UNIQUE）。脚本だけ・タイムラインだけ、という状態は存在�
 4. **「できました」は `get_deliverable` が `passed` になってから。** 自分で採点しない（reviewer）。
    止まる 4 つ（承認待ち / round 上限 / 予算超過 / カットの差し替えで直らない）は確定行に 3 点を書いて終える
    （[references/closing-the-loop.md](references/closing-the-loop.md) §4）。
-5. **ファイルの加工（切る・繋ぐ・変換・合成）は手元でやって戻す。** `get_asset_preview` の url で落とし、ffmpeg 等で加工し、`create_upload_ticket` → curl PUT → `register_upload(source_asset_id=元)` で素材に戻す。生成・書き出し・Gemini・確定 / 束ねはサーバーの tool。使い分けは [references/local-vs-server.md](references/local-vs-server.md)。
+5. **ファイルの加工（切る・繋ぐ・変換・合成）は手元でやって戻す。** `get_asset_preview` の url で落とし、ffmpeg 等で加工し、`create_upload_ticket` → curl PUT → `register_upload(source_asset_id=元)` で素材に戻す。生成・書き出し・確定 / 束ねはサーバーの tool。使い分けは [references/local-vs-server.md](references/local-vs-server.md)。
 6. **画面を操作しない。** Computer Use・ブラウザ自動操作で Opusia の UI を触らない。アプリにできることは全部 MCP tool にある。tool が無い・落ちるときは報告して止まる（UI で代替しない。人に「アップロードして」とも頼まない）。
 7. **成果物は試作も含め、すべて DB に登録し、GUI で見られる形にする。** 置く先は添付されたシーン・本編のタイムライン。複製シーンや別タイムラインを勝手に作らない。登録先を実測して場所を報告する → [references/delivery.md](references/delivery.md)
 

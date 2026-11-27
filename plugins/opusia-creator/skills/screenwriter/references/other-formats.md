@@ -14,7 +14,7 @@
                   canvas_node_id: <その空ノード>)
    → transcript.v1（語ごとの時刻）。**素材から作るので盤面の外では投げられない**
 2. read_transcript(asset_id, from_sec, to_sec)   # 窓で読む。truncated なら狭める
-   + get_asset_preview（コンタクトシート）/ ask_gemini（「どこで誰が何を、時刻つきで」）
+   + get_asset_preview（コンタクトシート。誰が何を言うかは文字起こしの時刻つきの行で）
 3. plan_footage_scenes(asset_id, segments=[{start_ms, end_ms, title, note}, …])
    → 区間ごとにシーン（クリップは区間だけ再生する）
 4. apply_scene_proposal（いつもどおりレーンへ置く）

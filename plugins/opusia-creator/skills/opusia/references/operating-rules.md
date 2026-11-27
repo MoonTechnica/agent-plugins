@@ -19,7 +19,7 @@ composite), then put the result back with `create_upload_ticket` → the
 returned `curl` → `register_upload(source_asset_id=…)`. Prefer this local
 round trip over server-side processing tools whenever you have the tools at
 hand; never ask a person to upload something you made. Generation, rendering,
-Gemini analysis, and anything that confirms or binds state stay on the server
+and anything that confirms or binds state stay on the server
 as MCP tools (the `director` skill's references/local-vs-server.md draws the
 line). Never drive the Opusia UI through screen control or browser
 automation: if a tool is missing or fails, report it and stop. Use `web_fetch`

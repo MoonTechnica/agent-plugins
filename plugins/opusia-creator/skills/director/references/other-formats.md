@@ -10,7 +10,7 @@
 | 段 | 何をするか | 道具 | 担当 |
 |---|---|---|---|
 | M1 | 曲を確定（持ち込み or `text_to_music`） | `search_assets` / `generate_asset` | audio-engineer |
-| M2 | **曲の地図**: 機械が拍・小節頭・**鳴っている楽器**を測り、Gemini が区間・**編成の帯**・**出来事**（全員が入る・引き算・キメ…）と歌詞を名付け、**分割の設計（`scene_plan`）はあなたが決める**。歌のある曲は続けて**歌詞の時刻**（行ごとの開始・終了 → 地図の `lyric_lines[]`）。**地図を手で書かない**（検査に落ちたら理由を読んで直す） | `measure_music` → `hear_music` / `hear_lyrics` → `write_music_map` → `audio_map.v2`（`get_document` で読む）→ `speech_to_text` + `read_transcript` | audio-engineer |
+| M2 | **曲の地図**: 機械が拍・小節頭・**鳴っている楽器**を測り、あなたが表から区間・**編成の帯**・**出来事**（全員が入る・引き算・キメ…）を名付け、歌詞とフレーズは文字起こしから取り、**分割の設計（`scene_plan`）はあなたが決める**。歌のある曲は続けて**歌詞の時刻**（行ごとの開始・終了 → 地図の `lyric_lines[]`）。**地図を手で書かない**（検査に落ちたら理由を読んで直す） | `measure_music` → `write_music_map` → `audio_map.v2`（`get_document` で読む）→ `speech_to_text` + `read_transcript` | audio-engineer |
 | M3 | 企画（トリートメント・差し替えテスト・6 つの型・**歌詞を画面に出すか**） | `put_document(series_bible.v1)` | screenwriter（`genre-playbook` の mv.md §2） |
 | M4 | **小節の表（`mv_check.py --sheet`）の上で**、`scene_plan` をカットに写し（尺は小節数で、シーンの合計と一致させる。**カットごとに受け持つ歌詞の行を決める** —— A メロは行の頭 / 終わりで切り、歌唱カットは行のある小節だけ。**ビート分割は使わない**。**短いシーンを束ねない** —— 編成の変化が境目。画は `genre-playbook` の mv-dynamics.md §7 で誰を映すか決める）、**下書きを区間・フレーズの頭に置く**（`boundaries_sec` = 各シーンの `start_sec` + 最後の `end_sec`。尺で順に並べると整数秒の積み上げで切り替わりが拍から外れる） | `mv_check.py --sheet` → `plan_scenes(starts_scene をフレーズの頭に)` → **`mv_check.py` の所見 0** → `apply_scene_proposal(boundaries_sec=…, audio_map_asset_id=…)` | screenwriter |
 | ④〜⑨ | 物語ものと同じ。**確定動画が入ったシーンは `align_scene_cuts` で中のカットを拍に置く**（`compositor`）。歌唱カットは**全区間を `slice_media(ranges=[…], media_type="audio")` で 1 回に切り**、`generate_scene` の `reference_audio` へ。カットの境界は地図の時刻に合わせる | | storyboard / cinematographer / compositor |
@@ -24,7 +24,7 @@
 |---|---|---|---|
 | F1 | 素材を取り込む（尺・ポスター・コンタクトシートは自動） | 人がアップロード | — |
 | F2 | **文字起こし**（語ごとの時刻） | `generate_asset(task=speech_to_text, media=[{slot: source_audio, asset_id: <動画>}], canvas_node_id: <document の空ノード>)`（素材から作るので盤面必須） | screenwriter |
-| F3 | 内容を把握する | `read_transcript`（窓で読む）/ `get_asset_preview`（コンタクトシート）/ `ask_gemini`（「どこで誰が何を、時刻つきで」） | screenwriter |
+| F3 | 内容を把握する | `read_transcript`（窓で読む）/ `get_asset_preview`（コンタクトシート）（誰が何を言うかは文字起こしの時刻つきの行で） | screenwriter |
 | F4 | **使う区間を選んでシーンにする** | `plan_footage_scenes(asset_id, segments)` | screenwriter |
 | ④ | レーンへ（クリップは区間だけ再生する） | `propose_scenes` / `apply_scene_proposal` | |
 | F5 | 字幕・テロップ（`read_transcript` の行頭の時刻がそのまま `data-start`） | `put_composition_bundle` | compositor |

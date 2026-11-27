@@ -22,7 +22,7 @@ r"""正本の歌詞の各行に、文字起こしの時刻を割り当てて `ly
 
 `lyric_lines` (`start_sec` / `end_sec` / `text` / `section` /
 `source: "transcript"`) と、
-文字起こしに見つからなかった行 (`missing`。`ask_gemini` で補い `source: "gemini"`)。
+文字起こしに見つからなかった行 (`missing`。手元の歌詞から補い `source: "agent"`)。
 
 標準ライブラリだけ。終了コード: 0 = 全行に時刻 / 1 = 見つからない行あり /
 2 = 読めなかった.

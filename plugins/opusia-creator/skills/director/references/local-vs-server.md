@@ -10,7 +10,7 @@
 | 問い | はい → |
 |---|---|
 | 出力が**ファイル**（音・動画・画像）で、ffmpeg / ImageMagick / 自分のコードで作れるか | **手元**。落とす → 加工 → `register_upload(source_asset_id=元)` |
-| 鍵・課金・外部 API（fal / Gemini / HyperFrames Cloud）を使うか | **サーバー**（`generate_*` / `ask_gemini` / `measure_music` / `hear_music` / `render_composition`） |
+| 鍵・課金・外部 API（fal / HyperFrames Cloud）を使うか | **サーバー**（`generate_*` / `measure_music` / `render_composition`） |
 | DB の整合を伴うか（確定・束ね・シーン / カット・スロット・系譜の自動配線） | **サーバー**（`set_*` / `bind_*` / `split_board_sheet` …） |
 | 入力も出力も**テキスト**か（脚本・字コンテ・タイムラインの HTML・JSON） | **tool の引数で渡す**（`put_document` / `put_composition_bundle`）。ファイルにして上げない |
 | 区間を「タイムラインで再生したい」だけか | **切らない**。`data-media-start` / `plan_footage_scenes` の区間で足りる |
@@ -46,7 +46,7 @@
 |---|---|---|
 | 画像・動画・音・3D の**生成** | `generate_asset` / `generate_scene` | 鍵（`FAL_KEY`）と課金計測はサーバーにしか無い |
 | **書き出し** | `render_composition` | HyperFrames Cloud。`npx hyperframes render` は打てない |
-| **聴く / 見る**（曲の地図、口合わせの確認、素材の内容） | `ask_gemini` / `measure_music` / `hear_music` / `hear_lyrics` | Files API のキャッシュと課金計測 |
+| **測る / 見る**（曲の地図、素材の内容） | `measure_music` / `get_asset_preview`（口合わせ・音の確認は誰もできない） | 計測のキャッシュと課金計測 |
 | **文字起こし** | `generate_asset(task=speech_to_text)` | 同上 |
 | 絵コンテの**コマ切り分け** | `split_board_sheet` | 切るだけでなく**カットへ束ねる**まで一体。手元で切ると束ねが残る |
 | テイクの**カットの差し替え**（切り出し → `video_edit` → 差し戻し） | `extract_cut` / `replace_cut` | コマ単位の切り方・長いカットの分割・継ぎ目の溶かし・コマ数の保証が決まった手順。テイクを落とす往復も要らない（`cinematographer` の references/partial-edit.md） |
@@ -100,7 +100,7 @@
 次の 1 回に限って**サーバの生成が通る（使い切ったら、また手元から試す）。
 
 **動画・音声・3D は従来どおりサーバーの tool**（Codex に描けるのは画像だけ）。
-Claude / Gemini / Managed Agent で動いているときは `generate_*` のまま（次節の ComfyUI が
+Claude / Managed Agent で動いているときは `generate_*` のまま（次節の ComfyUI が
 繋がっている場合を除く）。
 
 ## ローカルの ComfyUI が繋がっているときの画像は、ComfyUI で描く

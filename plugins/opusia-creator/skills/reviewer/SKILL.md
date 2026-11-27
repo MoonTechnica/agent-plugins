@@ -6,7 +6,7 @@ description: >-
   根拠に、基準ごとに pass / fail / skip と根拠を付けて close_work の verdict で返す。
   自分でも get_composition_bundle → hyperframes check → record_check を回し、
   get_asset_preview のコンタクトシートで意図の基準を見る。作らない・直さない・
-  直し方を提案しない。**画はコンタクトシートで自分の目で見る。** ask_gemini は音・口合わせなど目で決まらない基準にだけ、1 問まで。「検品して」「納品物を採点して」
+  直し方を提案しない。**画はコンタクトシートで自分の目で見る。** 音・口合わせは誰も確かめられないので skip し「未確認」と根拠に書く。「検品して」「納品物を採点して」
   「基準を満たしているか見て」という委譲で reviewer 役だけが使う。director は
   自分では採点しない（生成者 ≠ 評価者）。
 ---
@@ -35,7 +35,7 @@ description: >-
    record_check(composition_id, head_seq, report)   # 受け取った head_seq で
 3. report_work(run_id, "looking")
    get_asset_preview(output_asset_id)          # ポスター + コンタクトシート
-   （ask_gemini は音・口合わせなど目で決まらない基準にだけ。画は自分の目）
+   （音・口合わせは確かめられない。画は自分の目）
 4. report_work(run_id, "deciding")
    get_work_order(run_id) を引き直して JSON に保存し、
    python3 <SKILL_DIR>/scripts/verdict_draft.py <その JSON>   # 規則で決まる部分の下書き
@@ -57,7 +57,7 @@ description: >-
 | `duration` / `no_black` / `no_freeze` / `no_silence` / `loudness` | L2 | 数字をそのまま根拠に書く（`178.2s` / `black 0.0–1.0s` / `-14.2 LUFS`） |
 | `captions_aligned` | L2 | `skip` なら文字起こしが無い。そのまま `skip` |
 | `uses_reference` | reviewer | `get_asset` の出自（provenance）に参照素材が入力として現れるか。辿れなければ `skip` |
-| `intent` | L3 + 自分の目 | L3 の `evidence` を読み、コンタクトシートで裏を取る。食い違えば**自分の目で別のコマを見る**。音・口合わせが絡むときだけ `ask_gemini` 1 問 |
+| `intent` | L3 + 自分の目 | L3 の `evidence` を読み、コンタクトシートで裏を取る。食い違えば**自分の目で別のコマを見る**。音・口合わせが絡む部分は確かめられないので「未確認」と書く |
 
 **`warn` の基準で `ok` を落とさない。** 合否は `severity: "block"` の基準だけで決まる。
 とくに**映像の検品を切っているプロジェクト**（既定）では、`intent` や `no_black` のように
@@ -91,7 +91,7 @@ L2 / L3 は古い。古い pass を根拠にしない。
 
 - 層の結果なら「`L2: duration 178.2s`」「`L1: check ok at head_seq 7`」
 - シートなら「シート 3 コマ目、主人公の顔が潰れている」
-- Gemini に訊いたなら「`ask_gemini`: 夜市の色味は S1–S4 で統一、S5 だけ昼光」
+- 色味など画の所見なら「シート 2〜5 コマ目: 夜市の色味は S1–S4 で統一、S5 だけ昼光」
 
 「良い」「問題なし」だけの根拠は根拠ではない。
 
@@ -110,6 +110,6 @@ L2 / L3 は古い。古い pass を根拠にしない。
 
 - 直し方を書く（「S3 を撮り直せ」）。書くのは何が足りないかまで
 - 基準表に無いことで落とす／通す（好みは基準ではない）
-- `ask_gemini` を 2 問以上、または画だけで決まる基準に使う（費用は納品物ごとに計上される）
+- 音・口合わせを確かめたふりをして pass にする（確かめられない基準は skip + 「未確認」）
 - 古い `head_seq` / 古い書き出しの結果を根拠にする
 - 生成者の `record_check` を自分の確認の代わりにする

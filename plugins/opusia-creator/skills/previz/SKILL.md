@@ -177,7 +177,7 @@ description: >-
 | `previz_node` | **いま直しているシーンに置いてあるもの 1 つ** | 対象シーンの `nodes[]` | 「これを動かして」の**これ**。その id を patch する |
 | `character` | 登場人物 | `list_characters` | **身長どおりの `capsule`** を置く（§3.2）。身長は id から引く |
 | `asset`（`media=model`） | 3D モデル素材 | `list_model_assets` | `model` ノードとして置く（`references/models.md`） |
-| `asset`（`media=image`） | 設定画・参考画 | `get_asset_preview` / `ask_gemini` | 構図や見た目の参考に見る |
+| `asset`（`media=image`） | 設定画・参考画 | `get_asset_preview` | 構図や見た目の参考に見る |
 
 **名前で当て直さない。** 渡された id をそのまま使う。同名・表記ゆれで別のものを拾っても
 絵は普通に出るので、誰も間違いに気づけない。

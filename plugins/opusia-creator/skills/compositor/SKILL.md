@@ -144,7 +144,7 @@ python3 <SKILL_DIR>/scripts/timeline_report.py index.html --json   # 中身が�
   プラットフォームが投入する。**自分で投げ直さない**（二重に課金される）。`report_work` で
   「書き出しの承認を待っている」と伝えて終える。
 - 書き出しが終わると、プラットフォームが媒体 QC（黒・凍結・無音・音量・尺）と意図の
-  判定（Gemini）を回し、`verifications` に残す。採点は reviewer 役（`director` が開く）。
+  判定（L3。コンタクトシートだけを見る視覚モデル。音は聴かない）を回し、`verifications` に残す。採点は reviewer 役（`director` が開く）。
 - 解像度・fps は composition が持っているので**渡さない**
   （渡せる作りにすると、投入した設定と composition が食い違ったまま課金される）。
 - 完了は `get_render_status(render_id)`。`failed` の理由はここに出る。
@@ -376,7 +376,7 @@ Blender（bpy）で透過の動画にして重ねる（[references/blender-by-ha
 | 置き場 | 顔と口を覆わない。縦型はセーフゾーン（`vertical-shortform`） |
 | 読める | 縁取りか影を付け、背景の明暗に負けない。日本語は縦組みも選べる |
 | 動き | 拍で出す・語頭で 1 文字ずつ出す・サビ頭で大きく叩きつける、など演出として動かす。**全行を同じ出方にしない**（要所の行だけ強く） |
-| `lyric_lines[].source` が `gemini` | ±0.2 秒の精度。プレビューで聴いて合わせ直す |
+| `lyric_lines[].source` が `agent` | 文字起こしに無く、手元の歌詞から補った行。精度は保証できない。人に伝える |
 
 **出入りの秒は手で測らない**: `python3 <SKILL_DIR>/scripts/lyric_check.py <歌詞の載ったファイル> --map <地図の doc>`
 （遅れて出る・早すぎる・消えのずれ・次の行への居残り・載っていない行）。**輪・円弧・渦巻き・波に沿った文字は `scripts/text_path.py`**（references/kinetic-2d-recipes.md §0）。**歌詞を語に割って四隅・縦組みに面付けするのは `scripts/lyric_layers.py`**（references/lyric-composition.md）、**文字を散らす・幾何学的に並べるのは `scripts/glyph_layout.py`**（references/glyph-layout.md）。
@@ -417,7 +417,7 @@ Blender（bpy）で透過の動画にして重ねる（[references/blender-by-ha
   （`parts` が 1 つ）はその奏者だけに光を当てる**（`genre-playbook` の mv-dynamics.md §7）
 - 生成クリップは整数秒で**少し長く**できている。`data-duration` は小節の実秒（128 BPM 2 小節 =
   3.75）にし、余りは `data-media-start` で捨てる。**動きのピークが拍点に来るよう**
-  `data-media-start` を調整する（ピークのコマは `get_asset_preview` / `ask_gemini` で読む）
+  `data-media-start` を調整する（ピークのコマは `get_asset_preview` のコンタクトシートで読む）
 - **編成の帯（`arrangement[]`）が変わる小節で画も変える**: 誰が鳴っているかが変わったのに同じ画が
   続くと、曲が展開したのに映像が置いていかれる（mv-dynamics.md §7）
 - 歌なしの区間に歌唱カットを置かない。参照音声は小節頭から小節頭まで切られているので、
