@@ -46,3 +46,19 @@ npm の公開パッケージは足してよい。ただし**足したものは�
 - **`bunfig.toml` を変えない**: 各 package は自分の `package.json` に宣言した依存だけを解決する（`linker = "isolated"`）。宣言していない package を import すると動かない（`$fdpocket-app-structure`）。
   依存の install スクリプトは動かない（`ignoreScripts`）。install スクリプトが無いと動かないパッケージは使えない。
 - `packages/miniapp-sdk/` と `packages/project-protocol/` は Kit が置く。npm の同名・類似のパッケージを足さない。
+
+## 4. 既知の脆弱性で止められたとき（`VULNERABLE` / `VULNERABLE_TRANSITIVE`）
+
+`kit check` と取り込みの検証は、`bun.lock` の全部の版を OSV で調べ、**危険度が高い・重大な脆弱性とマルウェアは、直接の依存でも間接の依存でも止める**。中程度・低は警告で、止めない。
+
+- **直接の依存**（`VULNERABLE`）: 直った版へ上げる。直った版が無いパッケージは、使わずに済ませるか、別のものにする。
+- **間接の依存**（`VULNERABLE_TRANSITIVE`）: メッセージにある直った版を使う。
+  1. まず親のパッケージを新しい版へ上げる（親が直った版に更新していることが多い）。
+  2. 親が古い版を固定していて直らないときは、**根の `package.json` の `overrides`** で直った版に固定する。
+
+   ```json
+   { "overrides": { "undici": "7.30.2" } }
+   ```
+
+   `bun install` で `bun.lock` を作り直し、commit する。同じメジャー版の中の版を選ぶ（メジャーを跨ぐと親が壊れることがある。そのときは親を別のものにする）。
+- 直したら `kit build` が通ることと、画面が動くことを確かめる。`overrides` で固定した理由（どの脆弱性のためか）を `build-report.json` の `notes` に 1 行書く。

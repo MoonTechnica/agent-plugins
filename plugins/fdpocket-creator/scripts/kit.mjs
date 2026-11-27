@@ -27706,12 +27706,13 @@ async function checkAdvisories(packages, client) {
     const sorted2 = [...vulns].sort((a, b2) => RANK[b2.severity] - RANK[a.severity]);
     const worst = sorted2[0];
     const code = directKeys.has(key) ? "VULNERABLE" : "VULNERABLE_TRANSITIVE";
+    const hint = code === "VULNERABLE_TRANSITIVE" ? " (transitive: update the parent package, or pin the fixed version with `overrides` in the root package.json)" : "";
     const finding = {
       code,
       path: "bun.lock",
-      message: `${key} has known vulnerabilities (${worst.severity}): ${sorted2.map((v2) => v2.id).join(", ")}`
+      message: `${key} has known vulnerabilities (${worst.severity}): ${sorted2.map((v2) => v2.id).join(", ")}${hint}`
     };
-    if (code === "VULNERABLE" && sorted2.some(isDangerous))
+    if (sorted2.some(isDangerous))
       errors5.push(finding);
     else
       warnings.push(finding);
