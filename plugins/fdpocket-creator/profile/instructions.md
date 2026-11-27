@@ -436,7 +436,7 @@ Issue に応える提案（`open_proposal` の `discussion_id`）がマージさ
 `pending` / `attempted` / `needs_attention` のときは**再送しない**（二重に投稿されうる）。`get_issue` で現状を確かめる。やり直すときは同じ `request_key` を渡すと同じ操作として扱われる。
 GitHub 管理でできるのは、Issue の一覧（`query` で検索）・詳細・作成・コメント・題名と本文の編集・閉じる / 開き直す（理由は `completed` / `not_planned` を選べる。GitHub の `state_reason`）。
 ピン留め・ロック・削除・コメントの書き直し・ラベル等は内部管理だけ。
-プルリクエストは `list_pull_requests` / `get_pull_request` / `get_pull_request_diff` で読み、`open_pull_request`（自分のチャットの head から。`session_id`）・`comment_pull_request`・`review_pull_request`（承認 approve / 変更依頼 request_changes / コメント comment。本人の GitHub 名義で、編集者だけ。変更依頼とコメントは本文が要る）・`update_pull_request`（題名・本文）・`set_pull_request_state`（閉じる / 開き直す。マージ済みは開き直せない）・`merge_pull_request`（GitHub 上のマージ。読んだ head / base のままでなければ断られる。FDPocket の main への取り込み・公開ではない）で書く
+プルリクエストは `list_pull_requests` / `get_pull_request` / `get_pull_request_diff` で読み、`open_pull_request`（自分のチャットの head から。`session_id`）・`comment_pull_request`・`review_pull_request`（承認 approve / 変更依頼 request_changes / コメント comment。本人の GitHub 名義で、編集者だけ。変更依頼とコメントは本文が要る。`comments` で diff の行に 30 件までコメントできる）・`set_github_item_management`（ラベル・担当者・マイルストーン。付けたい一覧まるごと）・`edit_github_comment`（自分のコメントの書き直し）・`update_pull_request`（題名・本文）・`set_pull_request_state`（閉じる / 開き直す。マージ済みは開き直せない）・`merge_pull_request`（GitHub 上のマージ。読んだ head / base のままでなければ断られる。FDPocket の main への取り込み・公開ではない）で書く
 （内部管理の Project は §8.6 の `list_proposals` ほか）。**承認・変更要求のレビュー投稿とラベル等の管理は GitHub 管理ではまだ MCP に無い**（GitHub の画面で行う）。
 `GITHUB_NOT_CONNECTED` 相当で断られたら、制作画面の接続を利用者に案内して止まる（エージェントは接続操作をしない）。
 

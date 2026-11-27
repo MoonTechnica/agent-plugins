@@ -175,6 +175,9 @@ approval_mode = "approve"
 [plugins."fdpocket-creator@moon-technica".mcp_servers.fdpocket.tools.remove_project_collaborator]
 approval_mode = "approve"
 
+[plugins."fdpocket-creator@moon-technica".mcp_servers.fdpocket.tools.delete_issue]
+approval_mode = "approve"
+
 [plugins."fdpocket-creator@moon-technica".mcp_servers.fdpocket.tools.adopt_branch]
 approval_mode = "approve"
 
@@ -202,9 +205,6 @@ approval_mode = "auto"
 [plugins."fdpocket-creator@moon-technica".mcp_servers.fdpocket.tools.manage_issue]
 approval_mode = "auto"
 
-[plugins."fdpocket-creator@moon-technica".mcp_servers.fdpocket.tools.delete_issue]
-approval_mode = "auto"
-
 [plugins."fdpocket-creator@moon-technica".mcp_servers.fdpocket.tools.open_proposal]
 approval_mode = "auto"
 
@@ -230,6 +230,12 @@ approval_mode = "auto"
 approval_mode = "auto"
 
 [plugins."fdpocket-creator@moon-technica".mcp_servers.fdpocket.tools.review_pull_request]
+approval_mode = "auto"
+
+[plugins."fdpocket-creator@moon-technica".mcp_servers.fdpocket.tools.set_github_item_management]
+approval_mode = "auto"
+
+[plugins."fdpocket-creator@moon-technica".mcp_servers.fdpocket.tools.edit_github_comment]
 approval_mode = "auto"
 
 [plugins."fdpocket-creator@moon-technica".mcp_servers.fdpocket.tools.update_pull_request]
