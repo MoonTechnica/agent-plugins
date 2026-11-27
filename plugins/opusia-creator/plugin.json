@@ -1,7 +1,7 @@
 {
   "$schema": "https://agent-plugins.org/schemas/1.0.0/plugin.schema.json",
   "name": "opusia-creator",
-  "version": "1.0.98809ce3",
+  "version": "1.0.32e24387",
   "description": "Make short films, animation and music videos with your own coding agent through Opusia: script, design sheets, storyboards, video, audio and the final render.",
   "author": {
     "name": "Moon Technica"

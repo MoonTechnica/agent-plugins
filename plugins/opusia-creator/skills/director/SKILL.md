@@ -437,8 +437,8 @@ id で引ける仕事**しか渡せない。
 
   `open_work` → 委譲メッセージの 1 行目に `run: <run_id>` → 相手が `get_work_order`
 
-順序・波の出し方・撮り直しの扱い・やってはいけない組み合わせは
-[references/parallel-work.md](references/parallel-work.md) にある。**任せる前に必ず読む。**
+順序・波の出し方・やってはいけない組み合わせは [references/parallel-work.md](references/parallel-work.md)
+にある。**任せる前に必ず読む。独立な生成は 1 ターンに並べて投げる**（同 §4.6。1 本ずつだと後ろが遅れる）。
 
 ## 3. 連作（シリーズ）のとき
 
