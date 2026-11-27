@@ -15,6 +15,7 @@ description: ゲームの「動き」を設計して作る。キャラの動作�
 | この SKILL.md | 動きを作る・直すとき（原則・時間の置き場所・道具の選び方） |
 | [references/sprite-2d.md](references/sprite-2d.md) | 2D のキャラを動かすとき（AI で描いたコマ・ドット絵・カットアウト・トゥイーン） |
 | [references/3d-animation.md](references/3d-animation.md) | 3D のキャラを動かすとき（AI モーションの選び方と整形・AnimationTree・足滑り・ルートモーション・IK） |
+| [references/motion-library.md](references/motion-library.md) | 人型の標準モーションをフリー素材（CC0）から探して取り込むとき（クリップ名の一覧つき） |
 | [references/ui-motion.md](references/ui-motion.md) | メニュー・HUD・リザルト・通知の動き、演出の場面、動きを減らす設定 |
 | `assets/motion.gd` | 時間の定数とトゥイーンの共通部品（pop・squash・enter・exit・stagger・count_up・press_feedback・Spring）。`res://motion.gd` にコピーして使う |
 | `assets/sprites.gd` | AI で描いたコマの整列・検査・ドット化（制作時の道具。ゲームには入らない） |
