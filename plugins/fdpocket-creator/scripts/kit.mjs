@@ -27700,24 +27700,47 @@ var init_check = __esm(() => {
 async function checkAdvisories(packages, client) {
   const errors5 = [];
   const warnings = [];
-  const vulnerable = [...(await client.vulnerabilities(packages)).entries()].filter(([, ids]) => ids.length > 0);
+  const vulnerable = [...(await client.vulnerabilities(packages)).entries()].filter(([, vulns]) => vulns.length > 0);
   const directKeys = new Set(packages.filter((p2) => p2.direct).map(keyOf));
-  for (const [key, ids] of vulnerable) {
+  for (const [key, vulns] of vulnerable) {
+    const sorted2 = [...vulns].sort((a, b2) => RANK[b2.severity] - RANK[a.severity]);
+    const worst = sorted2[0];
+    const code = directKeys.has(key) ? "VULNERABLE" : "VULNERABLE_TRANSITIVE";
     const finding = {
+      code,
       path: "bun.lock",
-      message: `${key} has known vulnerabilities: ${ids.join(", ")}`
+      message: `${key} has known vulnerabilities (${worst.severity}): ${sorted2.map((v2) => v2.id).join(", ")}`
     };
-    if (directKeys.has(key))
-      errors5.push({ code: "VULNERABLE", ...finding });
+    if (code === "VULNERABLE" && sorted2.some(isDangerous))
+      errors5.push(finding);
     else
-      warnings.push({ code: "VULNERABLE_TRANSITIVE", ...finding });
+      warnings.push(finding);
   }
   return { errors: errors5, warnings };
+}
+async function severityOf(fetcher, id) {
+  const response = await fetcher(`${OSV_VULN}${encodeURIComponent(id)}`);
+  if (response.status === 404)
+    return "unknown";
+  if (!response.ok)
+    throw new Error(`OSV answered ${response.status} for ${id}`);
+  const body = await response.json();
+  const raw = body.database_specific?.severity;
+  return typeof raw === "string" ? SEVERITIES[raw.toUpperCase()] ?? "unknown" : "unknown";
+}
+async function severities(fetcher, ids) {
+  const queue = [...new Set(ids)];
+  const found = new Map;
+  await Promise.all(Array.from({ length: Math.min(OSV_DETAIL_CONCURRENCY, queue.length) }, async () => {
+    for (let id = queue.shift();id !== undefined; id = queue.shift())
+      found.set(id, await severityOf(fetcher, id));
+  }));
+  return found;
 }
 function httpAdvisoryClient(fetcher = fetch) {
   return {
     async vulnerabilities(packages) {
-      const result = new Map;
+      const ids = new Map;
       for (let start = 0;start < packages.length; start += OSV_BATCH_SIZE) {
         const batch = packages.slice(start, start + OSV_BATCH_SIZE);
         const response = await fetcher(OSV_BATCH, {
@@ -27734,14 +27757,28 @@ function httpAdvisoryClient(fetcher = fetch) {
           throw new Error(`OSV answered ${response.status}`);
         const body = await response.json();
         batch.forEach((p2, index) => {
-          result.set(keyOf(p2), (body.results?.[index]?.vulns ?? []).map((v2) => v2.id));
+          ids.set(keyOf(p2), (body.results?.[index]?.vulns ?? []).map((v2) => v2.id));
         });
       }
-      return result;
+      const level = await severities(fetcher, [...ids.values()].flat());
+      return new Map([...ids].map(([key, list]) => [
+        key,
+        list.map((id) => ({ id, severity: level.get(id) ?? "unknown" }))
+      ]));
     }
   };
 }
-var keyOf = (p2) => `${p2.name}@${p2.version}`, OSV_BATCH = "https://api.osv.dev/v1/querybatch", OSV_BATCH_SIZE = 1000;
+var keyOf = (p2) => `${p2.name}@${p2.version}`, RANK, isDangerous = (v2) => v2.id.startsWith("MAL-") || v2.severity === "high" || v2.severity === "critical", OSV_BATCH = "https://api.osv.dev/v1/querybatch", OSV_VULN = "https://api.osv.dev/v1/vulns/", OSV_BATCH_SIZE = 1000, OSV_DETAIL_CONCURRENCY = 8, SEVERITIES;
+var init_advisories = __esm(() => {
+  RANK = { critical: 4, high: 3, moderate: 2, low: 1, unknown: 0 };
+  SEVERITIES = {
+    CRITICAL: "critical",
+    HIGH: "high",
+    MODERATE: "moderate",
+    MEDIUM: "moderate",
+    LOW: "low"
+  };
+});
 
 // frontend/packages/project-validator/src/static/ai-prompts.ts
 import { createHash as createHash4 } from "node:crypto";
@@ -43878,6 +43915,7 @@ async function checkLockfile(root, options2, errors7, warnings) {
 var KIT_LAYOUT;
 var init_source = __esm(() => {
   init_src();
+  init_advisories();
   init_ai_prompts();
   init_lockfile();
   init_manifest2();
@@ -44262,6 +44300,7 @@ var init_src2 = __esm(() => {
   init_matrix();
   init_report();
   init_check();
+  init_advisories();
   init_ai_prompts();
   init_dist2();
   init_lockfile();

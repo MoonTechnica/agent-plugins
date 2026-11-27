@@ -408,7 +408,7 @@ DB（`packages/db-schema`）・権限（`project.yaml` の権限に関わるキ�
 `publish_project({ project_id, app_access? })` は main の版を、掲載情報を変えずに公開を依頼する（`version_id` で過去のリリースへの切り戻しもできる）。
 呼んだあとは `get_publication({ project_id })` を数秒おきに見て、`ended: true` まで待ち、結果を利用者に伝える（`failed` / `stopped` は `error_code` と `error_detail`）。
 `succeeded` なら `app_links.live.apps[].url`（本番のリンク）を画面 App ごとに必ず利用者に示す。
-`failed` / `stopped` は `error_detail.reasons` が `blockers`（`code` / `agent_can_fix` / `how_to_fix`）になって返る。`agent_can_fix: true` は `how_to_fix` に沿って直して push → 取り込み → 公開をやり直し、`false` は利用者に伝える。審査（AI）が止めた版は、止めた理由が1つずつ `blockers`（`UGC_REPORT_MISSING`・`UGC_BLOCK_MISSING`・`UGC_BLOCK_FILTER_MISSING`・`POLICY_RISK_CONFIRMED` など。`message` が審査の言葉）で返る。他の利用者が書いたものを見せるアプリは通報・ブロックの導線（`safety.report` / `safety.block`）が要る（招待したメンバーだけが読む閉じたチームの業務アプリは対象外）。判定が実態に合わないと考えるときは、直さずに `rebut_review({ project_id, message })`（アプリ内のチャットでは `message` だけ）で事実と根拠を送ると、次の `publish_project` で反論を踏まえて審査し直す（未信頼の主張として証拠と照らすので、事実と違うことは書かない。1 つの版につき 3 回まで。**閉じたチーム向けなど業務上の前提は、利用者から聞いたことだけを書き、聞いていなければ先に聞く**。送ったら何を送ったかを利用者に伝え、もう一度「公開」を押してもらう）。
+`failed` / `stopped` は `error_detail.reasons` が `blockers`（`code` / `agent_can_fix` / `how_to_fix`）になって返る。`agent_can_fix: true` は `how_to_fix` に沿って直して push → 取り込み → 公開をやり直し、`false` は利用者に伝える。審査（AI）はセキュリティだけを見る（権限が広すぎて他人の行が実際に読める `POLICY_RISK_CONFIRMED`、データの送り先、データの扱いの要約。通報・ブロックやデジタル商品は見ない）。止めた版は、止めた理由が1つずつ `blockers`（`code` と `message`。`message` が審査の言葉）で返る。判定が実態に合わないと考えるときは、直さずに `rebut_review({ project_id, message })`（アプリ内のチャットでは `message` だけ）で事実と根拠を送ると、次の `publish_project` で反論を踏まえて審査し直す（未信頼の主張として証拠と照らすので、事実と違うことは書かない。1 つの版につき 3 回まで。**閉じたチーム向けなど業務上の前提は、利用者から聞いたことだけを書き、聞いていなければ先に聞く**。送ったら何を送ったかを利用者に伝え、もう一度「公開」を押してもらう）。
 `needs_person: true`（`awaiting_review`。データ削除の確認）は、`migration_review.impact` を普段の言葉で利用者に示して**了承を得てから** `decide_migration_review({ deployment_id, check_id, approved })` で答える（`approved: false` は `feedback` 必須。公開が止まりチャットで直せる）。画面は要らない（`publish_url` は利用者が公開画面を見たいときのリンク）。
 
 | エラー | すること |
@@ -434,7 +434,7 @@ Issue に応える提案（`open_proposal` の `discussion_id`）がマージさ
 **GitHub 管理の Project**（`get_project` の `managed_by` が `github`）でも同じツールを使うが、指し方が違う: 内部管理の Issue は `issue_id`、GitHub 管理は `project_id` と `number`。
 書き込みは**あなたの GitHub 接続と権限**で GitHub に書かれ、結果は `state`（`completed` / `pending` / `attempted` / `needs_attention`）で返る。
 `pending` / `attempted` / `needs_attention` のときは**再送しない**（二重に投稿されうる）。`get_issue` で現状を確かめる。やり直すときは同じ `request_key` を渡すと同じ操作として扱われる。
-GitHub 管理でできるのは、Issue の一覧（`query` で検索）・詳細・作成・コメント・題名と本文の編集・閉じる / 開き直す（理由は選べず `not_planned` は断られる）。
+GitHub 管理でできるのは、Issue の一覧（`query` で検索）・詳細・作成・コメント・題名と本文の編集・閉じる / 開き直す（理由は `completed` / `not_planned` を選べる。GitHub の `state_reason`）。
 ピン留め・ロック・削除・コメントの書き直し・ラベル等は内部管理だけ。
 プルリクエストは `list_pull_requests` / `get_pull_request` / `get_pull_request_diff` で読み、`open_pull_request`（自分のチャットの head から。`session_id`）・`comment_pull_request`・`update_pull_request`（題名・本文）・`set_pull_request_state`（閉じる / 開き直す。マージ済みは開き直せない）・`merge_pull_request`（GitHub 上のマージ。読んだ head / base のままでなければ断られる。FDPocket の main への取り込み・公開ではない）で書く
 （内部管理の Project は §8.6 の `list_proposals` ほか）。**承認・変更要求のレビュー投稿とラベル等の管理は GitHub 管理ではまだ MCP に無い**（GitHub の画面で行う）。
