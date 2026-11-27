@@ -96,8 +96,8 @@ CLIは参照検索と決定的なローカル加工だけで、有料生成・�
 |---|---|---|
 | 背景・タイトル画面 | 画像を作る（冒頭の表）→ `convert <PNG> -resize 1024x1024 -quality 85 godot/assets/bg.jpg` | JPEG。長辺 1024px 以下 |
 | キャラクター・アイテム（透過） | 内蔵の画像生成なら §3 の手順。`generate_image` なら `transparent=true` で作って取得する（§4） | 透過 PNG。長辺 512px 以下 |
-| 効果音 | `generate_sound_effect(name, prompt, duration_sec)`。短く具体的に（「軽いジャンプ音、上がる音程、0.3 秒」） | MP3。0.5〜2 秒 |
-| BGM | `generate_music(name, prompt, duration_sec=30)`。雰囲気・テンポ・楽器を書き「ループしやすい」と添える | MP3。ループ再生 |
+| 効果音 | **まず無料素材を探す**（`search_stock_assets` の `kind: audio`。約 3,000 本の CC0）。合うものが無いときだけ `generate_sound_effect(name, prompt, duration_sec)`。短く具体的に（「軽いジャンプ音、上がる音程、0.3 秒」） | MP3。0.5〜2 秒 |
+| BGM | **まず無料素材を探す**（`search_stock_assets` の `kind: audio` で `boss battle` `town` `dungeon ambience` `chiptune` など。戦闘・街・環境音の CC0 の曲がある）。合うものが無いときだけ `generate_music(name, prompt, duration_sec=30)`。雰囲気・テンポ・楽器を書き「ループしやすい」と添える | MP3。ループ再生 |
 | 3D モデル | 透過した元画像の `asset_id`（§3 の結果、または `generate_image(transparent=true)` の結果）で `generate_model_3d(name, asset_id, polycount="low")`。**数分かかる** | GLB を `godot/` の下に置いて import する（`$game-3d-and-bundles`） |
 | 人型のモーション | フリー素材のアニメ付きキャラ（§3.5）とプリセットに無い**一発もの**（固有の攻撃・技・感情）だけ `generate_motion(name, prompt, duration_sec)`。prompt は英語 60 語以内で、体の部位と動きを具体的に（「A person swings a sword overhead, then steps back.」）。ループ・その場の動き・人型以外は苦手なので使わない（`$game-motion` references/3d-animation.md §1） | **FBX のままゲームに入れない。** `$game-3d-studio` §4.3.1 でキャラの骨格にリターゲットし、キャラの GLB にクリップとして入れる |
 | 自分で作った音・GLB | ほかのファイルと同じく commit する（Git LFS に入り、次のターンにも残る）。他のターン・リミックスで使い回すなら `upload_asset(name, kind)` でも台帳に載せる（§4） | `godot/` の下 |
