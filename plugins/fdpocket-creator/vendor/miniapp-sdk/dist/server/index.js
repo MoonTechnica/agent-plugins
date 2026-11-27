@@ -120,7 +120,7 @@ export function createServerClient(options) {
                 : serviceTransport({}, async () => {
                     throw new SdkError('FORBIDDEN', 'job data access requires an active queue delivery');
                 });
-            const { openai, embed } = createAi(transport, base);
+            const { openai, embed, transcribe, speak, rerank } = createAi(transport, base);
             const data = dataClient(dataTransport);
             return {
                 ...data,
@@ -128,7 +128,7 @@ export function createServerClient(options) {
                     ...data.storage,
                     download: (fileId, options) => dataTransport.fetch(`${base}/v1/storage/files/${encodeURIComponent(fileId)}/job-content`, { signal: options?.signal }),
                 },
-                ai: { openai, embed },
+                ai: { openai, embed, transcribe, speak, rerank },
                 python: createPython(transport),
             };
         },

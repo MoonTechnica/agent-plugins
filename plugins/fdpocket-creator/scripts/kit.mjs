@@ -16768,10 +16768,17 @@ var init_manifest = __esm(() => {
 });
 
 // frontend/packages/project-protocol/src/ai.ts
+function aiTranscriptionFormatOf(contentType, filename) {
+  const byType = TRANSCRIPTION_CONTENT_TYPES[contentType.split(";")[0]?.trim().toLowerCase() ?? ""];
+  if (byType)
+    return byType;
+  const extension = filename?.split(".").pop()?.toLowerCase();
+  return AI_TRANSCRIPTION_FORMATS.includes(extension ?? "") ? extension : null;
+}
 function aiAttachmentKindOf(contentType) {
   return ATTACHMENT_KINDS[contentType.split(";")[0]?.trim().toLowerCase() ?? ""] ?? null;
 }
-var AI_ATTACHMENTS_MAX = 4, AI_ATTACHMENTS_MAX_BYTES, AI_MESSAGE_MAX_BYTES, AI_EMBEDDING_MODEL_DEFAULT = "openai/text-embedding-3-small", AI_EMBEDDING_INPUTS_MAX = 64, AI_EMBEDDING_INPUT_CHARS_MAX = 32000, AI_EMBEDDING_TOTAL_CHARS_MAX = 200000, AI_EMBEDDING_DIMENSIONS_MAX = 3072, aiEmbeddingsResponse, ATTACHMENT_KINDS, aiTurnRequestSchema, AI_FINISH_REASONS, aiTurnResult, aiTurnEvent, aiResetResponse;
+var AI_ATTACHMENTS_MAX = 4, AI_ATTACHMENTS_MAX_BYTES, AI_MESSAGE_MAX_BYTES, AI_EMBEDDING_MODEL_DEFAULT = "openai/text-embedding-3-small", AI_EMBEDDING_INPUTS_MAX = 64, AI_EMBEDDING_INPUT_CHARS_MAX = 32000, AI_EMBEDDING_TOTAL_CHARS_MAX = 200000, AI_EMBEDDING_DIMENSIONS_MAX = 3072, aiEmbeddingsResponse, AI_TRANSCRIPTION_MODEL_DEFAULT = "openai/gpt-4o-mini-transcribe", AI_TRANSCRIPTION_MAX_BYTES, AI_TRANSCRIPTION_KEYTERMS_MAX = 100, AI_TRANSCRIPTION_PROMPT_MAX_CHARS = 2000, AI_TRANSCRIPTION_FORMATS, TRANSCRIPTION_CONTENT_TYPES, aiTranscriptionResponse, AI_SPEECH_MODEL_DEFAULT = "elevenlabs/eleven-flash-v2.5", AI_SPEECH_INPUT_CHARS_MAX = 5000, AI_SPEECH_INSTRUCTIONS_CHARS_MAX = 1000, AI_SPEECH_FORMATS, AI_RERANK_MODEL_DEFAULT = "cohere/rerank-4-fast", AI_RERANK_DOCUMENTS_MAX = 200, AI_RERANK_DOCUMENT_CHARS_MAX = 16000, AI_RERANK_QUERY_CHARS_MAX = 2000, AI_RERANK_TOTAL_CHARS_MAX = 400000, aiRerankResponse, AI_PDF_ENGINES, AI_PDF_ENGINE_KEYS, ATTACHMENT_KINDS, aiTurnRequestSchema, AI_FINISH_REASONS, aiTurnResult, aiTurnEvent, aiResetResponse;
 var init_ai = __esm(() => {
   init_zod();
   init_contract();
@@ -16784,6 +16791,64 @@ var init_ai = __esm(() => {
     data: exports_external.array(exports_external.looseObject({ index: exports_external.int().min(0), embedding: exports_external.array(exports_external.number()) })),
     model: exports_external.string()
   });
+  AI_TRANSCRIPTION_MAX_BYTES = 12 * 1024 * 1024;
+  AI_TRANSCRIPTION_FORMATS = [
+    "wav",
+    "mp3",
+    "m4a",
+    "mp4",
+    "ogg",
+    "webm",
+    "flac",
+    "aac"
+  ];
+  TRANSCRIPTION_CONTENT_TYPES = {
+    "audio/wav": "wav",
+    "audio/x-wav": "wav",
+    "audio/wave": "wav",
+    "audio/mpeg": "mp3",
+    "audio/mp3": "mp3",
+    "audio/mp4": "m4a",
+    "audio/x-m4a": "m4a",
+    "audio/m4a": "m4a",
+    "video/mp4": "mp4",
+    "audio/ogg": "ogg",
+    "audio/opus": "ogg",
+    "audio/webm": "webm",
+    "video/webm": "webm",
+    "audio/flac": "flac",
+    "audio/x-flac": "flac",
+    "audio/aac": "aac"
+  };
+  aiTranscriptionResponse = exports_external.looseObject({
+    text: exports_external.string(),
+    language: exports_external.string().optional(),
+    duration: exports_external.number().optional(),
+    segments: exports_external.array(exports_external.looseObject({
+      start: exports_external.number().optional(),
+      end: exports_external.number().optional(),
+      text: exports_external.string().optional(),
+      speaker: exports_external.union([exports_external.string(), exports_external.number()]).optional()
+    })).optional(),
+    words: exports_external.array(exports_external.looseObject({})).optional(),
+    usage: exports_external.looseObject({ cost: exports_external.number().optional(), seconds: exports_external.number().optional() }).optional()
+  });
+  AI_SPEECH_FORMATS = ["mp3", "wav", "pcm"];
+  aiRerankResponse = exports_external.looseObject({
+    model: exports_external.string().optional(),
+    results: exports_external.array(exports_external.looseObject({
+      index: exports_external.int().min(0),
+      relevance_score: exports_external.number(),
+      document: exports_external.looseObject({ text: exports_external.string().optional() }).optional()
+    })),
+    usage: exports_external.looseObject({ cost: exports_external.number().optional() }).optional()
+  });
+  AI_PDF_ENGINES = {
+    text: "cloudflare-ai",
+    ocr: "mistral-ocr",
+    native: "native"
+  };
+  AI_PDF_ENGINE_KEYS = ["text", "ocr", "native"];
   ATTACHMENT_KINDS = {
     "image/png": "image",
     "image/jpeg": "image",
@@ -16805,7 +16870,9 @@ var init_ai = __esm(() => {
     instructions: exports_external.string().regex(AI_INSTRUCTIONS_KEY_PATTERN).optional(),
     schema: exports_external.string().regex(AI_SCHEMA_KEY_PATTERN).optional(),
     model: exports_external.string().min(1).max(160).optional(),
-    stream: exports_external.boolean().optional()
+    stream: exports_external.boolean().optional(),
+    webSearch: exports_external.boolean().optional(),
+    pdfEngine: exports_external.enum(AI_PDF_ENGINE_KEYS).optional()
   });
   AI_FINISH_REASONS = ["stop", "length", "content_filter", "other"];
   aiTurnResult = contract((o) => o.object({
@@ -16813,6 +16880,7 @@ var init_ai = __esm(() => {
     finishReason: o.enum(AI_FINISH_REASONS),
     json: exports_external.unknown().optional(),
     credits: exports_external.number().nonnegative(),
+    sources: exports_external.array(exports_external.object({ url: exports_external.string(), title: exports_external.string().optional() })).optional(),
     responseId: exports_external.string(),
     model: exports_external.string()
   }));
@@ -76293,6 +76361,28 @@ async function startCompletion(ai2, plan, fields) {
   }
   return upstream.body;
 }
+async function assertChatModel(ai2, plan) {
+  if (plan.model.operations.includes("chat"))
+    return;
+  await ai2.platform.fail(plan.turnId, null, "not_chat_model");
+  throw new GatewayError("VALIDATION_FAILED", "not_chat_model");
+}
+function sourcesOf(annotations) {
+  const seen = new Set;
+  const sources = [];
+  for (const raw2 of annotations) {
+    const citation = raw2;
+    const url4 = citation.url_citation?.url;
+    if (citation.type !== "url_citation" || !url4 || seen.has(url4))
+      continue;
+    seen.add(url4);
+    sources.push({
+      url: url4,
+      ...citation.url_citation?.title ? { title: citation.url_citation.title } : {}
+    });
+  }
+  return sources;
+}
 async function measureCompletion(platform, turnId, stream, onDelta = () => {}) {
   const completion = {
     id: null,
@@ -76300,6 +76390,7 @@ async function measureCompletion(platform, turnId, stream, onDelta = () => {}) {
     created: null,
     content: "",
     toolCalls: [],
+    annotations: [],
     finishReason: null,
     usage: null,
     refused: null
@@ -76326,6 +76417,7 @@ async function measureCompletion(platform, turnId, stream, onDelta = () => {}) {
           completion.content += choice.delta.content;
           onDelta(choice.delta.content);
         }
+        completion.annotations.push(...choice.delta?.annotations ?? []);
         for (const call of choice.delta?.tool_calls ?? []) {
           const index2 = call.index ?? 0;
           const current = completion.toolCalls[index2] ?? {
@@ -76367,15 +76459,52 @@ async function settleCompletion(platform, turnId, stream) {
   }
   return completion;
 }
+function splitStream(upstream) {
+  const reader = upstream.getReader();
+  let toClient = null;
+  let toSettlement;
+  const forSettlement = new ReadableStream({
+    start(controller) {
+      toSettlement = controller;
+    }
+  });
+  const forClient = new ReadableStream({
+    start(controller) {
+      toClient = controller;
+      pump();
+    },
+    cancel() {
+      toClient = null;
+    }
+  });
+  async function pump() {
+    try {
+      for (;; ) {
+        const { value, done } = await reader.read();
+        if (done)
+          break;
+        toSettlement.enqueue(value);
+        toClient?.enqueue(value);
+      }
+      toSettlement.close();
+      toClient?.close();
+    } catch (error151) {
+      toSettlement.error(error151);
+      toClient?.error(error151);
+    }
+  }
+  return [forClient, forSettlement];
+}
 async function respondCompletion(c, ai2, plan, upstream, stream, logger) {
   if (stream) {
-    const [forClient, forSettlement] = upstream.tee();
+    const [forClient, forSettlement] = splitStream(upstream);
     const settlement = settleCompletion(ai2.platform, plan.turnId, forSettlement).catch((error151) => {
       logger.log("error", "ai settlement failed", { turn_id: plan.turnId, error: String(error151) });
     });
     waitUntilOf(c)?.(settlement);
-    return new Response(forClient, {
-      headers: { "content-type": "text/event-stream", "cache-control": "no-store" }
+    return c.body(forClient, 200, {
+      "content-type": "text/event-stream",
+      "cache-control": "no-store"
     });
   }
   return c.json(chatCompletionOf(await settleCompletion(ai2.platform, plan.turnId, upstream), plan));
@@ -76393,7 +76522,8 @@ function chatCompletionOf(completion, plan) {
         message: {
           role: "assistant",
           content: completion.content === "" && toolCalls.length > 0 ? null : completion.content,
-          ...toolCalls.length > 0 ? { tool_calls: toolCalls } : {}
+          ...toolCalls.length > 0 ? { tool_calls: toolCalls } : {},
+          ...completion.annotations.length > 0 ? { annotations: completion.annotations } : {}
         },
         finish_reason: completion.finishReason ?? "stop"
       }
@@ -76465,23 +76595,21 @@ var init_completion = __esm(() => {
   init_errors6();
 });
 
-// frontend/packages/project-gateway/src/ai/embedding.ts
-async function startEmbedding(ai2, plan, request) {
-  if (plan.model.kind !== "model" || !plan.model.providerSlug) {
-    await ai2.platform.fail(plan.turnId, null, "not_embedding_model");
-    throw new GatewayError("VALIDATION_FAILED", "not_embedding_model");
+// frontend/packages/project-gateway/src/ai/operation.ts
+async function callOperation(ai2, plan, operation, send, fields) {
+  if (plan.model.kind !== "model" || !plan.model.providerSlug || !plan.model.operations.includes(operation)) {
+    await ai2.platform.fail(plan.turnId, null, NOT_MODEL[operation]);
+    throw new GatewayError("VALIDATION_FAILED", NOT_MODEL[operation]);
   }
   const body = {
+    ...fields,
     model: plan.model.id,
-    input: request.input,
-    ...request.dimensions === undefined ? {} : { dimensions: request.dimensions },
-    ...request.encoding_format === undefined ? {} : { encoding_format: request.encoding_format },
     user: await sha256Hex2(new TextEncoder().encode(plan.userId)),
     provider: { only: [plan.model.providerSlug], allow_fallbacks: false, data_collection: "deny" }
   };
   let upstream;
   try {
-    upstream = await ai2.openRouter.embeddings(body);
+    upstream = await send(body);
   } catch (cause) {
     await ai2.platform.fail(plan.turnId, null, "provider_unreachable");
     if (cause instanceof GatewayError)
@@ -76495,36 +76623,63 @@ async function startEmbedding(ai2, plan, request) {
   }
   return upstream;
 }
-async function settleEmbedding(ai2, plan, upstream) {
+async function deferSettlement(ai2, plan, upstream) {
+  const id = upstream.headers.get("x-generation-id");
+  await ai2.platform.fail(plan.turnId, id, id ? "usage_deferred" : "usage_missing");
+}
+async function settleOperation(ai2, plan, upstream) {
   let body;
   try {
     body = await upstream.json();
   } catch (cause) {
-    await ai2.platform.fail(plan.turnId, null, "stream_lost");
+    await ai2.platform.fail(plan.turnId, upstream.headers.get("x-generation-id"), "stream_lost");
     throw new GatewayError("GATEWAY_UNAVAILABLE", "ai response was not readable", { cause });
   }
   const answer = answerSchema.safeParse(body);
-  const id = answer.success ? answer.data.id ?? null : null;
+  const id = (answer.success ? answer.data.id : undefined) ?? upstream.headers.get("x-generation-id");
   const cost = answer.success ? answer.data.usage?.cost : undefined;
-  if (!answer.success || id === null || cost === undefined) {
-    await ai2.platform.fail(plan.turnId, id, "usage_missing");
+  if (!answer.success || !id || cost === undefined) {
+    await ai2.platform.fail(plan.turnId, id ?? null, "usage_missing");
   } else {
     await ai2.platform.settle({
       turnId: plan.turnId,
       generationId: id,
-      modelUsed: answer.data.model ?? "",
+      modelUsed: answer.data.model ?? plan.model.id,
       usage: answer.data.usage ?? {},
       costUsd: cost
     });
   }
   return body;
 }
-var text3, embeddingRequestSchema, embeddingModelOf = (request) => request.model ?? AI_EMBEDDING_MODEL_DEFAULT, usageSchema, answerSchema;
-var init_embedding = __esm(() => {
+var NOT_MODEL, answerSchema;
+var init_operation = __esm(() => {
   init_src();
   init_zod3();
   init_errors6();
   init_completion();
+  NOT_MODEL = {
+    embedding: "not_embedding_model",
+    transcription: "not_transcription_model",
+    speech: "not_speech_model",
+    rerank: "not_rerank_model"
+  };
+  answerSchema = exports_external3.looseObject({
+    id: exports_external3.string().min(1).optional(),
+    model: exports_external3.string().optional(),
+    usage: exports_external3.looseObject({ cost: exports_external3.number().finite().min(0).optional() }).optional()
+  });
+});
+
+// frontend/packages/project-gateway/src/ai/embedding.ts
+var text3, embeddingRequestSchema, embeddingModelOf = (request) => request.model ?? AI_EMBEDDING_MODEL_DEFAULT, startEmbedding = (ai2, plan, request) => callOperation(ai2, plan, "embedding", (body) => ai2.openRouter.embeddings(body), {
+  input: request.input,
+  ...request.dimensions === undefined ? {} : { dimensions: request.dimensions },
+  ...request.encoding_format === undefined ? {} : { encoding_format: request.encoding_format }
+}), settleEmbedding;
+var init_embedding = __esm(() => {
+  init_src();
+  init_zod3();
+  init_operation();
   text3 = exports_external3.string().min(1).max(AI_EMBEDDING_INPUT_CHARS_MAX);
   embeddingRequestSchema = exports_external3.looseObject({
     model: exports_external3.string().min(1).max(160).optional(),
@@ -76532,12 +76687,52 @@ var init_embedding = __esm(() => {
     dimensions: exports_external3.int().min(1).max(AI_EMBEDDING_DIMENSIONS_MAX).optional(),
     encoding_format: exports_external3.enum(["float", "base64"]).optional()
   }).refine((request) => [request.input].flat().reduce((sum, item) => sum + item.length, 0) <= AI_EMBEDDING_TOTAL_CHARS_MAX);
-  usageSchema = exports_external3.looseObject({ cost: exports_external3.number().finite().min(0).optional() });
-  answerSchema = exports_external3.looseObject({
-    id: exports_external3.string().min(1).optional(),
-    model: exports_external3.string().optional(),
-    usage: usageSchema.optional()
+  settleEmbedding = settleOperation;
+});
+
+// frontend/packages/project-gateway/src/ai/plugins.ts
+function sanitizePlugins(plugins) {
+  if (!Array.isArray(plugins) || plugins.length > 4) {
+    throw new GatewayError("VALIDATION_FAILED", "invalid plugins");
+  }
+  return plugins.map((raw2) => {
+    const parsed = filePlugin.safeParse(raw2);
+    if (!parsed.success)
+      throw new GatewayError("VALIDATION_FAILED", "unsupported_plugin");
+    return parsed.data;
   });
+}
+var engines, filePlugin, pdfPluginOf = (engine) => ({
+  id: "file-parser",
+  pdf: { engine: AI_PDF_ENGINES[engine] }
+});
+var init_plugins = __esm(() => {
+  init_src();
+  init_zod3();
+  init_errors6();
+  engines = Object.values(AI_PDF_ENGINES);
+  filePlugin = exports_external3.strictObject({
+    id: exports_external3.literal("file-parser"),
+    pdf: exports_external3.strictObject({ engine: exports_external3.enum(engines) }).optional()
+  });
+});
+
+// frontend/packages/project-gateway/src/ai/rerank.ts
+var document2, rerankRequestSchema, rerankModelOf = (request) => request.model ?? AI_RERANK_MODEL_DEFAULT, rerankFields = (request) => ({
+  query: request.query,
+  documents: request.documents,
+  ...request.top_n === undefined ? {} : { top_n: request.top_n }
+});
+var init_rerank = __esm(() => {
+  init_src();
+  init_zod3();
+  document2 = exports_external3.string().min(1).max(AI_RERANK_DOCUMENT_CHARS_MAX);
+  rerankRequestSchema = exports_external3.looseObject({
+    model: exports_external3.string().min(1).max(160).optional(),
+    query: exports_external3.string().min(1).max(AI_RERANK_QUERY_CHARS_MAX),
+    documents: exports_external3.array(document2).min(1).max(AI_RERANK_DOCUMENTS_MAX),
+    top_n: exports_external3.int().min(1).max(AI_RERANK_DOCUMENTS_MAX).optional()
+  }).refine((request) => request.documents.reduce((sum, item) => sum + item.length, 0) <= AI_RERANK_TOTAL_CHARS_MAX);
 });
 
 // frontend/packages/project-gateway/src/internal/audit.ts
@@ -76768,6 +76963,74 @@ var init_conversation_scope = __esm(() => {
   init_src();
 });
 
+// frontend/packages/project-gateway/src/ai/tools.ts
+function sanitizeTools(tools) {
+  if (!Array.isArray(tools) || tools.length > 64)
+    throw invalid("invalid tools");
+  return tools.map((raw2) => {
+    const parsed = tool.safeParse(raw2);
+    if (!parsed.success)
+      throw invalid("invalid tools");
+    const { type, ...rest } = parsed.data;
+    if (type === "function")
+      return raw2;
+    const parameters = rest.parameters ?? {};
+    const only = (schema) => {
+      const checked = schema.safeParse(parameters);
+      if (!checked.success)
+        throw invalid(`invalid ${type} parameters`);
+      return checked.data;
+    };
+    switch (type) {
+      case "openrouter:web_search":
+        return { type, parameters: { ...WEB_SEARCH_DEFAULTS, ...only(webSearch) } };
+      case "openrouter:web_fetch":
+        return { type, parameters: { ...WEB_FETCH_DEFAULTS, ...only(webFetch) } };
+      case "openrouter:datetime":
+        return { type, parameters: only(datetime7) };
+      default:
+        throw invalid("unsupported_tool");
+    }
+  });
+}
+var domains, webSearch, webFetch, datetime7, tool, WEB_SEARCH_DEFAULTS, WEB_FETCH_DEFAULTS, invalid = (reason) => new GatewayError("VALIDATION_FAILED", reason), WEB_SEARCH_TOOL;
+var init_tools = __esm(() => {
+  init_zod3();
+  init_errors6();
+  domains = exports_external3.array(exports_external3.string().min(1).max(253)).min(1).max(20);
+  webSearch = exports_external3.strictObject({
+    engine: exports_external3.enum(["auto", "native", "exa", "parallel"]).optional(),
+    max_results: exports_external3.int().min(1).max(10).optional(),
+    max_uses: exports_external3.int().min(1).max(5).optional(),
+    max_total_results: exports_external3.int().min(1).max(30).optional(),
+    search_context_size: exports_external3.enum(["low", "medium", "high"]).optional(),
+    allowed_domains: domains.optional(),
+    excluded_domains: domains.optional(),
+    user_location: exports_external3.strictObject({
+      type: exports_external3.literal("approximate").optional(),
+      country: exports_external3.string().max(2).optional(),
+      region: exports_external3.string().max(80).optional(),
+      city: exports_external3.string().max(80).optional(),
+      timezone: exports_external3.string().max(64).optional()
+    }).optional()
+  });
+  webFetch = exports_external3.strictObject({
+    engine: exports_external3.enum(["auto", "native", "exa", "parallel"]).optional(),
+    max_uses: exports_external3.int().min(1).max(5).optional(),
+    max_content_tokens: exports_external3.int().min(1000).max(50000).optional(),
+    allowed_domains: domains,
+    blocked_domains: domains.optional()
+  });
+  datetime7 = exports_external3.strictObject({ timezone: exports_external3.string().max(64).optional() });
+  tool = exports_external3.looseObject({ type: exports_external3.string().min(1).max(64) });
+  WEB_SEARCH_DEFAULTS = { max_results: 5, max_uses: 3, max_total_results: 15 };
+  WEB_FETCH_DEFAULTS = { max_uses: 3, max_content_tokens: 20000 };
+  WEB_SEARCH_TOOL = {
+    type: "openrouter:web_search",
+    parameters: WEB_SEARCH_DEFAULTS
+  };
+});
+
 // frontend/packages/project-gateway/src/ai/routes.ts
 function registerAiRoutes(app, adapters, config4, runtime, logger) {
   const { open, loadAttachments } = createAiAccess(adapters, config4, runtime);
@@ -76792,6 +77055,7 @@ function registerAiRoutes(app, adapters, config4, runtime, logger) {
       instructions: request.instructions ?? null,
       schema: request.schema ?? null
     });
+    await assertChatModel(ai2, { ...plan, userId: claims.actorId });
     if (plan.model.kind === "model" && attachments.some((a) => !plan.model.inputModalities.includes(a.kind))) {
       await ai2.platform.fail(turnId, null, "unsupported_attachment");
       throw new GatewayError("VALIDATION_FAILED", "unsupported_attachment");
@@ -76805,6 +77069,8 @@ function registerAiRoutes(app, adapters, config4, runtime, logger) {
           content: [{ type: "text", text: request.message }, ...attachments.map(contentPartOf)]
         }
       ],
+      ...request.webSearch ? { tools: [WEB_SEARCH_TOOL] } : {},
+      ...request.pdfEngine ? { plugins: [pdfPluginOf(request.pdfEngine)] } : {},
       ...request.schema && plan.schema ? {
         response_format: {
           type: "json_schema",
@@ -76899,40 +77165,54 @@ function createAiAccess(adapters, config4, runtime) {
     }
     return { claims, resolved, ai: ai2, db };
   }
-  async function loadAttachments(db, claims, resolved, requested) {
-    if (requested.length === 0)
-      return [];
+  async function readFile9(db, claims, resolved, fileId, accept, budget) {
     const schema = await runtime.schemaOf(resolved);
+    const file4 = await findReadableFile(runtime, { db, claims, resolved, schema, fileId });
+    if (!file4 || file4.status !== "active")
+      throw new GatewayError("NOT_FOUND", "file not found");
+    const accepted = accept(file4);
+    budget.left -= file4.sizeBytes ?? 0;
+    if (budget.left < 0)
+      throw new GatewayError("PAYLOAD_TOO_LARGE", "files are too large");
+    const object5 = await adapters.storage.get({
+      tier: tierOf(claims.env),
+      area: "private",
+      key: file4.objectKey
+    });
+    if (!object5)
+      throw new GatewayError("NOT_FOUND", "file not found");
+    return { file: file4, accepted, bytes: new Uint8Array(await object5.arrayBuffer()) };
+  }
+  async function loadAttachments(db, claims, resolved, requested) {
+    const budget = { left: AI_ATTACHMENTS_MAX_BYTES };
     const attachments = [];
-    let total = 0;
     for (const { fileId } of requested) {
-      const file4 = await findReadableFile(runtime, { db, claims, resolved, schema, fileId });
-      if (!file4 || file4.status !== "active")
-        throw new GatewayError("NOT_FOUND", "file not found");
-      const kind = aiAttachmentKindOf(file4.contentType ?? "");
-      if (!kind || !file4.contentType)
-        throw new GatewayError("VALIDATION_FAILED", "unsupported_attachment");
-      total += file4.sizeBytes ?? 0;
-      if (total > AI_ATTACHMENTS_MAX_BYTES)
-        throw new GatewayError("PAYLOAD_TOO_LARGE", "attachments are too large");
-      const object5 = await adapters.storage.get({
-        tier: tierOf(claims.env),
-        area: "private",
-        key: file4.objectKey
-      });
-      if (!object5)
-        throw new GatewayError("NOT_FOUND", "file not found");
+      const { file: file4, accepted, bytes: bytes3 } = await readFile9(db, claims, resolved, fileId, (found) => {
+        const kind = aiAttachmentKindOf(found.contentType ?? "");
+        if (!kind)
+          throw new GatewayError("VALIDATION_FAILED", "unsupported_attachment");
+        return kind;
+      }, budget);
       attachments.push({
         fileId,
-        kind,
-        contentType: file4.contentType.split(";")[0]?.trim().toLowerCase() ?? file4.contentType,
+        kind: accepted,
+        contentType: file4.contentType?.split(";")[0]?.trim().toLowerCase() ?? "",
         name: file4.originalName ?? "attachment",
-        base64: toBase64(new Uint8Array(await object5.arrayBuffer()))
+        base64: toBase64(bytes3)
       });
     }
     return attachments;
   }
-  return { open, loadAttachments };
+  async function loadAudio(db, claims, resolved, fileId) {
+    const { accepted, bytes: bytes3 } = await readFile9(db, claims, resolved, fileId, (found) => {
+      const format = aiTranscriptionFormatOf(found.contentType ?? "", found.originalName ?? undefined);
+      if (!format)
+        throw new GatewayError("VALIDATION_FAILED", "unsupported_audio");
+      return format;
+    }, { left: AI_TRANSCRIPTION_MAX_BYTES });
+    return { bytes: bytes3, format: accepted };
+  }
+  return { open, loadAttachments, loadAudio };
 }
 function createTurn(platform, input) {
   let listener = () => {};
@@ -76952,9 +77232,11 @@ function createTurn(platform, input) {
       costUsd: cost
     });
     await input.saveHistory(text4);
+    const sources = sourcesOf(completion.annotations);
     return {
       text: text4,
       finishReason,
+      ...sources.length > 0 ? { sources } : {},
       ...input.schema && finishReason === "stop" ? jsonOf(text4) : {},
       credits,
       responseId: completion.id,
@@ -76997,11 +77279,124 @@ var init_routes = __esm(() => {
   init_app_history();
   init_completion();
   init_conversation_scope();
+  init_plugins();
+  init_tools();
+});
+
+// frontend/packages/project-gateway/src/ai/speech.ts
+var speechRequestSchema, speechModelOf = (request) => request.model ?? AI_SPEECH_MODEL_DEFAULT, speechFields = (request) => ({
+  input: request.input,
+  voice: request.voice,
+  response_format: request.response_format ?? "mp3",
+  ...request.speed === undefined ? {} : { speed: request.speed },
+  ...request.instructions === undefined ? {} : { instructions: request.instructions }
+});
+var init_speech = __esm(() => {
+  init_src();
+  init_zod3();
+  speechRequestSchema = exports_external3.looseObject({
+    model: exports_external3.string().min(1).max(160).optional(),
+    input: exports_external3.string().min(1).max(AI_SPEECH_INPUT_CHARS_MAX),
+    voice: exports_external3.string().min(1).max(64),
+    response_format: exports_external3.enum(AI_SPEECH_FORMATS).optional(),
+    speed: exports_external3.number().min(0.25).max(4).optional(),
+    instructions: exports_external3.string().min(1).max(AI_SPEECH_INSTRUCTIONS_CHARS_MAX).optional()
+  });
+});
+
+// frontend/packages/project-gateway/src/ai/transcription.ts
+function optionsOfForm(form) {
+  const text4 = (name3) => {
+    const value = form.get(name3);
+    return typeof value === "string" && value !== "" ? value : undefined;
+  };
+  const number10 = text4("temperature");
+  const keyterms = [...form.getAll("keyterms[]"), ...form.getAll("keyterms")].filter((value) => typeof value === "string" && value !== "");
+  return {
+    model: text4("model"),
+    language: text4("language"),
+    prompt: text4("prompt"),
+    response_format: text4("response_format"),
+    temperature: number10 === undefined ? undefined : Number(number10),
+    diarize: text4("diarize") === undefined ? undefined : text4("diarize") === "true",
+    keyterms: keyterms.length ? keyterms : undefined
+  };
+}
+async function parseTranscriptionRequest(c) {
+  if (c.req.header("content-type")?.toLowerCase().startsWith("multipart/form-data")) {
+    const form = await c.req.formData().catch(() => {
+      throw invalid2("invalid transcription request");
+    });
+    const file5 = form.get("file");
+    if (!(file5 instanceof File))
+      throw invalid2("file is required");
+    if (file5.size === 0)
+      throw invalid2("file is empty");
+    if (file5.size > AI_TRANSCRIPTION_MAX_BYTES)
+      throw new GatewayError("PAYLOAD_TOO_LARGE", "audio is too large");
+    const format = aiTranscriptionFormatOf(file5.type, file5.name);
+    if (!format)
+      throw invalid2("unsupported_audio");
+    const options3 = exports_external3.looseObject(fields).safeParse(optionsOfForm(form));
+    if (!options3.success)
+      throw invalid2("invalid transcription request");
+    return {
+      options: options3.data,
+      source: { kind: "bytes", bytes: new Uint8Array(await file5.arrayBuffer()), format }
+    };
+  }
+  const parsed = jsonSchema2.safeParse(await jsonBody(c));
+  if (!parsed.success)
+    throw invalid2("invalid transcription request");
+  const { file: file4, ...options2 } = parsed.data;
+  const match2 = FILE_REF.exec(file4);
+  if (!match2?.[1])
+    throw invalid2("invalid transcription request");
+  return {
+    options: Object.fromEntries(Object.keys(fields).flatMap((key) => (key in options2) ? [[key, options2[key]]] : [])),
+    source: { kind: "file", fileId: match2[1].toLowerCase() }
+  };
+}
+function transcriptionFields(options2, audio) {
+  return {
+    input_audio: { data: toBase642(audio.bytes), format: audio.format },
+    ...options2.language ? { language: options2.language } : {},
+    ...options2.prompt ? { prompt: options2.prompt } : {},
+    ...options2.response_format ? { response_format: options2.response_format } : {},
+    ...options2.temperature === undefined ? {} : { temperature: options2.temperature },
+    ...options2.diarize === undefined ? {} : { diarize: options2.diarize },
+    ...options2.keyterms ? { keyterms: options2.keyterms } : {}
+  };
+}
+function toBase642(bytes3) {
+  let binary = "";
+  for (let i = 0;i < bytes3.length; i += 32768) {
+    binary += String.fromCharCode(...bytes3.subarray(i, i + 32768));
+  }
+  return btoa(binary);
+}
+var FILE_REF, fields, jsonSchema2, invalid2 = (reason) => new GatewayError("VALIDATION_FAILED", reason), transcriptionModelOf = (request) => request.options.model ?? AI_TRANSCRIPTION_MODEL_DEFAULT;
+var init_transcription = __esm(() => {
+  init_src();
+  init_zod3();
+  init_errors6();
+  init_session();
+  FILE_REF = /^fdpocket-file:([0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12})$/i;
+  fields = {
+    model: exports_external3.string().min(1).max(160).optional(),
+    language: exports_external3.string().regex(/^[a-z]{2,3}(-[A-Za-z0-9]{2,8})?$/).optional(),
+    prompt: exports_external3.string().max(AI_TRANSCRIPTION_PROMPT_MAX_CHARS).optional(),
+    response_format: exports_external3.enum(["json", "verbose_json"]).optional(),
+    temperature: exports_external3.number().min(0).max(1).optional(),
+    diarize: exports_external3.boolean().optional(),
+    keyterms: exports_external3.array(exports_external3.string().min(1).max(100)).max(AI_TRANSCRIPTION_KEYTERMS_MAX).optional()
+  };
+  jsonSchema2 = exports_external3.looseObject({ ...fields, file: exports_external3.string().regex(FILE_REF) });
 });
 
 // frontend/packages/project-gateway/src/ai/openai-routes.ts
 function registerAiOpenAiRoutes(app, adapters, config4, runtime, logger) {
-  const { open, loadAttachments } = createAiAccess(adapters, config4, runtime);
+  const { open, loadAttachments, loadAudio } = createAiAccess(adapters, config4, runtime);
   app.post("/v1/ai/openai/chat/completions", async (c) => {
     const run = c.req.header(RUN_CONTEXT_HEADER);
     const turnId = crypto.randomUUID();
@@ -77053,14 +77448,20 @@ function registerAiOpenAiRoutes(app, adapters, config4, runtime, logger) {
     const files = new Map((await loadAttachments(db, claims, resolved, refs.map((fileId) => ({ fileId })))).map((file4) => [file4.fileId, file4]));
     return messages.map((message2) => inlineFiles(message2, files));
   }
-  app.post("/v1/ai/openai/embeddings", async (c) => {
+  async function beginOperation(c, parse14, modelOf, usesFile) {
     const run = c.req.header(RUN_CONTEXT_HEADER);
     const turnId = crypto.randomUUID();
     if (run !== undefined) {
       const job = await openJob(c);
-      const request2 = await parseEmbeddingRequest(c);
+      const request2 = await parse14(c);
       if (!/^(queue|schedule|python):[0-9a-f-]{36}$/i.test(run)) {
         throw new GatewayError("VALIDATION_FAILED", "invalid run");
+      }
+      let user2 = null;
+      if (usesFile(request2)) {
+        if (!run.startsWith("queue:"))
+          throw new GatewayError("VALIDATION_FAILED", "file references need a user");
+        user2 = await open(c, true);
       }
       const plan2 = await job.ai.platform.beginJob({
         turnId,
@@ -77069,12 +77470,13 @@ function registerAiOpenAiRoutes(app, adapters, config4, runtime, logger) {
         ...adapters.jobs?.runtimeContext ? {
           context: await adapters.jobs.runtimeContext(job.credentialId, run, c.req.header(JOB_LEASE_HEADER))
         } : {},
-        model: embeddingModelOf(request2)
+        model: modelOf(request2)
       });
-      return embed(c, job.ai, turnId, plan2, request2);
+      return { ai: job.ai, plan: { ...plan2, turnId }, request: request2, user: user2 };
     }
-    const { claims, resolved, ai: ai2 } = await open(c);
-    const request = await parseEmbeddingRequest(c);
+    const user = await open(c);
+    const request = await parse14(c);
+    const { claims, resolved, ai: ai2 } = user;
     const plan = await ai2.platform.beginRequest({
       turnId,
       projectId: claims.aud,
@@ -77083,19 +77485,63 @@ function registerAiOpenAiRoutes(app, adapters, config4, runtime, logger) {
       environmentId: claims.envId,
       appSlug: claims.app,
       userId: claims.actorId,
-      model: embeddingModelOf(request)
+      model: modelOf(request)
     });
-    return embed(c, ai2, turnId, plan, request);
+    return { ai: ai2, plan: { ...plan, turnId }, request, user };
+  }
+  app.post("/v1/ai/openai/embeddings", async (c) => {
+    const { ai: ai2, plan, request } = await beginOperation(c, parseEmbeddingRequest, embeddingModelOf, () => false);
+    const upstream = await startEmbedding(ai2, plan, request);
+    return c.json(await settleEmbedding(ai2, plan, upstream));
+  });
+  app.post("/v1/ai/openai/audio/transcriptions", async (c) => {
+    const { ai: ai2, plan, request, user } = await beginOperation(c, parseTranscriptionRequest, transcriptionModelOf, (r) => r.source.kind === "file");
+    let audio;
+    try {
+      if (request.source.kind === "bytes")
+        audio = request.source;
+      else if (user) {
+        audio = await loadAudio(user.db, user.claims, user.resolved, request.source.fileId);
+      } else
+        throw new GatewayError("FORBIDDEN", "file references need a user");
+    } catch (error151) {
+      await ai2.platform.fail(plan.turnId, null, "audio_unreadable");
+      throw error151;
+    }
+    const upstream = await callOperation(ai2, plan, "transcription", (body) => ai2.openRouter.request("/audio/transcriptions", body), transcriptionFields(request.options, audio));
+    return c.json(await settleOperation(ai2, plan, upstream));
+  });
+  app.post("/v1/ai/openai/audio/speech", async (c) => {
+    const { ai: ai2, plan, request } = await beginOperation(c, async (ctx) => {
+      const parsed = speechRequestSchema.safeParse(await jsonBody(ctx));
+      if (!parsed.success)
+        throw new GatewayError("VALIDATION_FAILED", "invalid speech request");
+      return parsed.data;
+    }, speechModelOf, () => false);
+    const upstream = await callOperation(ai2, plan, "speech", (body) => ai2.openRouter.request("/audio/speech", body), speechFields(request));
+    await deferSettlement(ai2, plan, upstream);
+    if (!upstream.body)
+      throw new GatewayError("GATEWAY_UNAVAILABLE", "ai returned no audio");
+    return c.body(upstream.body, 200, {
+      "content-type": upstream.headers.get("content-type") ?? "audio/mpeg",
+      "cache-control": "private, no-store"
+    });
+  });
+  app.post("/v1/ai/openai/rerank", async (c) => {
+    const { ai: ai2, plan, request } = await beginOperation(c, async (ctx) => {
+      const parsed = rerankRequestSchema.safeParse(await jsonBody(ctx));
+      if (!parsed.success)
+        throw new GatewayError("VALIDATION_FAILED", "invalid rerank request");
+      return parsed.data;
+    }, rerankModelOf, () => false);
+    const upstream = await callOperation(ai2, plan, "rerank", (body) => ai2.openRouter.request("/rerank", body), rerankFields(request));
+    return c.json(await settleOperation(ai2, plan, upstream));
   });
   async function parseEmbeddingRequest(c) {
     const parsed = embeddingRequestSchema.safeParse(await jsonBody(c));
     if (!parsed.success)
       throw new GatewayError("VALIDATION_FAILED", "invalid embeddings request");
     return parsed.data;
-  }
-  async function embed(c, ai2, turnId, plan, request) {
-    const upstream = await startEmbedding(ai2, { ...plan, turnId }, request);
-    return c.json(await settleEmbedding(ai2, { ...plan, turnId }, upstream));
   }
   async function parseRequest(c) {
     const parsed = requestSchema.safeParse(await jsonBody(c));
@@ -77110,6 +77556,7 @@ function registerAiOpenAiRoutes(app, adapters, config4, runtime, logger) {
     return { ai: adapters.ai, credentialId: service.cid };
   }
   async function complete(c, ai2, turnId, plan, request, messages) {
+    await assertChatModel(ai2, plan);
     const kinds = new Set(messages.flatMap(partKindsOf));
     if (plan.model.kind === "model" && [...kinds].some((k2) => !plan.model.inputModalities.includes(k2))) {
       await ai2.platform.fail(turnId, null, "unsupported_attachment");
@@ -77117,6 +77564,8 @@ function registerAiOpenAiRoutes(app, adapters, config4, runtime, logger) {
     }
     const upstream = await startCompletion(ai2, plan, {
       ...Object.fromEntries(PASS_THROUGH.filter((key) => request[key] !== undefined).map((key) => [key, request[key]])),
+      ...request.tools === undefined ? {} : { tools: sanitizeTools(request.tools) },
+      ...request.plugins === undefined ? {} : { plugins: sanitizePlugins(request.plugins) },
       messages,
       maxTokens: request.max_completion_tokens ?? request.max_tokens
     });
@@ -77128,7 +77577,7 @@ function fileRefsOf(message2) {
     return [];
   return message2.content.flatMap((part) => {
     const location2 = locationOf(part);
-    const match2 = location2 ? FILE_REF.exec(location2) : null;
+    const match2 = location2 ? FILE_REF2.exec(location2) : null;
     return match2?.[1] ? [match2[1].toLowerCase()] : [];
   });
 }
@@ -77154,7 +77603,7 @@ function inlineFiles(message2, files) {
     ...message2,
     content: message2.content.map((part) => {
       const location2 = locationOf(part);
-      const match2 = location2 ? FILE_REF.exec(location2) : null;
+      const match2 = location2 ? FILE_REF2.exec(location2) : null;
       const file4 = match2?.[1] ? files.get(match2[1].toLowerCase()) : undefined;
       if (!file4)
         return part;
@@ -77170,7 +77619,7 @@ function inlineFiles(message2, files) {
     })
   };
 }
-var FILE_REF, PASS_THROUGH, partSchema, messageSchema, requestSchema, KIND_OF_PART;
+var FILE_REF2, PASS_THROUGH, partSchema, messageSchema, requestSchema, KIND_OF_PART;
 var init_openai_routes = __esm(() => {
   init_src();
   init_zod3();
@@ -77178,10 +77627,15 @@ var init_openai_routes = __esm(() => {
   init_session();
   init_completion();
   init_embedding();
+  init_operation();
+  init_plugins();
+  init_rerank();
   init_routes();
-  FILE_REF = /^fdpocket-file:([0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12})$/i;
+  init_speech();
+  init_tools();
+  init_transcription();
+  FILE_REF2 = /^fdpocket-file:([0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12})$/i;
   PASS_THROUGH = [
-    "tools",
     "tool_choice",
     "parallel_tool_calls",
     "response_format",
@@ -81677,11 +82131,11 @@ async function ensureRealtimeCapture(db, options2) {
     const table = mappedName2(definition, model);
     if (table.toLowerCase().startsWith("_platform") || reservedNames.has(table.toLowerCase()))
       throw new Error("Realtime capture accepts declared business models only");
-    const fields = Object.entries(definition?.fields ?? {}).map(([field2, def]) => ({
+    const fields2 = Object.entries(definition?.fields ?? {}).map(([field2, def]) => ({
       field: field2,
       column: mappedName2(def, field2)
     }));
-    return { model, table, fields };
+    return { model, table, fields: fields2 };
   });
   const fingerprint = JSON.stringify(descriptors);
   const tx = await db.transaction("write");
@@ -81693,7 +82147,7 @@ async function ensureRealtimeCapture(db, options2) {
     const expected = new Map;
     const triggers = await tx.execute(`SELECT name,sql FROM sqlite_master WHERE type='trigger' AND name GLOB '_platform_rt_*'`);
     const installed = new Map(triggers.rows.map((row) => [String(row.name), String(row.sql)]));
-    for (const { model, table, fields } of descriptors) {
+    for (const { model, table, fields: fields2 } of descriptors) {
       const columns = await tx.execute(`PRAGMA table_info(${quote4(table)})`);
       const keys = columns.rows.filter((row) => Number(row.pk) > 0).sort((a, b2) => Number(a.pk) - Number(b2.pk)).map((row) => String(row.name));
       if (keys.length === 0)
@@ -81701,11 +82155,11 @@ async function ensureRealtimeCapture(db, options2) {
       for (const operation of ["INSERT", "UPDATE", "DELETE"]) {
         const source = operation === "DELETE" ? "OLD" : "NEW";
         const json4 = keys.flatMap((key) => [
-          literal5(fields.find((f2) => f2.column === key)?.field ?? key),
+          literal5(fields2.find((f2) => f2.column === key)?.field ?? key),
           `${source}.${quote4(key)}`
         ]).join(",");
         const oldJson = keys.flatMap((key) => [
-          literal5(fields.find((f2) => f2.column === key)?.field ?? key),
+          literal5(fields2.find((f2) => f2.column === key)?.field ?? key),
           `OLD.${quote4(key)}`
         ]).join(",");
         const pkChanged = keys.map((key) => `OLD.${quote4(key)} IS NOT NEW.${quote4(key)}`).join(" OR ");
@@ -83333,7 +83787,7 @@ __export(exports_regexes4, {
   e164: () => e1647,
   duration: () => duration7,
   domain: () => domain4,
-  datetime: () => datetime7,
+  datetime: () => datetime8,
   date: () => date13,
   currencyCode: () => currencyCode,
   cuid2: () => cuid27,
@@ -83365,7 +83819,7 @@ function timeSource4(args) {
 function time7(args) {
   return new RegExp(`^${timeSource4(args)}$`);
 }
-function datetime7(args) {
+function datetime8(args) {
   const opts = ["Z"];
   if (args.offset)
     opts.push(`([+-](?:[01]\\d|2[0-3]):[0-5]\\d)`);
@@ -84920,7 +85374,7 @@ var init_schemas7 = __esm(() => {
     $ZodStringFormat4.init(inst, def);
   });
   $ZodISODateTime4 = /* @__PURE__ */ $constructor4("$ZodISODateTime", (inst, def) => {
-    def.pattern ?? (def.pattern = datetime7(def));
+    def.pattern ?? (def.pattern = datetime8(def));
     $ZodStringFormat4.init(inst, def);
   });
   $ZodISODate4 = /* @__PURE__ */ $constructor4("$ZodISODate", (inst, def) => {
@@ -99511,10 +99965,10 @@ function _instanceof4(cls, params = {}) {
   return inst;
 }
 function json4(params) {
-  const jsonSchema2 = lazy4(() => {
-    return union4([string11(params), number11(), boolean11(), _null12(), array4(jsonSchema2), record5(string11(), jsonSchema2)]);
+  const jsonSchema3 = lazy4(() => {
+    return union4([string11(params), number11(), boolean11(), _null12(), array4(jsonSchema3), record5(string11(), jsonSchema3)]);
   });
-  return jsonSchema2;
+  return jsonSchema3;
 }
 function preprocess4(fn, schema) {
   return new ZodPreprocess4({
@@ -100518,14 +100972,14 @@ var exports_iso4 = {};
 __export(exports_iso4, {
   time: () => time8,
   duration: () => duration8,
-  datetime: () => datetime8,
+  datetime: () => datetime9,
   date: () => date15,
   ZodISOTime: () => ZodISOTime4,
   ZodISODuration: () => ZodISODuration4,
   ZodISODateTime: () => ZodISODateTime4,
   ZodISODate: () => ZodISODate4
 });
-function datetime8(params) {
+function datetime9(params) {
   return _isoDateTime4(ZodISODateTime4, params);
 }
 function date15(params) {
@@ -105497,11 +105951,11 @@ function createInternalError(message2, model, options2) {
   error212.model = model;
   return error212;
 }
-function extractFields(obj, fields) {
-  return Object.fromEntries(Object.entries(obj).filter(([key]) => fields.includes(key)));
+function extractFields(obj, fields2) {
+  return Object.fromEntries(Object.entries(obj).filter(([key]) => fields2.includes(key)));
 }
-function fieldsToSelectObject(fields) {
-  return Object.fromEntries(fields.map((f3) => [f3, true]));
+function fieldsToSelectObject(fields2) {
+  return Object.fromEntries(fields2.map((f3) => [f3, true]));
 }
 function isEmptyObject2(x3) {
   return isPlainObject5(x3) && Object.keys(x3).length === 0;
@@ -107331,28 +107785,28 @@ var import_cuid, import_json_stable_stringify, import_toposort, ORMErrorReason, 
     return this.makeFindSchema(model, "findMany", options2);
   }
   makeFindSchema(model, operation, options2) {
-    const fields = {};
+    const fields2 = {};
     const unique = operation === "findUnique";
     const findOne = operation === "findUnique" || operation === "findFirst";
     const where = this.makeWhereSchema(model, unique, false, false, options2);
     if (unique)
-      fields["where"] = where;
+      fields2["where"] = where;
     else
-      fields["where"] = where.optional();
-    fields["select"] = this.makeSelectSchema(model, options2).optional().nullable();
-    fields["include"] = this.makeIncludeSchema(model, options2).optional().nullable();
-    fields["omit"] = this.makeOmitSchema(model).optional().nullable();
+      fields2["where"] = where.optional();
+    fields2["select"] = this.makeSelectSchema(model, options2).optional().nullable();
+    fields2["include"] = this.makeIncludeSchema(model, options2).optional().nullable();
+    fields2["omit"] = this.makeOmitSchema(model).optional().nullable();
     if (!unique) {
-      fields["skip"] = this.makeSkipSchema().optional();
+      fields2["skip"] = this.makeSkipSchema().optional();
       if (findOne)
-        fields["take"] = exports_external4.literal(1).optional();
+        fields2["take"] = exports_external4.literal(1).optional();
       else
-        fields["take"] = this.makeTakeSchema().optional();
-      fields["orderBy"] = this.orArray(this.makeOrderBySchema(model, true, false, options2), true).optional();
-      fields["cursor"] = this.makeCursorSchema(model, options2).optional();
-      fields["distinct"] = this.makeDistinctSchema(model).optional();
+        fields2["take"] = this.makeTakeSchema().optional();
+      fields2["orderBy"] = this.orArray(this.makeOrderBySchema(model, true, false, options2), true).optional();
+      fields2["cursor"] = this.makeCursorSchema(model, options2).optional();
+      fields2["distinct"] = this.makeDistinctSchema(model).optional();
     }
-    const baseSchema2 = exports_external4.strictObject(fields);
+    const baseSchema2 = exports_external4.strictObject(fields2);
     let result = this.mergePluginArgsSchema(baseSchema2, operation);
     result = this.refineForSelectIncludeMutuallyExclusive(result);
     result = this.refineForSelectOmitMutuallyExclusive(result);
@@ -107440,7 +107894,7 @@ var import_cuid, import_json_stable_stringify, import_toposort, ORMErrorReason, 
   makeWhereSchema(model, unique, withoutRelationFields = false, withAggregations = false, options2) {
     const uniqueFieldNames = unique ? getUniqueFields(this.schema, model).filter((uf) => ("def" in uf)).map((uf) => uf.name) : undefined;
     const nextOpts = this.nextOptions(options2);
-    const fields = {};
+    const fields2 = {};
     for (const [field2, fieldDef] of this.getModelFields(model)) {
       let fieldSchema;
       if (fieldDef.relation) {
@@ -107481,13 +107935,13 @@ var import_cuid, import_json_stable_stringify, import_toposort, ORMErrorReason, 
       if (fieldSchema && this.isParameterizedComputedField(fieldDef))
         fieldSchema = this.addComputedArgsToFilter(fieldSchema, fieldDef.params);
       if (fieldSchema)
-        fields[field2] = fieldSchema.optional();
+        fields2[field2] = fieldSchema.optional();
     }
     if (unique) {
       const uniqueFields = getUniqueFields(this.schema, model);
       for (const uniqueField of uniqueFields)
         if ("defs" in uniqueField)
-          fields[uniqueField.name] = exports_external4.object(Object.fromEntries(Object.entries(uniqueField.defs).map(([key, def]) => {
+          fields2[uniqueField.name] = exports_external4.object(Object.fromEntries(Object.entries(uniqueField.defs).map(([key, def]) => {
             invariant(!def.relation, "unique field cannot be a relation");
             let fieldSchema;
             const enumDef = getEnum(this.schema, def.type);
@@ -107501,11 +107955,11 @@ var import_cuid, import_json_stable_stringify, import_toposort, ORMErrorReason, 
             return [key, fieldSchema];
           }))).optional();
     }
-    fields["$expr"] = exports_external4.custom((v3) => typeof v3 === "function", { error: '"$expr" must be a function' }).optional();
-    fields["AND"] = this.orArray(exports_external4.lazy(() => this.makeWhereSchema(model, false, withoutRelationFields, false, options2)), true).optional();
-    fields["OR"] = exports_external4.lazy(() => this.makeWhereSchema(model, false, withoutRelationFields, false, options2)).array().optional();
-    fields["NOT"] = this.orArray(exports_external4.lazy(() => this.makeWhereSchema(model, false, withoutRelationFields, false, options2)), true).optional();
-    const baseWhere = exports_external4.strictObject(fields);
+    fields2["$expr"] = exports_external4.custom((v3) => typeof v3 === "function", { error: '"$expr" must be a function' }).optional();
+    fields2["AND"] = this.orArray(exports_external4.lazy(() => this.makeWhereSchema(model, false, withoutRelationFields, false, options2)), true).optional();
+    fields2["OR"] = exports_external4.lazy(() => this.makeWhereSchema(model, false, withoutRelationFields, false, options2)).array().optional();
+    fields2["NOT"] = this.orArray(exports_external4.lazy(() => this.makeWhereSchema(model, false, withoutRelationFields, false, options2)), true).optional();
+    const baseWhere = exports_external4.strictObject(fields2);
     let result = baseWhere;
     if (unique) {
       const uniqueFields = getUniqueFields(this.schema, model);
@@ -107825,29 +108279,29 @@ var import_cuid, import_json_stable_stringify, import_toposort, ORMErrorReason, 
     });
   }
   makeSelectSchema(model, options2) {
-    const fields = {};
+    const fields2 = {};
     for (const [field2, fieldDef] of this.getModelFields(model)) {
       if (this.isParameterizedComputedField(fieldDef)) {
-        fields[field2] = exports_external4.strictObject({ args: this.makeFieldArgsSchema(fieldDef.params) }).optional();
+        fields2[field2] = exports_external4.strictObject({ args: this.makeFieldArgsSchema(fieldDef.params) }).optional();
         continue;
       }
       if (fieldDef.relation) {
         if (!this.shouldIncludeRelations(options2))
           continue;
         if (this.isModelAllowed(fieldDef.type))
-          fields[field2] = this.makeRelationSelectIncludeSchema(model, field2, options2).optional();
+          fields2[field2] = this.makeRelationSelectIncludeSchema(model, field2, options2).optional();
       } else if (this.options.allowQueryTimeOmitOverride === false && this.isFieldOmittedByConfig(model, field2))
-        fields[field2] = exports_external4.literal(false).optional();
+        fields2[field2] = exports_external4.literal(false).optional();
       else
-        fields[field2] = exports_external4.boolean().optional();
+        fields2[field2] = exports_external4.boolean().optional();
     }
     if (this.shouldIncludeRelations(options2)) {
       const _countSchema = this.makeCountSelectionSchema(model, options2);
       if (!(_countSchema instanceof exports_external4.ZodNever))
-        fields["_count"] = _countSchema;
+        fields2["_count"] = _countSchema;
     }
-    this.addExtResultFields(model, fields);
-    const result = exports_external4.strictObject(fields);
+    this.addExtResultFields(model, fields2);
+    const result = exports_external4.strictObject(fields2);
     this.registerSchema(`${model}Select`, result);
     return result;
   }
@@ -107895,81 +108349,81 @@ var import_cuid, import_json_stable_stringify, import_toposort, ORMErrorReason, 
     return !!requireField(this.schema, model, field2).omit;
   }
   makeOmitSchema(model) {
-    const fields = {};
+    const fields2 = {};
     for (const [field2, fieldDef] of this.getModelFields(model)) {
       if (this.isParameterizedComputedField(fieldDef))
         continue;
       if (!fieldDef.relation)
         if (this.options.allowQueryTimeOmitOverride !== false)
-          fields[field2] = exports_external4.boolean().optional();
+          fields2[field2] = exports_external4.boolean().optional();
         else
-          fields[field2] = exports_external4.literal(true).optional();
+          fields2[field2] = exports_external4.literal(true).optional();
     }
-    this.addExtResultFields(model, fields);
-    const result = exports_external4.strictObject(fields);
+    this.addExtResultFields(model, fields2);
+    const result = exports_external4.strictObject(fields2);
     this.registerSchema(`${model}OmitInput`, result);
     return result;
   }
-  addExtResultFields(model, fields) {
+  addExtResultFields(model, fields2) {
     for (const plugin of this.plugins) {
       const resultConfig = plugin.result;
       if (resultConfig) {
         const modelConfig = resultConfig[lowerCaseFirst(model)];
         if (modelConfig)
           for (const field2 of Object.keys(modelConfig))
-            fields[field2] = exports_external4.boolean().optional();
+            fields2[field2] = exports_external4.boolean().optional();
       }
     }
   }
   makeIncludeSchema(model, options2) {
     const modelDef = requireModel(this.schema, model);
-    const fields = {};
+    const fields2 = {};
     for (const field2 of Object.keys(modelDef.fields)) {
       const fieldDef = requireField(this.schema, model, field2);
       if (fieldDef.relation) {
         if (!this.shouldIncludeRelations(options2))
           continue;
         if (this.isModelAllowed(fieldDef.type))
-          fields[field2] = this.makeRelationSelectIncludeSchema(model, field2, options2).optional();
+          fields2[field2] = this.makeRelationSelectIncludeSchema(model, field2, options2).optional();
       } else if (this.isParameterizedComputedField(fieldDef))
-        fields[field2] = exports_external4.strictObject({ args: this.makeFieldArgsSchema(fieldDef.params) }).optional();
+        fields2[field2] = exports_external4.strictObject({ args: this.makeFieldArgsSchema(fieldDef.params) }).optional();
     }
     if (this.shouldIncludeRelations(options2)) {
       const _countSchema = this.makeCountSelectionSchema(model, options2);
       if (!(_countSchema instanceof exports_external4.ZodNever))
-        fields["_count"] = _countSchema;
+        fields2["_count"] = _countSchema;
     }
-    const result = exports_external4.strictObject(fields);
+    const result = exports_external4.strictObject(fields2);
     this.registerSchema(`${model}Include`, result);
     return result;
   }
   makeOrderBySchema(model, withRelation, WithAggregation, options2) {
-    const fields = {};
+    const fields2 = {};
     const sort = exports_external4.union([exports_external4.literal("asc"), exports_external4.literal("desc")]);
     const refineAtMostOneKey = (s3) => s3.refine((v3) => Object.keys(v3).length <= 1, { message: "Each orderBy element must have at most one key" });
     const nextOpts = this.nextOptions(options2);
     for (const [field2, fieldDef] of this.getModelFields(model))
       if (fieldDef.relation) {
         if (withRelation && this.shouldIncludeRelations(options2))
-          fields[field2] = exports_external4.lazy(() => {
+          fields2[field2] = exports_external4.lazy(() => {
             let relationOrderBy = this.makeOrderBySchema(fieldDef.type, withRelation, WithAggregation, nextOpts);
             if (fieldDef.array)
               relationOrderBy = refineAtMostOneKey(relationOrderBy.safeExtend({ _count: sort }));
             return relationOrderBy;
           }).optional();
       } else if (fieldDef.computed && fieldDef.params)
-        fields[field2] = exports_external4.strictObject({
+        fields2[field2] = exports_external4.strictObject({
           args: this.makeFieldArgsSchema(fieldDef.params),
           sort,
           nulls: exports_external4.union([exports_external4.literal("first"), exports_external4.literal("last")]).optional()
         }).optional();
       else if (fieldDef.optional)
-        fields[field2] = exports_external4.union([sort, exports_external4.strictObject({
+        fields2[field2] = exports_external4.union([sort, exports_external4.strictObject({
           sort,
           nulls: exports_external4.union([exports_external4.literal("first"), exports_external4.literal("last")]).optional()
         })]).optional();
       else
-        fields[field2] = sort.optional();
+        fields2[field2] = sort.optional();
     if (WithAggregation)
       for (const agg of [
         "_count",
@@ -107978,11 +108432,11 @@ var import_cuid, import_json_stable_stringify, import_toposort, ORMErrorReason, 
         "_min",
         "_max"
       ])
-        fields[agg] = exports_external4.lazy(() => this.makeOrderBySchema(model, true, false, options2).optional());
+        fields2[agg] = exports_external4.lazy(() => this.makeOrderBySchema(model, true, false, options2).optional());
     if (this.providerSupportsFuzzySearch) {
       const fuzzyFieldNames = this.getModelFields(model).filter(([, def]) => !def.relation && def.type === "String" && def.fuzzy === true).map(([name3]) => name3);
       if (fuzzyFieldNames.length > 0)
-        fields["_fuzzyRelevance"] = exports_external4.strictObject({
+        fields2["_fuzzyRelevance"] = exports_external4.strictObject({
           fields: exports_external4.array(exports_external4.enum(fuzzyFieldNames)).min(1),
           search: exports_external4.string(),
           mode: exports_external4.union([
@@ -107997,14 +108451,14 @@ var import_cuid, import_json_stable_stringify, import_toposort, ORMErrorReason, 
     if (this.providerSupportsFullTextSearch) {
       const fullTextFieldNames = this.getModelFields(model).filter(([, def]) => !def.relation && def.type === "String" && def.fullText === true).map(([name3]) => name3);
       if (fullTextFieldNames.length > 0)
-        fields["_ftsRelevance"] = exports_external4.strictObject({
+        fields2["_ftsRelevance"] = exports_external4.strictObject({
           fields: exports_external4.array(exports_external4.enum(fullTextFieldNames)).min(1),
           search: exports_external4.string().min(1),
           config: exports_external4.string().min(1).optional(),
           sort
         }).optional();
     }
-    const schema = refineAtMostOneKey(exports_external4.strictObject(fields));
+    const schema = refineAtMostOneKey(exports_external4.strictObject(fields2));
     let schemaId = `${model}OrderBy`;
     if (withRelation)
       schemaId += "WithRelation";
@@ -108142,19 +108596,19 @@ var import_cuid, import_json_stable_stringify, import_toposort, ORMErrorReason, 
     const fieldType = fieldDef.type;
     const array5 = !!fieldDef.array;
     const canCreateModel = this.canCreateModel(fieldType);
-    const fields = { connect: this.makeConnectDataSchema(fieldType, array5, options2).optional() };
+    const fields2 = { connect: this.makeConnectDataSchema(fieldType, array5, options2).optional() };
     if (canCreateModel) {
-      fields["create"] = this.makeCreateDataSchema(fieldDef.type, !!fieldDef.array, withoutFields, false, options2).optional();
-      fields["connectOrCreate"] = this.makeConnectOrCreateDataSchema(fieldType, array5, withoutFields, options2).optional();
+      fields2["create"] = this.makeCreateDataSchema(fieldDef.type, !!fieldDef.array, withoutFields, false, options2).optional();
+      fields2["connectOrCreate"] = this.makeConnectOrCreateDataSchema(fieldType, array5, withoutFields, options2).optional();
     }
     if (array5 && canCreateModel)
-      fields["createMany"] = this.makeCreateManyPayloadSchema(fieldType, withoutFields, options2).optional();
+      fields2["createMany"] = this.makeCreateManyPayloadSchema(fieldType, withoutFields, options2).optional();
     if (mode === "update") {
       if (fieldDef.optional || fieldDef.array) {
-        fields["disconnect"] = this.makeDisconnectDataSchema(fieldType, array5, options2).optional();
-        fields["delete"] = this.makeDeleteRelationDataSchema(fieldType, array5, true, options2).optional();
+        fields2["disconnect"] = this.makeDisconnectDataSchema(fieldType, array5, options2).optional();
+        fields2["delete"] = this.makeDeleteRelationDataSchema(fieldType, array5, true, options2).optional();
       }
-      fields["update"] = array5 ? this.orArray(exports_external4.strictObject({
+      fields2["update"] = array5 ? this.orArray(exports_external4.strictObject({
         where: this.makeWhereSchema(fieldType, true, false, false, options2),
         data: this.makeUpdateDataSchema(fieldType, withoutFields, false, options2)
       }), true).optional() : exports_external4.union([exports_external4.strictObject({
@@ -108165,22 +108619,22 @@ var import_cuid, import_json_stable_stringify, import_toposort, ORMErrorReason, 
         let upsertWhere = this.makeWhereSchema(fieldType, true, false, false, options2);
         if (!fieldDef.array)
           upsertWhere = upsertWhere.optional();
-        fields["upsert"] = this.orArray(exports_external4.strictObject({
+        fields2["upsert"] = this.orArray(exports_external4.strictObject({
           where: upsertWhere,
           create: this.makeCreateDataSchema(fieldType, false, withoutFields, false, options2),
           update: this.makeUpdateDataSchema(fieldType, withoutFields, false, options2)
         }), true).optional();
       }
       if (array5) {
-        fields["set"] = this.makeSetDataSchema(fieldType, true, options2).optional();
-        fields["updateMany"] = this.orArray(exports_external4.strictObject({
+        fields2["set"] = this.makeSetDataSchema(fieldType, true, options2).optional();
+        fields2["updateMany"] = this.orArray(exports_external4.strictObject({
           where: this.makeWhereSchema(fieldType, false, true, false, options2),
           data: this.makeUpdateDataSchema(fieldType, withoutFields, false, options2)
         }), true).optional();
-        fields["deleteMany"] = this.makeDeleteRelationDataSchema(fieldType, true, false, options2).optional();
+        fields2["deleteMany"] = this.makeDeleteRelationDataSchema(fieldType, true, false, options2).optional();
       }
     }
-    return exports_external4.strictObject(fields);
+    return exports_external4.strictObject(fields2);
   }
   makeSetDataSchema(model, canBeArray, options2) {
     return this.orArray(this.makeWhereSchema(model, true, false, false, options2), canBeArray);
@@ -109252,9 +109706,9 @@ var import_cuid, import_json_stable_stringify, import_toposort, ORMErrorReason, 
     };
   }
   fillGeneratedAndDefaultValues(modelDef, data) {
-    const fields = modelDef.fields;
+    const fields2 = modelDef.fields;
     const values = clone4(data);
-    for (const [field2, fieldDef] of Object.entries(fields)) {
+    for (const [field2, fieldDef] of Object.entries(fields2)) {
       if (fieldDef.originModel)
         continue;
       if (!(field2 in data)) {
@@ -110024,13 +110478,13 @@ var import_cuid, import_json_stable_stringify, import_toposort, ORMErrorReason, 
   }
   makeChildFilter(model, fieldDef, parentRows) {
     const opposite = fieldDef.relation.opposite;
-    const { fields, references } = this.requireField(fieldDef.type, opposite).relation ?? {};
+    const { fields: fields2, references } = this.requireField(fieldDef.type, opposite).relation ?? {};
     const idFields = this.requireModel(model).idFields;
-    if (!fields || !references || !references.every((f3) => idFields.includes(f3)))
+    if (!fields2 || !references || !references.every((f3) => idFields.includes(f3)))
       return { [opposite]: this.makeIdsFilter(model, parentRows) };
-    if (fields.length === 1)
-      return { [fields[0]]: { in: parentRows.map((row) => row[references[0]]) } };
-    return { OR: parentRows.map((row) => Object.fromEntries(fields.map((f3, i2) => [f3, row[references[i2]]]))) };
+    if (fields2.length === 1)
+      return { [fields2[0]]: { in: parentRows.map((row) => row[references[0]]) } };
+    return { OR: parentRows.map((row) => Object.fromEntries(fields2.map((f3, i2) => [f3, row[references[i2]]]))) };
   }
   makeIdsFilter(model, rows) {
     const idFields = this.requireModel(model).idFields;
@@ -110694,12 +111148,12 @@ var import_cuid, import_json_stable_stringify, import_toposort, ORMErrorReason, 
     const firstRow = Array.isArray(data) ? data[0] : data;
     if (!firstRow || typeof firstRow !== "object")
       return data;
-    const fields = this.resolveFields(firstRow, model);
+    const fields2 = this.resolveFields(firstRow, model);
     if (Array.isArray(data)) {
-      data.forEach((row, i2) => data[i2] = this.processRow(row, fields));
+      data.forEach((row, i2) => data[i2] = this.processRow(row, fields2));
       return data;
     } else
-      return this.processRow(data, fields);
+      return this.processRow(data, fields2);
   }
   resolveFields(row, model) {
     if (!row || typeof row !== "object")
@@ -110714,7 +111168,7 @@ var import_cuid, import_json_stable_stringify, import_toposort, ORMErrorReason, 
     }
     return result;
   }
-  processRow(data, fields) {
+  processRow(data, fields2) {
     if (!data || typeof data !== "object")
       return data;
     for (const key of Object.keys(data)) {
@@ -110739,7 +111193,7 @@ var import_cuid, import_json_stable_stringify, import_toposort, ORMErrorReason, 
         delete data[key];
       }
     }
-    for (const fieldDef of fields) {
+    for (const fieldDef of fields2) {
       const value = data[fieldDef.name];
       if (value === undefined)
         continue;
@@ -111613,14 +112067,14 @@ var init_dist10 = __esm(() => {
         likeCaseSensitive: false
       };
     }
-    buildValuesTableSelect(fields, rows) {
+    buildValuesTableSelect(fields2, rows) {
       const cols = rows[0]?.length ?? 0;
-      if (fields.length !== cols)
+      if (fields2.length !== cols)
         throw createInvalidInputError("Number of fields must match number of columns in each row");
       for (const row of rows)
         if (row.length !== cols)
           throw createInvalidInputError("All rows must have the same number of columns");
-      const aliasWithColumns = `$values(${fields.map((f3) => f3.name).join(", ")})`;
+      const aliasWithColumns = `$values(${fields2.map((f3) => f3.name).join(", ")})`;
       return expressionBuilder().selectFrom(sql`(VALUES ${sql.join(rows.map((row) => sql`ROW(${sql.join(row.map((v3) => sql.val(v3)))})`), sql.raw(", "))}) as ${sql.raw(aliasWithColumns)}`).selectAll();
     }
     buildOrderByField(query, field2, sort, nulls) {
@@ -112003,16 +112457,16 @@ var init_dist10 = __esm(() => {
         likeCaseSensitive: true
       };
     }
-    buildValuesTableSelect(fields, rows) {
+    buildValuesTableSelect(fields2, rows) {
       if (rows.length === 0)
         throw createInvalidInputError("At least one row is required to build values table");
       const rowLength = rows[0].length;
-      if (fields.length !== rowLength)
+      if (fields2.length !== rowLength)
         throw createInvalidInputError("Number of fields must match number of columns in each row");
       for (const row of rows)
         if (row.length !== rowLength)
           throw createInvalidInputError("All rows must have the same number of columns");
-      return expressionBuilder().selectFrom(sql`(VALUES ${sql.join(rows.map((row) => sql`(${sql.join(row.map((v3) => sql.val(v3)))})`), sql.raw(", "))})`.as("$values")).select(fields.map((f3, i2) => {
+      return expressionBuilder().selectFrom(sql`(VALUES ${sql.join(rows.map((row) => sql`(${sql.join(row.map((v3) => sql.val(v3)))})`), sql.raw(", "))})`.as("$values")).select(fields2.map((f3, i2) => {
         const mappedType = this.getSqlType(f3.type, f3.attributes);
         const castType = f3.array ? sql`${sql.raw(mappedType)}[]` : sql.raw(mappedType);
         return this.eb.cast(sql.ref(`$values.column${i2 + 1}`), castType).as(f3.name);
@@ -112089,11 +112543,11 @@ var init_dist10 = __esm(() => {
     }
     buildFtsRelevanceOrderBy(query, fieldRefs, search2, config6, sort) {
       const q = sql.val(search2);
-      const document2 = fieldRefs.length === 1 ? sql`coalesce(${fieldRefs[0]}, '')` : sql`concat_ws(' ', ${sql.join(fieldRefs)})`;
+      const document3 = fieldRefs.length === 1 ? sql`coalesce(${fieldRefs[0]}, '')` : sql`concat_ws(' ', ${sql.join(fieldRefs)})`;
       if (config6 === undefined)
-        return query.orderBy(sql`ts_rank(to_tsvector(${document2}), to_tsquery(${q}))`, sort);
+        return query.orderBy(sql`ts_rank(to_tsvector(${document3}), to_tsquery(${q}))`, sort);
       const cfg = sql.val(config6);
-      return query.orderBy(sql`ts_rank(to_tsvector(${cfg}::regconfig, ${document2}), to_tsquery(${cfg}::regconfig, ${q}))`, sort);
+      return query.orderBy(sql`ts_rank(to_tsvector(${cfg}::regconfig, ${document3}), to_tsquery(${cfg}::regconfig, ${q}))`, sort);
     }
   };
   SqliteCrudDialect = class extends BaseCrudDialect {
@@ -112360,17 +112814,17 @@ var init_dist10 = __esm(() => {
         likeCaseSensitive: false
       };
     }
-    buildValuesTableSelect(fields, rows) {
+    buildValuesTableSelect(fields2, rows) {
       if (rows.length === 0)
         throw createInvalidInputError("At least one row is required to build values table");
       const rowLength = rows[0].length;
-      if (fields.length !== rowLength)
+      if (fields2.length !== rowLength)
         throw createInvalidInputError("Number of fields must match number of columns in each row");
       for (const row of rows)
         if (row.length !== rowLength)
           throw createInvalidInputError("All rows must have the same number of columns");
       const eb = expressionBuilder();
-      return eb.selectFrom(sql`(VALUES ${sql.join(rows.map((row) => sql`(${sql.join(row.map((v3) => sql.val(v3)))})`), sql.raw(", "))})`.as("$values")).select(fields.map((f3, i2) => eb.ref(`$values.column${i2 + 1}`).as(f3.name)));
+      return eb.selectFrom(sql`(VALUES ${sql.join(rows.map((row) => sql`(${sql.join(row.map((v3) => sql.val(v3)))})`), sql.raw(", "))})`.as("$values")).select(fields2.map((f3, i2) => eb.ref(`$values.column${i2 + 1}`).as(f3.name)));
     }
     buildOrderByField(query, field2, sort, nulls) {
       return query.orderBy(field2, (ob) => {
@@ -115992,22 +116446,22 @@ var init_dist11 = __esm(() => {
       const policies = this.getModelPolicies(model, "post-update");
       if (policies.length === 0)
         return;
-      const fields = /* @__PURE__ */ new Set;
+      const fields2 = /* @__PURE__ */ new Set;
       const fieldCollector = new class extends schema_utils_exports.ExpressionVisitor {
         visitMember(e2) {
           if (isBeforeInvocation(e2.receiver)) {
             invariant(e2.members.length === 1, "before() can only be followed by a scalar field access");
-            fields.add(e2.members[0]);
+            fields2.add(e2.members[0]);
           }
           super.visitMember(e2);
         }
       };
       for (const policy of policies)
         fieldCollector.visit(policy.condition);
-      if (fields.size === 0)
+      if (fields2.size === 0)
         return;
-      query_utils_exports.requireIdFields(this.client.$schema, model).forEach((f3) => fields.add(f3));
-      return Array.from(fields).sort();
+      query_utils_exports.requireIdFields(this.client.$schema, model).forEach((f3) => fields2.add(f3));
+      return Array.from(fields2).sort();
     }
     hasPostUpdatePolicies(model) {
       return this.getModelPolicies(model, "post-update").length > 0;
@@ -116092,24 +116546,24 @@ var init_dist11 = __esm(() => {
       return new ColumnCollector().collect(node2.returning).every((c2) => idFields.includes(c2));
     }
     async enforcePreCreatePolicy(node2, mutationModel, isManyToManyJoinTable, proceed) {
-      const fields = node2.columns?.map((c2) => c2.column.name) ?? [];
-      const valueRows = node2.values ? this.unwrapCreateValueRows(node2.values, mutationModel, fields, isManyToManyJoinTable) : [[]];
+      const fields2 = node2.columns?.map((c2) => c2.column.name) ?? [];
+      const valueRows = node2.values ? this.unwrapCreateValueRows(node2.values, mutationModel, fields2, isManyToManyJoinTable) : [[]];
       if (!isManyToManyJoinTable) {
         if (isTrueNode(this.buildPolicyFilter(mutationModel, undefined, "create")))
           return;
       }
       for (const values of valueRows)
         if (isManyToManyJoinTable)
-          await this.enforcePreCreatePolicyForManyToManyJoinTable(mutationModel, fields, values.map((v3) => v3.node), proceed);
+          await this.enforcePreCreatePolicyForManyToManyJoinTable(mutationModel, fields2, values.map((v3) => v3.node), proceed);
         else
-          await this.enforcePreCreatePolicyForOne(mutationModel, fields, values.map((v3) => v3.node), proceed);
+          await this.enforcePreCreatePolicyForOne(mutationModel, fields2, values.map((v3) => v3.node), proceed);
     }
-    async enforcePreCreatePolicyForManyToManyJoinTable(tableName, fields, values, proceed) {
+    async enforcePreCreatePolicyForManyToManyJoinTable(tableName, fields2, values, proceed) {
       const m2m = this.resolveManyToManyJoinTable(tableName);
       invariant(m2m);
-      invariant(fields.includes("A") && fields.includes("B"), "many-to-many join table must have A and B fk fields");
-      const aNode = values[fields.indexOf("A")];
-      const bNode = values[fields.indexOf("B")];
+      invariant(fields2.includes("A") && fields2.includes("B"), "many-to-many join table must have A and B fk fields");
+      const aNode = values[fields2.indexOf("A")];
+      const bNode = values[fields2.indexOf("B")];
       invariant(ValueNode.is(aNode) && ValueNode.is(bNode), "A and B values must be ValueNode");
       const aValue = aNode.value;
       const bValue = bNode.value;
@@ -116129,11 +116583,11 @@ var init_dist11 = __esm(() => {
       if (!result.rows[0]?.$conditionB)
         throw createRejectedByPolicyError2(m2m.secondModel, RejectedByPolicyReason.NO_ACCESS, `many-to-many relation participant model "${m2m.secondModel}" not updatable`);
     }
-    async enforcePreCreatePolicyForOne(model, fields, values, proceed) {
+    async enforcePreCreatePolicyForOne(model, fields2, values, proceed) {
       const allFields = query_utils_exports.getModelFields(this.client.$schema, model, { inherited: true });
       const allValues = [];
       for (const def of allFields) {
-        const index2 = fields.indexOf(def.name);
+        const index2 = fields2.indexOf(def.name);
         if (index2 >= 0)
           allValues.push(new ExpressionWrapper(values[index2]));
         else
@@ -116148,16 +116602,16 @@ var init_dist11 = __esm(() => {
       })).rows[0]?.$condition)
         throw createRejectedByPolicyError2(model, RejectedByPolicyReason.NO_ACCESS);
     }
-    unwrapCreateValueRows(node2, model, fields, isManyToManyJoinTable) {
+    unwrapCreateValueRows(node2, model, fields2, isManyToManyJoinTable) {
       if (ValuesNode.is(node2))
-        return node2.values.map((v3) => this.unwrapCreateValueRow(v3.values, model, fields, isManyToManyJoinTable, ValueListNode.is(v3)));
+        return node2.values.map((v3) => this.unwrapCreateValueRow(v3.values, model, fields2, isManyToManyJoinTable, ValueListNode.is(v3)));
       else if (PrimitiveValueListNode.is(node2))
-        return [this.unwrapCreateValueRow(node2.values, model, fields, isManyToManyJoinTable, false)];
+        return [this.unwrapCreateValueRow(node2.values, model, fields2, isManyToManyJoinTable, false)];
       else
         invariant(false, `Unexpected node kind: ${node2.kind} for unwrapping create values`);
     }
-    unwrapCreateValueRow(data, model, fields, isImplicitManyToManyJoinTable, itemsAreNodes) {
-      invariant(data.length === fields.length, "data length must match fields length");
+    unwrapCreateValueRow(data, model, fields2, isImplicitManyToManyJoinTable, itemsAreNodes) {
+      invariant(data.length === fields2.length, "data length must match fields length");
       const result = [];
       for (let i2 = 0;i2 < data.length; i2++) {
         const item = data[i2];
@@ -116170,7 +116624,7 @@ var init_dist11 = __esm(() => {
             });
             continue;
           }
-          const fieldDef = query_utils_exports.requireField(this.client.$schema, model, fields[i2]);
+          const fieldDef = query_utils_exports.requireField(this.client.$schema, model, fields2[i2]);
           invariant(ValueNode.is(itemNode), `expecting a ValueNode, got ${itemNode.kind}`);
           result.push({
             node: ValueNode.create(this.dialect.transformInput(itemNode.value, fieldDef.type, !!fieldDef.array)),
@@ -116179,11 +116633,11 @@ var init_dist11 = __esm(() => {
         } else {
           let value = item;
           if (!isImplicitManyToManyJoinTable) {
-            const fieldDef = query_utils_exports.requireField(this.client.$schema, model, fields[i2]);
+            const fieldDef = query_utils_exports.requireField(this.client.$schema, model, fields2[i2]);
             value = this.dialect.transformInput(item, fieldDef.type, !!fieldDef.array);
           }
           if (Array.isArray(value)) {
-            const fieldDef = query_utils_exports.requireField(this.client.$schema, model, fields[i2]);
+            const fieldDef = query_utils_exports.requireField(this.client.$schema, model, fields2[i2]);
             result.push({
               node: this.dialect.buildArrayValue(value, fieldDef.type).toOperationNode(),
               raw: value
@@ -120662,18 +121116,18 @@ var require_cache = __commonJS((exports) => {
       }
     }
     get(data, options2) {
-      const document2 = this.storage.find(([storedData, storedOptions]) => this.resolver(storedData, data) && Object.is(storedOptions, options2));
-      if (document2) {
-        return document2[2];
+      const document3 = this.storage.find(([storedData, storedOptions]) => this.resolver(storedData, data) && Object.is(storedOptions, options2));
+      if (document3) {
+        return document3[2];
       }
       return false;
     }
-    set(data, document2, options2) {
+    set(data, document3, options2) {
       if (this.storage.length > this.limit) {
         this.storage.shift();
       }
-      this.storage.push([data, options2, document2]);
-      return document2;
+      this.storage.push([data, options2, document3]);
+      return document3;
     }
   }
   exports.default = Cache;
@@ -120835,9 +121289,9 @@ var require_error_serializer = __commonJS((exports) => {
       const linkers = o2.linkers;
       const metaizers = o2.metaizers;
       const version6 = o2.version;
-      const document2 = { errors: [] };
+      const document3 = { errors: [] };
       const normalizedErrors = Array.isArray(errors12) ? errors12 : [errors12];
-      document2.errors = normalizedErrors.map((e2) => {
+      document3.errors = normalizedErrors.map((e2) => {
         if (e2 instanceof error_model_1.default) {
           return e2;
         }
@@ -120875,32 +121329,32 @@ var require_error_serializer = __commonJS((exports) => {
         return new error_model_1.default(eo);
       });
       if (version6) {
-        document2.jsonapi = { version: version6 };
+        document3.jsonapi = { version: version6 };
       }
       if (metaizers.jsonapi) {
-        document2.jsonapi = {
-          ...document2.jsonapi,
+        document3.jsonapi = {
+          ...document3.jsonapi,
           meta: metaizers.jsonapi.metaize()
         };
       }
       if (metaizers.document) {
-        document2.meta = metaizers.document.metaize(document2.errors);
+        document3.meta = metaizers.document.metaize(document3.errors);
       }
       if (metaizers.error) {
-        for (const error212 of document2.errors) {
+        for (const error212 of document3.errors) {
           error212.meta = metaizers.error.metaize(error212);
         }
       }
       if (Object.keys(linkers).length > 0) {
         for (const [key, linker] of Object.entries(linkers)) {
           if (linker) {
-            for (const error212 of document2.errors) {
+            for (const error212 of document3.errors) {
               error212.links = { ...error212.links, [key]: linker.link(error212) };
             }
           }
         }
       }
-      return document2;
+      return document3;
     }
   }
   exports.default = ErrorSerializer;
@@ -121236,9 +121690,9 @@ var require_serializer_utils = __commonJS((exports) => {
     let currentDepth = 0;
     while (currentDepth < maxDepth) {
       const newRelatorDataCache = new Map;
-      const includeFields = include.map((i2) => i2.split(".")).flatMap((fields) => {
-        const field2 = fields[currentDepth];
-        return field2 ? [{ field: field2, hasMore: fields.length > currentDepth + 1 }] : [];
+      const includeFields = include.map((i2) => i2.split(".")).flatMap((fields2) => {
+        const field2 = fields2[currentDepth];
+        return field2 ? [{ field: field2, hasMore: fields2.length > currentDepth + 1 }] : [];
       }).reduce((acc, i2) => {
         const match2 = acc.find((j2) => j2.field === i2.field);
         if (match2) {
@@ -121446,13 +121900,13 @@ var require_serializer = __commonJS((exports) => {
           return storedDocument;
         }
       }
-      const document2 = {};
+      const document3 = {};
       if (o2.version) {
-        document2.jsonapi = { ...document2.jsonapi, version: o2.version };
+        document3.jsonapi = { ...document3.jsonapi, version: o2.version };
       }
       if (o2.metaizers.jsonapi) {
-        document2.jsonapi = {
-          ...document2.jsonapi,
+        document3.jsonapi = {
+          ...document3.jsonapi,
           meta: o2.metaizers.jsonapi.metaize()
         };
       }
@@ -121477,11 +121931,11 @@ var require_serializer = __commonJS((exports) => {
         const relatedData = await relator.getRelatedData(data);
         const links = relator.getRelatedLinks(data, relatedData);
         if (links) {
-          document2.links = links;
+          document3.links = links;
         }
         const meta9 = relator.getRelatedMeta(data, relatedData);
         if (meta9) {
-          document2.meta = meta9;
+          document3.meta = meta9;
         }
         createIdentifier = (datum) => relator.getRelatedIdentifier(datum);
         createResource = async (datum) => {
@@ -121493,18 +121947,18 @@ var require_serializer = __commonJS((exports) => {
         dto = relatedData;
       } else {
         if (o2.metaizers.document) {
-          document2.meta = o2.metaizers.document.metaize(data);
+          document3.meta = o2.metaizers.document.metaize(data);
         }
         if (o2.linkers.document) {
-          document2.links = {
-            ...document2.links,
+          document3.links = {
+            ...document3.links,
             self: o2.linkers.document.link(data)
           };
         }
         if (o2.linkers.paginator) {
           const pagination = o2.linkers.paginator.paginate(data);
           if (pagination) {
-            document2.links = { ...document2.links, ...pagination };
+            document3.links = { ...document3.links, ...pagination };
           }
         }
         createIdentifier = (datum) => this.createIdentifier(datum, o2);
@@ -121517,34 +121971,34 @@ var require_serializer = __commonJS((exports) => {
         dto = data;
       }
       if (dto === undefined) {
-        return cache2.set(data, document2, options2);
+        return cache2.set(data, document3, options2);
       }
       if (o2.nullData || dto === null) {
-        document2.data = null;
-        return cache2.set(data, document2, options2);
+        document3.data = null;
+        return cache2.set(data, document3, options2);
       }
       if (o2.onlyIdentifier) {
-        document2.data = Array.isArray(dto) ? dto.map(createIdentifier) : createIdentifier(dto);
-        return cache2.set(data, document2, options2);
+        document3.data = Array.isArray(dto) ? dto.map(createIdentifier) : createIdentifier(dto);
+        return cache2.set(data, document3, options2);
       }
       if (!Array.isArray(dto)) {
         wasSingle = true;
         dto = [dto];
       }
       if (o2.asIncluded) {
-        document2.data = dto.map(createIdentifier);
-        document2.included = await Promise.all(dto.map(createResource));
+        document3.data = dto.map(createIdentifier);
+        document3.included = await Promise.all(dto.map(createResource));
       } else {
-        document2.data = await Promise.all(dto.map(createResource));
+        document3.data = await Promise.all(dto.map(createResource));
       }
       const include = o2.include || o2.depth;
       if (relators && include) {
-        document2.included = (document2.included || []).concat(await (0, serializer_utils_1.recurseRelators)(dto, relators, include, keys, relatorDataCache));
+        document3.included = (document3.included || []).concat(await (0, serializer_utils_1.recurseRelators)(dto, relators, include, keys, relatorDataCache));
       }
       if (wasSingle) {
-        document2.data = document2.data[0];
+        document3.data = document3.data[0];
       }
-      return cache2.set(data, document2, options2);
+      return cache2.set(data, document3, options2);
     }
   }
   exports.default = Serializer;
@@ -121578,48 +122032,48 @@ var require_polymorphic_serialiser = __commonJS((exports) => {
         }, {})).map((d2) => {
           return this.serializeType(d2, options2);
         }));
-        let document2 = {
+        let document3 = {
           data: []
         };
         if (options2?.version) {
-          document2.jsonapi = { ...document2.jsonapi, version: options2.version };
+          document3.jsonapi = { ...document3.jsonapi, version: options2.version };
         }
         if (options2?.metaizers?.jsonapi) {
-          document2.jsonapi = {
-            ...document2.jsonapi,
+          document3.jsonapi = {
+            ...document3.jsonapi,
             meta: options2.metaizers.jsonapi.metaize()
           };
         }
-        document2 = documents.reduce((result, document3) => {
-          result.data = [result.data ?? [], document3.data ?? []].flat();
-          result.included = [result.included ?? [], document3.included ?? []].flat();
+        document3 = documents.reduce((result, document4) => {
+          result.data = [result.data ?? [], document4.data ?? []].flat();
+          result.included = [result.included ?? [], document4.included ?? []].flat();
           return result;
-        }, document2);
-        if (Array.isArray(document2.data)) {
-          document2.data = document2.data.toSorted((a2, b3) => {
+        }, document3);
+        if (Array.isArray(document3.data)) {
+          document3.data = document3.data.toSorted((a2, b3) => {
             const aIndex = data.findIndex((datum) => datum.id === a2.id);
             const bIndex = data.findIndex((datum) => datum.id === b3.id);
             return aIndex - bIndex;
           });
         }
         if (options2?.metaizers?.document) {
-          document2.meta = options2.metaizers.document.metaize(data);
+          document3.meta = options2.metaizers.document.metaize(data);
         }
         if (options2?.linkers) {
           if (options2.linkers.document) {
-            document2.links = {
-              ...document2.links,
+            document3.links = {
+              ...document3.links,
               self: options2.linkers.document.link(data)
             };
           }
           if (options2.linkers.paginator) {
             const pagination = options2.linkers.paginator.paginate(data);
             if (pagination) {
-              document2.links = { ...document2.links, ...pagination };
+              document3.links = { ...document3.links, ...pagination };
             }
           }
         }
-        return document2;
+        return document3;
       }
       if (data) {
         return this.serializeType(data, options2);
@@ -121719,8 +122173,8 @@ var require_is_error_document = __commonJS((exports) => {
   exports.isErrorDocument = isErrorDocument;
   var error_model_1 = __importDefault(require_error_model());
   var is_plain_object_1 = require_is_plain_object();
-  function isErrorDocument(document2) {
-    return (0, is_plain_object_1.isPlainObject)(document2) && Array.isArray(document2.errors) && (("jsonapi" in document2) || document2.errors.every((error212) => error212 instanceof error_model_1.default ? true : error_model_1.default.isLikeJapiError(error212)));
+  function isErrorDocument(document3) {
+    return (0, is_plain_object_1.isPlainObject)(document3) && Array.isArray(document3.errors) && (("jsonapi" in document3) || document3.errors.every((error212) => error212 instanceof error_model_1.default ? true : error_model_1.default.isLikeJapiError(error212)));
   }
 });
 
@@ -124621,13 +125075,13 @@ var import_ts_japi, import_url_pattern, loggerSchema, fieldSlicingSchema, modelS
         select: undefined,
         error: this.makeUnsupportedModelError(type)
       };
-    const fields = selectFieldsQuery.split(",").filter((i2) => i2).reduce((acc, curr) => ({
+    const fields2 = selectFieldsQuery.split(",").filter((i2) => i2).reduce((acc, curr) => ({
       ...acc,
       [curr]: true
     }), {});
     return { select: {
       ...this.makeIdSelect(typeInfo.idFields),
-      ...fields
+      ...fields2
     } };
   }
   addTotalCountToMeta(meta9, total) {
@@ -124872,7 +125326,7 @@ var import_ts_japi, import_url_pattern, loggerSchema, fieldSlicingSchema, modelS
   }
   buildTypeMap() {
     this.typeMap = {};
-    for (const [model, { fields }] of Object.entries(this.schema.models)) {
+    for (const [model, { fields: fields2 }] of Object.entries(this.schema.models)) {
       const idFields = this.getIdFields(model);
       if (idFields.length === 0) {
         log3(this.options.log, "warn", `Not including model ${model} in the API because it has no ID field`);
@@ -124882,9 +125336,9 @@ var import_ts_japi, import_url_pattern, loggerSchema, fieldSlicingSchema, modelS
         name: model,
         idFields,
         relationships: {},
-        fields
+        fields: fields2
       };
-      for (const [field2, fieldInfo] of Object.entries(fields)) {
+      for (const [field2, fieldInfo] of Object.entries(fields2)) {
         if (!fieldInfo.relation)
           continue;
         const fieldTypeIdFields = this.getIdFields(fieldInfo.type);
@@ -128410,24 +128864,24 @@ function createSampleWriter(schemaInput, planInput) {
     },
     insert: async (tx, model, id, data) => {
       const entry = binding(model);
-      const fields = Object.keys(data);
-      const stamped = entry.stamped.filter((column) => !fields.map(entry.column).includes(column));
-      const columns = [...["id", ...fields].map(entry.column), ...stamped];
+      const fields2 = Object.keys(data);
+      const stamped = entry.stamped.filter((column) => !fields2.map(entry.column).includes(column));
+      const columns = [...["id", ...fields2].map(entry.column), ...stamped];
       await tx.execute({
         sql: `INSERT INTO ${entry.table}(${columns.join(",")}) VALUES(${columns.map(() => "?").join(",")})`,
-        args: [id, ...fields.map((field2) => toDb(data[field2])), ...stamped.map(now2)]
+        args: [id, ...fields2.map((field2) => toDb(data[field2])), ...stamped.map(now2)]
       });
     },
     update: async (tx, model, id, data) => {
       const entry = binding(model);
-      const fields = Object.keys(data);
-      if (!fields.length)
+      const fields2 = Object.keys(data);
+      if (!fields2.length)
         return;
-      const given = fields.map(entry.column);
+      const given = fields2.map(entry.column);
       const stamped = entry.stamped.filter((column) => !given.includes(column));
       const result = await tx.execute({
         sql: `UPDATE ${entry.table} SET ${[...given, ...stamped].map((column) => `${column}=?`).join(",")} WHERE ${entry.column("id")}=?`,
-        args: [...fields.map((field2) => toDb(data[field2])), ...stamped.map(now2), id]
+        args: [...fields2.map((field2) => toDb(data[field2])), ...stamped.map(now2), id]
       });
       if (result.rowsAffected !== 1)
         throw new Error("sample row changed during update");
@@ -131392,8 +131846,8 @@ function createLocalObjectStore(options2) {
     }
     return path;
   }
-  async function signature(fields) {
-    const mac9 = await crypto.subtle.sign("HMAC", await keyPromise, encoder5.encode(fields.join(`
+  async function signature(fields2) {
+    const mac9 = await crypto.subtle.sign("HMAC", await keyPromise, encoder5.encode(fields2.join(`
 `)));
     return [...new Uint8Array(mac9)].map((b3) => b3.toString(16).padStart(2, "0")).join("");
   }
@@ -131721,11 +132175,13 @@ function createDevAi(options2) {
   }
   const modelOf2 = (requested) => {
     const model = requested ?? options2.manifest.ai?.model ?? "auto";
+    const operation = /embedding/.test(model) ? "embedding" : /transcribe|scribe|whisper/.test(model) ? "transcription" : /tts|eleven|^speech$/.test(model) ? "speech" : /rerank/.test(model) ? "rerank" : "chat";
     return {
       id: model === "auto" ? JEV_ROUTER : model,
       kind: model === "auto" ? "router" : "model",
-      providerSlug: null,
+      providerSlug: model === "auto" ? null : "kit-dev",
       inputModalities: ALL_MODALITIES,
+      operations: [operation],
       supportsJsonSchema: true
     };
   };
@@ -131803,9 +132259,77 @@ function createDevAi(options2) {
           id: `gen-emb-kit-dev-${crypto.randomUUID()}`,
           usage: { prompt_tokens: 0, total_tokens: 0, cost: 0 }
         });
+      },
+      async request(path, body) {
+        if (path === "/audio/transcriptions")
+          return mockTranscription(body);
+        if (path === "/audio/speech")
+          return mockSpeech(body);
+        return mockRerank(body);
       }
     }
   };
+}
+function mockTranscription(body) {
+  const request = body;
+  const text4 = "（kit dev の模擬の文字起こし。本番では音声の内容が文字になります）";
+  const detailed = request.response_format === "verbose_json" || request.diarize === true;
+  return Response.json({
+    text: text4,
+    ...detailed ? {
+      language: "ja",
+      duration: 1,
+      segments: [
+        { id: 0, start: 0, end: 1, text: text4, ...request.diarize ? { speaker: 0 } : {} }
+      ]
+    } : {},
+    usage: { seconds: 1, cost: 0 }
+  }, { headers: { "x-generation-id": `gen-stt-kit-dev-${crypto.randomUUID()}` } });
+}
+function mockSpeech(body) {
+  const request = body;
+  const seconds = Math.min(30, Math.max(1, Math.ceil([...request.input ?? ""].length / 8)));
+  const rate = 8000;
+  const samples = rate * seconds;
+  const wav = new Uint8Array(44 + samples * 2);
+  const view = new DataView(wav.buffer);
+  const text4 = (offset, value2) => {
+    for (const [i2, ch] of [...value2].entries())
+      view.setUint8(offset + i2, ch.charCodeAt(0));
+  };
+  text4(0, "RIFF");
+  view.setUint32(4, 36 + samples * 2, true);
+  text4(8, "WAVEfmt ");
+  view.setUint32(16, 16, true);
+  view.setUint16(20, 1, true);
+  view.setUint16(22, 1, true);
+  view.setUint32(24, rate, true);
+  view.setUint32(28, rate * 2, true);
+  view.setUint16(32, 2, true);
+  view.setUint16(34, 16, true);
+  text4(36, "data");
+  view.setUint32(40, samples * 2, true);
+  return new Response(wav, {
+    headers: {
+      "content-type": "audio/wav",
+      "x-generation-id": `gen-tts-kit-dev-${crypto.randomUUID()}`
+    }
+  });
+}
+function mockRerank(body) {
+  const request = body;
+  const query = mockEmbedding(request.query, 256);
+  const results = request.documents.map((text4, index2) => {
+    const vector = mockEmbedding(text4, 256);
+    const score = vector.reduce((sum2, x3, i2) => sum2 + x3 * (query[i2] ?? 0), 0);
+    return { index: index2, relevance_score: Math.max(0, Number(score.toFixed(6))), document: { text: text4 } };
+  }).sort((a2, b3) => b3.relevance_score - a2.relevance_score).slice(0, request.top_n ?? request.documents.length);
+  return Response.json({
+    id: `gen-rerank-kit-dev-${crypto.randomUUID()}`,
+    model: "kit-dev/mock-rerank",
+    results,
+    usage: { search_units: 0, cost: 0 }
+  });
 }
 function mockEmbedding(text4, dims) {
   const chars = [...text4];
@@ -141059,14 +141583,14 @@ ${lanes.join(`
             return Debug.assertNever(field3);
         }
       }
-      with(fields) {
+      with(fields2) {
         const {
           major = this.major,
           minor = this.minor,
           patch = this.patch,
           prerelease = this.prerelease,
           build: build2 = this.build
-        } = fields;
+        } = fields2;
         return new _Version2(major, minor, patch, prerelease, build2);
       }
       toString() {
@@ -308298,7 +308822,7 @@ __export(exports_regexes5, {
   e164: () => e1649,
   duration: () => duration9,
   domain: () => domain5,
-  datetime: () => datetime9,
+  datetime: () => datetime10,
   date: () => date17,
   cuid2: () => cuid29,
   cuid: () => cuid11,
@@ -308361,7 +308885,7 @@ function timeSource5(args) {
 function time9(args) {
   return new RegExp(`^${timeSource5(args)}$`);
 }
-function datetime9(args) {
+function datetime10(args) {
   const time10 = timeSource5({ precision: args.precision });
   const opts = ["Z"];
   if (args.local)
@@ -309254,7 +309778,7 @@ var $ZodKSUID5 = /* @__PURE__ */ $constructor5("$ZodKSUID", (inst, def) => {
   $ZodStringFormat5.init(inst, def);
 });
 var $ZodISODateTime5 = /* @__PURE__ */ $constructor5("$ZodISODateTime", (inst, def) => {
-  def.pattern ?? (def.pattern = datetime9(def));
+  def.pattern ?? (def.pattern = datetime10(def));
   $ZodStringFormat5.init(inst, def);
 });
 var $ZodISODate5 = /* @__PURE__ */ $constructor5("$ZodISODate", (inst, def) => {
@@ -319114,7 +319638,7 @@ var exports_iso5 = {};
 __export(exports_iso5, {
   time: () => time10,
   duration: () => duration10,
-  datetime: () => datetime10,
+  datetime: () => datetime11,
   date: () => date18,
   ZodISOTime: () => ZodISOTime5,
   ZodISODuration: () => ZodISODuration5,
@@ -319125,7 +319649,7 @@ var ZodISODateTime5 = /* @__PURE__ */ $constructor5("ZodISODateTime", (inst, def
   $ZodISODateTime5.init(inst, def);
   ZodStringFormat5.init(inst, def);
 });
-function datetime10(params) {
+function datetime11(params) {
   return _isoDateTime5(ZodISODateTime5, params);
 }
 var ZodISODate5 = /* @__PURE__ */ $constructor5("ZodISODate", (inst, def) => {
@@ -319448,7 +319972,7 @@ var ZodString6 = /* @__PURE__ */ $constructor5("ZodString", (inst, def) => {
   inst.cidrv4 = (params) => inst.check(_cidrv45(ZodCIDRv45, params));
   inst.cidrv6 = (params) => inst.check(_cidrv65(ZodCIDRv65, params));
   inst.e164 = (params) => inst.check(_e1645(ZodE1645, params));
-  inst.datetime = (params) => inst.check(datetime10(params));
+  inst.datetime = (params) => inst.check(datetime11(params));
   inst.date = (params) => inst.check(date18(params));
   inst.time = (params) => inst.check(time10(params));
   inst.duration = (params) => inst.check(duration10(params));
@@ -320474,10 +320998,10 @@ var stringbool5 = (...args) => _stringbool5({
   String: ZodString6
 }, ...args);
 function json6(params) {
-  const jsonSchema2 = lazy5(() => {
-    return union5([string14(params), number14(), boolean14(), _null15(), array5(jsonSchema2), record6(string14(), jsonSchema2)]);
+  const jsonSchema3 = lazy5(() => {
+    return union5([string14(params), number14(), boolean14(), _null15(), array5(jsonSchema3), record6(string14(), jsonSchema3)]);
   });
-  return jsonSchema2;
+  return jsonSchema3;
 }
 function preprocess5(fn, schema2) {
   return new ZodPreprocess5({
@@ -321249,14 +321773,14 @@ function codexApprovalToml(pluginId, server2) {
   return [
     `[${table}]`,
     'default_tools_approval_mode = "writes"',
-    ...ASK_A_PERSON_TOOLS.flatMap((tool) => [
+    ...ASK_A_PERSON_TOOLS.flatMap((tool2) => [
       "",
-      `[${table}.tools.${tool}]`,
+      `[${table}.tools.${tool2}]`,
       'approval_mode = "approve"'
     ]),
-    ...AUTO_APPROVE_TOOLS.flatMap((tool) => [
+    ...AUTO_APPROVE_TOOLS.flatMap((tool2) => [
       "",
-      `[${table}.tools.${tool}]`,
+      `[${table}.tools.${tool2}]`,
       'approval_mode = "auto"'
     ])
   ].join(`
@@ -321840,7 +322364,7 @@ function exactOrigin2(value2, local) {
     return false;
   }
 }
-function invalid() {
+function invalid3() {
   throw new DevError("KIT_LIVE must contain exact session, Gateway, Storage and screen origins");
 }
 function parseLiveConfig(raw2) {
@@ -321851,16 +322375,16 @@ function parseLiveConfig(raw2) {
     throw new DevError("KIT_LIVE must be JSON");
   }
   if (!record7(value2) || typeof value2.token !== "string" || !LIVE_TOKEN_PATTERN.test(value2.token) || typeof value2.environmentId !== "string" || !UUID4.test(value2.environmentId))
-    return invalid();
+    return invalid3();
   if (!exactOrigin2(value2.sessionOrigin, false) || !exactOrigin2(value2.gatewayUrl, false) || !Array.isArray(value2.platformOrigins) || value2.platformOrigins.length === 0 || !value2.platformOrigins.every((origin2) => exactOrigin2(origin2, true)) || !Array.isArray(value2.storageOrigins) || !value2.storageOrigins.every((origin2) => exactOrigin2(origin2, false)))
-    return invalid();
+    return invalid3();
   const origins = value2.origins;
   if (!record7(origins) || Object.keys(origins).some((key) => key !== "host" && key !== "apps" && key !== "appsRelay") || !exactOrigin2(origins.host, true) || origins.appsRelay !== undefined && !exactOrigin2(origins.appsRelay, false) || !record7(origins.apps) || !Object.keys(origins.apps).length)
-    return invalid();
+    return invalid3();
   const apps = {};
   for (const [slug, origin2] of Object.entries(origins.apps)) {
     if (slug !== "*" && !/^[a-z][a-z0-9-]*$/.test(slug) || !exactOrigin2(origin2, true))
-      return invalid();
+      return invalid3();
     apps[slug] = origin2;
   }
   return {
@@ -321935,7 +322459,7 @@ function parseConnectedSession(value2, scope) {
     throw new DevError("Invalid session synchronization endpoint");
   return { live: live2, notify: wire.notify };
 }
-async function callTool(mcp2, tool, args, timeoutMs, signal) {
+async function callTool(mcp2, tool2, args, timeoutMs, signal) {
   const deadline = new AbortController;
   const timeout = setTimeout(() => deadline.abort(new DevError("Session request timed out")), timeoutMs);
   const combined = signal ? AbortSignal.any([signal, deadline.signal]) : deadline.signal;
@@ -321943,7 +322467,7 @@ async function callTool(mcp2, tool, args, timeoutMs, signal) {
   try {
     combined.throwIfAborted();
     return await Promise.race([
-      mcp2.call(tool, args, { signal: combined }),
+      mcp2.call(tool2, args, { signal: combined }),
       new Promise((_3, reject) => {
         abort = () => reject(new DevError("Session request cancelled or timed out"));
         combined.addEventListener("abort", abort, { once: true });
@@ -321964,10 +322488,10 @@ async function connectSession(options2) {
   let lost = false;
   let heartbeat;
   let ticking = false;
-  const call = async (tool, args, signal) => {
+  const call = async (tool2, args, signal) => {
     if (closed || lost)
       throw new DevError("Session connection is closed");
-    return callTool(mcp2, tool, args, timeoutMs, signal ? AbortSignal.any([lifetime.signal, signal]) : lifetime.signal);
+    return callTool(mcp2, tool2, args, timeoutMs, signal ? AbortSignal.any([lifetime.signal, signal]) : lifetime.signal);
   };
   const ensure = async () => {
     const value2 = await call("ensure_session", {
@@ -322343,7 +322867,7 @@ function readNavigationTiming(clock, headScript, moduleStart) {
     source: modern ? "navigation" : offset ? "legacy" : "unavailable"
   };
   const values = modern ? entry2 : offset ? legacy : {};
-  const fields = {
+  const fields2 = {
     fetchStartMs: "fetchStart",
     dnsStartMs: "domainLookupStart",
     dnsEndMs: "domainLookupEnd",
@@ -322355,7 +322879,7 @@ function readNavigationTiming(clock, headScript, moduleStart) {
     responseEndMs: "responseEnd",
     domInteractiveMs: "domInteractive"
   };
-  for (const [key, field3] of Object.entries(fields)) {
+  for (const [key, field3] of Object.entries(fields2)) {
     const raw2 = values[field3];
     if (typeof raw2 !== "number" || !Number.isFinite(raw2) || raw2 <= 0)
       continue;
@@ -326886,9 +327410,9 @@ class McpToolError extends Error {
   reason;
   details;
   name = "McpToolError";
-  constructor(tool, code, reason, details, message2) {
+  constructor(tool2, code, reason, details, message2) {
     super(message2);
-    this.tool = tool;
+    this.tool = tool2;
     this.code = code;
     this.reason = reason;
     this.details = details;
@@ -326903,7 +327427,7 @@ function createMcpClient(options2) {
   const send = options2.fetch ?? globalThis.fetch;
   let id = 0;
   return {
-    async call(tool, args, callOptions) {
+    async call(tool2, args, callOptions) {
       const requestId = ++id;
       const token2 = await options2.token();
       callOptions?.signal?.throwIfAborted();
@@ -326920,20 +327444,20 @@ function createMcpClient(options2) {
           jsonrpc: "2.0",
           id: requestId,
           method: "tools/call",
-          params: { name: tool, arguments: args }
+          params: { name: tool2, arguments: args }
         })
       });
       if (response.status === 401 || response.status === 403) {
-        throw new McpAuthError(`${tool}: the login was not accepted (HTTP ${response.status})`);
+        throw new McpAuthError(`${tool2}: the login was not accepted (HTTP ${response.status})`);
       }
       if (!response.ok)
-        throw new Error(`${tool}: HTTP ${response.status}`);
-      const message2 = await readMessage(response, tool);
+        throw new Error(`${tool2}: HTTP ${response.status}`);
+      const message2 = await readMessage(response, tool2);
       if (message2.error)
-        throw new Error(`${tool}: ${message2.error.message ?? "JSON-RPC error"}`);
+        throw new Error(`${tool2}: ${message2.error.message ?? "JSON-RPC error"}`);
       const result = message2.result ?? {};
       if (result.isError)
-        throw toolError(tool, textOf2(result));
+        throw toolError(tool2, textOf2(result));
       if (result.structuredContent !== undefined)
         return result.structuredContent;
       const text4 = textOf2(result);
@@ -326941,24 +327465,24 @@ function createMcpClient(options2) {
         return JSON.parse(text4);
       } catch (error262) {
         if (error262 instanceof SyntaxError)
-          throw new Error(`${tool}: the result is not JSON`);
+          throw new Error(`${tool2}: the result is not JSON`);
         throw error262;
       }
     }
   };
 }
-async function readMessage(response, tool) {
+async function readMessage(response, tool2) {
   const text4 = await response.text();
   const type = response.headers.get("content-type") ?? "";
   const payload = type.includes("text/event-stream") ? text4.split(`
 `).filter((line) => line.startsWith("data:")).map((line) => line.slice(5).trim()).at(-1) : text4;
   if (!payload)
-    throw new Error(`${tool}: the response is empty`);
+    throw new Error(`${tool2}: the response is empty`);
   try {
     return JSON.parse(payload);
   } catch (error262) {
     if (error262 instanceof SyntaxError)
-      throw new Error(`${tool}: the response is not JSON-RPC`);
+      throw new Error(`${tool2}: the response is not JSON-RPC`);
     throw error262;
   }
 }
@@ -326966,20 +327490,20 @@ function textOf2(result) {
   const content = Array.isArray(result.content) ? result.content : [];
   return content.map((part) => typeof part === "object" && part !== null && ("text" in part) ? String(part.text) : "").join("");
 }
-function toolError(tool, text4) {
+function toolError(tool2, text4) {
   const body2 = text4.replace(/^Error executing tool [^:]+:\s*/, "");
   try {
     const parsed = JSON.parse(body2);
     if (typeof parsed.error === "string") {
       const reason = typeof parsed.reason === "string" ? parsed.reason : undefined;
-      return new McpToolError(tool, parsed.error, reason, parsed, `${tool}: ${parsed.error}${reason ? ` (${reason})` : ""}`);
+      return new McpToolError(tool2, parsed.error, reason, parsed, `${tool2}: ${parsed.error}${reason ? ` (${reason})` : ""}`);
     }
   } catch (error262) {
     if (!(error262 instanceof SyntaxError))
       throw error262;
   }
   const code = /^([A-Z][A-Z0-9_]+)\b/.exec(body2)?.[1] ?? "TOOL_ERROR";
-  return new McpToolError(tool, code, undefined, {}, `${tool}: ${body2}`);
+  return new McpToolError(tool2, code, undefined, {}, `${tool2}: ${body2}`);
 }
 
 // frontend/packages/miniapp-kit/src/mcp-proxy.ts
@@ -327164,13 +327688,13 @@ async function newProject(options2) {
     const target2 = targetPath(source);
     let text4 = fill(await readFile35(join46(template, source), "utf8"), { name: name3, title });
     if (target2 === PROJECT_PATHS.manifest) {
-      const document2 = $parseDocument(text4);
-      const original = document2.toJS().apps;
-      document2.set("apps", Object.fromEntries(declarations.map(({ slug, kind }) => [
+      const document3 = $parseDocument(text4);
+      const original = document3.toJS().apps;
+      document3.set("apps", Object.fromEntries(declarations.map(({ slug, kind }) => [
         slug,
         kind === "web" ? original[slug === "admin" ? "admin" : "web"] : kind === "python" ? pythonManifestEntry(slug) : kind === "mcp" ? { kind, capabilities: { models: {} } } : { kind }
       ])));
-      text4 = document2.toString();
+      text4 = document3.toString();
     }
     await put(target2, text4);
   }
@@ -327588,9 +328112,9 @@ var SAVE_AS = {
 class ToolMissingError extends Error {
   tool;
   name = "ToolMissingError";
-  constructor(tool) {
-    super(`${tool} is not installed in this sandbox`);
-    this.tool = tool;
+  constructor(tool2) {
+    super(`${tool2} is not installed in this sandbox`);
+    this.tool = tool2;
   }
 }
 

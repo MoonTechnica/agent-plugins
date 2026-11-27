@@ -34,6 +34,10 @@ export declare const CONTRACTS: {
                 }>;
                 json: z.ZodOptional<z.ZodUnknown>;
                 credits: z.ZodNumber;
+                sources: z.ZodOptional<z.ZodArray<z.ZodObject<{
+                    url: z.ZodString;
+                    title: z.ZodOptional<z.ZodString>;
+                }, z.core.$strip>>>;
                 responseId: z.ZodString;
                 model: z.ZodString;
             }, z.core.$strip>;
@@ -74,6 +78,10 @@ export declare const CONTRACTS: {
             }>;
             json: z.ZodOptional<z.ZodUnknown>;
             credits: z.ZodNumber;
+            sources: z.ZodOptional<z.ZodArray<z.ZodObject<{
+                url: z.ZodString;
+                title: z.ZodOptional<z.ZodString>;
+            }, z.core.$strip>>>;
             responseId: z.ZodString;
             model: z.ZodString;
         }, z.core.$strip>>;

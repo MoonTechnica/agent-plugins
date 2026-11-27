@@ -1,7 +1,22 @@
-import { AI_EMBEDDING_DIMENSIONS_MAX, AI_EMBEDDING_INPUTS_MAX, aiEmbeddingsResponse, aiResetResponse, aiTurnEvent, aiTurnRequestSchema, aiTurnResult, } from '@workspace/project-protocol';
+import { AI_EMBEDDING_DIMENSIONS_MAX, AI_EMBEDDING_INPUTS_MAX, AI_RERANK_DOCUMENT_CHARS_MAX, AI_RERANK_DOCUMENTS_MAX, AI_SPEECH_INPUT_CHARS_MAX, AI_SPEECH_INSTRUCTIONS_CHARS_MAX, AI_TRANSCRIPTION_KEYTERMS_MAX, AI_TRANSCRIPTION_MAX_BYTES, aiEmbeddingsResponse, aiRerankResponse, aiResetResponse, aiTranscriptionResponse, aiTurnEvent, aiTurnRequestSchema, aiTurnResult, } from '@workspace/project-protocol';
 import { SdkError } from "../errors.js";
 import { gatewayBase, readResponse } from "../transport.js";
 export function createAi(transport, gateway) {
+    /** Gateway へ 1 回送る。`signal` で待つのをやめたときは、transport の失敗ではなく止めた理由を投げる */
+    async function post(path, init, signal) {
+        try {
+            return await transport.fetch(`${gatewayBase(gateway)}${path}`, {
+                method: 'POST',
+                ...init,
+                ...(signal ? { signal } : {}),
+            });
+        }
+        catch (error) {
+            if (signal?.aborted)
+                throw signal.reason;
+            throw error;
+        }
+    }
     return {
         async chat({ onToken, signal, ...input }) {
             const parsed = aiTurnRequestSchema.safeParse({ ...input, stream: onToken !== undefined });
@@ -47,20 +62,10 @@ export function createAi(transport, gateway) {
                         options.dimensions > AI_EMBEDDING_DIMENSIONS_MAX))) {
                 throw new SdkError('VALIDATION_FAILED', 'invalid ai.embed input');
             }
-            let response;
-            try {
-                response = await transport.fetch(`${gatewayBase(gateway)}/v1/ai/openai/embeddings`, {
-                    method: 'POST',
-                    headers: { 'content-type': 'application/json' },
-                    body: JSON.stringify({ input: texts, encoding_format: 'float', ...options }),
-                    ...(signal ? { signal } : {}),
-                });
-            }
-            catch (error) {
-                if (signal?.aborted)
-                    throw signal.reason;
-                throw error;
-            }
+            const response = await post('/v1/ai/openai/embeddings', {
+                headers: { 'content-type': 'application/json' },
+                body: JSON.stringify({ input: texts, encoding_format: 'float', ...options }),
+            }, signal);
             const parsed = aiEmbeddingsResponse.safeParse(await readResponse(response));
             // 返ったベクトルの数が入力と違えば、取り違えて保存しないよう失敗にする
             if (!parsed.success || parsed.data.data.length !== texts.length) {
@@ -71,6 +76,112 @@ export function createAi(transport, gateway) {
             return {
                 embeddings: [...parsed.data.data].sort((a, b) => a.index - b.index).map((d) => d.embedding),
                 model: parsed.data.model,
+            };
+        },
+        async transcribe({ audio, signal, keyterms, diarize, ...options }) {
+            const isFile = !(audio instanceof Blob);
+            if ((!isFile && (audio.size === 0 || audio.size > AI_TRANSCRIPTION_MAX_BYTES)) ||
+                (isFile && !/^[0-9a-f-]{36}$/i.test(audio.fileId)) ||
+                (keyterms !== undefined && keyterms.length > AI_TRANSCRIPTION_KEYTERMS_MAX)) {
+                throw new SdkError('VALIDATION_FAILED', 'invalid ai.transcribe input');
+            }
+            const fields = { ...options, ...(diarize === undefined ? {} : { diarize }) };
+            let init;
+            if (isFile) {
+                // Storage の音声は、Gateway が read ポリシーで確かめて読む（Blob を載せ直さない）
+                init = {
+                    headers: { 'content-type': 'application/json' },
+                    body: JSON.stringify({
+                        ...fields,
+                        file: `fdpocket-file:${audio.fileId}`,
+                        ...(keyterms ? { keyterms } : {}),
+                        ...(diarize ? { response_format: 'verbose_json' } : {}),
+                    }),
+                };
+            }
+            else {
+                // OpenAI の `audio/transcriptions` と同じ multipart（content-type は境界つきで fetch が付ける）
+                const form = new FormData();
+                form.set('file', audio, audio instanceof File ? audio.name : 'audio');
+                for (const [key, value] of Object.entries(fields)) {
+                    if (value !== undefined)
+                        form.set(key, String(value));
+                }
+                for (const term of keyterms ?? [])
+                    form.append('keyterms[]', term);
+                if (diarize)
+                    form.set('response_format', 'verbose_json');
+                init = { body: form };
+            }
+            const parsed = aiTranscriptionResponse.safeParse(await readResponse(await post('/v1/ai/openai/audio/transcriptions', init, signal)));
+            if (!parsed.success) {
+                throw new SdkError('GATEWAY_UNAVAILABLE', 'unexpected ai transcription response', {
+                    retryable: true,
+                });
+            }
+            const { text, language, duration, segments } = parsed.data;
+            return {
+                text,
+                ...(language === undefined ? {} : { language }),
+                ...(duration === undefined ? {} : { duration }),
+                ...(segments === undefined ? {} : { segments }),
+            };
+        },
+        async speak({ text, voice, model, format, speed, instructions, signal }) {
+            if (text === '' ||
+                text.length > AI_SPEECH_INPUT_CHARS_MAX ||
+                voice === '' ||
+                (instructions !== undefined &&
+                    (instructions === '' || instructions.length > AI_SPEECH_INSTRUCTIONS_CHARS_MAX))) {
+                throw new SdkError('VALIDATION_FAILED', 'invalid ai.speak input');
+            }
+            const response = await post('/v1/ai/openai/audio/speech', {
+                headers: { 'content-type': 'application/json' },
+                body: JSON.stringify({
+                    input: text,
+                    voice,
+                    ...(model === undefined ? {} : { model }),
+                    ...(format === undefined ? {} : { response_format: format }),
+                    ...(speed === undefined ? {} : { speed }),
+                    ...(instructions === undefined ? {} : { instructions }),
+                }),
+            }, signal);
+            const contentType = response.headers.get('content-type') ?? '';
+            // 失敗は transport が SdkError にする。成功なのに音声でないものは、取り違えて鳴らさない
+            if (!contentType.startsWith('audio/')) {
+                throw new SdkError('GATEWAY_UNAVAILABLE', 'unexpected ai speech response', {
+                    retryable: true,
+                });
+            }
+            return { audio: await response.blob(), contentType };
+        },
+        async rerank({ query, documents, topN, model, signal }) {
+            if (query === '' ||
+                documents.length < 1 ||
+                documents.length > AI_RERANK_DOCUMENTS_MAX ||
+                documents.some((d) => d === '' || d.length > AI_RERANK_DOCUMENT_CHARS_MAX) ||
+                (topN !== undefined && (!Number.isInteger(topN) || topN < 1))) {
+                throw new SdkError('VALIDATION_FAILED', 'invalid ai.rerank input');
+            }
+            const parsed = aiRerankResponse.safeParse(await readResponse(await post('/v1/ai/openai/rerank', {
+                headers: { 'content-type': 'application/json' },
+                body: JSON.stringify({
+                    query,
+                    documents,
+                    ...(topN === undefined ? {} : { top_n: topN }),
+                    ...(model === undefined ? {} : { model }),
+                }),
+            }, signal)));
+            if (!parsed.success) {
+                throw new SdkError('GATEWAY_UNAVAILABLE', 'unexpected ai rerank response', {
+                    retryable: true,
+                });
+            }
+            return {
+                results: parsed.data.results
+                    .map((r) => ({ index: r.index, score: r.relevance_score }))
+                    .sort((a, b) => b.score - a.score),
+                model: parsed.data.model ?? model ?? '',
             };
         },
         openai() {

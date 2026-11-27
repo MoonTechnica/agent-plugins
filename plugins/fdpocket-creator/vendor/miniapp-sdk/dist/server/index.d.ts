@@ -39,7 +39,7 @@ export interface ServerClient<S extends SchemaDef = SchemaDef> extends ServerDat
                 signal?: AbortSignal;
             }): Promise<Response>;
         };
-        readonly ai: Pick<Ai, 'openai' | 'embed'>;
+        readonly ai: Pick<Ai, 'openai' | 'embed' | 'transcribe' | 'speak' | 'rerank'>;
         /** python の App のタスクを依頼する（払うのはこのジョブの払う人。python-backend.md §5） */
         readonly python: Python;
     };

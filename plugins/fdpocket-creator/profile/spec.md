@@ -592,14 +592,17 @@ notifications:
 
 | API | 書き方 |
 |---|---|
-| `client.ai.chat(input)` | 1 ターン送って結果を待つ。`input`（`AiChatInput`）: `conversation`（会話の名前。`[A-Za-z0-9_.:-]` で 64 字まで。同じ名前の履歴を Platform が持つ）・`message`・`attachments`（`[{ fileId }]`。Storage のファイル、4 個まで）・`instructions`（宣言した指示文の名前）・`schema`（宣言した Schema の名前。JSON で返させる）・`model`・`onToken`（渡すと届いた分から順に呼ぶ）・`signal`（待つのをやめる） |
+| `client.ai.chat(input)` | 1 ターン送って結果を待つ。`input`（`AiChatInput`）: `pdfEngine`（添付の PDF の読み取り方式。`text` 無料の抽出 / `ocr` スキャン向け・1 ページ 0.2 クレジット / `native` モデルが直接読む。省略は Platform が選ぶ。`$fdpocket-app-ai` §3g）・`webSearch`（`true` で、モデルが必要と判断したときに Web を検索する。1 回約 0.7 クレジット・3 回 / 15 件まで。結果の `sources` に出典の URL）・`conversation`（会話の名前。`[A-Za-z0-9_.:-]` で 64 字まで。同じ名前の履歴を Platform が持つ）・`message`・`attachments`（`[{ fileId }]`。Storage のファイル、4 個まで）・`instructions`（宣言した指示文の名前）・`schema`（宣言した Schema の名前。JSON で返させる）・`model`・`onToken`（渡すと届いた分から順に呼ぶ）・`signal`（待つのをやめる） |
 | `client.ai.reset(conversation)` | 会話を切る（次のターンから履歴を送らない） |
 | `client.ai.embed(input, options?)` | 文を埋め込み（意味を表す数のベクトル）にする。`input` は文字列か文字列の配列（1 回 64 件まで・1 件 32,000 字まで）。入力と同じ順の `{ embeddings: number[][], model }` を返す。`options`: `model`（省略で既定の埋め込みモデル `openai/text-embedding-3-small`。別名 `embedding`）・`dimensions`（次元。ベクトル検索の `dims` に合わせる。既定は 1536）・`signal`。費用は使った本人のクレジット。ベクトル検索の使い方は `$fdpocket-app-search` §6 |
+| `client.ai.transcribe(input)` | 音声を文字にする（文字起こし）。`input.audio` は録音した `Blob` / `File`（ブラウザの `MediaRecorder` の webm・ogg・mp4、wav・mp3・m4a・flac・aac。12 MiB まで）か Storage の音声 `{ fileId }`。`language`（`ja` など。省略で自動判定）・`prompt`（固有名詞・用語の手がかり）・`keyterms`（認識を寄せる単語。対応モデルだけ）・`diarize`（話者ごとに分ける。対応モデルだけ。`segments` に話者が付く）・`model`（省略で既定。別名 `transcribe`。`elevenlabs/scribe-v2` は話者の分離・用語の指定に対応）・`signal`。`{ text, language?, duration?, segments? }` を返す。費用は使った本人のクレジット（短い会話で 0.01 クレジット前後）。チャットに音声を添えるより、これを使う |
+| `client.ai.speak(input)` | 文を音声にする（読み上げ）。`text`（5,000 字まで）・`voice`（声の名前。モデルごとに違う。既定のモデルは `sarah` など）・`model`（省略で既定。別名 `speech`。`google/gemini-3.8-flash-tts` は `Kore` など・`format: 'wav'`）・`format`（`mp3` 既定 / `wav` / `pcm`）・`speed`・`instructions`（話し方の指示。対応モデルだけ）・`signal`。`{ audio: Blob, contentType }` を返す（`URL.createObjectURL(audio)` を `<audio src>` に）。費用は文字数で決まり（約 4 クレジット / 1,000 字）、使った本人のクレジットから**少し遅れて**引かれる。作った音声は Storage に保存して使い回す |
+| `client.ai.rerank(input)` | 検索で取れた候補を、問いとの関連の強さで並べ直す。`query`・`documents`（文字列の配列、200 件まで）・`topN`・`model`（省略で既定。別名 `rerank`）・`signal`。関連が強い順の `{ results: [{ index, score }], model }` を返す（`index` は渡した `documents` の位置）。全文検索・ベクトル検索で多めに取り、これで上位を決める |
 | `client.ai.openai()` | OpenAI 互換の接続先（`OpenAiCompatible`: `baseURL`・`apiKey`・`fetch`）。Mastra・LangChain・Vercel AI SDK・OpenAI SDK にそのまま渡し、エージェント（ツール呼び出しのループ）・構造化出力・ストリーミングを作る。会話の履歴はフレームワークが持つ |
 
 結果（`AiTurnResult`）: `text`・`json`（`schema` を指定し、正常に終わったときだけ）・`finishReason`（`AiFinishReason`。
 `stop` は正常、`length` は出力の上限で切れた、`content_filter` は提供元が止めた、`other` はそれ以外）・
-`credits`（このターンで引いたクレジット）・`responseId`・`model`（実際に使われたモデル）。
+`credits`（このターンで引いたクレジット）・`sources`（`webSearch` のときの出典 `{ url, title? }[]`）・`responseId`・`model`（実際に使われたモデル）。
 
 - `finishReason` が `length` なら「途中で切れた」と出す（`maxOutputTokens` を上げるか、短く頼む）。`text` を完成した答えとして扱わない。
 - `signal` で止めても、始まったターンの費用は戻らない。
@@ -610,8 +613,8 @@ notifications:
 - AI を使う画面には「AI を使うとクレジットを消費します」と分かる表示を置く。
 - 回数・同時に動かす数の制限は無い（エージェントのように続けて・並べて呼べる）。上限は払う人のクレジットだけ。
 - api（サーバー）からは、利用者のリクエストを受けたときだけ、`asUser(request)` の戻り値の `ai`（同じ `chat` / `reset` /
-  `openai()` / `embed()`）でその利用者として呼ぶ（`servicePermissions: [ai.chat]`。その利用者のクレジットから引く）。
-- jobs からは、受け取った queue / scheduled のイベントを `createServerClient(...).forJob(event)` に渡し、`.ai.openai()` / `.ai.embed()` で呼ぶ
+  `openai()` / `embed()` / `transcribe()` / `speak()` / `rerank()`）でその利用者として呼ぶ（`servicePermissions: [ai.chat]`。その利用者のクレジットから引く）。
+- jobs からは、受け取った queue / scheduled のイベントを `createServerClient(...).forJob(event)` に渡し、`.ai.openai()` / `.ai.embed()` / `.ai.transcribe()` / `.ai.speak()` / `.ai.rerank()` で呼ぶ
   （`servicePermissions: [jobs.consume, ai.chat]`）。払うのは、`asUser(request).jobs.schedule(...)` で**利用者として登録した
   ジョブならその利用者**、project.yaml の **cron なら Project の持ち主**、python のタスクが `ctx.jobs` で登録したジョブなら
   **そのタスクの払う人**。サーバーとして（`asUser` 無しで）登録したジョブは
@@ -630,7 +633,7 @@ const { baseURL, apiKey, fetch } = client.ai.openai()
 const llm = new ChatOpenAI({ model: 'auto', apiKey, configuration: { baseURL, fetch } })
 ```
 
-- 使えるのは Chat Completions（`/chat/completions`）と Embeddings（`/embeddings`。`client.ai.embed` か、`createOpenAI(client.ai.openai()).textEmbeddingModel('embedding')` / `OpenAIEmbeddings`）。Responses API・画像生成は無い。
+- 使えるのは Chat Completions（`/chat/completions`。`tools` は `function`・`openrouter:web_search`・`openrouter:web_fetch`（`allowed_domains` 必須）・`openrouter:datetime` だけ）・Embeddings（`/embeddings`。`plugins` は PDF の読み取り（`file-parser`）だけ。`client.ai.embed` か、`createOpenAI(client.ai.openai()).textEmbeddingModel('embedding')` / `OpenAIEmbeddings`）・文字起こし（`/audio/transcriptions`。`client.ai.transcribe` か、OpenAI SDK の `audio.transcriptions.create`・Vercel AI SDK の `experimental_transcribe({ model: fdpocket.transcription('transcribe') })`）・音声合成（`/audio/speech`。`client.ai.speak` か、OpenAI SDK の `audio.speech.create`・Vercel AI SDK の `experimental_generateSpeech`）・rerank（`/rerank`。`client.ai.rerank`）。Responses API・画像生成・動画生成は無い。モデルは入口ごとに決まっていて、チャット用のモデルで文字起こしはできない（`VALIDATION_FAILED`）。
 - Storage のファイルは画像・ファイル・音声・動画の場所に `fdpocket-file:<fileId>` と書く（read ポリシーで確かめて渡す）。
 - 断られたときは OpenAI の形のエラー（本文の `error.code` が `SdkErrorCode`）。`402`（`QUOTA_EXCEEDED`）は再試行しない。
 - 自分の API キーで外部の AI を呼ぶこともできる（`$fdpocket-app-integrations`。費用は作者持ち）。利用者に払ってもらうならこの `client.ai`。
