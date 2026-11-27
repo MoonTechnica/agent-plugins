@@ -13,6 +13,8 @@ export const Route = createRootRoute({ component: Root })
 // 行き先が 1 つのアプリ（1 画面で完結する道具など）はナビを出さない。並び・ラベル・アイコンはアプリに合わせて決める。
 // 見た目は AppNav / AppNavItem の className で変えてよい（packages/ui の部品も自分のもの）。
 // 別の形（上のタブ・メニューなど）が合うアプリは AppNav を使わなくてよい。
+// 行き先が 6 個以上になる（管理画面など）なら、apps/admin の __root.tsx のとおり「その他」と節の見出しを使う（`$app-responsive` §2）。
+// PC 幅の道具の帯（AppShell の topBar）と本文の下のフッター（footer）も、要るときだけ AppShell に渡す。
 const NAV_ITEMS: { to: NonNullable<LinkProps["to"]>; label: string; icon: LucideIcon }[] = [
   { to: "/", label: "ホーム", icon: House },
 ]
@@ -38,7 +40,7 @@ function Root() {
       </AppNav>
     ) : undefined
   return (
-    <AppShell safeArea={safeArea} colorScheme={colorScheme} nav={nav}>
+    <AppShell safeArea={safeArea} colorScheme={colorScheme} nav={nav} skipLabel="本文へ移動">
       <Outlet />
     </AppShell>
   )

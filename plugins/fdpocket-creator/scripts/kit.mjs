@@ -328056,15 +328056,15 @@ function inspectPage(limits2) {
       lowContrastText.push({ label: labelOf(parent), ratio: Math.round(ratio * 100) / 100 });
     }
   }
+  const navs = [...document.querySelectorAll('nav, [role="navigation"]')].filter((nav) => {
+    if (nav.closest("main"))
+      return false;
+    if (/breadcrumb|pagination/i.test(nav.getAttribute("aria-label") ?? ""))
+      return false;
+    return nav.querySelectorAll("a[href], button").length >= 2;
+  });
   let bottomNavMissing = false;
   if (limits2.phone) {
-    const navs = [...document.querySelectorAll('nav, [role="navigation"]')].filter((nav) => {
-      if (nav.closest("main"))
-        return false;
-      if (/breadcrumb|pagination/i.test(nav.getAttribute("aria-label") ?? ""))
-        return false;
-      return nav.querySelectorAll("a[href], button").length >= 2;
-    });
     const atBottom = navs.some((nav) => {
       if (!visible(nav))
         return false;
@@ -328073,6 +328073,18 @@ function inspectPage(limits2) {
     });
     bottomNavMissing = navs.length > 0 && !atBottom;
   }
+  const segmentOf = (pathname) => pathname.split("/")[1] ?? "";
+  const here = segmentOf(location.pathname);
+  const otherScreens = new Set;
+  for (const link of document.querySelectorAll("main a[href]")) {
+    const url7 = new URL(link.href, location.href);
+    if (url7.origin !== location.origin)
+      continue;
+    const segment = segmentOf(url7.pathname);
+    if (segment !== here)
+      otherScreens.add(segment);
+  }
+  const mainNavAbsent = navs.length === 0 && otherScreens.size >= 2;
   const pinned = (edge) => [...document.body.querySelectorAll("*")].filter((element) => {
     if (element.closest("main") || !visible(element))
       return false;
@@ -328109,6 +328121,7 @@ function inspectPage(limits2) {
   const root = document.documentElement;
   return {
     bottomNavMissing,
+    mainNavAbsent,
     coveredByBottomBar: coveredByBottomBar.slice(0, limits2.reported),
     appBarAboveContent,
     horizontalOverflow: root.scrollWidth > window.innerWidth + 1,
@@ -328162,6 +328175,9 @@ async function takeShots(options2, launch = launchChromium) {
         if (inspected.bottomNavMissing) {
           notes.push(`${width}px: the app has 2+ main destinations but no navigation at the bottom of the screen; on phones put them in a bottom bar within thumb reach ($app-responsive §2). Ignore if this layout is intended`);
         }
+        if (inspected.mainNavAbsent) {
+          notes.push(`${width}px: the screen links to 2+ other screens but the app has no main navigation; add every screen to NAV_ITEMS / NAV_GROUPS in __root.tsx so users can reach and switch between them ($app-responsive §2). Ignore if this is a single-screen flow`);
+        }
         if (inspected.coveredByBottomBar.length > 0) {
           notes.push(`${width}px: content is covered by the bar fixed at the bottom even when scrolled to the end (${inspected.coveredByBottomBar.join(", ")}); leave room below the content for the bar (AppShell nav does this, $app-responsive §2)`);
         }
@@ -328186,6 +328202,7 @@ async function takeShots(options2, launch = launchChromium) {
             smallTextCount: inspected.smallTextCount,
             lowContrastText: inspected.lowContrastText,
             bottomNavMissing: inspected.bottomNavMissing,
+            mainNavAbsent: inspected.mainNavAbsent,
             coveredByBottomBar: inspected.coveredByBottomBar,
             appBarAboveContent: inspected.appBarAboveContent,
             consoleErrors

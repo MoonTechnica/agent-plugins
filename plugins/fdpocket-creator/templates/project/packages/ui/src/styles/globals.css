@@ -166,6 +166,19 @@
     }
   /* 端まで引っ張ったとき（バウンス）に見える色も背景と同じに */
   html { @apply bg-background; }
+  /*
+   * キーボードで移動したとき、固定のナビ・帯の裏にフォーカスが隠れない（WCAG 2.4.11）。
+   * スマホ幅は下のタブ（56px + ホームバー）、md 以上は上の道具の帯（56px + 安全領域）の分だけ空ける
+   */
+  html {
+    scroll-padding-bottom: calc(4rem + var(--safe-bottom));
+  }
+  @media (min-width: 48rem) {
+    html {
+      scroll-padding-top: calc(4rem + var(--safe-top));
+      scroll-padding-bottom: 0;
+    }
+  }
   body {
     @apply bg-background text-foreground antialiased;
     /* 日本語は欧文より行間を広げると読みやすい */

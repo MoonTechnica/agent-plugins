@@ -69,11 +69,13 @@ python3 <kit>/skills/fdpocket-ui-ux-pro-max/scripts/search.py "list row badge" -
 
 ## 4. 骨格と部品（ひな形にある。なければ足す）
 
-`@workspace/ui/components/*`: `app-shell`・`page-header`・`empty-state`・`card`・`button`・`input`・`textarea`・`label`・`badge`・`skeleton`・`separator`・`tabs`・`switch`・`avatar`・`dialog`・`sheet`（`md` 以上で中央のダイアログになる）・`app-nav`（主な行き先。幅でタブバー → レール → サイドバー）・`dropdown-menu`（「…」の操作）・`tooltip`（アイコンのボタンの名前と近道）。
+`@workspace/ui/components/*`: `app-shell`・`page-header`・`empty-state`・`card`・`button`・`input`・`textarea`・`label`・`badge`・`skeleton`・`separator`・`tabs`・`switch`・`avatar`・`dialog`・`sheet`（`md` 以上で中央のダイアログになる）・`app-nav`（主な行き先。幅でタブバー → レール → サイドバー。6 個以上は「その他」・節の見出し・上下の枠も持つ。`$fdpocket-app-responsive` §2）・`dropdown-menu`（「…」の操作）・`tooltip`（アイコンのボタンの名前と近道）。
 
 - 幅ごとの形（ナビ・一覧と詳細・密度・指とマウス）は `$fdpocket-app-responsive`。
 - **外枠は `__root.tsx` の `AppShell` で 1 回だけ**（本文の幅と余白・セーフエリア・ナビ）。利用者向けは `width="narrow"`、管理画面は `width="wide"`。画面ごとに外枠を作り直さない。
 - **アプリ名のヘッダー（上に固定した帯）を作らない。** スーパーアプリの中では FDPocket がアプリの名前・閉じる・メニューを上に出している。自分で帯を足すと名前が 2 回並び、本文が狭くなる（`kit shot` が「header bar is pinned above the content」と出す）。上に固定してよいのは、その画面だけの道具（検索欄・絞り込みのタブ）だけ。
+  - 「ヘッダーが要る」と頼まれたら、**頼まれた中身を分けて作る**: 画面の名前・戻る・操作 → `PageHeader`、PC 幅の検索・通知・アカウント → `AppShell` の `topBar`（`md` 以上だけ）、ロゴとアプリ名 → 単独で開く管理画面だけ `AppNavHeader`。アプリ名の帯だけを作らず、頼まれたことを断って終わらせない（作らない理由は結果に 1 行書く）。
+- **フッターは作ってよい**（規約・版・問い合わせなど画面の最後に置くもの）。`AppShell` の `footer`（本文の最後に出る。画面の下に固定しない）。
 - 各画面の先頭は `PageHeader`: `title` は**その画面に何があるか**（「今日のタスク」「連絡先」。アプリ名ではない）、`description` は 1 行、`actions` に主な操作（編集・追加）、詳細・編集の画面は `back` に左上の戻る（`<Link>` を入れる。48px の丸いアイコンになる）。**本文の途中に「← 戻る」の行やボタンを置かない**。
 - 下のタブ（`AppNav`）は選択中がブランド色と太字になる。ラベルを消さない。
 - 部品が足りないときは `packages/ui/src/components/` に shadcn の書き方で足し、web と admin で共有する（クラス文字列を画面ごとにコピペしない）。`radix-ui` は入っている。
