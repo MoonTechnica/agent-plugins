@@ -39,6 +39,22 @@
 `Interact` `PickUp` `Climbing` `LayingDownIdle`（操作）/ `Cheer` `Dance` `Wave` `Defeat` `BasePose`（感情・基本）。
 UAL とは別の骨格。UAL のキャラに使うときは `SkeletonProfileHumanoid` でそろえてから（`3d-animation.md` §1.3）。
 
+## 2.2 KayKit のキャラ（Adventurers / Skeletons）に埋まっているクリップ
+
+`kaykit adventurers` / `kaykit skeletons` で探すと、**キャラ本体（GLB）にクリップが埋まっている**。取り込むだけで、モデルと動きがそろう
+（Rig_Medium 共通の骨格。5 体 + 4 体が同じクリップを持つ。1 体 3.6 MB 前後）。結果の `animations` に実際の名前が返る。
+
+- **Adventurers（Knight / Barbarian / Mage / Rogue / Rogue_Hooded。76 クリップ）**:
+  近接 `1H_Melee_Attack_Chop/Slice_Diagonal/Slice_Horizontal/Stab` `2H_Melee_Attack_Chop/Slice/Spin/Spinning/Stab` `Dualwield_Melee_Attack_*`
+  `Unarmed_Melee_Attack_Kick/Punch_A/Punch_B` / 射撃 `1H_Ranged_Aiming/Reload/Shoot/Shooting` `2H_Ranged_*` /
+  魔法 `Spellcast_Long/Raise/Shoot` `Spellcasting` / 防御・回避 `Block` `Block_Attack` `Block_Hit` `Blocking` `Dodge_Forward/Backward/Left/Right` /
+  移動 `Walking_A/B/C` `Walking_Backwards` `Running_A/B` `Running_Strafe_Left/Right` / 跳び `Jump_Start/Idle/Land` `Jump_Full_Long/Short` /
+  被弾・死亡 `Hit_A` `Hit_B` `Death_A` `Death_A_Pose` `Death_B` `Death_B_Pose` / 待機 `Idle` `2H_Melee_Idle` `Unarmed_Idle` /
+  日常 `Interact` `PickUp` `Throw` `Use_Item` `Cheer` `Sit_Chair_*` `Sit_Floor_*` `Lie_*` `T-Pose`
+- **Skeletons（Skeleton_Warrior / Mage / Minion / Rogue。95 クリップ）**: 上に加えて `Spawn_Ground` `Spawn_Air` `Skeletons_Awaken_*`
+  `Death_C_Skeletons_Resurrect` `Taunt` `Taunt_Longer` `Idle_Combat` `Running_C` `Walking_D_Skeletons` `Spellcast_Summon` `1H_Melee_Attack_Jump_Chop`
+- 武器・小物（剣・盾・杖・弓・樽など）は同じパックの別ファイル（`Assets/gltf`）。キャラの手の骨に付ける。
+
 ## 3. 使い方の注意
 
 - **その場か移動か**: `Walk_Loop` などはその場のクリップ。移動はコード、再生速度は実際の速さに合わせる（`3d-animation.md` §3）。

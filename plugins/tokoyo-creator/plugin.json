@@ -1,7 +1,7 @@
 {
   "$schema": "https://agent-plugins.org/schemas/1.0.0/plugin.schema.json",
   "name": "tokoyo-creator",
-  "version": "2.11.1b4b9ddc",
+  "version": "2.11.5118aa93",
   "description": "TOKOYO.games のミニゲームを手元の Coding Agent で作る Creator Kit（Skills・SDK・検証器・Platform MCP）",
   "author": {
     "name": "Moon Technica"
