@@ -321202,6 +321202,7 @@ var AUTO_APPROVE_TOOLS = [
   "merge_proposal",
   "open_pull_request",
   "comment_pull_request",
+  "review_pull_request",
   "update_pull_request",
   "set_pull_request_state",
   "merge_pull_request",

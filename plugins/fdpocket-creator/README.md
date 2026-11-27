@@ -229,6 +229,9 @@ approval_mode = "auto"
 [plugins."fdpocket-creator@moon-technica".mcp_servers.fdpocket.tools.comment_pull_request]
 approval_mode = "auto"
 
+[plugins."fdpocket-creator@moon-technica".mcp_servers.fdpocket.tools.review_pull_request]
+approval_mode = "auto"
+
 [plugins."fdpocket-creator@moon-technica".mcp_servers.fdpocket.tools.update_pull_request]
 approval_mode = "auto"
 
