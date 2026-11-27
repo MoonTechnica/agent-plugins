@@ -321186,7 +321186,12 @@ var ASK_A_PERSON_TOOLS = [
   "delete_issue",
   "adopt_branch",
   "publish_project",
-  "decide_migration_review"
+  "decide_migration_review",
+  "leave_organization",
+  "delete_organization_team",
+  "update_project_settings",
+  "transfer_project",
+  "restore_main_version"
 ];
 var AUTO_APPROVE_TOOLS = [
   "create_issue",
@@ -321220,7 +321225,24 @@ var AUTO_APPROVE_TOOLS = [
   "set_organization_team_member",
   "set_project_team_grant",
   "share_project_with_organization_members",
-  "rebut_review"
+  "rebut_review",
+  "update_organization",
+  "set_organization_member_role",
+  "set_organization_invitation_role",
+  "rename_organization_team",
+  "cancel_publication",
+  "rename_project",
+  "set_project_collaborator_role",
+  "set_project_collaborator_invitation_role",
+  "retry_adopted_build",
+  "write_project_review",
+  "reply_project_review",
+  "set_project_mcp_enabled",
+  "revoke_my_mcp_grant",
+  "request_sdk_update",
+  "retry_sdk_update",
+  "cancel_sdk_update",
+  "update_version_listing"
 ];
 function codexApprovalToml(pluginId, server2) {
   const table = `plugins."${pluginId}".mcp_servers.${server2}`;

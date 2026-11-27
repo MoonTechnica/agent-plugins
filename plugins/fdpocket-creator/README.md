@@ -187,6 +187,21 @@ approval_mode = "approve"
 [plugins."fdpocket-creator@moon-technica".mcp_servers.fdpocket.tools.decide_migration_review]
 approval_mode = "approve"
 
+[plugins."fdpocket-creator@moon-technica".mcp_servers.fdpocket.tools.leave_organization]
+approval_mode = "approve"
+
+[plugins."fdpocket-creator@moon-technica".mcp_servers.fdpocket.tools.delete_organization_team]
+approval_mode = "approve"
+
+[plugins."fdpocket-creator@moon-technica".mcp_servers.fdpocket.tools.update_project_settings]
+approval_mode = "approve"
+
+[plugins."fdpocket-creator@moon-technica".mcp_servers.fdpocket.tools.transfer_project]
+approval_mode = "approve"
+
+[plugins."fdpocket-creator@moon-technica".mcp_servers.fdpocket.tools.restore_main_version]
+approval_mode = "approve"
+
 [plugins."fdpocket-creator@moon-technica".mcp_servers.fdpocket.tools.create_issue]
 approval_mode = "auto"
 
@@ -282,6 +297,57 @@ approval_mode = "auto"
 
 [plugins."fdpocket-creator@moon-technica".mcp_servers.fdpocket.tools.rebut_review]
 approval_mode = "auto"
+
+[plugins."fdpocket-creator@moon-technica".mcp_servers.fdpocket.tools.update_organization]
+approval_mode = "auto"
+
+[plugins."fdpocket-creator@moon-technica".mcp_servers.fdpocket.tools.set_organization_member_role]
+approval_mode = "auto"
+
+[plugins."fdpocket-creator@moon-technica".mcp_servers.fdpocket.tools.set_organization_invitation_role]
+approval_mode = "auto"
+
+[plugins."fdpocket-creator@moon-technica".mcp_servers.fdpocket.tools.rename_organization_team]
+approval_mode = "auto"
+
+[plugins."fdpocket-creator@moon-technica".mcp_servers.fdpocket.tools.cancel_publication]
+approval_mode = "auto"
+
+[plugins."fdpocket-creator@moon-technica".mcp_servers.fdpocket.tools.rename_project]
+approval_mode = "auto"
+
+[plugins."fdpocket-creator@moon-technica".mcp_servers.fdpocket.tools.set_project_collaborator_role]
+approval_mode = "auto"
+
+[plugins."fdpocket-creator@moon-technica".mcp_servers.fdpocket.tools.set_project_collaborator_invitation_role]
+approval_mode = "auto"
+
+[plugins."fdpocket-creator@moon-technica".mcp_servers.fdpocket.tools.retry_adopted_build]
+approval_mode = "auto"
+
+[plugins."fdpocket-creator@moon-technica".mcp_servers.fdpocket.tools.write_project_review]
+approval_mode = "auto"
+
+[plugins."fdpocket-creator@moon-technica".mcp_servers.fdpocket.tools.reply_project_review]
+approval_mode = "auto"
+
+[plugins."fdpocket-creator@moon-technica".mcp_servers.fdpocket.tools.set_project_mcp_enabled]
+approval_mode = "auto"
+
+[plugins."fdpocket-creator@moon-technica".mcp_servers.fdpocket.tools.revoke_my_mcp_grant]
+approval_mode = "auto"
+
+[plugins."fdpocket-creator@moon-technica".mcp_servers.fdpocket.tools.request_sdk_update]
+approval_mode = "auto"
+
+[plugins."fdpocket-creator@moon-technica".mcp_servers.fdpocket.tools.retry_sdk_update]
+approval_mode = "auto"
+
+[plugins."fdpocket-creator@moon-technica".mcp_servers.fdpocket.tools.cancel_sdk_update]
+approval_mode = "auto"
+
+[plugins."fdpocket-creator@moon-technica".mcp_servers.fdpocket.tools.update_version_listing]
+approval_mode = "auto"
 ```
 
 ### Update
@@ -346,22 +412,19 @@ replacing an earlier copy and keeping the rest of the file):
 [plugins."fdpocket-creator@moon-technica".mcp_servers.fdpocket]
 default_tools_approval_mode = "writes"
 
-[plugins."fdpocket-creator@moon-technica".mcp_servers.fdpocket.tools.open_proposal]
-approval_mode = "approve"
-
-[plugins."fdpocket-creator@moon-technica".mcp_servers.fdpocket.tools.close_proposal]
-approval_mode = "approve"
-
-[plugins."fdpocket-creator@moon-technica".mcp_servers.fdpocket.tools.request_proposal_changes]
-approval_mode = "approve"
-
-[plugins."fdpocket-creator@moon-technica".mcp_servers.fdpocket.tools.comment_proposal]
-approval_mode = "approve"
-
-[plugins."fdpocket-creator@moon-technica".mcp_servers.fdpocket.tools.merge_proposal]
-approval_mode = "approve"
-
 [plugins."fdpocket-creator@moon-technica".mcp_servers.fdpocket.tools.grant_session_consent]
+approval_mode = "approve"
+
+[plugins."fdpocket-creator@moon-technica".mcp_servers.fdpocket.tools.remove_organization_member]
+approval_mode = "approve"
+
+[plugins."fdpocket-creator@moon-technica".mcp_servers.fdpocket.tools.delete_organization]
+approval_mode = "approve"
+
+[plugins."fdpocket-creator@moon-technica".mcp_servers.fdpocket.tools.remove_project_collaborator]
+approval_mode = "approve"
+
+[plugins."fdpocket-creator@moon-technica".mcp_servers.fdpocket.tools.delete_issue]
 approval_mode = "approve"
 
 [plugins."fdpocket-creator@moon-technica".mcp_servers.fdpocket.tools.adopt_branch]
@@ -372,6 +435,168 @@ approval_mode = "approve"
 
 [plugins."fdpocket-creator@moon-technica".mcp_servers.fdpocket.tools.decide_migration_review]
 approval_mode = "approve"
+
+[plugins."fdpocket-creator@moon-technica".mcp_servers.fdpocket.tools.leave_organization]
+approval_mode = "approve"
+
+[plugins."fdpocket-creator@moon-technica".mcp_servers.fdpocket.tools.delete_organization_team]
+approval_mode = "approve"
+
+[plugins."fdpocket-creator@moon-technica".mcp_servers.fdpocket.tools.update_project_settings]
+approval_mode = "approve"
+
+[plugins."fdpocket-creator@moon-technica".mcp_servers.fdpocket.tools.transfer_project]
+approval_mode = "approve"
+
+[plugins."fdpocket-creator@moon-technica".mcp_servers.fdpocket.tools.restore_main_version]
+approval_mode = "approve"
+
+[plugins."fdpocket-creator@moon-technica".mcp_servers.fdpocket.tools.create_issue]
+approval_mode = "auto"
+
+[plugins."fdpocket-creator@moon-technica".mcp_servers.fdpocket.tools.comment_issue]
+approval_mode = "auto"
+
+[plugins."fdpocket-creator@moon-technica".mcp_servers.fdpocket.tools.update_issue]
+approval_mode = "auto"
+
+[plugins."fdpocket-creator@moon-technica".mcp_servers.fdpocket.tools.edit_issue_comment]
+approval_mode = "auto"
+
+[plugins."fdpocket-creator@moon-technica".mcp_servers.fdpocket.tools.set_issue_state]
+approval_mode = "auto"
+
+[plugins."fdpocket-creator@moon-technica".mcp_servers.fdpocket.tools.manage_issue]
+approval_mode = "auto"
+
+[plugins."fdpocket-creator@moon-technica".mcp_servers.fdpocket.tools.open_proposal]
+approval_mode = "auto"
+
+[plugins."fdpocket-creator@moon-technica".mcp_servers.fdpocket.tools.update_proposal]
+approval_mode = "auto"
+
+[plugins."fdpocket-creator@moon-technica".mcp_servers.fdpocket.tools.close_proposal]
+approval_mode = "auto"
+
+[plugins."fdpocket-creator@moon-technica".mcp_servers.fdpocket.tools.request_proposal_changes]
+approval_mode = "auto"
+
+[plugins."fdpocket-creator@moon-technica".mcp_servers.fdpocket.tools.comment_proposal]
+approval_mode = "auto"
+
+[plugins."fdpocket-creator@moon-technica".mcp_servers.fdpocket.tools.merge_proposal]
+approval_mode = "auto"
+
+[plugins."fdpocket-creator@moon-technica".mcp_servers.fdpocket.tools.open_pull_request]
+approval_mode = "auto"
+
+[plugins."fdpocket-creator@moon-technica".mcp_servers.fdpocket.tools.comment_pull_request]
+approval_mode = "auto"
+
+[plugins."fdpocket-creator@moon-technica".mcp_servers.fdpocket.tools.review_pull_request]
+approval_mode = "auto"
+
+[plugins."fdpocket-creator@moon-technica".mcp_servers.fdpocket.tools.set_github_item_management]
+approval_mode = "auto"
+
+[plugins."fdpocket-creator@moon-technica".mcp_servers.fdpocket.tools.edit_github_comment]
+approval_mode = "auto"
+
+[plugins."fdpocket-creator@moon-technica".mcp_servers.fdpocket.tools.update_pull_request]
+approval_mode = "auto"
+
+[plugins."fdpocket-creator@moon-technica".mcp_servers.fdpocket.tools.set_pull_request_state]
+approval_mode = "auto"
+
+[plugins."fdpocket-creator@moon-technica".mcp_servers.fdpocket.tools.merge_pull_request]
+approval_mode = "auto"
+
+[plugins."fdpocket-creator@moon-technica".mcp_servers.fdpocket.tools.create_organization]
+approval_mode = "auto"
+
+[plugins."fdpocket-creator@moon-technica".mcp_servers.fdpocket.tools.invite_organization_member]
+approval_mode = "auto"
+
+[plugins."fdpocket-creator@moon-technica".mcp_servers.fdpocket.tools.revoke_organization_invitation]
+approval_mode = "auto"
+
+[plugins."fdpocket-creator@moon-technica".mcp_servers.fdpocket.tools.resend_organization_invitation]
+approval_mode = "auto"
+
+[plugins."fdpocket-creator@moon-technica".mcp_servers.fdpocket.tools.invite_project_collaborator]
+approval_mode = "auto"
+
+[plugins."fdpocket-creator@moon-technica".mcp_servers.fdpocket.tools.revoke_project_collaborator_invitation]
+approval_mode = "auto"
+
+[plugins."fdpocket-creator@moon-technica".mcp_servers.fdpocket.tools.resend_project_collaborator_invitation]
+approval_mode = "auto"
+
+[plugins."fdpocket-creator@moon-technica".mcp_servers.fdpocket.tools.create_organization_team]
+approval_mode = "auto"
+
+[plugins."fdpocket-creator@moon-technica".mcp_servers.fdpocket.tools.set_organization_team_member]
+approval_mode = "auto"
+
+[plugins."fdpocket-creator@moon-technica".mcp_servers.fdpocket.tools.set_project_team_grant]
+approval_mode = "auto"
+
+[plugins."fdpocket-creator@moon-technica".mcp_servers.fdpocket.tools.share_project_with_organization_members]
+approval_mode = "auto"
+
+[plugins."fdpocket-creator@moon-technica".mcp_servers.fdpocket.tools.rebut_review]
+approval_mode = "auto"
+
+[plugins."fdpocket-creator@moon-technica".mcp_servers.fdpocket.tools.update_organization]
+approval_mode = "auto"
+
+[plugins."fdpocket-creator@moon-technica".mcp_servers.fdpocket.tools.set_organization_member_role]
+approval_mode = "auto"
+
+[plugins."fdpocket-creator@moon-technica".mcp_servers.fdpocket.tools.set_organization_invitation_role]
+approval_mode = "auto"
+
+[plugins."fdpocket-creator@moon-technica".mcp_servers.fdpocket.tools.rename_organization_team]
+approval_mode = "auto"
+
+[plugins."fdpocket-creator@moon-technica".mcp_servers.fdpocket.tools.cancel_publication]
+approval_mode = "auto"
+
+[plugins."fdpocket-creator@moon-technica".mcp_servers.fdpocket.tools.rename_project]
+approval_mode = "auto"
+
+[plugins."fdpocket-creator@moon-technica".mcp_servers.fdpocket.tools.set_project_collaborator_role]
+approval_mode = "auto"
+
+[plugins."fdpocket-creator@moon-technica".mcp_servers.fdpocket.tools.set_project_collaborator_invitation_role]
+approval_mode = "auto"
+
+[plugins."fdpocket-creator@moon-technica".mcp_servers.fdpocket.tools.retry_adopted_build]
+approval_mode = "auto"
+
+[plugins."fdpocket-creator@moon-technica".mcp_servers.fdpocket.tools.write_project_review]
+approval_mode = "auto"
+
+[plugins."fdpocket-creator@moon-technica".mcp_servers.fdpocket.tools.reply_project_review]
+approval_mode = "auto"
+
+[plugins."fdpocket-creator@moon-technica".mcp_servers.fdpocket.tools.set_project_mcp_enabled]
+approval_mode = "auto"
+
+[plugins."fdpocket-creator@moon-technica".mcp_servers.fdpocket.tools.revoke_my_mcp_grant]
+approval_mode = "auto"
+
+[plugins."fdpocket-creator@moon-technica".mcp_servers.fdpocket.tools.request_sdk_update]
+approval_mode = "auto"
+
+[plugins."fdpocket-creator@moon-technica".mcp_servers.fdpocket.tools.retry_sdk_update]
+approval_mode = "auto"
+
+[plugins."fdpocket-creator@moon-technica".mcp_servers.fdpocket.tools.cancel_sdk_update]
+approval_mode = "auto"
+
+[plugins."fdpocket-creator@moon-technica".mcp_servers.fdpocket.tools.update_version_listing]
+approval_mode = "auto"
 ```
 
 ### Update
