@@ -42,7 +42,7 @@ function DropdownMenuItem({
     <DropdownMenuPrimitive.Item
       data-slot="dropdown-menu-item"
       className={cn(
-        'flex min-h-11 cursor-default items-center gap-2 rounded-lg px-3 text-base outline-none select-none data-[disabled]:pointer-events-none data-[disabled]:opacity-50 data-[highlighted]:bg-muted md:min-h-9 md:text-sm [&_svg]:size-4 [&_svg]:shrink-0 [&_svg]:text-muted-foreground',
+        'flex min-h-11 cursor-default items-center gap-2 rounded-lg px-3 text-base outline-none select-none data-[disabled]:pointer-events-none data-[disabled]:opacity-50 data-[highlighted]:bg-muted desk:min-h-8 desk:text-sm [&_svg]:size-4 [&_svg]:shrink-0 [&_svg]:text-muted-foreground',
         destructive && 'text-destructive data-[highlighted]:bg-destructive/10 [&_svg]:text-destructive',
         className
       )}

@@ -1,5 +1,5 @@
-// Project のデータモデル（data-model.md §3.2）。基底（User / Workspace / Role / StorageFile …）は platform.zmodel
-// （kit generate が置く。編集しない）。User と Workspace には業務モデルへの逆向きの relation だけを足せる。
+// Project のデータモデル（data-model.md §3.2）。基底（User / Workspace / Role / StorageFile …）は platform.zmodel（kit generate が置く。編集しない）。User と Workspace には業務モデルへの逆向きの relation だけを足せる。
+// Task は見本。作るアプリの業務モデルに置き換える（名前・列・権限）。置き換えたら seed.ts の samples と project.yaml の capabilities も合わせる。
 import "platform"
 
 datasource db {
@@ -11,7 +11,31 @@ plugin policy {
 }
 
 model User with PlatformUser {
+  tasks Task[]
 }
 
 model Workspace with PlatformWorkspace {
+  tasks Task[]
+}
+
+model Task {
+  id          String    @id @default(uuid())
+  title       String
+  // todo（未着手）/ doing（進行中）/ done（完了）
+  status      String    @default("todo")
+  dueAt       DateTime?
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+  ownerId     String
+  owner       User      @relation(fields: [ownerId], references: [id], onDelete: Cascade)
+  workspaceId String
+  workspace   Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+
+  @@index([workspaceId, createdAt, id])
+  @@allow('read', workspace.members?[userId == auth().id])
+  @@allow('create', workspace.members?[userId == auth().id && role in ['owner', 'admin', 'editor']] && ownerId == auth().id)
+  @@allow('update', ownerId == auth().id || workspace.members?[userId == auth().id && role in ['owner', 'admin']])
+  @@allow('delete', ownerId == auth().id || workspace.members?[userId == auth().id && role in ['owner', 'admin']])
+  @@allow('post-update', true)
+  @@deny('post-update', before().ownerId != ownerId || before().workspaceId != workspaceId)
 }

@@ -133639,8 +133639,25 @@ async function recoverLocalSeed(input2) {
   });
   return true;
 }
+function sampleFloorWarning(plan) {
+  if (plan === null)
+    return `${PROJECT_PATHS.seed} has no samples(): add 20-40 realistic rows (every status, dates around today) so screens can be checked with data`;
+  const counts2 = new Map;
+  for (const row of plan.rows)
+    counts2.set(row.model, (counts2.get(row.model) ?? 0) + 1);
+  const thin = [...counts2].filter(([, n2]) => n2 < SAMPLE_FLOOR_PER_MODEL).map(([model]) => model);
+  if (plan.rows.length >= SAMPLE_FLOOR_ROWS && thin.length === 0)
+    return null;
+  const parts = [`samples() returns ${plan.rows.length} rows (want ${SAMPLE_FLOOR_ROWS}+)`];
+  if (thin.length)
+    parts.push(`too few rows for ${thin.join(", ")}`);
+  return `${parts.join("; ")}: add realistic rows covering every status and dates around today`;
+}
 async function runSampleSeed(input2) {
   const bundle = await generateSampleBundle(input2);
+  const warning = sampleFloorWarning(bundle.plan);
+  if (warning)
+    input2.onWarning?.(warning);
   if (bundle.plan === null)
     return null;
   const seedContext = await createSessionSeedContext(input2.context, bundle.identities);
@@ -133695,7 +133712,7 @@ async function projectSeedImporter(root) {
     throw new SeedError("seed planning requires a Project App dependency tree");
   return viteImporter(resolveViteEntry(join21(root, "apps", app.slug)), root);
 }
-var SeedError, LOCAL_SEED_ENVIRONMENT_ID = "00000000-0000-4000-8000-00000000de01", LegacyRecoveryUnsupported;
+var SeedError, LOCAL_SEED_ENVIRONMENT_ID = "00000000-0000-4000-8000-00000000de01", LegacyRecoveryUnsupported, SAMPLE_FLOOR_ROWS = 10, SAMPLE_FLOOR_PER_MODEL = 3;
 var init_seed = __esm(() => {
   init_session_sample();
   init_session_seed2();
@@ -134105,7 +134122,8 @@ async function createDevRuntime(options2) {
           context: seedContext,
           importModule: options2.importModule ?? defaultImporter(root, manifest2),
           schemaRevision: schemaHash,
-          operationId: crypto.randomUUID()
+          operationId: crypto.randomUUID(),
+          onWarning: options2.quiet ? undefined : (message2) => console.warn(`kit dev: ${message2}`)
         });
       } catch (error212) {
         if (!options2.quiet)

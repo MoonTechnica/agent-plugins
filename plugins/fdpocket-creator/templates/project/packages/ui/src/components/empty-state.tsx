@@ -22,7 +22,7 @@ function EmptyState({
   return (
     <div
       data-slot="empty-state"
-      className={cn('flex flex-col items-center gap-3 px-4 py-12 text-center', className)}
+      className={cn('flex flex-col items-center gap-3 px-4 py-12 text-center desk:py-10', className)}
     >
       {Icon ? (
         <div className="flex size-12 items-center justify-center rounded-full bg-accent text-accent-foreground">

@@ -37,7 +37,7 @@ function SheetContent({
         {children}
         <SheetPrimitive.Close
           aria-label="Close"
-          className="absolute top-4 right-3 inline-flex size-12 items-center justify-center rounded-full text-muted-foreground transition-colors outline-none hover:bg-muted focus-visible:ring-3 focus-visible:ring-ring/50"
+          className="absolute top-4 right-3 inline-flex size-11 items-center desk:size-9 justify-center rounded-full text-muted-foreground transition-colors outline-none hover:bg-muted focus-visible:ring-3 focus-visible:ring-ring/50"
         >
           <XIcon aria-hidden className="size-5" />
         </SheetPrimitive.Close>

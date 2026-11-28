@@ -6,6 +6,12 @@
 @custom-variant dark (&:is(.dark *));
 /* ホーム画面から全画面で開いたとき（PWA）だけ効かせる: `standalone:flex`（`$app-pwa` §1） */
 @custom-variant standalone (@media (display-mode: standalone));
+/*
+ * マウスで使う広い画面（PC）だけ効かせる: `desk:h-9`。部品の大きさを指（44px・16px）とマウス（36px・14px）で分ける
+ * （`$app-ui` §2）。タブレット（指）・スマホは指の大きさのまま。幅だけでなくポインタで分けるのは、
+ * iPad の 16px 未満の入力欄はフォーカスで拡大されるため（幅だけで文字を小さくすると iPad で崩れる）。
+ */
+@custom-variant desk (@media (min-width: 48rem) and (pointer: fine));
 @source "../../../apps/**/*.{ts,tsx}";
 @source "../../../components/**/*.{ts,tsx}";
 @source "../**/*.{ts,tsx}";
@@ -110,6 +116,10 @@
     --chart-4: oklch(0.7 0.14 calc(var(--brand-hue) + 200));
     --chart-5: oklch(0.6 0.16 calc(var(--brand-hue) + 290));
     --radius: 0.75rem;
+    /* 部品の高さ（指 44px / マウス 36px）。自作の部品もこの変数で高さをそろえる: `h-(--control-h)` */
+    --control-h: 2.75rem;
+    /* 一覧の 1 行の最小の高さ（指 56px / マウス 44px） */
+    --row-h: 3.5rem;
     --sidebar: oklch(0.975 0.006 var(--brand-hue));
     --sidebar-foreground: oklch(0.2 0.02 var(--brand-hue));
     --sidebar-primary: oklch(0.52 0.2 var(--brand-hue));
@@ -118,6 +128,15 @@
     --sidebar-accent-foreground: oklch(0.3 0.09 var(--brand-hue));
     --sidebar-border: oklch(0.915 0.008 var(--brand-hue));
     --sidebar-ring: oklch(0.6 0.16 var(--brand-hue));
+}
+
+/* マウスで使う広い画面: 詰めた密度（Linear・GitHub・Notion と同じ 36px の部品、14px の本文、8px の角） */
+@media (min-width: 48rem) and (pointer: fine) {
+    :root {
+        --radius: 0.5rem;
+        --control-h: 2.25rem;
+        --row-h: 2.75rem;
+    }
 }
 
 .dark {
@@ -184,6 +203,10 @@
     /* 日本語は欧文より行間を広げると読みやすい */
     line-height: 1.65;
     }
+  /* マウスで使う広い画面の本文は 14px（指の画面は 16px のまま。入力欄の拡大を防ぐ） */
+  @media (min-width: 48rem) and (pointer: fine) {
+    body { font-size: 0.875rem; line-height: 1.6; }
+  }
   /* 見出しは字間を少し詰める。数字は桁をそろえる（金額・件数・時刻） */
   /*
    * ホーム画面（PWA）で開いたときだけ、アプリらしい挙動にする（web.dev「Make it feel like an app」）。

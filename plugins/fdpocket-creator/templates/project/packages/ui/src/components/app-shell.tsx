@@ -5,8 +5,10 @@ import { applyColorScheme, type ColorScheme } from '../lib/color-scheme'
 const WIDTHS = {
   // 利用者向け（スマホが主）。本文は読みやすい幅に。
   narrow: 'max-w-2xl',
-  // 管理画面（表・一覧が主）。広い画面で表が窮屈にならない幅に。
-  wide: 'max-w-5xl',
+  // 一覧・表・ダッシュボードが主の画面（業務・管理）。PC の幅を使い切る（本文が画面の半分しかない、を作らない）。
+  wide: 'max-w-7xl',
+  // 画面幅いっぱい（カンバン・カレンダー・横に長い表）。
+  full: 'max-w-none',
 } as const
 
 type SafeAreaInsets = { top: number; right: number; bottom: number; left: number }

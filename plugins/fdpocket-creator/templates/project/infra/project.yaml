@@ -12,6 +12,7 @@ apps:
         workspace: [read, create, update]
         membership: [read, create, update, delete]
         appUserState: [read, create, update]
+        task: [read, create, update, delete]
     anonymous: { allowed: false, write: false }
   admin:
     kind: web

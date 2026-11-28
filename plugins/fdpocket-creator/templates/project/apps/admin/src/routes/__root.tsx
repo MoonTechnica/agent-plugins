@@ -17,21 +17,23 @@ import {
 import { AppShell } from "@workspace/ui/components/app-shell"
 import { LayoutDashboard, type LucideIcon, Settings, UserRound } from "lucide-react"
 import { Fragment } from "react"
+import { type Key, useI18n } from "../i18n"
 
 // 管理画面の骨格はここで 1 回だけ作る（本文の幅・余白・左のナビ）。画面ごとに外枠を作り直さない。
 // アプリ名のヘッダーは置かない（スーパーアプリの中では FDPocket が上に出す）。各画面の先頭は PageHeader（その画面の名前）。
 export const Route = createRootRoute({ component: Root })
 
-type NavItem = { to: NonNullable<LinkProps["to"]>; label: string; icon: LucideIcon }
+// ラベルは src/i18n.ts の辞書のキー（画面に日本語・英語を直接書かない）
+type NavItem = { to: NonNullable<LinkProps["to"]>; labelKey: Key; icon: LucideIcon }
 
 // 行き先の一覧。**画面（routes/ のファイル）を足したら、必ずここに 1 行足す**（足さないと、その画面へ行く道が無い）。
-// - 並びは「よく使う順」。`heading` を付けると、広い画面のサイドバーに節の見出しが出る（スマホ幅には出ない）。
+// - 並びは「よく使う順」。`headingKey` を付けると、広い画面のサイドバーに節の見出しが出る（スマホ幅には出ない）。
 // - 2 個以上でナビが出る。スマホ幅の下のタブは 5 枠までなので、6 個以上のときは先頭の 4 つだけが下のタブに残り、
 //   残りは自動で「その他」（押すと下からシートが開く）に入る。PC・タブレットの左のナビには全部が並ぶ（`$app-responsive` §2）。
 // - 管理画面でも 10 個を超えたら、行き先を増やす前に画面をまとめられないか考える（`$app-ux-patterns` §1）。
-const NAV_GROUPS: { heading?: string; items: NavItem[] }[] = [
-  { items: [{ to: "/", label: "概要", icon: LayoutDashboard }] },
-  { heading: "管理", items: [{ to: "/settings", label: "設定", icon: Settings }] },
+const NAV_GROUPS: { headingKey?: Key; items: NavItem[] }[] = [
+  { items: [{ to: "/", labelKey: "nav.overview", icon: LayoutDashboard }] },
+  { headingKey: "nav.section.manage", items: [{ to: "/settings", labelKey: "nav.settings", icon: Settings }] },
 ]
 
 const ALL_ITEMS = NAV_GROUPS.flatMap((group) => group.items)
@@ -39,6 +41,7 @@ const TAB_COUNT = ALL_ITEMS.length > 5 ? 4 : ALL_ITEMS.length
 const MORE_ITEMS = ALL_ITEMS.slice(TAB_COUNT)
 
 function Root() {
+  const { t } = useI18n()
   // セーフエリアと明暗は開き方で取り方が違う（スーパーアプリ内は Host の値、ホーム画面・ブラウザは env() と端末の設定）。AppShell がまとめる
   const safeArea = useSafeArea()
   const colorScheme = useColorScheme()
@@ -48,28 +51,28 @@ function Root() {
 
   const nav =
     ALL_ITEMS.length >= 2 ? (
-      <AppNav aria-label="メイン">
+      <AppNav aria-label={t("nav.label")}>
         {NAV_GROUPS.map((group) => (
-          <Fragment key={group.heading ?? "main"}>
-            {group.heading ? <AppNavSection>{group.heading}</AppNavSection> : null}
-            {group.items.map(({ to, label, icon: Icon }) => (
+          <Fragment key={group.headingKey ?? "main"}>
+            {group.headingKey ? <AppNavSection>{t(group.headingKey)}</AppNavSection> : null}
+            {group.items.map(({ to, labelKey, icon: Icon }) => (
               <AppNavItem key={to} asChild secondary={MORE_ITEMS.some((item) => item.to === to)}>
                 {/* 概要（/）は完全一致のときだけ選択中にする */}
                 <Link to={to} activeOptions={to === "/" ? { exact: true } : undefined}>
                   <Icon aria-hidden />
-                  {label}
+                  {t(labelKey)}
                 </Link>
               </AppNavItem>
             ))}
           </Fragment>
         ))}
         {MORE_ITEMS.length > 0 ? (
-          <AppNavMore label="その他" active={moreActive}>
-            {MORE_ITEMS.map(({ to, label, icon: Icon }) => (
+          <AppNavMore label={t("nav.more")} active={moreActive}>
+            {MORE_ITEMS.map(({ to, labelKey, icon: Icon }) => (
               <AppNavMoreItem key={to} asChild>
                 <Link to={to}>
                   <Icon aria-hidden />
-                  {label}
+                  {t(labelKey)}
                 </Link>
               </AppNavMoreItem>
             ))}
@@ -80,7 +83,7 @@ function Root() {
           <div className="flex min-h-11 items-center justify-center gap-3 px-3 text-sm text-muted-foreground lg:justify-start">
             <UserRound aria-hidden className="shrink-0" />
             <span className="hidden min-w-0 truncate lg:inline">
-              {session?.displayName ?? "ゲスト"}
+              {session?.displayName ?? t("nav.guest")}
             </span>
           </div>
         </AppNavFooter>
@@ -94,7 +97,7 @@ function Root() {
       safeArea={safeArea}
       colorScheme={colorScheme}
       nav={nav}
-      skipLabel="本文へ移動"
+      skipLabel={t("shell.skip")}
     >
       <Outlet />
     </AppShell>

@@ -863,12 +863,22 @@ ZModel を変えたら `kit generate` → `kit db migrate --slug <slug>` → `mi
 
 ```ts
 // packages/db-schema/seed.ts（DB client を受け取らず、初期化計画を返す）
-import type { SchemaType, SeedContext, SeedPlan, TestIdentity } from '@workspace/sdk'
+import type { SamplePlan, SchemaType, SeedContext, SeedPlan, TestIdentity } from '@workspace/sdk'
 
 export const testIdentities = [{ slot: 'alice', roles: [], displayName: 'Alice' }] satisfies TestIdentity[]
 export default async function seed(context: SeedContext): Promise<SeedPlan<SchemaType>> {
   return { version: 1, operations: [
     { model: 'workspace', operation: 'create', args: { data: { id: await context.id('sample-team'), name: 'Sample' } } },
+  ] }
+}
+
+// 画面で見るための行は samples に書く（主な一覧は 20〜40 行。状態は全種類、日付は今日の前後に散らす）
+export async function samples(context: SeedContext): Promise<SamplePlan<SchemaType>> {
+  const workspaceId = await context.id('sample-team')
+  const now = new Date(context.initializedAt).getTime()
+  return { version: 2, rows: [
+    { model: 'task', key: 't01', data: { title: '見積書を A 社へ送る', status: 'todo',
+      dueAt: new Date(now + 86_400_000).toISOString(), ownerId: context.users.alice!.id, workspaceId } },
   ] }
 }
 

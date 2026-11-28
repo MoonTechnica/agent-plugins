@@ -66,11 +66,14 @@ const nav = (
 
 ### 行き先が 6 個以上のとき（管理画面・業務システム）
 
-スマホ幅の下のタブは **5 枠まで**（親指が届き、ラベルが読める数。Material・Apple とも 3〜5）。**ハンバーガーに主な行き先を隠さない**。決め方:
+スマホ幅の下のタブは **5 枠まで**（親指が届き、ラベルが読める数。Android のナビゲーションバーは 3〜5、Apple もタブは少なく保つ）。**ハンバーガーに主な行き先を隠さない**。
 
-1. 行き先を**よく使う順**に並べる。先頭の 4 つが下のタブに残り、残りは自動で **「その他」**（押すと下からシートが開く）に入る。PC・タブレットの左のナビには**全部が並ぶ**。
-2. 広い画面（`lg` 以上）のサイドバーには、`AppNavSection` で**節の見出し**を付けて分ける（「業務」「マスタ」「設定」など。1 節 3〜7 項目が目安）。レール（`md`）では細い区切り線になる。
-3. 行き先が 10 個を超えるなら、増やす前に画面をまとめる（一覧 + 絞り込みタブ、設定は 1 画面にまとめる）。
+**まず 5 個以下に絞れないかを考える**。Apple は「あふれたタブ（More）を避ける」としている（隠れた行き先は見つけにくく、押す回数が増える）。「その他」は、業務・管理画面で 6 個以上がどうしても要るときの**最後の手段**で、入れるのは**いちばん使われない行き先**だけ。決め方:
+
+1. 行き先を**よく使う順**に並べる。先頭の 4 つが下のタブに残り、残りは自動で **「その他」**（押すと下からシートが開く）に入る。PC・タブレットの左のナビには**全部が並ぶ**。毎日使う画面を「その他」に入れない。
+2. 広い画面（`lg` 以上）のサイドバーには、`AppNavSection` で**節の見出し**を付けて分ける（「業務」「マスタ」「設定」など）。レール（`md`）では細い区切り線になる。階層は**節 → 行き先の 2 段まで**（Apple: サイドバーは 2 階層まで。それより深い分類は画面の中のタブや絞り込みにする）。
+3. レールに並べるのは **3〜7 個が目安**（Android のナビゲーションレール）。行き先が 10 個を超えるなら、増やす前に画面をまとめる（一覧 + 絞り込みタブ、設定は 1 画面にまとめる）。
+4. ナビの項目のバッジ（件数・点）は、**すぐ見るべきこと**（未処理の承認など）だけに使う（Apple: タブのバッジは重要な情報だけ）。
 
 ひな形の admin の `__root.tsx` は、この振り分けをすでにやっている（`NAV_GROUPS` に行き先を足すだけ。6 個を超えると「その他」が自動で出る）。部品は `app-nav.tsx` にある:
 
@@ -80,7 +83,7 @@ const nav = (
 | `AppNavMore` + `AppNavMoreItem` | 下のタブの最後の「その他」と、開くシートの中の行き先（選ぶとシートが閉じる）。`active` は今いる画面が中にあるとき | スマホ幅だけ |
 | `AppNavSection` | サイドバーの節の見出し | `md`（線）・`lg` 以上（見出し） |
 | `AppNavHeader` | ナビの先頭（ロゴ・アプリ名）。**独自ドメイン・ホーム画面で単独で開く管理画面のときだけ**（スーパーアプリの中では FDPocket が名前を出すので重複する）。文字は `hidden lg:inline` に入れる | `md` 以上 |
-| `AppNavFooter` | ナビの下端（今のアカウント・設定への入口） | `md` 以上 |
+| `AppNavFooter` | ナビの下端（今のアカウント・設定への入口）。**大事な操作をここだけに置かない**（PC の下端は目が届きにくい。Apple: macOS では窓の下端に重要な操作を置かない） | `md` 以上 |
 
 ```tsx
 // PC 幅の道具の帯と、本文の下のフッター（要るときだけ）
@@ -98,7 +101,7 @@ const nav = (
 - 行き先は**どの幅でも同じ並び・同じ名前**（幅で項目を増減しない。「その他」に入るのは下のタブだけで、左のナビには全部ある）。今いる場所は `aria-current="page"`（TanStack Router の `Link` が付ける）。
 - ラベルを消してアイコンだけにしない（レールでもラベルを出す）。
 - 権限で見せない行き先は、`client.auth.can()` で **配列から外す**（ナビに出さないのは補助。守りは `$fdpocket-app-admin` の 3 層）。
-- **キーボードが出ても、下に固定した入力欄・主ボタンが見えること**（スマホではキーボードが画面の約半分を覆う）。ひな形の `index.html` は viewport に `interactive-widget=resizes-content` を付けてあり、キーボードの分だけ画面が縮むので、`fixed bottom-0` の帯と `dvh` はキーボードの上に乗る（iOS Safari の既定は縮まないので、この指定を消さない）。フォームの中では、タブバーと同じ場所に主ボタンを固定せず、フォームの最後に置く。チャットのような下固定の入力欄は、入力中は下のタブを隠す（`focus-within` で `AppNav` を消す）。`env(keyboard-inset-*)` は iOS で常に 0 なので頼らない。
+- **キーボードが出ても、下に固定した入力欄・主ボタンが見えること**（スマホではキーボードが画面の約半分を覆う）。ひな形の `index.html` は viewport に `interactive-widget=resizes-content` を付けてあり、キーボードの分だけ画面が縮むので、`fixed bottom-0` の帯と `dvh` はキーボードの上に乗る（iOS Safari の既定は縮まないので、この指定を消さない）。フォームの中では、タブバーと同じ場所に主ボタンを固定せず、フォームの最後に置く。チャットのような下固定の入力欄は、入力中は下のタブを隠す（ひな形の `AppNav` は、スマホ幅で文字の入力欄にフォーカスがある間だけ下のタブを隠す。キーボードの上にタブが乗って入力欄が狭くなるため）。それ以外のときは下のタブを隠さない（Apple: タブバーは常に見えるように保つ。スクロールで隠さない）。`env(keyboard-inset-*)` は iOS で常に 0 なので頼らない。
 - PC 幅で**大事な操作を画面の下端に置かない**（Apple: macOS では窓の下に重要な操作を置かない）。スマホ幅で下に固定した主ボタンは、PC 幅では `PageHeader` の右か、フォームの直下に戻す。
 
 ## 3. 指とマウス（入力の種類は画面の幅から推測しない）
@@ -220,6 +223,8 @@ node <kit>/scripts/kit.mjs shot --out /tmp/fdpocket/shots --path / --widths 320,
   - [ ] どの幅でも主な操作が見えて、押せそう（hover に隠れていない）
   - [ ] `horizontalOverflow` が false（320 でも）、`smallTargets` が空
   - [ ] `bottomNavMissing` が false（スマホ幅で、本文の外の `<nav>` / `role="navigation"` に行き先が 2 つ以上あるのに、画面の下にナビが無いと true になり、notes にも出る）。部品や見た目は問わず位置だけを見る。知らせるだけで、意図した配置なら理由を結果に書いてそのままでよい
+  - [ ] `mainNavAbsent` が false（ナビが 1 つも無いのに、本文に別の画面へのリンクが 2 つ以上あると true。画面を足したのにナビに足し忘れていないか。知らせるだけ）
+  - [ ] 「その他」に入った行き先は、いちばん使われないものだけか（毎日使う画面が隠れていないか）
   - [ ] PC 幅で大事な操作が画面の下端に無い
 - 撮れない環境では、使った接頭辞（`md:` `lg:` `pointer-coarse:`）と部品を根拠に書き、**見られていないことを結果に書く**。
 
@@ -238,4 +243,7 @@ node <kit>/scripts/kit.mjs shot --out /tmp/fdpocket/shots --path / --widths 320,
 - Apple HIG: [Layout（サイズクラス）](https://developer.apple.com/design/human-interface-guidelines/layout) / [Designing for macOS](https://developer.apple.com/design/human-interface-guidelines/designing-for-macos) / [Keyboards](https://developer.apple.com/design/human-interface-guidelines/keyboards) / [Context menus](https://developer.apple.com/design/human-interface-guidelines/context-menus)
 - Microsoft: [Screen sizes and breakpoints](https://learn.microsoft.com/en-us/windows/apps/design/layout/screen-sizes-and-breakpoints-for-responsive-design)
 - web.dev: [Media features（pointer / hover）](https://web.dev/learn/design/media-features) / [Interaction](https://web.dev/learn/design/interaction)
+- Apple HIG（ナビ）: [Tab bars](https://developer.apple.com/design/human-interface-guidelines/tab-bars)（あふれたタブを避ける・常に見せる・バッジは重要な情報だけ）/ [Sidebars](https://developer.apple.com/design/human-interface-guidelines/sidebars)（2 階層まで・節に見出し・既定で隠さない）
+- Android（ナビ）: [Navigation bar](https://developer.android.com/develop/ui/compose/components/navigation-bar)（3〜5 個）/ [Navigation rail](https://developer.android.com/develop/ui/compose/components/navigation-rail)（3〜7 個）/ [Navigation drawer](https://developer.android.com/develop/ui/compose/components/drawer)（節と区切り線）
+- WCAG 2.2（ナビ）: [2.4.1 Bypass Blocks](https://www.w3.org/WAI/WCAG22/Understanding/bypass-blocks.html)（本文へ移動）/ [2.4.11 Focus Not Obscured (Minimum)](https://www.w3.org/WAI/WCAG22/Understanding/focus-not-obscured-minimum.html)（固定のナビにフォーカスが隠れない）
 - WCAG 2.2: [1.4.10 Reflow](https://www.w3.org/WAI/WCAG22/Understanding/reflow.html) / [2.5.8 Target Size](https://www.w3.org/WAI/WCAG22/Understanding/target-size-minimum.html) / [2.1.4 Character Key Shortcuts](https://www.w3.org/WAI/WCAG22/Understanding/character-key-shortcuts.html)

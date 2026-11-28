@@ -51,7 +51,9 @@ function AppNav({ className, ...props }: React.ComponentProps<'nav'>) {
 const ITEM_CLASS = cn(
   'flex min-h-14 min-w-0 flex-1 flex-col items-center justify-center gap-1 px-1 text-xs font-medium text-muted-foreground transition-colors outline-none focus-visible:ring-3 focus-visible:ring-ring/50 aria-[current=page]:font-semibold aria-[current=page]:text-primary [&_svg]:size-5 [&_svg]:shrink-0',
   'md:flex-none md:rounded-xl md:py-2 md:text-center md:hover:bg-muted md:aria-[current=page]:bg-muted',
-  'lg:min-h-11 lg:flex-row lg:justify-start lg:gap-3 lg:px-3 lg:text-left lg:text-sm'
+  'lg:min-h-11 lg:flex-row lg:justify-start lg:gap-3 lg:px-3 lg:text-left lg:text-sm',
+  // マウスの PC は行を詰める（業務アプリのサイドバーの密度。指の端末は 44px 以上のまま）
+  'desk:lg:min-h-9 desk:lg:rounded-lg desk:lg:gap-2.5 desk:lg:[&_svg]:size-4'
 )
 
 /**

@@ -1,17 +1,26 @@
 import { cn } from 'cn'
 import type * as React from 'react'
 
+/**
+ * 面のまとまり。余白は Card 自身が持つ（`CardHeader` / `CardContent` の左右・Card の上下）。
+ * **Card・CardContent に `p-*` を足さない**（余白が二重になる）。詰めたいときは `size="sm"`。
+ *
+ * 一覧（行の並び）は `variant="list"`: 余白なしで行を端まで並べ、行の間に線を引く。中身は `ListRow`。
+ * Card の中に Card を入れない（入れ子の枠は情報の階層を見えにくくする）。
+ */
 function Card({
   className,
   size = 'default',
+  variant = 'default',
   ...props
-}: React.ComponentProps<'div'> & { size?: 'default' | 'sm' }) {
+}: React.ComponentProps<'div'> & { size?: 'default' | 'sm'; variant?: 'default' | 'list' }) {
   return (
     <div
       data-slot="card"
       data-size={size}
+      data-variant={variant}
       className={cn(
-        'group/card flex flex-col gap-(--card-spacing) overflow-hidden rounded-xl bg-card py-(--card-spacing) text-sm text-card-foreground ring-1 ring-foreground/10 [--card-spacing:--spacing(4)] has-data-[slot=card-footer]:pb-0 has-[>img:first-child]:pt-0 data-[size=sm]:[--card-spacing:--spacing(3)] data-[size=sm]:has-data-[slot=card-footer]:pb-0 *:[img:first-child]:rounded-t-xl *:[img:last-child]:rounded-b-xl',
+        'group/card flex flex-col gap-(--card-spacing) overflow-hidden rounded-xl bg-card py-(--card-spacing) text-sm text-card-foreground ring-1 ring-foreground/10 [--card-spacing:--spacing(4)] has-data-[slot=card-footer]:pb-0 has-[>img:first-child]:pt-0 data-[size=sm]:[--card-spacing:--spacing(3)] data-[size=sm]:has-data-[slot=card-footer]:pb-0 *:[img:first-child]:rounded-t-xl *:[img:last-child]:rounded-b-xl data-[variant=list]:gap-0 data-[variant=list]:divide-y data-[variant=list]:py-0',
         className
       )}
       {...props}
